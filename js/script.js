@@ -2,14 +2,15 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// 2. Paste YOUR Firebase Config here
+// 2. YOUR Actual Fit Track Firebase Config
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
+    authDomain: "fit-track-ca8d1.firebaseapp.com",
+    projectId: "fit-track-ca8d1",
+    storageBucket: "fit-track-ca8d1.firebasestorage.app",
+    messagingSenderId: "157593985795",
+    appId: "1:157593985795:web:07156961dda8e2254fbf36",
+    measurementId: "G-NYGGEMMJMC"
 };
 
 // 3. Initialize Firebase
@@ -22,11 +23,8 @@ const db = getFirestore(app);
 
 // --- SECURE LOGOUT LOGIC ---
 window.handleLogout = function() {
-    // Wipe the session data completely from the browser
     localStorage.removeItem("loggedInUser");
     localStorage.removeItem("userRole");
-    
-    // Kick the user back to the login screen without a history trail
     window.location.replace("index.html"); 
 };
 
@@ -99,8 +97,8 @@ let globalEarnings = 0;
 let globalExpenses = 0;
 
 const inventoryCol = collection(db, "inventory");
-const staffCol = collection(db, "staff");
 const paymentsCol = collection(db, "payments");
+const usersCol = collection(db, "users"); // Reads directly from your user accounts
 
 // ==========================================
 // 1. INVENTORY LOGIC (Live Listener)
@@ -210,11 +208,16 @@ document.getElementById('equipmentForm').addEventListener('submit', async (e) =>
 });
 
 // ==========================================
-// 2. STAFF LOGIC (Live Listener)
+// 2. ROLE-BASED STAFF LOGIC (Reading from Users)
 // ==========================================
-onSnapshot(staffCol, (snapshot) => {
+onSnapshot(usersCol, (snapshot) => {
     staffData = [];
-    snapshot.forEach(doc => staffData.push({ id: doc.id, ...doc.data() }));
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        if(data.role !== 'Admin') {
+            staffData.push({ id: doc.id, ...data });
+        }
+    });
     renderStaff();
 });
 
@@ -227,15 +230,17 @@ function renderStaff() {
 
     staffData.forEach(s => {
         let badgeClass = s.status === 'Active' ? 'active' : 'inactive';
+        let displayStatus = s.status || 'Active'; 
+        
         tbody.innerHTML += `<tr>
             <td>${s.name}</td><td>${s.role}</td><td>${s.email}</td>
-            <td><span class="badge ${badgeClass}">${s.status}</span></td>
+            <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
             <td><button class="btn-icon btn-delete" onclick="deleteStaff('${s.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
 
         if(s.role === 'Trainer') {
             totalTrainers++;
-            if(s.status === 'Active') {
+            if(displayStatus === 'Active') {
                 activeTrainers++;
                 trainersFeed += `<div class="list-item">
                     <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
@@ -260,14 +265,25 @@ window.openStaffModal = () => {
     document.getElementById('staffForm').reset();
     document.getElementById('staffModal').style.display = 'flex';
 }
+
 window.deleteStaff = async (id) => {
-    if(confirm("Remove this staff member?")) await deleteDoc(doc(db, "staff", id));
+    if(confirm("Remove this staff member from the system? They will no longer be able to log in.")) {
+        await deleteDoc(doc(db, "users", id));
+    }
 }
+
 document.getElementById('staffForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const newStaff = { name: document.getElementById('staffName').value, role: document.getElementById('staffRole').value, email: document.getElementById('staffEmail').value, status: document.getElementById('staffStatus').value };
-    await addDoc(staffCol, newStaff);
+    const newStaff = { 
+        name: document.getElementById('staffName').value, 
+        role: document.getElementById('staffRole').value, 
+        email: document.getElementById('staffEmail').value, 
+        status: document.getElementById('staffStatus').value,
+        password: "password123" 
+    };
+    await addDoc(usersCol, newStaff);
     window.closeModal('staffModal');
+    alert("New staff added! They can log in immediately using password: password123");
 });
 
 // ==========================================
