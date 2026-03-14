@@ -59,7 +59,7 @@
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View All Staff</li>
+                <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View Staff</li>
                 <li class="sub-item" onclick="switchTab('placeholder', this)"><i class="fa-solid fa-arrow-right"></i> Check In/Out</li>
                 <li class="sub-item" onclick="switchTab('chat', this)"><i class="fa-solid fa-arrow-right"></i> Internal Chat</li>
             </ul>
@@ -69,7 +69,7 @@
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View Trainers</li>
+                <li class="sub-item" onclick="switchTab('trainers', this)"><i class="fa-solid fa-arrow-right"></i> View Trainers</li>
                 <li class="sub-item" onclick="switchTab('placeholder', this)"><i class="fa-solid fa-arrow-right"></i> Check In/Out</li>
                 <li class="sub-item" onclick="switchTab('chat', this)"><i class="fa-solid fa-arrow-right"></i> Internal Chat</li>
             </ul>
@@ -100,7 +100,7 @@
                 <div class="stat-card card-black">
                     <span class="stat-badge" id="dashStaffTotal">0</span>
                     <i class="fa-solid fa-user-tie"></i>
-                    <div class="value">Total Staff</div>
+                    <div class="value">Total Employees</div>
                 </div>
                 <div class="stat-card card-red">
                     <i class="fa-solid fa-money-bill-wave"></i>
@@ -160,24 +160,12 @@
             </div>
         </div>
 
-        <div id="inventory" class="content-section">
+        <div id="inventory" class="content-section">... (Rest of Inventory remains the same) ...
             <div class="summary-bar">
-                <div class="summary-box">
-                    <div class="summary-text"><small>Total Machines</small><span id="statMachines">0</span></div>
-                    <i class="fas fa-dumbbell"></i>
-                </div>
-                <div class="summary-box">
-                    <div class="summary-text"><small>Operational</small><span id="statOperational" style="color: #2ecc71;">0</span></div>
-                    <i class="fas fa-check-circle"></i>
-                </div>
-                <div class="summary-box">
-                    <div class="summary-text"><small>Needs Maint.</small><span id="statMaintenance" style="color: #f1c40f;">0</span></div>
-                    <i class="fas fa-tools"></i>
-                </div>
-                <div class="summary-box">
-                    <div class="summary-text"><small>Low Stock</small><span id="statLowStock" style="color: #e74c3c;">0</span></div>
-                    <i class="fas fa-exclamation-circle"></i>
-                </div>
+                <div class="summary-box"><div class="summary-text"><small>Total Machines</small><span id="statMachines">0</span></div><i class="fas fa-dumbbell"></i></div>
+                <div class="summary-box"><div class="summary-text"><small>Operational</small><span id="statOperational" style="color: #2ecc71;">0</span></div><i class="fas fa-check-circle"></i></div>
+                <div class="summary-box"><div class="summary-text"><small>Needs Maint.</small><span id="statMaintenance" style="color: #f1c40f;">0</span></div><i class="fas fa-tools"></i></div>
+                <div class="summary-box"><div class="summary-text"><small>Low Stock</small><span id="statLowStock" style="color: #e74c3c;">0</span></div><i class="fas fa-exclamation-circle"></i></div>
             </div>
 
             <div class="table-controls">
@@ -259,12 +247,31 @@
                     <i class="fas fa-search"></i>
                     <input type="text" id="staffSearch" placeholder="Search staff..." onkeyup="filterTable('staffTable', 'staffSearch')">
                 </div>
-                <button class="action-btn" onclick="openStaffModal()"><i class="fas fa-plus"></i> Add New Staff</button>
+                <button class="action-btn" onclick="openStaffModal()"><i class="fas fa-plus"></i> Add General Staff</button>
             </div>
             <div class="panel">
-                <div class="panel-header"><i class="fas fa-id-badge"></i> Staff Directory</div>
+                <div class="panel-header"><i class="fas fa-id-badge"></i> Non-Trainer Staff Directory</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="staffTable">
+                        <thead><tr><th>Full Name</th><th>Role</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="trainers" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="trainerSearch" placeholder="Search trainers..." onkeyup="filterTable('trainerTable', 'trainerSearch')">
+                </div>
+                <button class="action-btn" onclick="openStaffModal()"><i class="fas fa-plus"></i> Add New Trainer</button>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-dumbbell"></i> Trainer Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="trainerTable">
                         <thead><tr><th>Full Name</th><th>Role</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
@@ -321,7 +328,7 @@
     <div id="staffModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="staffModalTitle">Add New Staff</h3>
+                <h3 id="staffModalTitle">Add New Account</h3>
                 <span class="close-btn" onclick="closeModal('staffModal')">&times;</span>
             </div>
             <form class="modal-form" id="staffForm">
@@ -337,7 +344,7 @@
                     <option value="Active">Active</option>
                     <option value="On Leave">On Leave</option>
                 </select>
-                <button type="submit" id="staffSubmitBtn">Save Staff</button>
+                <button type="submit" id="staffSubmitBtn">Save Account</button>
             </form>
         </div>
     </div>

@@ -21,7 +21,6 @@ const db = getFirestore(app);
 // GLOBAL EXPORTS FOR HTML ONCLICK BUTTONS
 // ==========================================
 
-// --- SECURE LOGOUT LOGIC ---
 window.handleLogout = function() {
     localStorage.removeItem("loggedInUser");
     localStorage.removeItem("userRole");
@@ -45,7 +44,8 @@ window.switchTab = function(tabId, element) {
         'inventory': 'Inventory Management',
         'payments': 'Sales & Transactions',
         'attendance': 'Member Status Tracking',
-        'staff': 'Staff & Trainer Management',
+        'staff': 'General Staff Management',
+        'trainers': 'Trainer Management', // ADDED NEW TAB TITLE HERE
         'placeholder': 'Under Construction',
         'chat': 'Internal Messenger'
     };
@@ -85,7 +85,7 @@ window.viewTransaction = function(id, name, amount, status) {
 // STATE ARRAYS & GLOBAL CHART VARIABLES
 // ==========================================
 let inventoryData = [];
-let staffData = [];
+let allUsersData = []; // CHANGED FROM staffData
 let paymentsData = [];
 
 let editingInventoryId = null;
@@ -98,7 +98,7 @@ let globalExpenses = 0;
 
 const inventoryCol = collection(db, "inventory");
 const paymentsCol = collection(db, "payments");
-const usersCol = collection(db, "users"); // Reads directly from your user accounts
+const usersCol = collection(db, "users");
 
 // ==========================================
 // 1. INVENTORY LOGIC (Live Listener)
@@ -208,52 +208,62 @@ document.getElementById('equipmentForm').addEventListener('submit', async (e) =>
 });
 
 // ==========================================
-// 2. ROLE-BASED STAFF LOGIC (Reading from Users)
+// 2. USER/STAFF/TRAINER LOGIC (Separated)
 // ==========================================
 onSnapshot(usersCol, (snapshot) => {
-    staffData = [];
+    allUsersData = [];
     snapshot.forEach(doc => {
         const data = doc.data();
         if(data.role !== 'Admin') {
-            staffData.push({ id: doc.id, ...data });
+            allUsersData.push({ id: doc.id, ...data });
         }
     });
-    renderStaff();
+    renderUsers();
 });
 
-function renderStaff() {
-    const tbody = document.querySelector('#staffTable tbody');
-    tbody.innerHTML = "";
+function renderUsers() {
+    const staffTbody = document.querySelector('#staffTable tbody');
+    const trainerTbody = document.querySelector('#trainerTable tbody'); // The new trainer table
+    staffTbody.innerHTML = "";
+    trainerTbody.innerHTML = "";
+    
     let trainersFeed = "";
     let totalTrainers = 0;
     let activeTrainers = 0;
 
-    staffData.forEach(s => {
-        let badgeClass = s.status === 'Active' ? 'active' : 'inactive';
-        let displayStatus = s.status || 'Active'; 
+    allUsersData.forEach(u => {
+        let badgeClass = u.status === 'Active' ? 'active' : 'inactive';
+        let displayStatus = u.status || 'Active'; 
         
-        tbody.innerHTML += `<tr>
-            <td>${s.name}</td><td>${s.role}</td><td>${s.email}</td>
+        // This is the row HTML we will put in EITHER the trainer table OR the staff table
+        const rowHtml = `<tr>
+            <td>${u.name}</td><td>${u.role}</td><td>${u.email}</td>
             <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
-            <td><button class="btn-icon btn-delete" onclick="deleteStaff('${s.id}')"><i class="fas fa-trash"></i></button></td>
+            <td><button class="btn-icon btn-delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
 
-        if(s.role === 'Trainer') {
+        // If they are a Trainer, they go to the Trainer tab
+        if(u.role === 'Trainer') {
+            trainerTbody.innerHTML += rowHtml;
             totalTrainers++;
+            
             if(displayStatus === 'Active') {
                 activeTrainers++;
                 trainersFeed += `<div class="list-item">
                     <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
                     <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <div><div class="trainer-name">${s.name}</div><p style="font-size: 12px; color: var(--text-muted);">${s.email}</p></div>
+                        <div><div class="trainer-name">${u.name}</div><p style="font-size: 12px; color: var(--text-muted);">${u.email}</p></div>
                         <span class="status-badge status-progress">On Floor</span>
                     </div>
                 </div>`;
             }
+        } else {
+            // Otherwise, they are a Receptionist, Cleaner, Manager, etc... they go to Staff tab
+            staffTbody.innerHTML += rowHtml;
         }
     });
 
-    document.getElementById('dashStaffTotal').innerText = staffData.length;
+    document.getElementById('dashStaffTotal').innerText = allUsersData.length;
     document.getElementById('gridTrainers').innerText = totalTrainers;
     document.getElementById('gridActiveTrainers').innerText = activeTrainers;
     
@@ -266,24 +276,24 @@ window.openStaffModal = () => {
     document.getElementById('staffModal').style.display = 'flex';
 }
 
-window.deleteStaff = async (id) => {
-    if(confirm("Remove this staff member from the system? They will no longer be able to log in.")) {
+window.deleteUser = async (id) => {
+    if(confirm("Remove this user from the system? They will no longer be able to log in.")) {
         await deleteDoc(doc(db, "users", id));
     }
 }
 
 document.getElementById('staffForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const newStaff = { 
+    const newUser = { 
         name: document.getElementById('staffName').value, 
         role: document.getElementById('staffRole').value, 
         email: document.getElementById('staffEmail').value, 
         status: document.getElementById('staffStatus').value,
         password: "password123" 
     };
-    await addDoc(usersCol, newStaff);
+    await addDoc(usersCol, newUser);
     window.closeModal('staffModal');
-    alert("New staff added! They can log in immediately using password: password123");
+    alert("New account added! They can log in immediately using password: password123");
 });
 
 // ==========================================
