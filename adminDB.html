@@ -380,51 +380,6 @@
         </div>
     </div>
 
-    <script type="module">
-  // 1. Import the core Firebase tools and the Database tools
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-
-  // 2. Your specific Fit Track configuration keys
-  const firebaseConfig = {
-    apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
-    authDomain: "fit-track-ca8d1.firebaseapp.com",
-    projectId: "fit-track-ca8d1",
-    storageBucket: "fit-track-ca8d1.firebasestorage.app",
-    messagingSenderId: "157593985795",
-    appId: "1:157593985795:web:07156961dda8e2254fbf36",
-    measurementId: "G-NYGGEMMJMC"
-  };
-
-  // 3. Initialize the App and the Database
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // 4. Make the database accessible to your script.js file
-  window.db = db;
-  // --- TEMPORARY FUNCTION TO ADD TRAINERS ---
-  async function addOldTrainers() {
-    const trainersCollection = collection(db, "trainers");
-    
-    const trainersList = [
-      { name: "Trainer One", email: "trainer1@fittrack.com", specialty: "Weightlifting", status: "Active" },
-      { name: "Trainer Two", email: "trainer2@fittrack.com", specialty: "Cardio", status: "Active" },
-      { name: "Trainer Three", email: "trainer3@fittrack.com", specialty: "Yoga", status: "Active" },
-      { name: "Trainer Four", email: "trainer4@fittrack.com", specialty: "Crossfit", status: "Active" }
-    ];
-
-    for (const trainer of trainersList) {
-      await addDoc(trainersCollection, trainer);
-      console.log("Successfully added:", trainer.name);
-    };
-    
-  }
-
-  // To run this function, we attach it to the window so you can click a temporary button, 
-  // or we can just run it immediately by uncommenting the line below:
-  // addOldTrainers();
-</script>
-
     <script type="module" src="js/script.js"></script>
 
 </body>
