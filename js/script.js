@@ -19,6 +19,17 @@ const db = getFirestore(app);
 // ==========================================
 // GLOBAL EXPORTS FOR HTML ONCLICK BUTTONS
 // ==========================================
+
+// --- SECURE LOGOUT LOGIC ---
+window.handleLogout = function() {
+    // Wipe the session data completely from the browser
+    localStorage.removeItem("loggedInUser");
+    localStorage.removeItem("userRole");
+    
+    // Kick the user back to the login screen without a history trail
+    window.location.replace("index.html"); 
+};
+
 window.switchTab = function(tabId, element) {
     if(event) event.stopPropagation();
     document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active-section'));
