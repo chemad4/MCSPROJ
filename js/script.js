@@ -45,7 +45,7 @@ window.switchTab = function(tabId, element) {
         'payments': 'Sales & Transactions',
         'attendance': 'Member Status Tracking',
         'staff': 'General Staff Management',
-        'trainers': 'Trainer Management', // ADDED NEW TAB TITLE HERE
+        'trainers': 'Trainer Management', 
         'placeholder': 'Under Construction',
         'chat': 'Internal Messenger'
     };
@@ -85,7 +85,7 @@ window.viewTransaction = function(id, name, amount, status) {
 // STATE ARRAYS & GLOBAL CHART VARIABLES
 // ==========================================
 let inventoryData = [];
-let allUsersData = []; // CHANGED FROM staffData
+let allUsersData = []; 
 let paymentsData = [];
 
 let editingInventoryId = null;
@@ -223,26 +223,25 @@ onSnapshot(usersCol, (snapshot) => {
 
 function renderUsers() {
     const staffTbody = document.querySelector('#staffTable tbody');
-    const trainerTbody = document.querySelector('#trainerTable tbody'); // The new trainer table
+    const trainerTbody = document.querySelector('#trainerTable tbody'); 
     staffTbody.innerHTML = "";
     trainerTbody.innerHTML = "";
     
     let trainersFeed = "";
     let totalTrainers = 0;
     let activeTrainers = 0;
+    let totalEmployees = 0; // Explicitly count non-trainer staff
 
     allUsersData.forEach(u => {
         let badgeClass = u.status === 'Active' ? 'active' : 'inactive';
         let displayStatus = u.status || 'Active'; 
         
-        // This is the row HTML we will put in EITHER the trainer table OR the staff table
         const rowHtml = `<tr>
             <td>${u.name}</td><td>${u.role}</td><td>${u.email}</td>
             <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
             <td><button class="btn-icon btn-delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
 
-        // If they are a Trainer, they go to the Trainer tab
         if(u.role === 'Trainer') {
             trainerTbody.innerHTML += rowHtml;
             totalTrainers++;
@@ -258,12 +257,14 @@ function renderUsers() {
                 </div>`;
             }
         } else {
-            // Otherwise, they are a Receptionist, Cleaner, Manager, etc... they go to Staff tab
+            // Receptionists, Cleaners, Managers go here and count as Employees
             staffTbody.innerHTML += rowHtml;
+            totalEmployees++; 
         }
     });
 
-    document.getElementById('dashStaffTotal').innerText = allUsersData.length;
+    // Dash Staff Total now only shows non-trainer employees
+    document.getElementById('dashStaffTotal').innerText = totalEmployees;
     document.getElementById('gridTrainers').innerText = totalTrainers;
     document.getElementById('gridActiveTrainers').innerText = activeTrainers;
     
