@@ -8,6 +8,13 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
+    <script>
+        if (localStorage.getItem("loggedInUser") && localStorage.getItem("userRole") === "Admin") {
+            // Replaces the history so they can't click back
+            window.location.replace("adminDB.html"); 
+        }
+    </script>
+
     <style>
         :root {
             --brand-red: #bb131a;     
@@ -20,7 +27,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: #2a2a2a; /* Nice dark dim gray */
+            background-color: #2a2a2a; 
             margin: 0;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
@@ -40,15 +47,14 @@
             position: relative;
         }
 
-        /* --- THE NEW LOGO STYLE --- */
         .logo-header { margin-bottom: 35px; }
         
         .logo-header h3 { 
             color: #fff; 
             font-size: 3.2rem; 
-            font-family: Arial, Helvetica, sans-serif; /* Set to Arial */
+            font-family: Arial, Helvetica, sans-serif; 
             font-weight: bold; 
-            text-transform: uppercase; /* Forces all caps */
+            text-transform: uppercase; 
             letter-spacing: 1px; 
             margin: 0;
             display: flex;
@@ -61,7 +67,6 @@
             font-weight: bold;
         }
 
-        /* Inputs */
         .input-group {
             margin-bottom: 20px !important;
             border-radius: 6px;
@@ -83,7 +88,6 @@
         .password-toggle { cursor: pointer; background-color: rgba(0, 0, 0, 0.5); border: none; color: #888; }
         .password-toggle:hover { color: var(--brand-red); }
 
-        /* Button */
         .btn-brand {
             width: 100%;
             background-color: var(--brand-red);
@@ -160,7 +164,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, query, where, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
@@ -174,22 +178,6 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-
-        // --- TEMPORARY FUNCTION TO ADD ADMIN ---
-        window.setupAdminAccount = async function() {
-            try {
-                const usersRef = collection(db, "users");
-                await addDoc(usersRef, {
-                    name: "System Admin",
-                    email: "admin@gmail.com",
-                    password: "password123",
-                    role: "Admin"
-                });
-                alert("Success! Admin account added to the Firebase 'users' collection.");
-            } catch (error) {
-                console.error("Error adding admin: ", error);
-            }
-        };
 
         window.switchForm = function(view) {
             const loginBox = document.getElementById('loginBox');
@@ -216,7 +204,7 @@
             }
         };
 
-        // --- ROLE-BASED LOGIN LOGIC ---
+        // --- SECURED ROLE-BASED LOGIN LOGIC ---
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault(); 
             const email = document.getElementById('emailInput').value.trim();
@@ -229,12 +217,14 @@
 
                 if (!querySnapshot.empty) {
                     const userData = querySnapshot.docs[0].data(); 
+                    
+                    // Save session data
                     localStorage.setItem("loggedInUser", userData.name);
                     localStorage.setItem("userRole", userData.role);
 
                     if (userData.role === "Admin") {
-                        alert("Login Successful! Welcome, Admin.");
-                        window.location.href = 'adminDB.html'; 
+                        // Use .replace() so they cannot hit the browser back button
+                        window.location.replace('adminDB.html'); 
                     } else {
                         alert("Login Successful! (Redirect for " + userData.role + " coming soon!)");
                     }
