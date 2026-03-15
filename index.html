@@ -9,9 +9,15 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <script>
-        if (localStorage.getItem("loggedInUser") && localStorage.getItem("userRole") === "Admin") {
-            // Replaces the history so they can't click back
-            window.location.replace("adminDB.html"); 
+        const activeUser = localStorage.getItem("loggedInUser");
+        const activeRole = localStorage.getItem("userRole");
+        
+        if (activeUser) {
+            if (activeRole === "Admin") {
+                window.location.replace("adminDB.html"); 
+            } else if (activeRole === "Staff") {
+                window.location.replace("staffDB.html");
+            }
         }
     </script>
 
@@ -222,9 +228,11 @@
                     localStorage.setItem("loggedInUser", userData.name);
                     localStorage.setItem("userRole", userData.role);
 
+                    // UPDATED: Now actively redirects both Admin and Staff
                     if (userData.role === "Admin") {
-                        // Use .replace() so they cannot hit the browser back button
                         window.location.replace('adminDB.html'); 
+                    } else if (userData.role === "Staff") {
+                        window.location.replace('staffDB.html');
                     } else {
                         alert("Login Successful! (Redirect for " + userData.role + " coming soon!)");
                     }
