@@ -40,14 +40,12 @@ window.switchTab = function(tabId, element) {
         if(element.classList.contains('sub-item')) element.parentElement.previousElementSibling.classList.add('active');
     }
     const titles = {
-        'dashboard': 'Admin Dashboard',
+        'dashboard': 'Dashboard',
         'inventory': 'Inventory Management',
         'payments': 'Sales & Transactions',
-        'members': 'Member Management & Status', // Updated title since they are combined
+        'members': 'Member Management & Status', 
         'staff': 'General Staff Management',
-        'trainers': 'Trainer Management', 
-        'placeholder': 'Under Construction',
-        'chat': 'Internal Messenger'
+        'trainers': 'Trainer Management'
     };
     document.getElementById('pageTitle').innerText = titles[tabId] || 'Dashboard';
 }
@@ -65,7 +63,7 @@ window.filterTable = function(tableId, inputId) {
     }
 }
 
-// NEW: Slide Bar filter specifically for Silver/Gold
+// Slide Bar filter specifically for Silver/Gold
 window.filterByPlan = function(val) {
     const tr = document.getElementById('membersTable').getElementsByTagName("tr");
     let filterText = "";
@@ -74,7 +72,6 @@ window.filterByPlan = function(val) {
     if (val === "2") filterText = "GOLD";
 
     for (let i = 1; i < tr.length; i++) {
-        // Membership Plan is the 3rd column (index 2)
         let td = tr[i].getElementsByTagName("td")[2]; 
         if (td) {
             let cellText = (td.textContent || td.innerText).toUpperCase();
@@ -190,8 +187,10 @@ function renderInventory() {
     
     document.getElementById('navInventoryCount').innerText = inventoryData.length;
     document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
-    document.getElementById('gridEquip').innerText = counts.ops;
-    document.getElementById('gridExpenses').innerText = `₱${globalExpenses.toLocaleString()}`;
+    
+    // Safety checks for elements that might only be on certain dashboards
+    if(document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = counts.ops;
+    if(document.getElementById('gridExpenses')) document.getElementById('gridExpenses').innerText = `₱${globalExpenses.toLocaleString()}`;
     
     const dashAlerts = document.getElementById('dashInventoryAlerts');
     if(dashAlerts) dashAlerts.innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
@@ -274,16 +273,15 @@ function renderMembers() {
     });
 
     document.getElementById('dashActiveMembers').innerText = activeMembers;
-    document.getElementById('gridMembers').innerText = membersData.length; 
+    if(document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = membersData.length; 
 }
 
 function renderStaff() {
     const staffTbody = document.querySelector('#staffTable tbody');
     const trainerTbody = document.querySelector('#trainerTable tbody'); 
-    if(!staffTbody || !trainerTbody) return;
     
-    staffTbody.innerHTML = "";
-    trainerTbody.innerHTML = "";
+    if(staffTbody) staffTbody.innerHTML = "";
+    if(trainerTbody) trainerTbody.innerHTML = "";
     
     let trainersFeed = "";
     let totalTrainers = 0;
@@ -304,7 +302,7 @@ function renderStaff() {
         </tr>`;
 
         if(roleStr === 'trainer') {
-            trainerTbody.innerHTML += rowHtml;
+            if(trainerTbody) trainerTbody.innerHTML += rowHtml;
             totalTrainers++;
             
             if(statusStr === 'active') {
@@ -318,70 +316,67 @@ function renderStaff() {
                 </div>`;
             }
         } else {
-            staffTbody.innerHTML += rowHtml;
+            if(staffTbody) staffTbody.innerHTML += rowHtml;
             totalEmployees++; 
         }
     });
 
-    document.getElementById('dashStaffTotal').innerText = totalEmployees;
-    document.getElementById('gridTrainers').innerText = totalTrainers;
-    document.getElementById('gridActiveTrainers').innerText = activeTrainers;
+    if(document.getElementById('dashStaffTotal')) document.getElementById('dashStaffTotal').innerText = totalEmployees;
+    if(document.getElementById('gridTrainers')) document.getElementById('gridTrainers').innerText = totalTrainers;
+    if(document.getElementById('gridActiveTrainers')) document.getElementById('gridActiveTrainers').innerText = activeTrainers;
     
     const dashTrainers = document.getElementById('dashActiveTrainersFeed');
     if(dashTrainers) dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
 }
 
-// Open Modals
-
-// Modified: Accepts 'Staff' or 'Trainer' to automatically populate the role silently
+// Modals
+window.openMemberModal = () => {
+    document.getElementById('memberForm').reset();
+    document.getElementById('memberModal').style.display = 'flex';
+}
 window.openStaffModal = (role) => {
     document.getElementById('staffForm').reset();
     document.getElementById('hiddenStaffRole').value = role;
     document.getElementById('staffModalTitle').innerText = `Add New ${role}`;
     document.getElementById('staffModal').style.display = 'flex';
 }
-
-window.openMemberModal = () => {
-    document.getElementById('memberForm').reset();
-    document.getElementById('memberModal').style.display = 'flex';
-}
-
 window.deleteUser = async (id) => {
     if(confirm("Remove this user account from the system? They will no longer be able to log in.")) {
         await deleteDoc(doc(db, "users", id));
     }
 }
 
-// Add Member Form Submit
-document.getElementById('memberForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const newMember = { 
-        name: document.getElementById('memberName').value, 
-        role: "Member", 
-        email: document.getElementById('memberEmail').value, 
-        status: document.getElementById('memberStatus').value,
-        plan: document.getElementById('memberPlan').value,
-        password: "password123" 
-    };
-    await addDoc(usersCol, newMember);
-    window.closeModal('memberModal');
-    alert("New member added! They can log in immediately using password: password123");
-});
-
-// Add Staff/Trainer Form Submit
-document.getElementById('staffForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const newUser = { 
-        name: document.getElementById('staffName').value, 
-        role: document.getElementById('hiddenStaffRole').value, // Takes the role silently 
-        email: document.getElementById('staffEmail').value, 
-        status: document.getElementById('staffStatus').value,
-        password: "password123" 
-    };
-    await addDoc(usersCol, newUser);
-    window.closeModal('staffModal');
-    alert("New account added! They can log in immediately using password: password123");
-});
+if(document.getElementById('memberForm')) {
+    document.getElementById('memberForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newMember = { 
+            name: document.getElementById('memberName').value, 
+            role: "Member", 
+            email: document.getElementById('memberEmail').value, 
+            status: document.getElementById('memberStatus').value,
+            plan: document.getElementById('memberPlan').value,
+            password: "password123" 
+        };
+        await addDoc(usersCol, newMember);
+        window.closeModal('memberModal');
+        alert("New member added! They can log in immediately using password: password123");
+    });
+}
+if(document.getElementById('staffForm')) {
+    document.getElementById('staffForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newUser = { 
+            name: document.getElementById('staffName').value, 
+            role: document.getElementById('hiddenStaffRole').value, // Takes the role silently 
+            email: document.getElementById('staffEmail').value, 
+            status: document.getElementById('staffStatus').value,
+            password: "password123" 
+        };
+        await addDoc(usersCol, newUser);
+        window.closeModal('staffModal');
+        alert("New account added! They can log in immediately using password: password123");
+    });
+}
 
 // ==========================================
 // 3. PAYMENTS & RECEIPT LOGIC
@@ -432,7 +427,7 @@ function renderPayments() {
     });
 
     document.getElementById('dashTotalEarnings').innerText = `Total Earnings: ₱${globalEarnings.toLocaleString()}`;
-    document.getElementById('presentMembers').innerText = walkinCount; 
+    if(document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = walkinCount; 
 
     if(servicesChartInstance) {
         servicesChartInstance.data.datasets[0].data = [goldSales, silverSales, walkinCount, productSales];
@@ -451,27 +446,35 @@ window.openAddPaymentModal = () => {
 window.deletePayment = async (id) => {
     if(confirm("Delete this transaction record?")) await deleteDoc(doc(db, "payments", id));
 }
-document.getElementById('paymentForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    
-    const newPay = {
-        name: document.getElementById('payName').value,
-        type: document.getElementById('payType').value,
-        amount: Number(document.getElementById('payAmount').value),
-        status: document.getElementById('payStatus').value,
-        date: dateStr,
-        timeIn: timeStr
-    };
-    await addDoc(paymentsCol, newPay);
-    window.closeModal('paymentModal');
-});
+
+if(document.getElementById('paymentForm')) {
+    document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        
+        const newPay = {
+            name: document.getElementById('payName').value,
+            type: document.getElementById('payType').value,
+            amount: Number(document.getElementById('payAmount').value),
+            status: document.getElementById('payStatus').value,
+            date: dateStr,
+            timeIn: timeStr
+        };
+        await addDoc(paymentsCol, newPay);
+        window.closeModal('paymentModal');
+    });
+}
 
 // ==========================================
 // UI INITIALIZATION & CHART CREATION
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
+    const topBarName = document.getElementById('topBarName');
+    if(topBarName) {
+        topBarName.innerText = "Welcome, " + (localStorage.getItem("loggedInUser") || "User");
+    }
+
     initDashboardCharts();
     
     const submenuToggles = document.querySelectorAll('.has-submenu');
@@ -495,8 +498,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initDashboardCharts() {
-    const ctxServices = document.getElementById('servicesChart').getContext('2d');
-    servicesChartInstance = new Chart(ctxServices, {
+    const ctxServices = document.getElementById('servicesChart');
+    if (!ctxServices) return;
+
+    servicesChartInstance = new Chart(ctxServices.getContext('2d'), {
         type: 'bar',
         data: { 
             labels: ['Gold Plan', 'Silver Plan', 'Walk-ins', 'Products'], 
@@ -509,8 +514,10 @@ function initDashboardCharts() {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } } } }
     });
 
-    const ctxEarnings = document.getElementById('earningsChart').getContext('2d');
-    earningsChartInstance = new Chart(ctxEarnings, {
+    const ctxEarnings = document.getElementById('earningsChart');
+    if (!ctxEarnings) return;
+
+    earningsChartInstance = new Chart(ctxEarnings.getContext('2d'), {
         type: 'bar',
         data: {
             labels: ['Earnings', 'Expenses'],

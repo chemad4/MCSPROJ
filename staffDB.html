@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fit Track - Staff Dashboard</title>
+    
+    <script>
+        if (!localStorage.getItem("loggedInUser") || localStorage.getItem("userRole") !== "Staff") {
+            window.location.replace("index.html"); 
+        }
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="logo-area">
+            FIT <span>TRACK</span>
+        </div>
+
+        <ul class="nav-menu" id="navMenu">
+            <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)">
+                <i class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span>
+            </li>
+            
+            <li class="nav-item nav-clickable" onclick="switchTab('members', this)">
+                <i class="fa-solid fa-address-card"></i> <span class="menu-text">Manage Members</span>
+            </li>
+
+            <li class="nav-item has-submenu">
+                <i class="fa-solid fa-boxes-stacked"></i> <span class="menu-text">Gym Inventory</span>
+                <span class="badge-nav" style="background-color: #555;" id="navInventoryCount">0</span>
+                <i class="fa-solid fa-chevron-down chevron-icon"></i>
+            </li>
+            <ul class="submenu">
+                <li class="sub-item" onclick="switchTab('inventory', this)"><i class="fa-solid fa-arrow-right"></i> View Tables</li>
+                <li class="sub-item" onclick="switchTab('inventory', this); openAddEquipmentModal();"><i class="fa-solid fa-arrow-right"></i> Add Equipment</li>
+                <li class="sub-item" onclick="switchTab('inventory', this); exportInventoryReport();"><i class="fa-solid fa-arrow-right"></i> Generate Report</li>
+            </ul>
+            
+            <li class="nav-item has-submenu">
+                <i class="fa-solid fa-chart-line"></i> <span class="menu-text">Sales Report</span>
+                <i class="fa-solid fa-chevron-down chevron-icon"></i>
+            </li>
+            <ul class="submenu">
+                <li class="sub-item" onclick="switchTab('payments', this)"><i class="fa-solid fa-arrow-right"></i> View Transactions</li>
+                <li class="sub-item" onclick="switchTab('payments', this); openAddPaymentModal();"><i class="fa-solid fa-arrow-right"></i> Log Sale</li>
+                <li class="sub-item" onclick="switchTab('payments', this); exportReport();"><i class="fa-solid fa-arrow-right"></i> Generate Report</li>
+            </ul>
+            
+            </ul>
+    </aside>
+
+    <main class="main-content">
+        <header class="topbar">
+            <div class="topbar-left">
+                <span id="pageTitle" style="font-weight: 500; color: var(--dark-black); font-size: 16px;">Staff Dashboard</span>
+            </div>
+            <div class="topbar-left" style="margin-left: auto; margin-right: 20px;">
+                <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
+            </div>
+            <div class="topbar-right">
+                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> <span id="topBarName">Welcome</span> <i class="fa-solid fa-caret-down"></i></button>
+                <button id="logoutBtn" onclick="handleLogout()"><i class="fa-solid fa-power-off"></i> Logout</button>
+            </div>
+        </header>
+
+        <div id="dashboard" class="content-section active-section">
+            <div class="stat-cards">
+                <div class="stat-card card-red">
+                    <span class="stat-badge" id="dashActiveMembers">0</span>
+                    <i class="fa-solid fa-user-check"></i>
+                    <div class="value">Active Members</div>
+                </div>
+                <div class="stat-card card-black">
+                    <i class="fa-solid fa-clock"></i>
+                    <div class="value">Shift Started</div>
+                </div>
+                <div class="stat-card card-red">
+                    <i class="fa-solid fa-money-bill-wave"></i>
+                    <div class="value" id="dashTotalEarnings">Total Earnings: ₱0</div>
+                </div>
+                <div class="stat-card card-black">
+                    <span class="stat-badge" id="dashInventoryTotal">0</span>
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <div class="value">Inventory Items</div>
+                </div>
+            </div>
+
+            <div class="middle-section">
+                <div class="panel" style="margin-bottom: 0;">
+                    <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Sales / Services Breakdown</div>
+                    <div class="panel-body">
+                        <div class="chart-container">
+                            <canvas id="servicesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel" style="background: none; border: none; box-shadow: none; margin-bottom: 0; padding: 0;">
+                    <div class="grid-stats">
+                        <div class="grid-stat-box border-black"><div class="num" id="gridMembers">0</div><div class="label">Total Members</div></div>
+                        <div class="grid-stat-box border-red"><div class="num" id="presentMembers">0</div><div class="label">Walk-ins Today</div></div>
+                        <div class="grid-stat-box border-red"><div class="num" id="gridEquip">0</div><div class="label">Available Equipments</div></div>
+                        <div class="grid-stat-box border-black"><div class="num" id="gridExpenses">₱0</div><div class="label">Total Expenses</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><i class="fa-solid fa-chart-bar"></i> Earnings & Expenses Reports</div>
+                <div class="panel-body">
+                    <div class="chart-container-horizontal">
+                        <canvas id="earningsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bottom-section">
+                <div class="panel">
+                    <div class="panel-header"><i class="fa-solid fa-clipboard-list"></i> Inventory Alerts</div>
+                    <div class="panel-body" id="dashInventoryAlerts">
+                        <p style="color: var(--text-muted); font-size: 14px;">Loading alerts...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="members" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="memberSearch" placeholder="Search members..." onkeyup="filterTable('membersTable', 'memberSearch')">
+                </div>
+                <div style="display: flex; gap: 15px;">
+                    <div class="filter-slider" style="display: flex; align-items: center; background: var(--white); padding: 5px 15px; border-radius: 5px; border: 1px solid var(--border-color);">
+                        <span style="font-weight: 500; font-size: 14px; margin-right: 10px; color: #333;">Plan:</span>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <input type="range" id="planSlideBar" min="0" max="2" value="0" step="1" oninput="filterByPlan(this.value)" style="width: 100px; cursor: pointer; accent-color: var(--primary-red);">
+                            <div style="display: flex; justify-content: space-between; width: 100px; font-size: 10px; color: #666; margin-top: 2px;">
+                                <span>All</span><span>Silver</span><span>Gold</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-plus"></i> Add Member</button>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-address-card"></i> Member Accounts Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="membersTable">
+                        <thead><tr><th>Full Name</th><th>Email</th><th>Membership Plan</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-list-alt"></i> Live Member Attendance Log (Status)</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="attendanceTable">
+                        <thead><tr><th>Guest Name</th><th>Date</th><th>Time In</th><th>Type</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="inventory" class="content-section">
+            <div class="summary-bar">
+                <div class="summary-box"><div class="summary-text"><small>Total Machines</small><span id="statMachines">0</span></div><i class="fas fa-dumbbell"></i></div>
+                <div class="summary-box"><div class="summary-text"><small>Operational</small><span id="statOperational" style="color: #2ecc71;">0</span></div><i class="fas fa-check-circle"></i></div>
+                <div class="summary-box"><div class="summary-text"><small>Needs Maint.</small><span id="statMaintenance" style="color: #f1c40f;">0</span></div><i class="fas fa-tools"></i></div>
+                <div class="summary-box"><div class="summary-text"><small>Low Stock</small><span id="statLowStock" style="color: #e74c3c;">0</span></div><i class="fas fa-exclamation-circle"></i></div>
+            </div>
+
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="inventorySearch" placeholder="Search all items..." onkeyup="filterInventory()">
+                </div>
+                <button class="action-btn" onclick="openAddEquipmentModal()"><i class="fas fa-plus"></i> Add Item</button>
+            </div>
+
+            <div class="panel" style="border-left: 5px solid var(--primary-red);">
+                <div class="panel-header" style="color: var(--primary-red);"><i class="fas fa-exclamation-triangle"></i> Needs Attention (Maintenance & Low Stock)</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="attentionTable">
+                        <thead><tr><th>Item Name</th><th>Category</th><th>Issue / Status</th><th>Quick Action</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-dumbbell"></i> Gym Machines & Equipment</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="machinesTable">
+                        <thead><tr><th>Item Name</th><th>Category</th><th>Quantity</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-wine-bottle"></i> Product Inventory (Supplements & Beverages)</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="productsTable">
+                        <thead><tr><th>Product Name</th><th>Category</th><th>Stock Level</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="payments" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="paymentSearch" placeholder="Search transaction..." onkeyup="filterTable('paymentTable', 'paymentSearch')">
+                </div>
+                <div>
+                    <button class="action-btn" onclick="openAddPaymentModal()" style="display:inline-flex; margin-right:10px;"><i class="fas fa-plus"></i> Log Sale</button>
+                    <button class="action-btn" onclick="exportReport()" style="display:inline-flex; background: var(--dark-black);"><i class="fas fa-file-export"></i> Export</button>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-money-check-alt"></i> Transaction History (Receipts)</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="paymentTable">
+                        <thead><tr><th>Customer Name</th><th>Type</th><th>Date</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <div id="equipmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="equipModalTitle">Add Inventory Item</h3>
+                <span class="close-btn" onclick="closeModal('equipmentModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="equipmentForm">
+                <input type="text" id="equipName" placeholder="Item Name" required>
+                <select id="equipCategory">
+                    <option value="Cardio">Cardio Equipment</option>
+                    <option value="Strength">Strength Equipment</option>
+                    <option value="Machines">Machines</option>
+                    <option value="Supplements">Supplements (Protein/Creatine)</option>
+                    <option value="Beverages">Beverages (Water/Energy)</option>
+                    <option value="Accessories">Accessories</option>
+                </select>
+                <input type="number" id="equipQty" placeholder="Quantity / Stock Level" required>
+                <select id="equipStatus">
+                    <option value="Operational">Operational / In Stock</option>
+                    <option value="Low Stock">Low Stock</option>
+                    <option value="Maintenance">Under Maintenance</option>
+                    <option value="Out of Order">Out of Order</option>
+                </select>
+                <button type="submit" id="equipSubmitBtn">Save Item</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="memberModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="memberModalTitle">Add New Member</h3>
+                <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="memberForm">
+                <input type="text" id="memberName" placeholder="Full Name" required>
+                <input type="email" id="memberEmail" placeholder="Email Address" required>
+                <select id="memberPlan">
+                    <option value="Gold Plan">Gold Plan</option>
+                    <option value="Silver Plan">Silver Plan</option>
+                    <option value="Walk-in">Walk-in</option>
+                </select>
+                <select id="memberStatus">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                </select>
+                <button type="submit">Save Member</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Log New Transaction</h3>
+                <span class="close-btn" onclick="closeModal('paymentModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="paymentForm">
+                <input type="text" id="payName" placeholder="Customer / Guest Name" required>
+                <select id="payType">
+                    <option value="Walk-in Fee">Walk-in Fee (₱150)</option>
+                    <option value="Membership (Gold)">Membership - Gold (₱2500)</option>
+                    <option value="Membership (Silver)">Membership - Silver (₱1500)</option>
+                    <option value="Product Purchase">Product / Supplement</option>
+                </select>
+                <input type="number" id="payAmount" placeholder="Amount (₱)" required>
+                <select id="payStatus">
+                    <option value="Paid">Paid</option>
+                    <option value="Pending">Pending</option>
+                </select>
+                <button type="submit">Save Transaction</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="transactionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Transaction Details</h3>
+                <span class="close-btn" onclick="closeModal('transactionModal')">&times;</span>
+            </div>
+            <div id="transactionDetails" style="line-height: 1.8; color: #333;"></div>
+            <button class="action-btn" style="width: 100%; margin-top: 20px;" onclick="closeModal('transactionModal')">Close</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
+            authDomain: "fit-track-ca8d1.firebaseapp.com",
+            projectId: "fit-track-ca8d1",
+            storageBucket: "fit-track-ca8d1.firebasestorage.app",
+            messagingSenderId: "157593985795",
+            appId: "1:157593985795:web:07156961dda8e2254fbf36",
+            measurementId: "G-NYGGEMMJMC"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+    </script>
+    <script type="module" src="js/script.js"></script>
+
+</body>
+</html>
