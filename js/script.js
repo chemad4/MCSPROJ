@@ -43,7 +43,7 @@ window.switchTab = function(tabId, element) {
         'dashboard': 'Admin Dashboard',
         'inventory': 'Inventory Management',
         'payments': 'Sales & Transactions',
-        'attendance': 'Member Status Tracking',
+        'members': 'Member Management', // UPDATED TITLE
         'staff': 'General Staff Management',
         'trainers': 'Trainer Management', 
         'placeholder': 'Under Construction',
@@ -76,20 +76,15 @@ window.filterInventory = function() {
     });
 }
 
-window.viewTransaction = function(id, name, amount, status) {
-    document.getElementById('transactionDetails').innerHTML = `<p><strong>Transaction ID:</strong> ${id}</p><p><strong>Customer:</strong> ${name}</p><p><strong>Amount:</strong> ${amount}</p><p><strong>Status:</strong> ${status}</p>`;
-    document.getElementById('transactionModal').style.display = 'flex';
-}
-
 // ==========================================
 // STATE ARRAYS & GLOBAL CHART VARIABLES
 // ==========================================
 let inventoryData = [];
 let allUsersData = []; 
+let membersData = []; // NEW ARRAY FOR MEMBERS
 let paymentsData = [];
 
 let editingInventoryId = null;
-
 let servicesChartInstance = null;
 let earningsChartInstance = null;
 
@@ -208,20 +203,53 @@ document.getElementById('equipmentForm').addEventListener('submit', async (e) =>
 });
 
 // ==========================================
-// 2. USER/STAFF/TRAINER LOGIC (Separated)
+// 2. MASTER DIRECTORY LOGIC (Members & Staff)
 // ==========================================
 onSnapshot(usersCol, (snapshot) => {
     allUsersData = [];
+    membersData = [];
+    
     snapshot.forEach(doc => {
         const data = doc.data();
-        if(data.role !== 'Admin') {
+        if(data.role === 'Member') {
+            membersData.push({ id: doc.id, ...data });
+        } else if(data.role !== 'Admin') {
             allUsersData.push({ id: doc.id, ...data });
         }
     });
-    renderUsers();
+    
+    renderStaff();
+    renderMembers(); // Automatically update the members table and stats!
 });
 
-function renderUsers() {
+function renderMembers() {
+    const memTbody = document.querySelector('#membersTable tbody');
+    if(memTbody) memTbody.innerHTML = "";
+    
+    let activeMembers = 0;
+
+    membersData.forEach(m => {
+        let badgeClass = m.status === 'Active' ? 'active' : 'inactive';
+        let displayStatus = m.status || 'Active'; 
+        let plan = m.plan || 'Standard Member'; // In Firebase, you can add a 'plan' field to members
+        
+        if (memTbody) {
+            memTbody.innerHTML += `<tr>
+                <td>${m.name}</td><td>${m.email}</td><td><strong>${plan}</strong></td>
+                <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
+                <td><button class="btn-icon btn-delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button></td>
+            </tr>`;
+        }
+
+        if(displayStatus === 'Active') activeMembers++;
+    });
+
+    // UPDATE DASHBOARD STATS DIRECTLY FROM USERS DATABASE
+    document.getElementById('dashActiveMembers').innerText = activeMembers;
+    document.getElementById('gridMembers').innerText = membersData.length; // Total registered members
+}
+
+function renderStaff() {
     const staffTbody = document.querySelector('#staffTable tbody');
     const trainerTbody = document.querySelector('#trainerTable tbody'); 
     staffTbody.innerHTML = "";
@@ -230,7 +258,7 @@ function renderUsers() {
     let trainersFeed = "";
     let totalTrainers = 0;
     let activeTrainers = 0;
-    let totalEmployees = 0; // Explicitly count non-trainer staff
+    let totalEmployees = 0; 
 
     allUsersData.forEach(u => {
         let badgeClass = u.status === 'Active' ? 'active' : 'inactive';
@@ -257,13 +285,11 @@ function renderUsers() {
                 </div>`;
             }
         } else {
-            // Receptionists, Cleaners, Managers go here and count as Employees
             staffTbody.innerHTML += rowHtml;
             totalEmployees++; 
         }
     });
 
-    // Dash Staff Total now only shows non-trainer employees
     document.getElementById('dashStaffTotal').innerText = totalEmployees;
     document.getElementById('gridTrainers').innerText = totalTrainers;
     document.getElementById('gridActiveTrainers').innerText = activeTrainers;
@@ -278,7 +304,7 @@ window.openStaffModal = () => {
 }
 
 window.deleteUser = async (id) => {
-    if(confirm("Remove this user from the system? They will no longer be able to log in.")) {
+    if(confirm("Remove this user account from the system? They will no longer be able to log in.")) {
         await deleteDoc(doc(db, "users", id));
     }
 }
@@ -298,23 +324,22 @@ document.getElementById('staffForm').addEventListener('submit', async (e) => {
 });
 
 // ==========================================
-// 3. PAYMENTS & ATTENDANCE LOGIC (Live Listener)
+// 3. PAYMENTS & RECEIPT LOGIC
 // ==========================================
 onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
     snapshot.forEach(doc => paymentsData.push({ id: doc.id, ...doc.data() }));
-    renderPaymentsAndAttendance();
+    renderPayments();
 });
 
-function renderPaymentsAndAttendance() {
+function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
-    const attTbody = document.querySelector('#attendanceTable tbody');
+    if(!payTbody) return;
     payTbody.innerHTML = "";
-    attTbody.innerHTML = "";
     
     globalEarnings = 0;
-    let activeMembersCount = 0;
-    let goldCount = 0, silverCount = 0, walkinCount = 0, productsCount = 0;
+    let walkinCount = 0;
+    let goldSales = 0, silverSales = 0, productSales = 0;
 
     paymentsData.forEach(t => {
         let badge = t.status === 'Pending' ? 'pending' : 'paid';
@@ -326,26 +351,20 @@ function renderPaymentsAndAttendance() {
 
         if(t.status === 'Paid') {
             globalEarnings += Number(t.amount);
-            if(t.type.includes('Gold')) { goldCount++; activeMembersCount++; }
-            else if(t.type.includes('Silver')) { silverCount++; activeMembersCount++; }
+            if(t.type.includes('Gold')) { goldSales++; }
+            else if(t.type.includes('Silver')) { silverSales++; }
             else if(t.type.includes('Walk-in')) { walkinCount++; }
-            else { productsCount++; }
+            else { productSales++; }
         }
-
-        let attBadge = t.type.includes('Gold') ? 'gold' : t.type.includes('Silver') ? 'silver' : 'active';
-        attTbody.innerHTML += `<tr>
-            <td>${t.name}</td><td>${t.date}</td><td>${t.timeIn || '8:00 AM'}</td>
-            <td><span class="badge ${attBadge}">${t.type}</span></td>
-            <td><button class="btn-icon btn-delete" onclick="deletePayment('${t.id}')"><i class="fas fa-trash"></i></button></td>
-        </tr>`;
     });
 
     document.getElementById('dashTotalEarnings').innerText = `Total Earnings: ₱${globalEarnings.toLocaleString()}`;
-    document.getElementById('dashActiveMembers').innerText = activeMembersCount;
-    document.getElementById('gridMembers').innerText = activeMembersCount;
+    
+    // Using walkinCount for the present members stat as a placeholder for attendance
+    document.getElementById('presentMembers').innerText = walkinCount; 
 
     if(servicesChartInstance) {
-        servicesChartInstance.data.datasets[0].data = [goldCount, silverCount, walkinCount, productsCount];
+        servicesChartInstance.data.datasets[0].data = [goldSales, silverSales, walkinCount, productSales];
         servicesChartInstance.update();
     }
     if(earningsChartInstance) {
@@ -359,7 +378,7 @@ window.openAddPaymentModal = () => {
     document.getElementById('paymentModal').style.display = 'flex';
 }
 window.deletePayment = async (id) => {
-    if(confirm("Delete this record from the database?")) await deleteDoc(doc(db, "payments", id));
+    if(confirm("Delete this transaction record?")) await deleteDoc(doc(db, "payments", id));
 }
 document.getElementById('paymentForm').addEventListener('submit', async (e) => {
     e.preventDefault();

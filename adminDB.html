@@ -29,8 +29,8 @@
                 <i class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span>
             </li>
             
-            <li class="nav-item nav-clickable" onclick="switchTab('attendance', this)">
-                <i class="fa-solid fa-eye"></i> <span class="menu-text">Member's Status</span>
+            <li class="nav-item nav-clickable" onclick="switchTab('members', this)">
+                <i class="fa-solid fa-address-card"></i> <span class="menu-text">Manage Members</span>
             </li>
 
             <li class="nav-item has-submenu">
@@ -59,7 +59,7 @@
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View Staff</li>
+                <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View All Staff</li>
                 <li class="sub-item" onclick="switchTab('placeholder', this)"><i class="fa-solid fa-arrow-right"></i> Check In/Out</li>
                 <li class="sub-item" onclick="switchTab('chat', this)"><i class="fa-solid fa-arrow-right"></i> Internal Chat</li>
             </ul>
@@ -130,7 +130,7 @@
                         <div class="grid-stat-box border-red"><div class="num" id="gridEquip">0</div><div class="label">Available Equipments</div></div>
                         <div class="grid-stat-box border-black"><div class="num" id="gridExpenses">₱0</div><div class="label">Total Expenses</div></div>
                         <div class="grid-stat-box border-black"><div class="num" id="gridActiveTrainers">0</div><div class="label">Active Trainers</div></div>
-                        <div class="grid-stat-box border-red"><div class="num" id="presentMembers">0</div><div class="label">Present Members</div></div>
+                        <div class="grid-stat-box border-red"><div class="num" id="presentMembers">0</div><div class="label">Walk-ins Today</div></div>
                     </div>
                 </div>
             </div>
@@ -160,7 +160,26 @@
             </div>
         </div>
 
-        <div id="inventory" class="content-section">... (Rest of Inventory remains the same) ...
+        <div id="members" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="memberSearch" placeholder="Search members..." onkeyup="filterTable('membersTable', 'memberSearch')">
+                </div>
+                <button class="action-btn" onclick="alert('Please add new Member accounts directly in the Firebase Users collection.')"><i class="fas fa-plus"></i> Add Member</button>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-address-card"></i> Member Accounts Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="membersTable">
+                        <thead><tr><th>Full Name</th><th>Email</th><th>Membership Plan</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="inventory" class="content-section">
             <div class="summary-bar">
                 <div class="summary-box"><div class="summary-text"><small>Total Machines</small><span id="statMachines">0</span></div><i class="fas fa-dumbbell"></i></div>
                 <div class="summary-box"><div class="summary-text"><small>Operational</small><span id="statOperational" style="color: #2ecc71;">0</span></div><i class="fas fa-check-circle"></i></div>
@@ -219,22 +238,10 @@
                 </div>
             </div>
             <div class="panel">
-                <div class="panel-header"><i class="fas fa-money-check-alt"></i> Live Transactions</div>
+                <div class="panel-header"><i class="fas fa-money-check-alt"></i> Transaction History (Receipts)</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="paymentTable">
                         <thead><tr><th>Customer Name</th><th>Type</th><th>Date</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="attendance" class="content-section">
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-list-alt"></i> Live Member Attendance Log</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="attendanceTable">
-                        <thead><tr><th>Guest Name</th><th>Date</th><th>Time In</th><th>Type</th><th>Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
