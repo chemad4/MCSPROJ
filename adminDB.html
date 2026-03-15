@@ -21,7 +21,7 @@
 
     <aside class="sidebar">
         <div class="logo-area">
-            <i class="fa-solid fa-dumbbell"></i> FIT <span>TRACK</span>
+            FIT <span>TRACK</span>
         </div>
 
         <ul class="nav-menu" id="navMenu">
@@ -31,10 +31,6 @@
             
             <li class="nav-item nav-clickable" onclick="switchTab('members', this)">
                 <i class="fa-solid fa-address-card"></i> <span class="menu-text">Manage Members</span>
-            </li>
-
-            <li class="nav-item nav-clickable" onclick="switchTab('attendance', this)">
-                <i class="fa-solid fa-eye"></i> <span class="menu-text">Member's Status</span>
             </li>
 
             <li class="nav-item has-submenu">
@@ -170,13 +166,35 @@
                     <i class="fas fa-search"></i>
                     <input type="text" id="memberSearch" placeholder="Search members..." onkeyup="filterTable('membersTable', 'memberSearch')">
                 </div>
-                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-plus"></i> Add Member</button>
+                <div style="display: flex; gap: 15px;">
+                    <div class="filter-slider" style="display: flex; align-items: center; background: var(--white); padding: 5px 15px; border-radius: 5px; border: 1px solid var(--border-color);">
+                        <span style="font-weight: 500; font-size: 14px; margin-right: 10px; color: #333;">Plan:</span>
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <input type="range" id="planSlideBar" min="0" max="2" value="0" step="1" oninput="filterByPlan(this.value)" style="width: 100px; cursor: pointer; accent-color: var(--primary-red);">
+                            <div style="display: flex; justify-content: space-between; width: 100px; font-size: 10px; color: #666; margin-top: 2px;">
+                                <span>All</span><span>Silver</span><span>Gold</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-plus"></i> Add Member</button>
+                </div>
             </div>
+            
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-address-card"></i> Member Accounts Directory</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="membersTable">
                         <thead><tr><th>Full Name</th><th>Email</th><th>Membership Plan</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-list-alt"></i> Live Member Attendance Log (Status)</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="attendanceTable">
+                        <thead><tr><th>Guest Name</th><th>Date</th><th>Time In</th><th>Type</th><th>Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -252,25 +270,13 @@
             </div>
         </div>
 
-        <div id="attendance" class="content-section">
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-list-alt"></i> Live Member Attendance Log</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="attendanceTable">
-                        <thead><tr><th>Guest Name</th><th>Date</th><th>Time In</th><th>Type</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
         <div id="staff" class="content-section">
             <div class="table-controls">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="staffSearch" placeholder="Search staff..." onkeyup="filterTable('staffTable', 'staffSearch')">
                 </div>
-                <button class="action-btn" onclick="openStaffModal()"><i class="fas fa-plus"></i> Add Staff Account</button>
+                <button class="action-btn" onclick="openStaffModal('Staff')"><i class="fas fa-plus"></i> Add General Staff</button>
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-id-badge"></i> Non-Trainer Staff Directory</div>
@@ -289,7 +295,7 @@
                     <i class="fas fa-search"></i>
                     <input type="text" id="trainerSearch" placeholder="Search trainers..." onkeyup="filterTable('trainerTable', 'trainerSearch')">
                 </div>
-                <button class="action-btn" onclick="openStaffModal()"><i class="fas fa-plus"></i> Add Trainer Account</button>
+                <button class="action-btn" onclick="openStaffModal('Trainer')"><i class="fas fa-plus"></i> Add New Trainer</button>
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-dumbbell"></i> Trainer Directory</div>
@@ -356,10 +362,9 @@
             </div>
             <form class="modal-form" id="staffForm">
                 <input type="text" id="staffName" placeholder="Full Name" required>
-                <select id="staffRole">
-                    <option value="Staff">Staff</option>
-                    <option value="Trainer">Trainer</option>
-                </select>
+                
+                <input type="hidden" id="hiddenStaffRole" value="Staff">
+
                 <input type="email" id="staffEmail" placeholder="Email Address" required>
                 <select id="staffStatus">
                     <option value="Active">Active</option>

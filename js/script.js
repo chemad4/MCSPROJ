@@ -43,8 +43,7 @@ window.switchTab = function(tabId, element) {
         'dashboard': 'Admin Dashboard',
         'inventory': 'Inventory Management',
         'payments': 'Sales & Transactions',
-        'attendance': 'Member Status Tracking',
-        'members': 'Member Management', 
+        'members': 'Member Management & Status', // Updated title since they are combined
         'staff': 'General Staff Management',
         'trainers': 'Trainer Management', 
         'placeholder': 'Under Construction',
@@ -63,6 +62,28 @@ window.filterTable = function(tableId, inputId) {
     for (let i = 1; i < tr.length; i++) {
         let td = tr[i].getElementsByTagName("td")[0];
         if (td) tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+    }
+}
+
+// NEW: Slide Bar filter specifically for Silver/Gold
+window.filterByPlan = function(val) {
+    const tr = document.getElementById('membersTable').getElementsByTagName("tr");
+    let filterText = "";
+    
+    if (val === "1") filterText = "SILVER";
+    if (val === "2") filterText = "GOLD";
+
+    for (let i = 1; i < tr.length; i++) {
+        // Membership Plan is the 3rd column (index 2)
+        let td = tr[i].getElementsByTagName("td")[2]; 
+        if (td) {
+            let cellText = (td.textContent || td.innerText).toUpperCase();
+            if (val === "0" || cellText.includes(filterText)) {
+                tr[i].style.display = "";
+            } else {
+                tr[i].style.display = "none";
+            }
+        }
     }
 }
 
@@ -217,7 +238,6 @@ onSnapshot(usersCol, (snapshot) => {
     
     snapshot.forEach(doc => {
         const data = doc.data();
-        // .trim() removes accidental spaces from Firebase, .toLowerCase() handles case-sensitivity
         const roleStr = (data.role || "").trim().toLowerCase(); 
         
         if(roleStr === 'member') {
@@ -298,7 +318,6 @@ function renderStaff() {
                 </div>`;
             }
         } else {
-            // Any other role (like "Staff") goes here
             staffTbody.innerHTML += rowHtml;
             totalEmployees++; 
         }
@@ -313,14 +332,18 @@ function renderStaff() {
 }
 
 // Open Modals
+
+// Modified: Accepts 'Staff' or 'Trainer' to automatically populate the role silently
+window.openStaffModal = (role) => {
+    document.getElementById('staffForm').reset();
+    document.getElementById('hiddenStaffRole').value = role;
+    document.getElementById('staffModalTitle').innerText = `Add New ${role}`;
+    document.getElementById('staffModal').style.display = 'flex';
+}
+
 window.openMemberModal = () => {
     document.getElementById('memberForm').reset();
     document.getElementById('memberModal').style.display = 'flex';
-}
-
-window.openStaffModal = () => {
-    document.getElementById('staffForm').reset();
-    document.getElementById('staffModal').style.display = 'flex';
 }
 
 window.deleteUser = async (id) => {
@@ -345,12 +368,12 @@ document.getElementById('memberForm').addEventListener('submit', async (e) => {
     alert("New member added! They can log in immediately using password: password123");
 });
 
-// Add Staff Form Submit (Now restricted to "Staff" and "Trainer")
+// Add Staff/Trainer Form Submit
 document.getElementById('staffForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const newUser = { 
         name: document.getElementById('staffName').value, 
-        role: document.getElementById('staffRole').value, 
+        role: document.getElementById('hiddenStaffRole').value, // Takes the role silently 
         email: document.getElementById('staffEmail').value, 
         status: document.getElementById('staffStatus').value,
         password: "password123" 
