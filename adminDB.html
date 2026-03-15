@@ -33,6 +33,10 @@
                 <i class="fa-solid fa-address-card"></i> <span class="menu-text">Manage Members</span>
             </li>
 
+            <li class="nav-item nav-clickable" onclick="switchTab('attendance', this)">
+                <i class="fa-solid fa-eye"></i> <span class="menu-text">Member's Status</span>
+            </li>
+
             <li class="nav-item has-submenu">
                 <i class="fa-solid fa-boxes-stacked"></i> <span class="menu-text">Gym Inventory</span>
                 <span class="badge-nav" style="background-color: #555;" id="navInventoryCount">0</span>
@@ -166,7 +170,7 @@
                     <i class="fas fa-search"></i>
                     <input type="text" id="memberSearch" placeholder="Search members..." onkeyup="filterTable('membersTable', 'memberSearch')">
                 </div>
-                <button class="action-btn" onclick="alert('Please add new Member accounts directly in the Firebase Users collection.')"><i class="fas fa-plus"></i> Add Member</button>
+                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-plus"></i> Add Member</button>
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-address-card"></i> Member Accounts Directory</div>
@@ -242,6 +246,18 @@
                 <div class="table-container" style="box-shadow: none;">
                     <table id="paymentTable">
                         <thead><tr><th>Customer Name</th><th>Type</th><th>Date</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="attendance" class="content-section">
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-list-alt"></i> Live Member Attendance Log</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="attendanceTable">
+                        <thead><tr><th>Guest Name</th><th>Date</th><th>Time In</th><th>Type</th><th>Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -352,6 +368,29 @@
                     <option value="On Leave">On Leave</option>
                 </select>
                 <button type="submit" id="staffSubmitBtn">Save Account</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="memberModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="memberModalTitle">Add New Member</h3>
+                <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="memberForm">
+                <input type="text" id="memberName" placeholder="Full Name" required>
+                <input type="email" id="memberEmail" placeholder="Email Address" required>
+                <select id="memberPlan">
+                    <option value="Gold Plan">Gold Plan</option>
+                    <option value="Silver Plan">Silver Plan</option>
+                    <option value="Walk-in">Walk-in</option>
+                </select>
+                <select id="memberStatus">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                </select>
+                <button type="submit">Save Member</button>
             </form>
         </div>
     </div>

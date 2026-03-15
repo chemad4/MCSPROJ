@@ -43,7 +43,8 @@ window.switchTab = function(tabId, element) {
         'dashboard': 'Admin Dashboard',
         'inventory': 'Inventory Management',
         'payments': 'Sales & Transactions',
-        'members': 'Member Management', // UPDATED TITLE
+        'attendance': 'Member Status Tracking',
+        'members': 'Member Management', 
         'staff': 'General Staff Management',
         'trainers': 'Trainer Management', 
         'placeholder': 'Under Construction',
@@ -76,12 +77,17 @@ window.filterInventory = function() {
     });
 }
 
+window.viewTransaction = function(id, name, amount, status) {
+    document.getElementById('transactionDetails').innerHTML = `<p><strong>Transaction ID:</strong> ${id}</p><p><strong>Customer:</strong> ${name}</p><p><strong>Amount:</strong> ${amount}</p><p><strong>Status:</strong> ${status}</p>`;
+    document.getElementById('transactionModal').style.display = 'flex';
+}
+
 // ==========================================
 // STATE ARRAYS & GLOBAL CHART VARIABLES
 // ==========================================
 let inventoryData = [];
 let allUsersData = []; 
-let membersData = []; // NEW ARRAY FOR MEMBERS
+let membersData = []; 
 let paymentsData = [];
 
 let editingInventoryId = null;
@@ -211,47 +217,50 @@ onSnapshot(usersCol, (snapshot) => {
     
     snapshot.forEach(doc => {
         const data = doc.data();
-        if(data.role === 'Member') {
+        const roleStr = (data.role || "").toLowerCase(); // Case insensitive
+        
+        if(roleStr === 'member') {
             membersData.push({ id: doc.id, ...data });
-        } else if(data.role !== 'Admin') {
+        } else if(roleStr !== 'admin') {
             allUsersData.push({ id: doc.id, ...data });
         }
     });
     
     renderStaff();
-    renderMembers(); // Automatically update the members table and stats!
+    renderMembers(); 
 });
 
 function renderMembers() {
     const memTbody = document.querySelector('#membersTable tbody');
-    if(memTbody) memTbody.innerHTML = "";
+    if(!memTbody) return;
+    memTbody.innerHTML = "";
     
     let activeMembers = 0;
 
     membersData.forEach(m => {
-        let badgeClass = m.status === 'Active' ? 'active' : 'inactive';
+        const statusStr = (m.status || "Active").toLowerCase();
+        let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let displayStatus = m.status || 'Active'; 
-        let plan = m.plan || 'Standard Member'; // In Firebase, you can add a 'plan' field to members
+        let plan = m.plan || 'Standard Member'; 
         
-        if (memTbody) {
-            memTbody.innerHTML += `<tr>
-                <td>${m.name}</td><td>${m.email}</td><td><strong>${plan}</strong></td>
-                <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
-                <td><button class="btn-icon btn-delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button></td>
-            </tr>`;
-        }
+        memTbody.innerHTML += `<tr>
+            <td>${m.name}</td><td>${m.email}</td><td><strong>${plan}</strong></td>
+            <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
+            <td><button class="btn-icon btn-delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button></td>
+        </tr>`;
 
-        if(displayStatus === 'Active') activeMembers++;
+        if(statusStr === 'active') activeMembers++;
     });
 
-    // UPDATE DASHBOARD STATS DIRECTLY FROM USERS DATABASE
     document.getElementById('dashActiveMembers').innerText = activeMembers;
-    document.getElementById('gridMembers').innerText = membersData.length; // Total registered members
+    document.getElementById('gridMembers').innerText = membersData.length; 
 }
 
 function renderStaff() {
     const staffTbody = document.querySelector('#staffTable tbody');
     const trainerTbody = document.querySelector('#trainerTable tbody'); 
+    if(!staffTbody || !trainerTbody) return;
+    
     staffTbody.innerHTML = "";
     trainerTbody.innerHTML = "";
     
@@ -261,7 +270,10 @@ function renderStaff() {
     let totalEmployees = 0; 
 
     allUsersData.forEach(u => {
-        let badgeClass = u.status === 'Active' ? 'active' : 'inactive';
+        const statusStr = (u.status || "Active").toLowerCase();
+        const roleStr = (u.role || "").toLowerCase();
+        
+        let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let displayStatus = u.status || 'Active'; 
         
         const rowHtml = `<tr>
@@ -270,11 +282,11 @@ function renderStaff() {
             <td><button class="btn-icon btn-delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
 
-        if(u.role === 'Trainer') {
+        if(roleStr === 'trainer') {
             trainerTbody.innerHTML += rowHtml;
             totalTrainers++;
             
-            if(displayStatus === 'Active') {
+            if(statusStr === 'active') {
                 activeTrainers++;
                 trainersFeed += `<div class="list-item">
                     <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
@@ -298,6 +310,12 @@ function renderStaff() {
     if(dashTrainers) dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
 }
 
+// Open Member Modal
+window.openMemberModal = () => {
+    document.getElementById('memberForm').reset();
+    document.getElementById('memberModal').style.display = 'flex';
+}
+
 window.openStaffModal = () => {
     document.getElementById('staffForm').reset();
     document.getElementById('staffModal').style.display = 'flex';
@@ -309,6 +327,23 @@ window.deleteUser = async (id) => {
     }
 }
 
+// Add Member Form Submit
+document.getElementById('memberForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newMember = { 
+        name: document.getElementById('memberName').value, 
+        role: "Member", 
+        email: document.getElementById('memberEmail').value, 
+        status: document.getElementById('memberStatus').value,
+        plan: document.getElementById('memberPlan').value,
+        password: "password123" 
+    };
+    await addDoc(usersCol, newMember);
+    window.closeModal('memberModal');
+    alert("New member added! They can log in immediately using password: password123");
+});
+
+// Add Staff Form Submit
 document.getElementById('staffForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const newUser = { 
@@ -334,8 +369,9 @@ onSnapshot(paymentsCol, (snapshot) => {
 
 function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
-    if(!payTbody) return;
-    payTbody.innerHTML = "";
+    const attTbody = document.querySelector('#attendanceTable tbody'); // The live status tab
+    if(payTbody) payTbody.innerHTML = "";
+    if(attTbody) attTbody.innerHTML = "";
     
     globalEarnings = 0;
     let walkinCount = 0;
@@ -343,11 +379,25 @@ function renderPayments() {
 
     paymentsData.forEach(t => {
         let badge = t.status === 'Pending' ? 'pending' : 'paid';
-        payTbody.innerHTML += `<tr>
-            <td>${t.name}</td><td>${t.type}</td><td>${t.date}</td>
-            <td>₱${t.amount}</td><td><span class="badge ${badge}">${t.status}</span></td>
-            <td><button class="btn-icon btn-delete" onclick="deletePayment('${t.id}')"><i class="fas fa-trash"></i></button></td>
-        </tr>`;
+        
+        // Populate the Receipts/Payments table
+        if(payTbody) {
+            payTbody.innerHTML += `<tr>
+                <td>${t.name}</td><td>${t.type}</td><td>${t.date}</td>
+                <td>₱${t.amount}</td><td><span class="badge ${badge}">${t.status}</span></td>
+                <td><button class="btn-icon btn-delete" onclick="deletePayment('${t.id}')"><i class="fas fa-trash"></i></button></td>
+            </tr>`;
+        }
+
+        // Populate the Member Status / Attendance table
+        if(attTbody) {
+            let attBadge = t.type.includes('Gold') ? 'gold' : t.type.includes('Silver') ? 'silver' : 'active';
+            attTbody.innerHTML += `<tr>
+                <td>${t.name}</td><td>${t.date}</td><td>${t.timeIn || '8:00 AM'}</td>
+                <td><span class="badge ${attBadge}">${t.type}</span></td>
+                <td><button class="btn-icon btn-delete" onclick="deletePayment('${t.id}')"><i class="fas fa-trash"></i></button></td>
+            </tr>`;
+        }
 
         if(t.status === 'Paid') {
             globalEarnings += Number(t.amount);
@@ -359,8 +409,6 @@ function renderPayments() {
     });
 
     document.getElementById('dashTotalEarnings').innerText = `Total Earnings: ₱${globalEarnings.toLocaleString()}`;
-    
-    // Using walkinCount for the present members stat as a placeholder for attendance
     document.getElementById('presentMembers').innerText = walkinCount; 
 
     if(servicesChartInstance) {
