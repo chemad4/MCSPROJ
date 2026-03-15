@@ -217,7 +217,8 @@ onSnapshot(usersCol, (snapshot) => {
     
     snapshot.forEach(doc => {
         const data = doc.data();
-        const roleStr = (data.role || "").toLowerCase(); // Case insensitive
+        // .trim() removes accidental spaces from Firebase, .toLowerCase() handles case-sensitivity
+        const roleStr = (data.role || "").trim().toLowerCase(); 
         
         if(roleStr === 'member') {
             membersData.push({ id: doc.id, ...data });
@@ -238,7 +239,7 @@ function renderMembers() {
     let activeMembers = 0;
 
     membersData.forEach(m => {
-        const statusStr = (m.status || "Active").toLowerCase();
+        const statusStr = (m.status || "Active").trim().toLowerCase();
         let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let displayStatus = m.status || 'Active'; 
         let plan = m.plan || 'Standard Member'; 
@@ -270,8 +271,8 @@ function renderStaff() {
     let totalEmployees = 0; 
 
     allUsersData.forEach(u => {
-        const statusStr = (u.status || "Active").toLowerCase();
-        const roleStr = (u.role || "").toLowerCase();
+        const statusStr = (u.status || "Active").trim().toLowerCase();
+        const roleStr = (u.role || "").trim().toLowerCase();
         
         let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let displayStatus = u.status || 'Active'; 
@@ -297,6 +298,7 @@ function renderStaff() {
                 </div>`;
             }
         } else {
+            // Any other role (like "Staff") goes here
             staffTbody.innerHTML += rowHtml;
             totalEmployees++; 
         }
@@ -310,7 +312,7 @@ function renderStaff() {
     if(dashTrainers) dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
 }
 
-// Open Member Modal
+// Open Modals
 window.openMemberModal = () => {
     document.getElementById('memberForm').reset();
     document.getElementById('memberModal').style.display = 'flex';
@@ -343,7 +345,7 @@ document.getElementById('memberForm').addEventListener('submit', async (e) => {
     alert("New member added! They can log in immediately using password: password123");
 });
 
-// Add Staff Form Submit
+// Add Staff Form Submit (Now restricted to "Staff" and "Trainer")
 document.getElementById('staffForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const newUser = { 
@@ -369,7 +371,7 @@ onSnapshot(paymentsCol, (snapshot) => {
 
 function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
-    const attTbody = document.querySelector('#attendanceTable tbody'); // The live status tab
+    const attTbody = document.querySelector('#attendanceTable tbody'); 
     if(payTbody) payTbody.innerHTML = "";
     if(attTbody) attTbody.innerHTML = "";
     
@@ -380,7 +382,6 @@ function renderPayments() {
     paymentsData.forEach(t => {
         let badge = t.status === 'Pending' ? 'pending' : 'paid';
         
-        // Populate the Receipts/Payments table
         if(payTbody) {
             payTbody.innerHTML += `<tr>
                 <td>${t.name}</td><td>${t.type}</td><td>${t.date}</td>
@@ -389,7 +390,6 @@ function renderPayments() {
             </tr>`;
         }
 
-        // Populate the Member Status / Attendance table
         if(attTbody) {
             let attBadge = t.type.includes('Gold') ? 'gold' : t.type.includes('Silver') ? 'silver' : 'active';
             attTbody.innerHTML += `<tr>

@@ -270,7 +270,7 @@
                     <i class="fas fa-search"></i>
                     <input type="text" id="staffSearch" placeholder="Search staff..." onkeyup="filterTable('staffTable', 'staffSearch')">
                 </div>
-                <button class="action-btn" onclick="openStaffModal()"><i class="fas fa-plus"></i> Add General Staff</button>
+                <button class="action-btn" onclick="openStaffModal()"><i class="fas fa-plus"></i> Add Staff Account</button>
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-id-badge"></i> Non-Trainer Staff Directory</div>
@@ -289,7 +289,7 @@
                     <i class="fas fa-search"></i>
                     <input type="text" id="trainerSearch" placeholder="Search trainers..." onkeyup="filterTable('trainerTable', 'trainerSearch')">
                 </div>
-                <button class="action-btn" onclick="openStaffModal()"><i class="fas fa-plus"></i> Add New Trainer</button>
+                <button class="action-btn" onclick="openStaffModal()"><i class="fas fa-plus"></i> Add Trainer Account</button>
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-dumbbell"></i> Trainer Directory</div>
@@ -357,10 +357,8 @@
             <form class="modal-form" id="staffForm">
                 <input type="text" id="staffName" placeholder="Full Name" required>
                 <select id="staffRole">
+                    <option value="Staff">Staff</option>
                     <option value="Trainer">Trainer</option>
-                    <option value="Receptionist">Receptionist</option>
-                    <option value="Cleaner">Cleaner</option>
-                    <option value="Manager">Manager</option>
                 </select>
                 <input type="email" id="staffEmail" placeholder="Email Address" required>
                 <select id="staffStatus">
