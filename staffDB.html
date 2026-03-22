@@ -14,6 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     
     <link rel="stylesheet" href="css/styles.css">
     <style>
@@ -25,8 +26,15 @@
         .pos-totals { background: var(--dark-black); color: white; padding: 20px; border-radius: 0 0 8px 8px; }
         .total-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
         .total-line.grand { font-size: 20px; font-weight: bold; color: var(--primary-red); border-top: 1px solid #444; padding-top: 10px; margin-top: 10px; }
-        .name-row { display: grid; grid-template-columns: 1fr 80px 1fr; gap: 10px; }
         .inventory-split { display: grid; grid-template-columns: 1fr; gap: 30px; }
+        
+        .stat-card, .grid-stat-box { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover, .grid-stat-box:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        
+        .batch-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .batch-table th { text-align: left; padding: 8px; background: #f4f6f9; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }
+        .batch-table td { padding: 5px; }
+        .batch-table input, .batch-table select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -40,11 +48,9 @@
             <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)">
                 <i class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span>
             </li>
-            
             <li class="nav-item nav-clickable" onclick="switchTab('members', this)">
                 <i class="fa-solid fa-address-card"></i> <span class="menu-text">Manage Members</span>
             </li>
-
             <li class="nav-item nav-clickable" onclick="switchTab('pos', this)">
                 <i class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale (POS)</span>
             </li>
@@ -81,14 +87,14 @@
                 <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
             </div>
             <div class="topbar-right">
-                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> Welcome Staff <i class="fa-solid fa-caret-down"></i></button>
+                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> <span id="topBarName">Welcome Staff</span> <i class="fa-solid fa-caret-down"></i></button>
                 <button id="logoutBtn" onclick="handleLogout()"><i class="fa-solid fa-power-off"></i> Logout</button>
             </div>
         </header>
 
         <div id="dashboard" class="content-section active-section">
-            <div class="stat-cards">
-                <div class="stat-card card-red">
+            <div class="stat-cards" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="stat-card card-red" onclick="switchTab('members')">
                     <span class="stat-badge" id="dashActiveMembers">0</span>
                     <i class="fa-solid fa-user-check"></i>
                     <div class="value">Active Members</div>
@@ -97,11 +103,7 @@
                     <i class="fa-solid fa-clock"></i>
                     <div class="value">Shift Started</div>
                 </div>
-                <div class="stat-card card-red">
-                    <i class="fa-solid fa-money-bill-wave"></i>
-                    <div class="value" id="dashTotalEarnings">Total Earnings: ₱0</div>
-                </div>
-                <div class="stat-card card-black">
+                <div class="stat-card card-red" onclick="switchTab('inventory')">
                     <span class="stat-badge" id="dashInventoryTotal">0</span>
                     <i class="fa-solid fa-clipboard-list"></i>
                     <div class="value">Inventory Items</div>
@@ -119,10 +121,19 @@
                 </div>
 
                 <div class="panel" style="background: none; border: none; box-shadow: none; margin-bottom: 0; padding: 0;">
-                    <div class="grid-stats">
-                        <div class="grid-stat-box border-black"><div class="num" id="gridMembers">0</div><div class="label">Registered Members</div></div>
-                        <div class="grid-stat-box border-red"><div class="num" id="gridEquip">0</div><div class="label">Operational Equipments</div></div>
-                        <div class="grid-stat-box border-black"><div class="num" id="gridExpenses">₱0</div><div class="label">Maintenance Cost</div></div>
+                    <div class="grid-stats" style="grid-template-columns: 1fr 1fr;">
+                        <div class="grid-stat-box border-black" onclick="switchTab('members')"><div class="num" id="gridMembers">0</div><div class="label">Registered Members</div></div>
+                        <div class="grid-stat-box border-red" onclick="switchTab('inventory')"><div class="num" id="gridEquip">0</div><div class="label">Operational Equipments</div></div>
+                        <div class="grid-stat-box border-black" onclick="switchTab('pos')"><div class="num" id="presentMembers">0</div><div class="label">Walk-ins Today</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bottom-section" style="margin-top: 20px;">
+                <div class="panel" onclick="switchTab('inventory')" style="cursor: pointer;">
+                    <div class="panel-header"><i class="fa-solid fa-clipboard-list"></i> Inventory Alerts</div>
+                    <div class="panel-body" id="dashInventoryAlerts">
+                        <p style="color: var(--text-muted); font-size: 14px;">Loading alerts...</p>
                     </div>
                 </div>
             </div>
@@ -169,20 +180,9 @@
             <div class="table-controls">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="memberSearch" placeholder="Search members..." onkeyup="filterTable('membersTable', 'memberSearch')">
+                    <input type="text" id="memberSearch" placeholder="Search name or plan (e.g. Gold)..." onkeyup="filterTable('membersTable', 'memberSearch')">
                 </div>
-                <div style="display: flex; gap: 15px;">
-                    <div class="filter-slider" style="display: flex; align-items: center; background: var(--white); padding: 5px 15px; border-radius: 5px; border: 1px solid var(--border-color);">
-                        <span style="font-weight: 500; font-size: 14px; margin-right: 10px; color: #333;">Plan:</span>
-                        <div style="display: flex; flex-direction: column; align-items: center;">
-                            <input type="range" id="planSlideBar" min="0" max="2" value="0" step="1" oninput="filterByPlan(this.value)" style="width: 100px; cursor: pointer; accent-color: var(--primary-red);">
-                            <div style="display: flex; justify-content: space-between; width: 100px; font-size: 10px; color: #666; margin-top: 2px;">
-                                <span>All</span><span>Silver</span><span>Gold</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-plus"></i> Register Member</button>
-                </div>
+                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-users"></i> Batch Register Members</button>
             </div>
             
             <div class="panel">
@@ -300,34 +300,55 @@
     </div>
 
     <div id="memberModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="width: 800px; max-width: 95vw;">
             <div class="modal-header">
-                <h3 id="memberModalTitle">Register New Member</h3>
+                <h3 id="memberModalTitle">Batch Register Members (Up to 20)</h3>
                 <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
             </div>
-            <form class="modal-form" id="memberForm">
-                <div class="name-row">
-                    <input type="text" id="memGiven" placeholder="Given Name" required>
-                    <input type="text" id="memMI" placeholder="M.I." maxlength="2" required>
-                    <input type="text" id="memFamily" placeholder="Family Name" required>
+            
+            <form class="modal-form" id="batchMemberForm">
+                <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
+                    <table class="batch-table">
+                        <thead>
+                            <tr>
+                                <th>Given Name</th>
+                                <th>M.I.</th>
+                                <th>Family Name</th>
+                                <th>Email</th>
+                                <th>Plan</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchMemberBody">
+                            </tbody>
+                    </table>
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <input type="email" id="memberEmail" placeholder="Email Address" required style="flex-grow: 1;">
-                    <button type="button" onclick="alert('Verification link sent to email.')" style="background: #555; padding: 0 15px; border-radius: 4px; color: white; border: none; cursor: pointer; margin-bottom: 15px;">Verify</button>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" onclick="addBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
+                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
                 </div>
-                <select id="memberPlan">
-                    <option value="Gold Plan">Gold Membership (1 Year)</option>
-                    <option value="Silver Plan">Silver Membership (6 Months)</option>
-                </select>
-                <select id="memberStatus">
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                </select>
-                <button type="submit">Create Member Profile</button>
             </form>
         </div>
     </div>
 
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
+            authDomain: "fit-track-ca8d1.firebaseapp.com",
+            projectId: "fit-track-ca8d1",
+            storageBucket: "fit-track-ca8d1.firebasestorage.app",
+            messagingSenderId: "157593985795",
+            appId: "1:157593985795:web:07156961dda8e2254fbf36",
+            measurementId: "G-NYGGEMMJMC"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+    </script>
     <script type="module" src="js/script.js"></script>
 
 </body>

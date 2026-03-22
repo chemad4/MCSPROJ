@@ -17,6 +17,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// 4. Initialize EmailJS with your Public API Key
+emailjs.init("ZqQKGRo5j5KpAhH98");
+
 // ==========================================
 // GLOBAL EXPORTS FOR HTML ONCLICK BUTTONS
 // ==========================================
@@ -27,6 +30,7 @@ window.handleLogout = function() {
     window.location.replace("index.html"); 
 };
 
+// Updated switchTab to support clicking from Dashboard cards
 window.switchTab = function(tabId, element) {
     if(event) event.stopPropagation();
     document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active-section'));
@@ -35,9 +39,16 @@ window.switchTab = function(tabId, element) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.sub-item').forEach(el => el.classList.remove('active'));
 
-    if(element) {
+    if(element && !element.classList.contains('stat-card') && !element.classList.contains('grid-stat-box')) {
         element.classList.add('active');
         if(element.classList.contains('sub-item')) element.parentElement.previousElementSibling.classList.add('active');
+    } else {
+        // If clicked from a dashboard stat card, highlight the correct sidebar item
+        const targetNav = document.querySelector(`.nav-menu li[onclick*="switchTab('${tabId}'"]`);
+        if(targetNav) {
+            targetNav.classList.add('active');
+            if(targetNav.classList.contains('sub-item')) targetNav.parentElement.previousElementSibling.classList.add('active');
+        }
     }
     const titles = {
         'dashboard': 'Dashboard',
@@ -59,22 +70,15 @@ window.filterTable = function(tableId, inputId) {
     const filter = document.getElementById(inputId).value.toUpperCase();
     const tr = document.getElementById(tableId).getElementsByTagName("tr");
     for (let i = 1; i < tr.length; i++) {
-        let td = tr[i].getElementsByTagName("td")[0];
-        if (td) tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
-    }
-}
-
-window.filterByPlan = function(val) {
-    const tr = document.getElementById('membersTable').getElementsByTagName("tr");
-    let filterText = "";
-    if (val === "1") filterText = "SILVER";
-    if (val === "2") filterText = "GOLD";
-    for (let i = 1; i < tr.length; i++) {
-        let td = tr[i].getElementsByTagName("td")[4]; // Index 4 is Plan
-        if (td) {
-            let cellText = (td.textContent || td.innerText).toUpperCase();
-            if (val === "0" || cellText.includes(filterText)) tr[i].style.display = "";
+        let td = tr[i].getElementsByTagName("td")[0]; // Also check plan for members
+        if(tableId === 'membersTable') {
+            // Check Name AND Plan columns for flexibility
+            let tdPlan = tr[i].getElementsByTagName("td")[4]; 
+            let text = (td ? td.textContent : "") + " " + (tdPlan ? tdPlan.textContent : "");
+            if (text.toUpperCase().indexOf(filter) > -1) tr[i].style.display = "";
             else tr[i].style.display = "none";
+        } else {
+            if (td) tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
         }
     }
 }
@@ -86,7 +90,7 @@ let inventoryData = [];
 let allUsersData = []; 
 let membersData = []; 
 let paymentsData = [];
-let posCart = []; // Cart for POS
+let posCart = []; 
 
 const inventoryCol = collection(db, "inventory");
 const paymentsCol = collection(db, "payments");
@@ -95,7 +99,6 @@ const usersCol = collection(db, "users");
 let earningsChartInstance = null;
 let servicesChartInstance = null;
 let globalEarnings = 0;
-let globalExpenses = 0;
 
 // ==========================================
 // 1. INVENTORY LOGIC (Live Listener)
@@ -114,16 +117,18 @@ function renderInventory() {
 
     equipTbody.innerHTML = "";
     prodTbody.innerHTML = "";
+    let alertsHtml = "";
 
     let ops = 0, maint = 0, low = 0, totalMachines = 0;
 
     inventoryData.forEach((item) => {
         let isConsumable = ['Supplements', 'Beverages', 'Merch'].includes(item.cat);
         let badge = 'operational';
+        let isProblematic = false;
 
-        if(item.status === 'Maintenance') { badge = 'maintenance'; maint++; }
-        else if(item.status === 'Out of Order') { badge = 'broken'; }
-        else if(item.qty <= 5) { badge = 'stock-low'; low++; }
+        if(item.status === 'Maintenance') { badge = 'maintenance'; maint++; isProblematic = true; }
+        else if(item.status === 'Out of Order') { badge = 'broken'; isProblematic = true; }
+        else if(item.qty <= 5) { badge = 'stock-low'; low++; isProblematic = true;}
         else { ops++; }
 
         if(!isConsumable) totalMachines++;
@@ -140,26 +145,31 @@ function renderInventory() {
 
         if(isConsumable) prodTbody.innerHTML += rowHTML;
         else equipTbody.innerHTML += rowHTML;
+
+        // Populate Dashboard Alerts
+        if(isProblematic) {
+            alertsHtml += `<div class="list-item">
+                <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="list-content"><h4>Status: ${item.status || 'Low Stock'}</h4><p><strong>${item.name}</strong> requires attention.</p></div>
+            </div>`;
+        }
     });
 
-    if(document.getElementById('statMachines')) document.getElementById('statMachines').innerText = totalMachines;
-    if(document.getElementById('statOperational')) document.getElementById('statOperational').innerText = ops;
-    if(document.getElementById('statMaintenance')) document.getElementById('statMaintenance').innerText = maint;
-    if(document.getElementById('statLowStock')) document.getElementById('statLowStock').innerText = low;
+    if(document.getElementById('dashInventoryTotal')) document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
     if(document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
+    
+    const dashAlerts = document.getElementById('dashInventoryAlerts');
+    if(dashAlerts) dashAlerts.innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
 }
 
 window.openEquipmentModal = () => { document.getElementById('equipmentForm').reset(); document.getElementById('equipmentModal').style.display = 'flex'; }
 window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
 window.deleteInventoryItem = async (id) => { if(confirm("Delete this inventory item?")) await deleteDoc(doc(db, "inventory", id)); }
 
-// Auto-Math for adding stock
 async function handleInventorySubmit(e, isProduct) {
     e.preventDefault();
     const nameStr = document.getElementById(isProduct ? 'prodName' : 'equipName').value.trim();
     const addQty = Number(document.getElementById(isProduct ? 'prodQty' : 'equipQty').value);
-    
-    // Check if it exists to add to stock
     const existingItem = inventoryData.find(i => i.name.toLowerCase() === nameStr.toLowerCase());
 
     if (existingItem) {
@@ -207,16 +217,11 @@ window.addToCart = function(id, name, price, maxQty) {
     if(existing) {
         if(existing.qty < maxQty) existing.qty++;
         else alert("Not enough stock available!");
-    } else {
-        posCart.push({id, name, price, qty: 1, maxQty});
-    }
+    } else posCart.push({id, name, price, qty: 1, maxQty});
     renderCart();
 }
 
-window.removeFromCart = function(id) {
-    posCart = posCart.filter(i => i.id !== id);
-    renderCart();
-}
+window.removeFromCart = function(id) { posCart = posCart.filter(i => i.id !== id); renderCart(); }
 
 function renderCart() {
     const cartBody = document.getElementById('posCartBody');
@@ -230,10 +235,7 @@ function renderCart() {
 
     cartBody.innerHTML = posCart.map(item => `
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
-            <div style="flex-grow:1;">
-                <strong>${item.name}</strong><br>
-                <small>₱${item.price} x ${item.qty}</small>
-            </div>
+            <div style="flex-grow:1;"><strong>${item.name}</strong><br><small>₱${item.price} x ${item.qty}</small></div>
             <div style="font-weight: bold; margin-right: 15px;">₱${(item.price * item.qty).toFixed(2)}</div>
             <button onclick="removeFromCart('${item.id}')" style="background: none; border: none; color: #ff4c4c; cursor: pointer;"><i class="fas fa-times"></i></button>
         </div>
@@ -243,9 +245,7 @@ function renderCart() {
     let vat = subtotal * 0.12;
     let isSenior = document.getElementById('seniorDiscount').checked;
     let discount = isSenior ? (subtotal * 0.20) : 0;
-    let grandTotal = subtotal + vat - discount;
-
-    updatePOSTotals(subtotal, vat, discount, grandTotal);
+    updatePOSTotals(subtotal, vat, discount, subtotal + vat - discount);
 }
 
 function updatePOSTotals(sub, vat, disc, grand) {
@@ -265,21 +265,11 @@ function updatePOSTotals(sub, vat, disc, grand) {
 
 window.processPayment = async function(grandTotal) {
     if(posCart.length === 0) return alert("Cart is empty!");
-    
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
-    // 1. Save Transaction Receipt
-    await addDoc(paymentsCol, {
-        name: "Walk-in POS Customer",
-        type: "Product Purchase",
-        items: itemsStr,
-        amount: grandTotal,
-        status: "Paid",
-        date: dateStr
-    });
+    await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "Product Purchase", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr });
 
-    // 2. Deduct Inventory Quantities
     for(let item of posCart) {
         let currentStock = inventoryData.find(i => i.id === item.id).qty;
         await updateDoc(doc(db, "inventory", item.id), { qty: currentStock - item.qty });
@@ -338,10 +328,13 @@ function renderStaff() {
     if(staffTbody) staffTbody.innerHTML = "";
     if(trainerTbody) trainerTbody.innerHTML = "";
     
-    let totalTrainers = 0, totalEmployees = 0; 
+    let totalTrainers = 0, totalEmployees = 0, activeTrainers = 0; 
+    let trainersFeed = "";
 
     allUsersData.forEach(u => {
         const roleStr = (u.role || "").trim().toLowerCase();
+        const statusStr = (u.status || "Active").trim().toLowerCase();
+
         const rowHtml = `<tr>
             <td>${u.name}</td><td>${u.role}</td><td>${u.email}</td>
             <td><span class="badge active">${u.status || 'Active'}</span></td>
@@ -351,6 +344,18 @@ function renderStaff() {
         if(roleStr === 'trainer') {
             if(trainerTbody) trainerTbody.innerHTML += rowHtml;
             totalTrainers++;
+            
+            // Populate Dashboard Active Trainer Feed
+            if(statusStr === 'active') {
+                activeTrainers++;
+                trainersFeed += `<div class="list-item">
+                    <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
+                    <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div><div class="trainer-name">${u.name}</div><p style="font-size: 12px; color: var(--text-muted);">${u.email}</p></div>
+                        <span class="status-badge status-progress">On Floor</span>
+                    </div>
+                </div>`;
+            }
         } else {
             if(staffTbody) staffTbody.innerHTML += rowHtml;
             totalEmployees++; 
@@ -359,6 +364,92 @@ function renderStaff() {
 
     if(document.getElementById('dashStaffTotal')) document.getElementById('dashStaffTotal').innerText = totalEmployees;
     if(document.getElementById('gridTrainers')) document.getElementById('gridTrainers').innerText = totalTrainers;
+    
+    const dashTrainers = document.getElementById('dashActiveTrainersFeed');
+    if(dashTrainers) dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
+}
+
+// BATCH MEMBER REGISTRATION LOGIC
+let batchRowCount = 1;
+window.addBatchRow = function() {
+    if(batchRowCount >= 20) return alert("Maximum 20 members can be registered at once.");
+    const tbody = document.getElementById('batchMemberBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" class="bm-first" required></td>
+        <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" required></td>
+        <td><input type="text" class="bm-last" required></td>
+        <td><input type="email" class="bm-email" required></td>
+        <td>
+            <select class="bm-plan">
+                <option value="Gold Plan">Gold</option>
+                <option value="Silver Plan">Silver</option>
+            </select>
+        </td>
+        <td><button type="button" onclick="this.parentElement.parentElement.remove(); batchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+    batchRowCount++;
+}
+
+window.openMemberModal = () => { 
+    document.getElementById('batchMemberBody').innerHTML = `
+        <tr>
+            <td><input type="text" class="bm-first" required></td>
+            <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" required></td>
+            <td><input type="text" class="bm-last" required></td>
+            <td><input type="email" class="bm-email" required></td>
+            <td><select class="bm-plan"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
+            <td></td>
+        </tr>`;
+    batchRowCount = 1;
+    document.getElementById('memberModal').style.display = 'flex'; 
+}
+
+// Generates an 8-character random password
+const generatePassword = () => Math.random().toString(36).slice(-8);
+
+if(document.getElementById('batchMemberForm')) {
+    document.getElementById('batchMemberForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const rows = document.querySelectorAll('#batchMemberBody tr');
+        let addedCount = 0;
+
+        for (let row of rows) {
+            const given = row.querySelector('.bm-first').value;
+            const mi = row.querySelector('.bm-mi').value;
+            const family = row.querySelector('.bm-last').value;
+            const email = row.querySelector('.bm-email').value;
+            const plan = row.querySelector('.bm-plan').value;
+            const randomPassword = generatePassword();
+
+            // 1. Save to Firebase
+            await addDoc(usersCol, { 
+                name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
+                role: "Member", email: email, status: "Active", plan: plan,
+                password: randomPassword 
+            });
+
+            // 2. Send Real Email via EmailJS
+            try {
+                await emailjs.send("service_x90mti6", "template_nda1wjc", {
+                    to_name: given,
+                    to_email: email,
+                    generated_password: randomPassword,
+                    plan: plan
+                });
+                console.log(`[Email Sent] Successfully sent to: ${email}`);
+            } catch(err) {
+                console.error("EmailJS failed:", err);
+            }
+            
+            addedCount++;
+        }
+
+        window.closeModal('memberModal');
+        alert(`Successfully registered ${addedCount} member(s)! Verification emails and passwords have been sent.`);
+    });
 }
 
 window.openStaffModal = (role) => {
@@ -367,28 +458,7 @@ window.openStaffModal = (role) => {
     document.getElementById('staffModalTitle').innerText = `Add New ${role}`;
     document.getElementById('staffModal').style.display = 'flex';
 }
-
-window.openMemberModal = () => { document.getElementById('memberForm').reset(); document.getElementById('memberModal').style.display = 'flex'; }
 window.deleteUser = async (id) => { if(confirm("Remove this account?")) await deleteDoc(doc(db, "users", id)); }
-
-if(document.getElementById('memberForm')) {
-    document.getElementById('memberForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        await addDoc(usersCol, { 
-            name: `${document.getElementById('memGiven').value} ${document.getElementById('memFamily').value}`, 
-            givenName: document.getElementById('memGiven').value,
-            mi: document.getElementById('memMI').value,
-            familyName: document.getElementById('memFamily').value,
-            role: "Member", 
-            email: document.getElementById('memberEmail').value, 
-            status: document.getElementById('memberStatus').value,
-            plan: document.getElementById('memberPlan').value,
-            password: "password123" 
-        });
-        window.closeModal('memberModal');
-        alert("Member registered successfully!");
-    });
-}
 
 if(document.getElementById('staffForm')) {
     document.getElementById('staffForm').addEventListener('submit', async (e) => {
@@ -406,7 +476,7 @@ if(document.getElementById('staffForm')) {
 }
 
 // ==========================================
-// 4. FINANCIALS (Live Listener)
+// 4. FINANCIALS
 // ==========================================
 onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
@@ -417,7 +487,9 @@ onSnapshot(paymentsCol, (snapshot) => {
 function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
     if(payTbody) payTbody.innerHTML = "";
+    
     globalEarnings = 0;
+    let walkinCount = 0, goldSales = 0, silverSales = 0, productSales = 0;
 
     paymentsData.forEach(t => {
         let vat = (t.amount * 0.12).toFixed(2);
@@ -428,23 +500,28 @@ function renderPayments() {
                 <td style="font-weight:bold; color:var(--primary-red);">₱${t.amount}</td>
             </tr>`;
         }
-        if(t.status === 'Paid') globalEarnings += Number(t.amount);
+        if(t.status === 'Paid') {
+            globalEarnings += Number(t.amount);
+            if(t.type && t.type.includes('Gold')) goldSales++; 
+            else if(t.type && t.type.includes('Silver')) silverSales++; 
+            else if(t.type && t.type.includes('Walk-in')) walkinCount++; 
+            else productSales++; 
+        }
     });
 
-    if(document.getElementById('dashTotalEarnings')) document.getElementById('dashTotalEarnings').innerText = `Total Earnings: ₱${globalEarnings.toLocaleString()}`;
+    if(document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = walkinCount; 
+
+    if(servicesChartInstance) {
+        servicesChartInstance.data.datasets[0].data = [goldSales, silverSales, walkinCount, productSales];
+        servicesChartInstance.update();
+    }
 }
 
 // ==========================================
-// 5. UI INITIALIZATION & CHART CREATION
+// UI INITIALIZATION
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    const topBarName = document.getElementById('topBarName');
-    if(topBarName) {
-        topBarName.innerText = "Welcome, " + (localStorage.getItem("loggedInUser") || "User");
-    }
-
     initDashboardCharts();
-    
     const submenuToggles = document.querySelectorAll('.has-submenu');
     submenuToggles.forEach(toggle => {
         toggle.addEventListener('click', function() {
@@ -480,23 +557,5 @@ function initDashboardCharts() {
             }] 
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } } } }
-    });
-
-    const ctxEarnings = document.getElementById('earningsChart');
-    if (!ctxEarnings) return;
-
-    earningsChartInstance = new Chart(ctxEarnings.getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: ['Earnings', 'Expenses'],
-            datasets: [{ data: [0, 0], backgroundColor: ['#C01718', '#111111'], borderRadius: 4 }]
-        },
-        options: { 
-            indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, 
-            scales: { 
-                x: { ticks: { callback: function(value) { return '₱' + value; } } },
-                y: { grid: { display: false } } 
-            } 
-        }
     });
 }
