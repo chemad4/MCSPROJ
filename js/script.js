@@ -42,8 +42,9 @@ window.switchTab = function(tabId, element) {
     const titles = {
         'dashboard': 'Dashboard',
         'inventory': 'Inventory Management',
-        'payments': 'Sales & Transactions',
-        'members': 'Member Management & Status', 
+        'pos': 'Point of Sale (POS)',
+        'payments': 'Financial Reports',
+        'members': 'Member Directory', 
         'staff': 'General Staff Management',
         'trainers': 'Trainer Management'
     };
@@ -51,8 +52,8 @@ window.switchTab = function(tabId, element) {
 }
 
 window.closeModal = function(modalId) { document.getElementById(modalId).style.display = 'none'; }
-window.exportReport = function() { alert("Generating Sales CSV report... Download started."); }
-window.exportInventoryReport = function() { alert("Generating Inventory Report... Download started."); }
+window.exportReport = function() { window.print(); }
+window.exportInventoryReport = function() { window.print(); }
 
 window.filterTable = function(tableId, inputId) {
     const filter = document.getElementById(inputId).value.toUpperCase();
@@ -63,61 +64,38 @@ window.filterTable = function(tableId, inputId) {
     }
 }
 
-// Slide Bar filter specifically for Silver/Gold
 window.filterByPlan = function(val) {
     const tr = document.getElementById('membersTable').getElementsByTagName("tr");
     let filterText = "";
-    
     if (val === "1") filterText = "SILVER";
     if (val === "2") filterText = "GOLD";
-
     for (let i = 1; i < tr.length; i++) {
-        let td = tr[i].getElementsByTagName("td")[2]; 
+        let td = tr[i].getElementsByTagName("td")[4]; // Index 4 is Plan
         if (td) {
             let cellText = (td.textContent || td.innerText).toUpperCase();
-            if (val === "0" || cellText.includes(filterText)) {
-                tr[i].style.display = "";
-            } else {
-                tr[i].style.display = "none";
-            }
+            if (val === "0" || cellText.includes(filterText)) tr[i].style.display = "";
+            else tr[i].style.display = "none";
         }
     }
 }
 
-window.filterInventory = function() {
-    const filter = document.getElementById('inventorySearch').value.toUpperCase();
-    ['machinesTable', 'productsTable', 'attentionTable'].forEach(id => {
-        const tr = document.getElementById(id).getElementsByTagName("tr");
-        for (let i = 1; i < tr.length; i++) {
-            let td = tr[i].getElementsByTagName("td")[0];
-            if (td) tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
-        }
-    });
-}
-
-window.viewTransaction = function(id, name, amount, status) {
-    document.getElementById('transactionDetails').innerHTML = `<p><strong>Transaction ID:</strong> ${id}</p><p><strong>Customer:</strong> ${name}</p><p><strong>Amount:</strong> ${amount}</p><p><strong>Status:</strong> ${status}</p>`;
-    document.getElementById('transactionModal').style.display = 'flex';
-}
-
 // ==========================================
-// STATE ARRAYS & GLOBAL CHART VARIABLES
+// STATE ARRAYS & COLLECTIONS
 // ==========================================
 let inventoryData = [];
 let allUsersData = []; 
 let membersData = []; 
 let paymentsData = [];
-
-let editingInventoryId = null;
-let servicesChartInstance = null;
-let earningsChartInstance = null;
-
-let globalEarnings = 0;
-let globalExpenses = 0;
+let posCart = []; // Cart for POS
 
 const inventoryCol = collection(db, "inventory");
 const paymentsCol = collection(db, "payments");
 const usersCol = collection(db, "users");
+
+let earningsChartInstance = null;
+let servicesChartInstance = null;
+let globalEarnings = 0;
+let globalExpenses = 0;
 
 // ==========================================
 // 1. INVENTORY LOGIC (Live Listener)
@@ -126,126 +104,204 @@ onSnapshot(inventoryCol, (snapshot) => {
     inventoryData = [];
     snapshot.forEach(doc => inventoryData.push({ id: doc.id, ...doc.data() }));
     renderInventory();
+    renderPOSProducts();
 });
 
 function renderInventory() {
-    document.querySelector('#machinesTable tbody').innerHTML = "";
-    document.querySelector('#productsTable tbody').innerHTML = "";
-    document.querySelector('#attentionTable tbody').innerHTML = "";
-    let alertsHtml = "";
+    const equipTbody = document.querySelector('#machinesTable tbody');
+    const prodTbody = document.querySelector('#productsTable tbody');
+    if(!equipTbody || !prodTbody) return;
 
-    let counts = { machines: 0, ops: 0, maint: 0, prod: 0, low: 0 };
+    equipTbody.innerHTML = "";
+    prodTbody.innerHTML = "";
+
+    let ops = 0, maint = 0, low = 0, totalMachines = 0;
 
     inventoryData.forEach((item) => {
+        let isConsumable = ['Supplements', 'Beverages', 'Merch'].includes(item.cat);
         let badge = 'operational';
-        let isProblematic = false;
 
-        if(item.status.includes('Maintenance')) { badge = 'maintenance'; isProblematic = true; counts.maint++; }
-        else if(item.status.includes('Out of Order')) { badge = 'broken'; isProblematic = true; }
-        else if(item.status.includes('Low')) { badge = 'stock-low'; isProblematic = true; counts.low++; }
-        else if(item.status === 'In Stock') { badge = 'stock-high'; }
-        else if(item.status === 'Operational') { counts.ops++; }
+        if(item.status === 'Maintenance') { badge = 'maintenance'; maint++; }
+        else if(item.status === 'Out of Order') { badge = 'broken'; }
+        else if(item.qty <= 5) { badge = 'stock-low'; low++; }
+        else { ops++; }
 
-        if (item.cat === 'Supplements' || item.cat === 'Beverages') counts.prod++; 
-        else counts.machines++;
+        if(!isConsumable) totalMachines++;
 
-        const mainRow = `<tr>
-            <td>${item.name}</td><td>${item.cat}</td><td>${item.qty}</td>
-            <td><span class="badge ${badge}">${item.status}</span></td>
-            <td>
-                <button class="btn-icon btn-edit" onclick="openEditInventoryModal('${item.id}')"><i class="fas fa-edit"></i></button>
-                <button class="btn-icon btn-delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
-            </td>
+        let rowHTML = `<tr>
+            <td>${item.name}</td>
+            <td>${item.cat}</td>
+            <td>${item.size || 'N/A'}</td>
+            ${isConsumable ? `<td>${item.expiry || 'N/A'}</td>` : ''}
+            <td>${item.qty}</td>
+            <td><span class="badge ${badge}">${item.status || 'Active'}</span></td>
+            <td><button class="btn-icon btn-delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
 
-        if (item.cat === 'Supplements' || item.cat === 'Beverages') {
-            document.querySelector('#productsTable tbody').insertAdjacentHTML('beforeend', mainRow);
-        } else {
-            document.querySelector('#machinesTable tbody').insertAdjacentHTML('beforeend', mainRow);
-        }
-
-        if(isProblematic) {
-            document.querySelector('#attentionTable tbody').insertAdjacentHTML('beforeend', `<tr>
-                <td><strong>${item.name}</strong></td><td>${item.cat}</td>
-                <td><span class="badge ${badge}">${item.status}</span></td>
-                <td><button class="btn-icon btn-resolve" onclick="openEditInventoryModal('${item.id}')"><i class="fas fa-tools"></i> Resolve</button></td>
-            </tr>`);
-
-            alertsHtml += `<div class="list-item">
-                <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                <div class="list-content"><h4>Status: ${item.status}</h4><p><strong>${item.name}</strong> requires attention.</p></div>
-            </div>`;
-        }
+        if(isConsumable) prodTbody.innerHTML += rowHTML;
+        else equipTbody.innerHTML += rowHTML;
     });
 
-    globalExpenses = (counts.maint * 1500) + (counts.low * 500);
-
-    document.getElementById('statMachines').innerText = counts.machines;
-    document.getElementById('statOperational').innerText = counts.ops;
-    document.getElementById('statMaintenance').innerText = counts.maint;
-    document.getElementById('statLowStock').innerText = counts.low;
-    
-    document.getElementById('navInventoryCount').innerText = inventoryData.length;
-    document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
-    
-    // Safety checks for elements that might only be on certain dashboards
-    if(document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = counts.ops;
-    if(document.getElementById('gridExpenses')) document.getElementById('gridExpenses').innerText = `₱${globalExpenses.toLocaleString()}`;
-    
-    const dashAlerts = document.getElementById('dashInventoryAlerts');
-    if(dashAlerts) dashAlerts.innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
-
-    if(earningsChartInstance) {
-        earningsChartInstance.data.datasets[0].data[1] = globalExpenses;
-        earningsChartInstance.update();
-    }
+    if(document.getElementById('statMachines')) document.getElementById('statMachines').innerText = totalMachines;
+    if(document.getElementById('statOperational')) document.getElementById('statOperational').innerText = ops;
+    if(document.getElementById('statMaintenance')) document.getElementById('statMaintenance').innerText = maint;
+    if(document.getElementById('statLowStock')) document.getElementById('statLowStock').innerText = low;
+    if(document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
 }
 
-window.openAddEquipmentModal = () => {
-    editingInventoryId = null;
-    document.getElementById('equipModalTitle').innerText = "Add Inventory Item";
-    document.getElementById('equipmentForm').reset();
-    document.getElementById('equipmentModal').style.display = 'flex';
-}
-window.openEditInventoryModal = (id) => {
-    editingInventoryId = id;
-    const item = inventoryData.find(i => i.id === id);
-    document.getElementById('equipModalTitle').innerText = "Edit Inventory Item";
-    document.getElementById('equipName').value = item.name;
-    document.getElementById('equipCategory').value = item.cat; 
-    document.getElementById('equipQty').value = item.qty;
-    document.getElementById('equipStatus').value = item.status;
-    document.getElementById('equipmentModal').style.display = 'flex';
-}
-window.deleteInventoryItem = async (id) => {
-    if(confirm("Delete this inventory item from the database?")) await deleteDoc(doc(db, "inventory", id));
-}
-document.getElementById('equipmentForm').addEventListener('submit', async (e) => {
+window.openEquipmentModal = () => { document.getElementById('equipmentForm').reset(); document.getElementById('equipmentModal').style.display = 'flex'; }
+window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
+window.deleteInventoryItem = async (id) => { if(confirm("Delete this inventory item?")) await deleteDoc(doc(db, "inventory", id)); }
+
+// Auto-Math for adding stock
+async function handleInventorySubmit(e, isProduct) {
     e.preventDefault();
-    const newItem = { name: document.getElementById('equipName').value, cat: document.getElementById('equipCategory').value, qty: Number(document.getElementById('equipQty').value), status: document.getElementById('equipStatus').value };
-    if (editingInventoryId) await updateDoc(doc(db, "inventory", editingInventoryId), newItem);
-    else await addDoc(inventoryCol, newItem);
-    window.closeModal('equipmentModal');
-});
+    const nameStr = document.getElementById(isProduct ? 'prodName' : 'equipName').value.trim();
+    const addQty = Number(document.getElementById(isProduct ? 'prodQty' : 'equipQty').value);
+    
+    // Check if it exists to add to stock
+    const existingItem = inventoryData.find(i => i.name.toLowerCase() === nameStr.toLowerCase());
+
+    if (existingItem) {
+        await updateDoc(doc(db, "inventory", existingItem.id), { qty: existingItem.qty + addQty });
+        alert(`Added ${addQty} to existing stock of ${existingItem.name}.`);
+    } else {
+        const newItem = { 
+            name: nameStr, 
+            cat: document.getElementById(isProduct ? 'prodCategory' : 'equipCategory').value, 
+            size: document.getElementById(isProduct ? 'prodVol' : 'equipSize').value, 
+            qty: addQty, 
+            status: isProduct ? 'Operational' : document.getElementById('equipStatus').value,
+            price: isProduct ? Number(document.getElementById('prodPrice').value) : 0,
+            expiry: isProduct ? document.getElementById('prodExpiry').value : null
+        };
+        await addDoc(inventoryCol, newItem);
+    }
+    window.closeModal(isProduct ? 'productModal' : 'equipmentModal');
+}
+
+if(document.getElementById('equipmentForm')) document.getElementById('equipmentForm').addEventListener('submit', (e) => handleInventorySubmit(e, false));
+if(document.getElementById('productForm')) document.getElementById('productForm').addEventListener('submit', (e) => handleInventorySubmit(e, true));
 
 // ==========================================
-// 2. MASTER DIRECTORY LOGIC (Members & Staff)
+// 2. POINT OF SALE (POS) LOGIC
+// ==========================================
+function renderPOSProducts() {
+    const posBody = document.getElementById('posProductList');
+    if(!posBody) return;
+    posBody.innerHTML = "";
+    
+    inventoryData.forEach(item => {
+        if(['Supplements', 'Beverages', 'Merch'].includes(item.cat) && item.qty > 0) {
+            let price = item.price || 0;
+            posBody.innerHTML += `<tr>
+                <td>${item.name}</td><td>${item.qty}</td><td>₱${price.toFixed(2)}</td>
+                <td><button class="action-btn" style="padding: 5px 10px;" onclick="addToCart('${item.id}', '${item.name}', ${price}, ${item.qty})">Add</button></td>
+            </tr>`;
+        }
+    });
+}
+
+window.addToCart = function(id, name, price, maxQty) {
+    let existing = posCart.find(i => i.id === id);
+    if(existing) {
+        if(existing.qty < maxQty) existing.qty++;
+        else alert("Not enough stock available!");
+    } else {
+        posCart.push({id, name, price, qty: 1, maxQty});
+    }
+    renderCart();
+}
+
+window.removeFromCart = function(id) {
+    posCart = posCart.filter(i => i.id !== id);
+    renderCart();
+}
+
+function renderCart() {
+    const cartBody = document.getElementById('posCartBody');
+    if(!cartBody) return;
+
+    if(posCart.length === 0) {
+        cartBody.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>`;
+        updatePOSTotals(0, 0, 0, 0);
+        return;
+    }
+
+    cartBody.innerHTML = posCart.map(item => `
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+            <div style="flex-grow:1;">
+                <strong>${item.name}</strong><br>
+                <small>₱${item.price} x ${item.qty}</small>
+            </div>
+            <div style="font-weight: bold; margin-right: 15px;">₱${(item.price * item.qty).toFixed(2)}</div>
+            <button onclick="removeFromCart('${item.id}')" style="background: none; border: none; color: #ff4c4c; cursor: pointer;"><i class="fas fa-times"></i></button>
+        </div>
+    `).join('');
+
+    let subtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    let vat = subtotal * 0.12;
+    let isSenior = document.getElementById('seniorDiscount').checked;
+    let discount = isSenior ? (subtotal * 0.20) : 0;
+    let grandTotal = subtotal + vat - discount;
+
+    updatePOSTotals(subtotal, vat, discount, grandTotal);
+}
+
+function updatePOSTotals(sub, vat, disc, grand) {
+    const totalsDiv = document.querySelector('.pos-totals');
+    if(!totalsDiv) return;
+    totalsDiv.innerHTML = `
+        <div class="total-line"><span>Subtotal:</span> <span>₱${sub.toFixed(2)}</span></div>
+        <div class="total-line"><span>VAT (12%):</span> <span>₱${vat.toFixed(2)}</span></div>
+        <div class="total-line" style="display: flex; align-items: center; justify-content: space-between;">
+            <span><input type="checkbox" id="seniorDiscount" style="accent-color: var(--primary-red);" ${disc > 0 ? 'checked' : ''} onchange="renderCart()"> Senior Citizen / PWD (20%)</span>
+            <span style="color: #ff4c4c;">- ₱${disc.toFixed(2)}</span>
+        </div>
+        <div class="total-line grand"><span>TOTAL:</span> <span>₱${grand.toFixed(2)}</span></div>
+        <button class="action-btn" onclick="processPayment(${grand})" style="width: 100%; justify-content: center; margin-top: 15px; font-size: 16px;"><i class="fa-solid fa-check"></i> PROCESS PAYMENT</button>
+    `;
+}
+
+window.processPayment = async function(grandTotal) {
+    if(posCart.length === 0) return alert("Cart is empty!");
+    
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
+
+    // 1. Save Transaction Receipt
+    await addDoc(paymentsCol, {
+        name: "Walk-in POS Customer",
+        type: "Product Purchase",
+        items: itemsStr,
+        amount: grandTotal,
+        status: "Paid",
+        date: dateStr
+    });
+
+    // 2. Deduct Inventory Quantities
+    for(let item of posCart) {
+        let currentStock = inventoryData.find(i => i.id === item.id).qty;
+        await updateDoc(doc(db, "inventory", item.id), { qty: currentStock - item.qty });
+    }
+
+    alert("Payment Processed Successfully! Inventory deducted.");
+    posCart = [];
+    renderCart();
+}
+
+// ==========================================
+// 3. MASTER DIRECTORY LOGIC (Members & Staff)
 // ==========================================
 onSnapshot(usersCol, (snapshot) => {
     allUsersData = [];
     membersData = [];
-    
     snapshot.forEach(doc => {
         const data = doc.data();
         const roleStr = (data.role || "").trim().toLowerCase(); 
-        
-        if(roleStr === 'member') {
-            membersData.push({ id: doc.id, ...data });
-        } else if(roleStr !== 'admin') {
-            allUsersData.push({ id: doc.id, ...data });
-        }
+        if(roleStr === 'member') membersData.push({ id: doc.id, ...data });
+        else if(roleStr !== 'admin') allUsersData.push({ id: doc.id, ...data });
     });
-    
     renderStaff();
     renderMembers(); 
 });
@@ -260,61 +316,41 @@ function renderMembers() {
     membersData.forEach(m => {
         const statusStr = (m.status || "Active").trim().toLowerCase();
         let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
-        let displayStatus = m.status || 'Active'; 
         let plan = m.plan || 'Standard Member'; 
         
         memTbody.innerHTML += `<tr>
-            <td>${m.name}</td><td>${m.email}</td><td><strong>${plan}</strong></td>
-            <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
+            <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
+            <td>${m.email}</td><td><strong>${plan}</strong></td>
+            <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
             <td><button class="btn-icon btn-delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
 
         if(statusStr === 'active') activeMembers++;
     });
 
-    document.getElementById('dashActiveMembers').innerText = activeMembers;
+    if(document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
     if(document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = membersData.length; 
 }
 
 function renderStaff() {
     const staffTbody = document.querySelector('#staffTable tbody');
     const trainerTbody = document.querySelector('#trainerTable tbody'); 
-    
     if(staffTbody) staffTbody.innerHTML = "";
     if(trainerTbody) trainerTbody.innerHTML = "";
     
-    let trainersFeed = "";
-    let totalTrainers = 0;
-    let activeTrainers = 0;
-    let totalEmployees = 0; 
+    let totalTrainers = 0, totalEmployees = 0; 
 
     allUsersData.forEach(u => {
-        const statusStr = (u.status || "Active").trim().toLowerCase();
         const roleStr = (u.role || "").trim().toLowerCase();
-        
-        let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
-        let displayStatus = u.status || 'Active'; 
-        
         const rowHtml = `<tr>
             <td>${u.name}</td><td>${u.role}</td><td>${u.email}</td>
-            <td><span class="badge ${badgeClass}">${displayStatus}</span></td>
+            <td><span class="badge active">${u.status || 'Active'}</span></td>
             <td><button class="btn-icon btn-delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
 
         if(roleStr === 'trainer') {
             if(trainerTbody) trainerTbody.innerHTML += rowHtml;
             totalTrainers++;
-            
-            if(statusStr === 'active') {
-                activeTrainers++;
-                trainersFeed += `<div class="list-item">
-                    <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
-                    <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <div><div class="trainer-name">${u.name}</div><p style="font-size: 12px; color: var(--text-muted);">${u.email}</p></div>
-                        <span class="status-badge status-progress">On Floor</span>
-                    </div>
-                </div>`;
-            }
         } else {
             if(staffTbody) staffTbody.innerHTML += rowHtml;
             totalEmployees++; 
@@ -323,63 +359,54 @@ function renderStaff() {
 
     if(document.getElementById('dashStaffTotal')) document.getElementById('dashStaffTotal').innerText = totalEmployees;
     if(document.getElementById('gridTrainers')) document.getElementById('gridTrainers').innerText = totalTrainers;
-    if(document.getElementById('gridActiveTrainers')) document.getElementById('gridActiveTrainers').innerText = activeTrainers;
-    
-    const dashTrainers = document.getElementById('dashActiveTrainersFeed');
-    if(dashTrainers) dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
 }
 
-// Modals
-window.openMemberModal = () => {
-    document.getElementById('memberForm').reset();
-    document.getElementById('memberModal').style.display = 'flex';
-}
 window.openStaffModal = (role) => {
     document.getElementById('staffForm').reset();
     document.getElementById('hiddenStaffRole').value = role;
     document.getElementById('staffModalTitle').innerText = `Add New ${role}`;
     document.getElementById('staffModal').style.display = 'flex';
 }
-window.deleteUser = async (id) => {
-    if(confirm("Remove this user account from the system? They will no longer be able to log in.")) {
-        await deleteDoc(doc(db, "users", id));
-    }
-}
+
+window.openMemberModal = () => { document.getElementById('memberForm').reset(); document.getElementById('memberModal').style.display = 'flex'; }
+window.deleteUser = async (id) => { if(confirm("Remove this account?")) await deleteDoc(doc(db, "users", id)); }
 
 if(document.getElementById('memberForm')) {
     document.getElementById('memberForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const newMember = { 
-            name: document.getElementById('memberName').value, 
+        await addDoc(usersCol, { 
+            name: `${document.getElementById('memGiven').value} ${document.getElementById('memFamily').value}`, 
+            givenName: document.getElementById('memGiven').value,
+            mi: document.getElementById('memMI').value,
+            familyName: document.getElementById('memFamily').value,
             role: "Member", 
             email: document.getElementById('memberEmail').value, 
             status: document.getElementById('memberStatus').value,
             plan: document.getElementById('memberPlan').value,
             password: "password123" 
-        };
-        await addDoc(usersCol, newMember);
+        });
         window.closeModal('memberModal');
-        alert("New member added! They can log in immediately using password: password123");
+        alert("Member registered successfully!");
     });
 }
+
 if(document.getElementById('staffForm')) {
     document.getElementById('staffForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const newUser = { 
+        await addDoc(usersCol, { 
             name: document.getElementById('staffName').value, 
-            role: document.getElementById('hiddenStaffRole').value, // Takes the role silently 
+            role: document.getElementById('hiddenStaffRole').value,
             email: document.getElementById('staffEmail').value, 
             status: document.getElementById('staffStatus').value,
             password: "password123" 
-        };
-        await addDoc(usersCol, newUser);
+        });
         window.closeModal('staffModal');
-        alert("New account added! They can log in immediately using password: password123");
+        alert("Account created successfully!");
     });
 }
 
 // ==========================================
-// 3. PAYMENTS & RECEIPT LOGIC
+// 4. FINANCIALS (Live Listener)
 // ==========================================
 onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
@@ -389,85 +416,26 @@ onSnapshot(paymentsCol, (snapshot) => {
 
 function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
-    const attTbody = document.querySelector('#attendanceTable tbody'); 
     if(payTbody) payTbody.innerHTML = "";
-    if(attTbody) attTbody.innerHTML = "";
-    
     globalEarnings = 0;
-    let walkinCount = 0;
-    let goldSales = 0, silverSales = 0, productSales = 0;
 
     paymentsData.forEach(t => {
-        let badge = t.status === 'Pending' ? 'pending' : 'paid';
-        
+        let vat = (t.amount * 0.12).toFixed(2);
         if(payTbody) {
             payTbody.innerHTML += `<tr>
-                <td>${t.name}</td><td>${t.type}</td><td>${t.date}</td>
-                <td>₱${t.amount}</td><td><span class="badge ${badge}">${t.status}</span></td>
-                <td><button class="btn-icon btn-delete" onclick="deletePayment('${t.id}')"><i class="fas fa-trash"></i></button></td>
+                <td>${t.name}</td><td>${t.items || t.type}</td><td>${t.date}</td>
+                <td>₱${t.amount}</td><td>₱${vat}</td>
+                <td style="font-weight:bold; color:var(--primary-red);">₱${t.amount}</td>
             </tr>`;
         }
-
-        if(attTbody) {
-            let attBadge = t.type.includes('Gold') ? 'gold' : t.type.includes('Silver') ? 'silver' : 'active';
-            attTbody.innerHTML += `<tr>
-                <td>${t.name}</td><td>${t.date}</td><td>${t.timeIn || '8:00 AM'}</td>
-                <td><span class="badge ${attBadge}">${t.type}</span></td>
-                <td><button class="btn-icon btn-delete" onclick="deletePayment('${t.id}')"><i class="fas fa-trash"></i></button></td>
-            </tr>`;
-        }
-
-        if(t.status === 'Paid') {
-            globalEarnings += Number(t.amount);
-            if(t.type.includes('Gold')) { goldSales++; }
-            else if(t.type.includes('Silver')) { silverSales++; }
-            else if(t.type.includes('Walk-in')) { walkinCount++; }
-            else { productSales++; }
-        }
+        if(t.status === 'Paid') globalEarnings += Number(t.amount);
     });
 
-    document.getElementById('dashTotalEarnings').innerText = `Total Earnings: ₱${globalEarnings.toLocaleString()}`;
-    if(document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = walkinCount; 
-
-    if(servicesChartInstance) {
-        servicesChartInstance.data.datasets[0].data = [goldSales, silverSales, walkinCount, productSales];
-        servicesChartInstance.update();
-    }
-    if(earningsChartInstance) {
-        earningsChartInstance.data.datasets[0].data[0] = globalEarnings;
-        earningsChartInstance.update();
-    }
-}
-
-window.openAddPaymentModal = () => {
-    document.getElementById('paymentForm').reset();
-    document.getElementById('paymentModal').style.display = 'flex';
-}
-window.deletePayment = async (id) => {
-    if(confirm("Delete this transaction record?")) await deleteDoc(doc(db, "payments", id));
-}
-
-if(document.getElementById('paymentForm')) {
-    document.getElementById('paymentForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        
-        const newPay = {
-            name: document.getElementById('payName').value,
-            type: document.getElementById('payType').value,
-            amount: Number(document.getElementById('payAmount').value),
-            status: document.getElementById('payStatus').value,
-            date: dateStr,
-            timeIn: timeStr
-        };
-        await addDoc(paymentsCol, newPay);
-        window.closeModal('paymentModal');
-    });
+    if(document.getElementById('dashTotalEarnings')) document.getElementById('dashTotalEarnings').innerText = `Total Earnings: ₱${globalEarnings.toLocaleString()}`;
 }
 
 // ==========================================
-// UI INITIALIZATION & CHART CREATION
+// 5. UI INITIALIZATION & CHART CREATION
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     const topBarName = document.getElementById('topBarName');

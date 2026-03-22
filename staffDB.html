@@ -16,6 +16,18 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .pos-container { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: calc(100vh - 150px); }
+        .pos-products { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .pos-cart { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .pos-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: #FAFAFA; }
+        .pos-body { padding: 20px; overflow-y: auto; flex-grow: 1; }
+        .pos-totals { background: var(--dark-black); color: white; padding: 20px; border-radius: 0 0 8px 8px; }
+        .total-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .total-line.grand { font-size: 20px; font-weight: bold; color: var(--primary-red); border-top: 1px solid #444; padding-top: 10px; margin-top: 10px; }
+        .name-row { display: grid; grid-template-columns: 1fr 80px 1fr; gap: 10px; }
+        .inventory-split { display: grid; grid-template-columns: 1fr; gap: 30px; }
+    </style>
 </head>
 <body>
 
@@ -33,28 +45,31 @@
                 <i class="fa-solid fa-address-card"></i> <span class="menu-text">Manage Members</span>
             </li>
 
+            <li class="nav-item nav-clickable" onclick="switchTab('pos', this)">
+                <i class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale (POS)</span>
+            </li>
+
             <li class="nav-item has-submenu">
                 <i class="fa-solid fa-boxes-stacked"></i> <span class="menu-text">Gym Inventory</span>
                 <span class="badge-nav" style="background-color: #555;" id="navInventoryCount">0</span>
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('inventory', this)"><i class="fa-solid fa-arrow-right"></i> View Tables</li>
-                <li class="sub-item" onclick="switchTab('inventory', this); openAddEquipmentModal();"><i class="fa-solid fa-arrow-right"></i> Add Equipment</li>
-                <li class="sub-item" onclick="switchTab('inventory', this); exportInventoryReport();"><i class="fa-solid fa-arrow-right"></i> Generate Report</li>
+                <li class="sub-item" onclick="switchTab('inventory', this)"><i class="fa-solid fa-arrow-right"></i> View Inventory</li>
+                <li class="sub-item" onclick="switchTab('inventory', this); openEquipmentModal();"><i class="fa-solid fa-arrow-right"></i> Add Equipment</li>
+                <li class="sub-item" onclick="switchTab('inventory', this); openProductModal();"><i class="fa-solid fa-arrow-right"></i> Add Consumable</li>
+                <li class="sub-item" onclick="exportInventoryReport();"><i class="fa-solid fa-print"></i> Print Report</li>
             </ul>
             
             <li class="nav-item has-submenu">
-                <i class="fa-solid fa-chart-line"></i> <span class="menu-text">Sales Report</span>
+                <i class="fa-solid fa-chart-line"></i> <span class="menu-text">Financial Reports</span>
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('payments', this)"><i class="fa-solid fa-arrow-right"></i> View Transactions</li>
-                <li class="sub-item" onclick="switchTab('payments', this); openAddPaymentModal();"><i class="fa-solid fa-arrow-right"></i> Log Sale</li>
-                <li class="sub-item" onclick="switchTab('payments', this); exportReport();"><i class="fa-solid fa-arrow-right"></i> Generate Report</li>
+                <li class="sub-item" onclick="exportReport();"><i class="fa-solid fa-print"></i> Print Sales Report</li>
             </ul>
-            
-            </ul>
+        </ul>
     </aside>
 
     <main class="main-content">
@@ -66,7 +81,7 @@
                 <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
             </div>
             <div class="topbar-right">
-                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> <span id="topBarName">Welcome</span> <i class="fa-solid fa-caret-down"></i></button>
+                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> Welcome Staff <i class="fa-solid fa-caret-down"></i></button>
                 <button id="logoutBtn" onclick="handleLogout()"><i class="fa-solid fa-power-off"></i> Logout</button>
             </div>
         </header>
@@ -95,7 +110,7 @@
 
             <div class="middle-section">
                 <div class="panel" style="margin-bottom: 0;">
-                    <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Sales / Services Breakdown</div>
+                    <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Membership Plan Distribution</div>
                     <div class="panel-body">
                         <div class="chart-container">
                             <canvas id="servicesChart"></canvas>
@@ -105,28 +120,46 @@
 
                 <div class="panel" style="background: none; border: none; box-shadow: none; margin-bottom: 0; padding: 0;">
                     <div class="grid-stats">
-                        <div class="grid-stat-box border-black"><div class="num" id="gridMembers">0</div><div class="label">Total Members</div></div>
-                        <div class="grid-stat-box border-red"><div class="num" id="presentMembers">0</div><div class="label">Walk-ins Today</div></div>
-                        <div class="grid-stat-box border-red"><div class="num" id="gridEquip">0</div><div class="label">Available Equipments</div></div>
-                        <div class="grid-stat-box border-black"><div class="num" id="gridExpenses">₱0</div><div class="label">Total Expenses</div></div>
+                        <div class="grid-stat-box border-black"><div class="num" id="gridMembers">0</div><div class="label">Registered Members</div></div>
+                        <div class="grid-stat-box border-red"><div class="num" id="gridEquip">0</div><div class="label">Operational Equipments</div></div>
+                        <div class="grid-stat-box border-black"><div class="num" id="gridExpenses">₱0</div><div class="label">Maintenance Cost</div></div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="panel">
-                <div class="panel-header"><i class="fa-solid fa-chart-bar"></i> Earnings & Expenses Reports</div>
-                <div class="panel-body">
-                    <div class="chart-container-horizontal">
-                        <canvas id="earningsChart"></canvas>
+        <div id="pos" class="content-section">
+            <div class="pos-container">
+                <div class="pos-products">
+                    <div class="pos-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span><i class="fa-solid fa-box-open"></i> Available Consumables</span>
+                        <div class="search-box" style="width: 200px;">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="posSearch" placeholder="Search product..." onkeyup="filterTable('posTable', 'posSearch')">
+                        </div>
+                    </div>
+                    <div class="pos-body" style="padding: 0;">
+                        <table id="posTable" style="box-shadow: none; border-radius: 0;">
+                            <thead><tr><th>Product Name</th><th>Stock</th><th>Price (₱)</th><th>Action</th></tr></thead>
+                            <tbody id="posProductList"></tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
 
-            <div class="bottom-section">
-                <div class="panel">
-                    <div class="panel-header"><i class="fa-solid fa-clipboard-list"></i> Inventory Alerts</div>
-                    <div class="panel-body" id="dashInventoryAlerts">
-                        <p style="color: var(--text-muted); font-size: 14px;">Loading alerts...</p>
+                <div class="pos-cart">
+                    <div class="pos-header"><i class="fa-solid fa-cart-shopping"></i> Current Cart</div>
+                    <div class="pos-body" id="posCartBody">
+                        <p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>
+                    </div>
+                    <div class="pos-totals">
+                        <div class="total-line"><span>Subtotal:</span> <span>₱0.00</span></div>
+                        <div class="total-line"><span>VAT (12%):</span> <span>₱0.00</span></div>
+                        <div class="total-line" style="display: flex; align-items: center; justify-content: space-between;">
+                            <span><input type="checkbox" id="seniorDiscount" style="accent-color: var(--primary-red);" onchange="renderCart()"> Senior Citizen / PWD (20%)</span>
+                            <span style="color: #ff4c4c;">- ₱0.00</span>
+                        </div>
+                        <div class="total-line grand"><span>TOTAL:</span> <span>₱0.00</span></div>
+                        <button class="action-btn" onclick="processPayment(0)" style="width: 100%; justify-content: center; margin-top: 15px; font-size: 16px;"><i class="fa-solid fa-check"></i> PROCESS PAYMENT</button>
                     </div>
                 </div>
             </div>
@@ -148,25 +181,15 @@
                             </div>
                         </div>
                     </div>
-                    <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-plus"></i> Add Member</button>
+                    <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-plus"></i> Register Member</button>
                 </div>
             </div>
             
             <div class="panel">
-                <div class="panel-header"><i class="fas fa-address-card"></i> Member Accounts Directory</div>
+                <div class="panel-header"><i class="fas fa-address-card"></i> Registered Member Directory</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="membersTable">
-                        <thead><tr><th>Full Name</th><th>Email</th><th>Membership Plan</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-list-alt"></i> Live Member Attendance Log (Status)</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="attendanceTable">
-                        <thead><tr><th>Guest Name</th><th>Date</th><th>Time In</th><th>Type</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Membership Plan</th><th>Status</th><th>Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -174,48 +197,31 @@
         </div>
 
         <div id="inventory" class="content-section">
-            <div class="summary-bar">
-                <div class="summary-box"><div class="summary-text"><small>Total Machines</small><span id="statMachines">0</span></div><i class="fas fa-dumbbell"></i></div>
-                <div class="summary-box"><div class="summary-text"><small>Operational</small><span id="statOperational" style="color: #2ecc71;">0</span></div><i class="fas fa-check-circle"></i></div>
-                <div class="summary-box"><div class="summary-text"><small>Needs Maint.</small><span id="statMaintenance" style="color: #f1c40f;">0</span></div><i class="fas fa-tools"></i></div>
-                <div class="summary-box"><div class="summary-text"><small>Low Stock</small><span id="statLowStock" style="color: #e74c3c;">0</span></div><i class="fas fa-exclamation-circle"></i></div>
-            </div>
-
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="inventorySearch" placeholder="Search all items..." onkeyup="filterInventory()">
+            <div class="inventory-split">
+                <div class="panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between;">
+                        <span><i class="fas fa-dumbbell"></i> Gym Equipment (Non-Consumable)</span>
+                        <button class="action-btn" onclick="openEquipmentModal()" style="padding: 5px 15px;"><i class="fas fa-plus"></i> Add Equipment</button>
+                    </div>
+                    <div class="table-container" style="box-shadow: none;">
+                        <table id="machinesTable">
+                            <thead><tr><th>Name of Equipment</th><th>Classification</th><th>Weight/Size</th><th>Qty</th><th>Status</th><th>Actions</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
-                <button class="action-btn" onclick="openAddEquipmentModal()"><i class="fas fa-plus"></i> Add Item</button>
-            </div>
 
-            <div class="panel" style="border-left: 5px solid var(--primary-red);">
-                <div class="panel-header" style="color: var(--primary-red);"><i class="fas fa-exclamation-triangle"></i> Needs Attention (Maintenance & Low Stock)</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="attentionTable">
-                        <thead><tr><th>Item Name</th><th>Category</th><th>Issue / Status</th><th>Quick Action</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-dumbbell"></i> Gym Machines & Equipment</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="machinesTable">
-                        <thead><tr><th>Item Name</th><th>Category</th><th>Quantity</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-wine-bottle"></i> Product Inventory (Supplements & Beverages)</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="productsTable">
-                        <thead><tr><th>Product Name</th><th>Category</th><th>Stock Level</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
+                <div class="panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between;">
+                        <span><i class="fas fa-wine-bottle"></i> Products & Consumables</span>
+                        <button class="action-btn" onclick="openProductModal()" style="padding: 5px 15px; background: var(--dark-black);"><i class="fas fa-plus"></i> Add Consumable</button>
+                    </div>
+                    <div class="table-container" style="box-shadow: none;">
+                        <table id="productsTable">
+                            <thead><tr><th>Product Name</th><th>Volume/Size</th><th>Stock Lvl</th><th>Expiration Date</th><th>Status</th><th>Actions</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -224,18 +230,15 @@
             <div class="table-controls">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="paymentSearch" placeholder="Search transaction..." onkeyup="filterTable('paymentTable', 'paymentSearch')">
+                    <input type="text" id="paymentSearch" placeholder="Search receipt..." onkeyup="filterTable('paymentTable', 'paymentSearch')">
                 </div>
-                <div>
-                    <button class="action-btn" onclick="openAddPaymentModal()" style="display:inline-flex; margin-right:10px;"><i class="fas fa-plus"></i> Log Sale</button>
-                    <button class="action-btn" onclick="exportReport()" style="display:inline-flex; background: var(--dark-black);"><i class="fas fa-file-export"></i> Export</button>
-                </div>
+                <button class="action-btn" onclick="exportReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Report</button>
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-money-check-alt"></i> Transaction History (Receipts)</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="paymentTable">
-                        <thead><tr><th>Customer Name</th><th>Type</th><th>Date</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Customer Name</th><th>Items Purchased</th><th>Date</th><th>Gross Total</th><th>VAT</th><th>Net Total</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -247,27 +250,51 @@
     <div id="equipmentModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="equipModalTitle">Add Inventory Item</h3>
+                <h3 id="equipModalTitle">Register Equipment</h3>
                 <span class="close-btn" onclick="closeModal('equipmentModal')">&times;</span>
             </div>
             <form class="modal-form" id="equipmentForm">
-                <input type="text" id="equipName" placeholder="Item Name" required>
+                <input type="text" id="equipName" placeholder="Name of Equipment" required>
                 <select id="equipCategory">
-                    <option value="Cardio">Cardio Equipment</option>
-                    <option value="Strength">Strength Equipment</option>
-                    <option value="Machines">Machines</option>
-                    <option value="Supplements">Supplements (Protein/Creatine)</option>
-                    <option value="Beverages">Beverages (Water/Energy)</option>
-                    <option value="Accessories">Accessories</option>
+                    <option value="Cardio">Cardio Classification</option>
+                    <option value="Strength">Strength Classification</option>
+                    <option value="Accessories">Accessories / Mats</option>
                 </select>
-                <input type="number" id="equipQty" placeholder="Quantity / Stock Level" required>
+                <input type="text" id="equipSize" placeholder="Weight (Kgs) or Size Dimensions" required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Quantity to Add (Automated Addition):</p>
+                <input type="number" id="equipQty" placeholder="Amount to add" required>
                 <select id="equipStatus">
-                    <option value="Operational">Operational / In Stock</option>
-                    <option value="Low Stock">Low Stock</option>
-                    <option value="Maintenance">Under Maintenance</option>
+                    <option value="Operational">No Issues (Operational)</option>
+                    <option value="Maintenance">Flag for Maintenance</option>
                     <option value="Out of Order">Out of Order</option>
                 </select>
-                <button type="submit" id="equipSubmitBtn">Save Item</button>
+                <button type="submit" id="equipSubmitBtn">Register Equipment</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="productModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="prodModalTitle">Stock Consumable Product</h3>
+                <span class="close-btn" onclick="closeModal('productModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="productForm">
+                <input type="text" id="prodName" placeholder="Product Name" required>
+                <select id="prodCategory">
+                    <option value="Supplements">Supplements (Tubs/Capsules)</option>
+                    <option value="Beverages">Beverages (Bottles)</option>
+                    <option value="Merch">Apparel / Merchandise</option>
+                </select>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="prodVol" placeholder="Volume / Size" required style="width: 50%;">
+                    <input type="number" id="prodPrice" placeholder="Selling Price (₱)" required style="width: 50%;">
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Expiration Date (Mandatory for Consumables):</p>
+                <input type="date" id="prodExpiry" required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Pieces/Units to Add:</p>
+                <input type="number" id="prodQty" placeholder="Amount to add" required>
+                <button type="submit" style="background-color: var(--dark-black);">Add to Stock</button>
             </form>
         </div>
     </div>
@@ -275,78 +302,32 @@
     <div id="memberModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="memberModalTitle">Add New Member</h3>
+                <h3 id="memberModalTitle">Register New Member</h3>
                 <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
             </div>
             <form class="modal-form" id="memberForm">
-                <input type="text" id="memberName" placeholder="Full Name" required>
-                <input type="email" id="memberEmail" placeholder="Email Address" required>
+                <div class="name-row">
+                    <input type="text" id="memGiven" placeholder="Given Name" required>
+                    <input type="text" id="memMI" placeholder="M.I." maxlength="2" required>
+                    <input type="text" id="memFamily" placeholder="Family Name" required>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <input type="email" id="memberEmail" placeholder="Email Address" required style="flex-grow: 1;">
+                    <button type="button" onclick="alert('Verification link sent to email.')" style="background: #555; padding: 0 15px; border-radius: 4px; color: white; border: none; cursor: pointer; margin-bottom: 15px;">Verify</button>
+                </div>
                 <select id="memberPlan">
-                    <option value="Gold Plan">Gold Plan</option>
-                    <option value="Silver Plan">Silver Plan</option>
-                    <option value="Walk-in">Walk-in</option>
+                    <option value="Gold Plan">Gold Membership (1 Year)</option>
+                    <option value="Silver Plan">Silver Membership (6 Months)</option>
                 </select>
                 <select id="memberStatus">
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
                 </select>
-                <button type="submit">Save Member</button>
+                <button type="submit">Create Member Profile</button>
             </form>
         </div>
     </div>
 
-    <div id="paymentModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Log New Transaction</h3>
-                <span class="close-btn" onclick="closeModal('paymentModal')">&times;</span>
-            </div>
-            <form class="modal-form" id="paymentForm">
-                <input type="text" id="payName" placeholder="Customer / Guest Name" required>
-                <select id="payType">
-                    <option value="Walk-in Fee">Walk-in Fee (₱150)</option>
-                    <option value="Membership (Gold)">Membership - Gold (₱2500)</option>
-                    <option value="Membership (Silver)">Membership - Silver (₱1500)</option>
-                    <option value="Product Purchase">Product / Supplement</option>
-                </select>
-                <input type="number" id="payAmount" placeholder="Amount (₱)" required>
-                <select id="payStatus">
-                    <option value="Paid">Paid</option>
-                    <option value="Pending">Pending</option>
-                </select>
-                <button type="submit">Save Transaction</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="transactionModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Transaction Details</h3>
-                <span class="close-btn" onclick="closeModal('transactionModal')">&times;</span>
-            </div>
-            <div id="transactionDetails" style="line-height: 1.8; color: #333;"></div>
-            <button class="action-btn" style="width: 100%; margin-top: 20px;" onclick="closeModal('transactionModal')">Close</button>
-        </div>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
-            authDomain: "fit-track-ca8d1.firebaseapp.com",
-            projectId: "fit-track-ca8d1",
-            storageBucket: "fit-track-ca8d1.firebasestorage.app",
-            messagingSenderId: "157593985795",
-            appId: "1:157593985795:web:07156961dda8e2254fbf36",
-            measurementId: "G-NYGGEMMJMC"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-    </script>
     <script type="module" src="js/script.js"></script>
 
 </body>
