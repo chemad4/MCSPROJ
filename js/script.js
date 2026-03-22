@@ -17,7 +17,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 4. Initialize EmailJS with your Public API Key
+// 4. Initialize EmailJS 
 emailjs.init("ZqQKGRo5j5KpAhH98");
 
 // ==========================================
@@ -87,15 +87,15 @@ let inventoryData = [];
 let allUsersData = []; 
 let membersData = []; 
 let paymentsData = [];
+let attendanceData = [];
 let posCart = []; 
 
 const inventoryCol = collection(db, "inventory");
 const paymentsCol = collection(db, "payments");
 const usersCol = collection(db, "users");
+const attendanceCol = collection(db, "attendance");
 
-let earningsChartInstance = null;
 let servicesChartInstance = null;
-let globalEarnings = 0;
 
 // ==========================================
 // 1. INVENTORY LOGIC (Live Listener)
@@ -143,7 +143,6 @@ function renderInventory() {
         if(isConsumable) prodTbody.innerHTML += rowHTML;
         else equipTbody.innerHTML += rowHTML;
 
-        // Populate Dashboard Alerts
         if(isProblematic) {
             alertsHtml += `<div class="list-item">
                 <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
@@ -196,7 +195,15 @@ if(document.getElementById('productForm')) document.getElementById('productForm'
 function renderPOSProducts() {
     const posBody = document.getElementById('posProductList');
     if(!posBody) return;
-    posBody.innerHTML = "";
+    
+    posBody.innerHTML = `
+        <tr style="background-color: #fff9e6;">
+            <td><strong>Walk-in Gym Access (Day Pass)</strong></td>
+            <td>Unlimited</td>
+            <td>₱150.00</td>
+            <td><button class="action-btn" style="padding: 5px 10px; background-color: var(--dark-black);" onclick="addToCart('WALKIN', 'Walk-in Gym Access', 150, 999)">Add</button></td>
+        </tr>
+    `;
     
     inventoryData.forEach(item => {
         if(['Supplements', 'Beverages', 'Merch'].includes(item.cat) && item.qty > 0) {
@@ -262,24 +269,91 @@ function updatePOSTotals(sub, vat, disc, grand) {
 
 window.processPayment = async function(grandTotal) {
     if(posCart.length === 0) return alert("Cart is empty!");
-    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
-    await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "Product Purchase", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr });
+    await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "POS Sale", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr, time: timeStr });
 
     for(let item of posCart) {
+        if (item.id === 'WALKIN') {
+            for(let w = 0; w < item.qty; w++) {
+                await addDoc(attendanceCol, {
+                    name: "Walk-in Guest",
+                    type: "Walk-in",
+                    date: dateStr,
+                    time: timeStr,
+                    timestamp: now.getTime()
+                });
+            }
+            continue; 
+        }
         let currentStock = inventoryData.find(i => i.id === item.id).qty;
         await updateDoc(doc(db, "inventory", item.id), { qty: currentStock - item.qty });
     }
 
-    alert("Payment Processed Successfully! Inventory deducted.");
+    alert("Payment Processed Successfully! Walk-ins logged to Attendance.");
     posCart = [];
     renderCart();
 }
 
 // ==========================================
-// 3. MASTER DIRECTORY LOGIC (Members & Staff)
+// 3. MASTER DIRECTORY & ATTENDANCE LOGIC
 // ==========================================
+onSnapshot(attendanceCol, (snapshot) => {
+    attendanceData = [];
+    snapshot.forEach(doc => attendanceData.push({ id: doc.id, ...doc.data() }));
+    renderAttendance();
+});
+
+function renderAttendance() {
+    const attTbody = document.querySelector('#attendanceTable tbody');
+    if(!attTbody) return;
+    attTbody.innerHTML = "";
+
+    let today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    let gold = 0, silver = 0, walkin = 0;
+
+    let todayAtt = attendanceData.filter(a => a.date === today).sort((a,b) => b.timestamp - a.timestamp);
+
+    todayAtt.forEach(a => {
+        let badgeClass = a.type.includes('Gold') ? 'gold' : a.type.includes('Silver') ? 'silver' : 'walkin';
+        attTbody.innerHTML += `<tr>
+            <td>${a.name}</td>
+            <td><strong>${a.type}</strong></td>
+            <td>${a.date}</td>
+            <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${a.time}</span></td>
+        </tr>`;
+
+        if(a.type.includes('Gold')) gold++;
+        else if(a.type.includes('Silver')) silver++;
+        else if(a.type.includes('Walk-in')) walkin++;
+    });
+
+    if(servicesChartInstance) {
+        servicesChartInstance.data.datasets[0].data = [gold, silver, walkin];
+        servicesChartInstance.update();
+    }
+
+    if(document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = gold + silver + walkin;
+}
+
+window.checkInMember = async function(name, plan) {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    await addDoc(attendanceCol, {
+        name: name,
+        type: plan,
+        date: dateStr,
+        time: timeStr,
+        timestamp: now.getTime()
+    });
+    alert(`${name} has been successfully checked in!`);
+}
+
 onSnapshot(usersCol, (snapshot) => {
     allUsersData = [];
     membersData = [];
@@ -304,12 +378,16 @@ function renderMembers() {
         const statusStr = (m.status || "Active").trim().toLowerCase();
         let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let plan = m.plan || 'Standard Member'; 
+        let fullName = `${m.givenName || m.name} ${m.familyName || ''}`;
         
         memTbody.innerHTML += `<tr>
             <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
             <td>${m.email}</td><td><strong>${plan}</strong></td>
             <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
-            <td><button class="btn-icon btn-delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button></td>
+            <td>
+                <button class="btn-icon" style="color: #2ecc71;" title="Check-in Member" onclick="checkInMember('${fullName}', '${plan}')"><i class="fa-solid fa-right-to-bracket"></i></button>
+                <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
+            </td>
         </tr>`;
 
         if(statusStr === 'active') activeMembers++;
@@ -333,7 +411,7 @@ function renderStaff() {
         const statusStr = (u.status || "Active").trim().toLowerCase();
 
         const rowHtml = `<tr>
-            <td>${u.givenName || u.name}</td><td>${u.familyName || ''}</td><td>${u.email}</td>
+            <td>${u.givenName || u.name} ${u.familyName || ''}</td><td>${u.role}</td><td>${u.email}</td>
             <td><span class="badge active">${u.status || 'Active'}</span></td>
             <td><button class="btn-icon btn-delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
@@ -377,7 +455,7 @@ window.addBatchRow = function() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td><input type="text" class="bm-first" required></td>
-        <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" required></td>
+        <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt."></td>
         <td><input type="text" class="bm-last" required></td>
         <td><input type="email" class="bm-email" required></td>
         <td>
@@ -396,7 +474,7 @@ window.openMemberModal = () => {
     document.getElementById('batchMemberBody').innerHTML = `
         <tr>
             <td><input type="text" class="bm-first" required></td>
-            <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" required></td>
+            <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt."></td>
             <td><input type="text" class="bm-last" required></td>
             <td><input type="email" class="bm-email" required></td>
             <td><select class="bm-plan"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
@@ -435,7 +513,6 @@ if(document.getElementById('batchMemberForm')) {
                     generated_password: randomPassword,
                     plan: plan
                 });
-                console.log(`[Email Sent] Successfully sent to: ${email}`);
             } catch(err) {
                 console.error("EmailJS failed:", err);
             }
@@ -515,7 +592,6 @@ if(document.getElementById('batchStaffForm')) {
                     generated_password: randomPassword,
                     plan: `${role} Account`
                 });
-                console.log(`[Email Sent] Successfully sent to: ${email}`);
             } catch(err) {
                 console.error("EmailJS failed:", err);
             }
@@ -539,33 +615,17 @@ function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
     if(payTbody) payTbody.innerHTML = "";
     
-    globalEarnings = 0;
-    let walkinCount = 0, goldSales = 0, silverSales = 0, productSales = 0;
-
     paymentsData.forEach(t => {
         let vat = (t.amount * 0.12).toFixed(2);
         if(payTbody) {
             payTbody.innerHTML += `<tr>
-                <td>${t.name}</td><td>${t.items || t.type}</td><td>${t.date}</td>
+                <td>${t.name}</td><td>${t.items || t.type}</td>
+                <td>${t.date} <span style="color:#888; font-size:12px;">${t.time || ''}</span></td>
                 <td>₱${t.amount}</td><td>₱${vat}</td>
                 <td style="font-weight:bold; color:var(--primary-red);">₱${t.amount}</td>
             </tr>`;
         }
-        if(t.status === 'Paid') {
-            globalEarnings += Number(t.amount);
-            if(t.type && t.type.includes('Gold')) goldSales++; 
-            else if(t.type && t.type.includes('Silver')) silverSales++; 
-            else if(t.type && t.type.includes('Walk-in')) walkinCount++; 
-            else productSales++; 
-        }
     });
-
-    if(document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = walkinCount; 
-
-    if(servicesChartInstance) {
-        servicesChartInstance.data.datasets[0].data = [goldSales, silverSales, walkinCount, productSales];
-        servicesChartInstance.update();
-    }
 }
 
 // ==========================================
@@ -600,10 +660,10 @@ function initDashboardCharts() {
     servicesChartInstance = new Chart(ctxServices.getContext('2d'), {
         type: 'bar',
         data: { 
-            labels: ['Gold Plan', 'Silver Plan', 'Walk-ins', 'Products'], 
+            labels: ['Gold Members', 'Silver Members', 'Walk-in Guests'], 
             datasets: [{ 
-                label: 'Total Units Sold',
-                data: [0, 0, 0, 0], 
+                label: 'Daily Check-ins',
+                data: [0, 0, 0], 
                 backgroundColor: '#C01718', hoverBackgroundColor: '#111111', borderRadius: 4 
             }] 
         },

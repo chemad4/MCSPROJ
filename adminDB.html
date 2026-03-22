@@ -128,8 +128,8 @@
             </div>
 
             <div class="middle-section">
-                <div class="panel" style="margin-bottom: 0;">
-                    <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Membership Plan Distribution</div>
+                <div class="panel" style="margin-bottom: 0;" onclick="switchTab('members')">
+                    <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Live Daily Attendance</div>
                     <div class="panel-body">
                         <div class="chart-container">
                             <canvas id="servicesChart"></canvas>
@@ -142,7 +142,7 @@
                         <div class="grid-stat-box border-black" onclick="switchTab('members')"><div class="num" id="gridMembers">0</div><div class="label">Registered Members</div></div>
                         <div class="grid-stat-box border-red" onclick="switchTab('trainers')"><div class="num" id="gridTrainers">0</div><div class="label">Total Trainers</div></div>
                         <div class="grid-stat-box border-red" onclick="switchTab('inventory')"><div class="num" id="gridEquip">0</div><div class="label">Operational Equipments</div></div>
-                        <div class="grid-stat-box border-black" onclick="switchTab('pos')"><div class="num" id="presentMembers">0</div><div class="label">Walk-ins Today</div></div>
+                        <div class="grid-stat-box border-black" onclick="switchTab('members')"><div class="num" id="presentMembers">0</div><div class="label">Total Check-ins Today</div></div>
                     </div>
                 </div>
             </div>
@@ -176,7 +176,8 @@
                     <div class="pos-body" style="padding: 0;">
                         <table id="posTable" style="box-shadow: none; border-radius: 0;">
                             <thead><tr><th>Product Name</th><th>Stock</th><th>Price (₱)</th><th>Action</th></tr></thead>
-                            <tbody id="posProductList"></tbody>
+                            <tbody id="posProductList">
+                                </tbody>
                         </table>
                     </div>
                 </div>
@@ -214,6 +215,16 @@
                 <div class="table-container" style="box-shadow: none;">
                     <table id="membersTable">
                         <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Membership Plan</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <div class="panel-header"><i class="fas fa-clipboard-user"></i> Live Daily Attendance Log (Timestamps)</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="attendanceTable">
+                        <thead><tr><th>Guest / Member Name</th><th>Membership Type</th><th>Date Logged</th><th>Time In</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -262,7 +273,7 @@
                 <div class="panel-header"><i class="fas fa-money-check-alt"></i> Transaction History (Receipts)</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="paymentTable">
-                        <thead><tr><th>Customer Name</th><th>Items Purchased</th><th>Date</th><th>Gross Total</th><th>VAT</th><th>Net Total</th></tr></thead>
+                        <thead><tr><th>Customer Name</th><th>Items Purchased</th><th>Date & Time</th><th>Gross Total</th><th>VAT</th><th>Net Total</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -382,10 +393,9 @@
                             </tr>
                         </thead>
                         <tbody id="batchStaffBody">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
-                
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <button type="button" onclick="addStaffBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
                     <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
@@ -415,10 +425,9 @@
                             </tr>
                         </thead>
                         <tbody id="batchMemberBody">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
-                
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <button type="button" onclick="addBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
                     <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
@@ -444,7 +453,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
     </script>
-
     <script type="module" src="js/script.js"></script>
 
 </body>

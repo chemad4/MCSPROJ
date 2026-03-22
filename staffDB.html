@@ -111,8 +111,8 @@
             </div>
 
             <div class="middle-section">
-                <div class="panel" style="margin-bottom: 0;">
-                    <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Membership Plan Distribution</div>
+                <div class="panel" style="margin-bottom: 0;" onclick="switchTab('members')">
+                    <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Live Daily Attendance</div>
                     <div class="panel-body">
                         <div class="chart-container">
                             <canvas id="servicesChart"></canvas>
@@ -194,6 +194,16 @@
                     </table>
                 </div>
             </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <div class="panel-header"><i class="fas fa-clipboard-user"></i> Live Daily Attendance Log (Timestamps)</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="attendanceTable">
+                        <thead><tr><th>Guest / Member Name</th><th>Membership Type</th><th>Date Logged</th><th>Time In</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <div id="inventory" class="content-section">
@@ -238,7 +248,7 @@
                 <div class="panel-header"><i class="fas fa-money-check-alt"></i> Transaction History (Receipts)</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="paymentTable">
-                        <thead><tr><th>Customer Name</th><th>Items Purchased</th><th>Date</th><th>Gross Total</th><th>VAT</th><th>Net Total</th></tr></thead>
+                        <thead><tr><th>Customer Name</th><th>Items Purchased</th><th>Date & Time</th><th>Gross Total</th><th>VAT</th><th>Net Total</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -320,10 +330,9 @@
                             </tr>
                         </thead>
                         <tbody id="batchMemberBody">
-                            </tbody>
+                        </tbody>
                     </table>
                 </div>
-                
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <button type="button" onclick="addBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
                     <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
