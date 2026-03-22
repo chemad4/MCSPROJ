@@ -143,6 +143,7 @@ function renderInventory() {
         if(isConsumable) prodTbody.innerHTML += rowHTML;
         else equipTbody.innerHTML += rowHTML;
 
+        // Populate Dashboard Alerts
         if(isProblematic) {
             alertsHtml += `<div class="list-item">
                 <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
