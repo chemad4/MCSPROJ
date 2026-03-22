@@ -30,7 +30,6 @@ window.handleLogout = function() {
     window.location.replace("index.html"); 
 };
 
-// Updated switchTab to support clicking from Dashboard cards
 window.switchTab = function(tabId, element) {
     if(event) event.stopPropagation();
     document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active-section'));
@@ -43,7 +42,6 @@ window.switchTab = function(tabId, element) {
         element.classList.add('active');
         if(element.classList.contains('sub-item')) element.parentElement.previousElementSibling.classList.add('active');
     } else {
-        // If clicked from a dashboard stat card, highlight the correct sidebar item
         const targetNav = document.querySelector(`.nav-menu li[onclick*="switchTab('${tabId}'"]`);
         if(targetNav) {
             targetNav.classList.add('active');
@@ -70,9 +68,8 @@ window.filterTable = function(tableId, inputId) {
     const filter = document.getElementById(inputId).value.toUpperCase();
     const tr = document.getElementById(tableId).getElementsByTagName("tr");
     for (let i = 1; i < tr.length; i++) {
-        let td = tr[i].getElementsByTagName("td")[0]; // Also check plan for members
+        let td = tr[i].getElementsByTagName("td")[0]; 
         if(tableId === 'membersTable') {
-            // Check Name AND Plan columns for flexibility
             let tdPlan = tr[i].getElementsByTagName("td")[4]; 
             let text = (td ? td.textContent : "") + " " + (tdPlan ? tdPlan.textContent : "");
             if (text.toUpperCase().indexOf(filter) > -1) tr[i].style.display = "";
@@ -146,7 +143,6 @@ function renderInventory() {
         if(isConsumable) prodTbody.innerHTML += rowHTML;
         else equipTbody.innerHTML += rowHTML;
 
-        // Populate Dashboard Alerts
         if(isProblematic) {
             alertsHtml += `<div class="list-item">
                 <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
@@ -336,7 +332,7 @@ function renderStaff() {
         const statusStr = (u.status || "Active").trim().toLowerCase();
 
         const rowHtml = `<tr>
-            <td>${u.name}</td><td>${u.role}</td><td>${u.email}</td>
+            <td>${u.givenName || u.name}</td><td>${u.familyName || ''}</td><td>${u.email}</td>
             <td><span class="badge active">${u.status || 'Active'}</span></td>
             <td><button class="btn-icon btn-delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
@@ -345,13 +341,12 @@ function renderStaff() {
             if(trainerTbody) trainerTbody.innerHTML += rowHtml;
             totalTrainers++;
             
-            // Populate Dashboard Active Trainer Feed
             if(statusStr === 'active') {
                 activeTrainers++;
                 trainersFeed += `<div class="list-item">
                     <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
                     <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <div><div class="trainer-name">${u.name}</div><p style="font-size: 12px; color: var(--text-muted);">${u.email}</p></div>
+                        <div><div class="trainer-name">${u.givenName || u.name}</div><p style="font-size: 12px; color: var(--text-muted);">${u.email}</p></div>
                         <span class="status-badge status-progress">On Floor</span>
                     </div>
                 </div>`;
@@ -369,7 +364,11 @@ function renderStaff() {
     if(dashTrainers) dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
 }
 
-// BATCH MEMBER REGISTRATION LOGIC
+window.deleteUser = async (id) => { if(confirm("Remove this account?")) await deleteDoc(doc(db, "users", id)); }
+
+// ==========================================
+// 4. BATCH REGISTRATION (MEMBERS & STAFF)
+// ==========================================
 let batchRowCount = 1;
 window.addBatchRow = function() {
     if(batchRowCount >= 20) return alert("Maximum 20 members can be registered at once.");
@@ -406,13 +405,11 @@ window.openMemberModal = () => {
     document.getElementById('memberModal').style.display = 'flex'; 
 }
 
-// Generates an 8-character random password
 const generatePassword = () => Math.random().toString(36).slice(-8);
 
 if(document.getElementById('batchMemberForm')) {
     document.getElementById('batchMemberForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
         const rows = document.querySelectorAll('#batchMemberBody tr');
         let addedCount = 0;
 
@@ -424,14 +421,12 @@ if(document.getElementById('batchMemberForm')) {
             const plan = row.querySelector('.bm-plan').value;
             const randomPassword = generatePassword();
 
-            // 1. Save to Firebase
             await addDoc(usersCol, { 
                 name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
                 role: "Member", email: email, status: "Active", plan: plan,
                 password: randomPassword 
             });
 
-            // 2. Send Real Email via EmailJS
             try {
                 await emailjs.send("service_x90mti6", "template_nda1wjc", {
                     to_name: given,
@@ -443,40 +438,95 @@ if(document.getElementById('batchMemberForm')) {
             } catch(err) {
                 console.error("EmailJS failed:", err);
             }
-            
             addedCount++;
         }
-
         window.closeModal('memberModal');
         alert(`Successfully registered ${addedCount} member(s)! Verification emails and passwords have been sent.`);
     });
 }
 
-window.openStaffModal = (role) => {
-    document.getElementById('staffForm').reset();
-    document.getElementById('hiddenStaffRole').value = role;
-    document.getElementById('staffModalTitle').innerText = `Add New ${role}`;
-    document.getElementById('staffModal').style.display = 'flex';
+// BATCH REGISTRATION FOR STAFF/TRAINERS
+let staffBatchRowCount = 1;
+window.addStaffBatchRow = function() {
+    if(staffBatchRowCount >= 20) return alert("Maximum 20 accounts can be registered at once.");
+    const tbody = document.getElementById('batchStaffBody');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="text" class="bs-first" required></td>
+        <td><input type="text" class="bs-last" required></td>
+        <td><input type="email" class="bs-email" required></td>
+        <td>
+            <select class="bs-status">
+                <option value="Active">Active</option>
+                <option value="On Leave">On Leave</option>
+            </select>
+        </td>
+        <td><button type="button" onclick="this.parentElement.parentElement.remove(); staffBatchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
+    `;
+    tbody.appendChild(tr);
+    staffBatchRowCount++;
 }
-window.deleteUser = async (id) => { if(confirm("Remove this account?")) await deleteDoc(doc(db, "users", id)); }
 
-if(document.getElementById('staffForm')) {
-    document.getElementById('staffForm').addEventListener('submit', async (e) => {
+window.openStaffModal = (role) => { 
+    document.getElementById('hiddenStaffRole').value = role;
+    document.getElementById('staffModalTitle').innerText = `Batch Register ${role}s (Up to 20)`;
+    document.getElementById('batchStaffBody').innerHTML = `
+        <tr>
+            <td><input type="text" class="bs-first" required></td>
+            <td><input type="text" class="bs-last" required></td>
+            <td><input type="email" class="bs-email" required></td>
+            <td>
+                <select class="bs-status">
+                    <option value="Active">Active</option>
+                    <option value="On Leave">On Leave</option>
+                </select>
+            </td>
+            <td></td>
+        </tr>`;
+    staffBatchRowCount = 1;
+    document.getElementById('staffModal').style.display = 'flex'; 
+}
+
+if(document.getElementById('batchStaffForm')) {
+    document.getElementById('batchStaffForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        await addDoc(usersCol, { 
-            name: document.getElementById('staffName').value, 
-            role: document.getElementById('hiddenStaffRole').value,
-            email: document.getElementById('staffEmail').value, 
-            status: document.getElementById('staffStatus').value,
-            password: "password123" 
-        });
+        const rows = document.querySelectorAll('#batchStaffBody tr');
+        const role = document.getElementById('hiddenStaffRole').value;
+        let addedCount = 0;
+
+        for (let row of rows) {
+            const given = row.querySelector('.bs-first').value;
+            const family = row.querySelector('.bs-last').value;
+            const email = row.querySelector('.bs-email').value;
+            const status = row.querySelector('.bs-status').value;
+            const randomPassword = generatePassword();
+
+            await addDoc(usersCol, { 
+                name: `${given} ${family}`, givenName: given, familyName: family,
+                role: role, email: email, status: status,
+                password: randomPassword 
+            });
+
+            try {
+                await emailjs.send("service_x90mti6", "template_nda1wjc", {
+                    to_name: given,
+                    to_email: email,
+                    generated_password: randomPassword,
+                    plan: `${role} Account`
+                });
+                console.log(`[Email Sent] Successfully sent to: ${email}`);
+            } catch(err) {
+                console.error("EmailJS failed:", err);
+            }
+            addedCount++;
+        }
         window.closeModal('staffModal');
-        alert("Account created successfully!");
+        alert(`Successfully registered ${addedCount} ${role}(s)! Verification emails and passwords have been sent.`);
     });
 }
 
 // ==========================================
-// 4. FINANCIALS
+// 5. FINANCIALS
 // ==========================================
 onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
