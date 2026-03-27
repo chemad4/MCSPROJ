@@ -132,16 +132,32 @@ function renderInventory() {
     let ops = 0, maint = 0, low = 0, totalMachines = 0;
 
     inventoryData.forEach((item) => {
-        let isConsumable = ['Supplements', 'Beverages', 'Merch'].includes(item.cat);
+        let isConsumable = ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
+        
+        // Dynamic Status Calculation based on Qty
+        let currentStatus = item.status || (isConsumable ? 'In Stock' : 'Operational');
         let badge = 'operational';
         let isProblematic = false;
 
-        if(item.status === 'Maintenance') { badge = 'maintenance'; maint++; isProblematic = true; }
-        else if(item.status === 'Out of Order') { badge = 'broken'; isProblematic = true; }
-        else if(item.qty <= 5) { badge = 'stock-low'; low++; isProblematic = true;}
-        else { ops++; }
-
-        if(!isConsumable) totalMachines++;
+        if (item.qty === 0) {
+            currentStatus = "Out of Stock";
+            badge = 'broken';
+            isProblematic = true;
+        } else if (item.qty <= 5) {
+            if (currentStatus !== 'Maintenance' && currentStatus !== 'Out of Order') {
+                currentStatus = "Low Stock";
+                badge = 'stock-low';
+                isProblematic = true;
+                low++;
+            }
+        } else if (currentStatus === 'Maintenance') { 
+            badge = 'maintenance'; maint++; isProblematic = true; 
+        } else if (currentStatus === 'Out of Order') { 
+            badge = 'broken'; isProblematic = true; 
+        }
+        
+        if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
+        if (!isConsumable) totalMachines++;
 
         let rowHTML = `<tr>
             <td>${item.name}</td>
@@ -149,7 +165,7 @@ function renderInventory() {
             <td>${item.size || 'N/A'}</td>
             ${isConsumable ? `<td>${item.expiry || 'N/A'}</td>` : ''}
             <td>${item.qty}</td>
-            <td><span class="badge ${badge}">${item.status || 'Active'}</span></td>
+            <td><span class="badge ${badge}">${currentStatus}</span></td>
             <td><button class="btn-icon btn-delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button></td>
         </tr>`;
 
@@ -159,7 +175,7 @@ function renderInventory() {
         if(isProblematic) {
             alertsHtml += `<div class="list-item">
                 <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                <div class="list-content"><h4>Status: ${item.status || 'Low Stock'}</h4><p><strong>${item.name}</strong> requires attention.</p></div>
+                <div class="list-content"><h4>Status: ${currentStatus}</h4><p><strong>${item.name}</strong> requires attention.</p></div>
             </div>`;
         }
     });
@@ -180,22 +196,25 @@ async function handleInventorySubmit(e, isProduct) {
     e.preventDefault();
     const nameStr = document.getElementById(isProduct ? 'prodName' : 'equipName').value.trim();
     const addQty = Number(document.getElementById(isProduct ? 'prodQty' : 'equipQty').value);
+    
+    // AUTOMATED INVENTORY ADDITION
     const existingItem = inventoryData.find(i => i.name.toLowerCase() === nameStr.toLowerCase());
 
     if (existingItem) {
         await updateDoc(doc(db, "inventory", existingItem.id), { qty: existingItem.qty + addQty });
-        alert(`Added ${addQty} to existing stock of ${existingItem.name}.`);
+        alert(`Automated Update: Added ${addQty} units to existing stock. New Total: ${existingItem.qty + addQty} units.`);
     } else {
         const newItem = { 
             name: nameStr, 
             cat: document.getElementById(isProduct ? 'prodCategory' : 'equipCategory').value, 
             size: document.getElementById(isProduct ? 'prodVol' : 'equipSize').value, 
             qty: addQty, 
-            status: isProduct ? 'Operational' : document.getElementById('equipStatus').value,
+            status: isProduct ? 'In Stock' : 'Operational', // Automatically assumes good status
             price: isProduct ? Number(document.getElementById('prodPrice').value) : 0,
             expiry: isProduct ? document.getElementById('prodExpiry').value : null
         };
         await addDoc(inventoryCol, newItem);
+        alert(`New ${isProduct ? 'product' : 'equipment'} registered successfully!`);
     }
     window.closeModal(isProduct ? 'productModal' : 'equipmentModal');
 }
@@ -220,7 +239,8 @@ function renderPOSProducts() {
     `;
     
     inventoryData.forEach(item => {
-        if(['Supplements', 'Beverages', 'Merch'].includes(item.cat) && item.qty > 0) {
+        let isConsumable = ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
+        if(isConsumable && item.qty > 0) {
             let price = item.price || 0;
             posBody.innerHTML += `<tr>
                 <td>${item.name}</td><td>${item.qty}</td><td>₱${price.toFixed(2)}</td>
@@ -394,7 +414,6 @@ function renderMembers() {
             daysLeftText = "30 Days";
         }
         
-        // FIXED COLUMN ALIGNMENT
         memTbody.innerHTML += `<tr>
             <td>${m.givenName || m.name}</td>
             <td>${m.mi || ''}</td>
@@ -524,7 +543,7 @@ if(document.getElementById('batchMemberForm')) {
                 name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
                 role: "Member", email: email, status: "Active", plan: plan,
                 password: randomPassword,
-                dateRegistered: currentTimestamp
+                dateRegistered: currentTimestamp 
             });
 
             try {
