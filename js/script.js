@@ -50,7 +50,8 @@ window.switchTab = function(tabId, element) {
     }
     const titles = {
         'dashboard': 'Dashboard',
-        'inventory': 'Inventory Management',
+        'equipment': 'Equipment Management',
+        'products': 'Products & Consumables',
         'pos': 'Point of Sale (POS)',
         'payments': 'Financial Reports',
         'members': 'Member Directory', 
@@ -64,30 +65,27 @@ window.closeModal = function(modalId) { document.getElementById(modalId).style.d
 window.exportReport = function() { window.print(); }
 window.exportInventoryReport = function() { window.print(); }
 
-// Search Table Global Function
 window.filterTable = function(tableId, inputId) {
     const filter = document.getElementById(inputId).value.toUpperCase();
     const tr = document.getElementById(tableId).getElementsByTagName("tr");
     for (let i = 1; i < tr.length; i++) {
-        let tdName = tr[i].getElementsByTagName("td")[0]; 
-        let tdPlan = tr[i].getElementsByTagName("td")[4]; 
-        
-        if (tdName) {
-            let text = (tdName.textContent || tdName.innerText).toUpperCase();
-            if (tdPlan) text += " " + (tdPlan.textContent || tdPlan.innerText).toUpperCase();
-            
-            if (text.indexOf(filter) > -1) tr[i].style.display = "";
+        let td = tr[i].getElementsByTagName("td")[0]; 
+        if(tableId === 'membersTable') {
+            let tdPlan = tr[i].getElementsByTagName("td")[4]; 
+            let text = (td ? td.textContent : "") + " " + (tdPlan ? tdPlan.textContent : "");
+            if (text.toUpperCase().indexOf(filter) > -1) tr[i].style.display = "";
             else tr[i].style.display = "none";
+        } else {
+            if (td) tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
         }
     }
 }
 
-// Plan Filter Dropdown Global Function
 window.filterByPlan = function(val) {
     const filterText = val.toUpperCase();
     const tr = document.getElementById('membersTable').getElementsByTagName("tr");
     for (let i = 1; i < tr.length; i++) {
-        let td = tr[i].getElementsByTagName("td")[4]; // Index 4 is Plan
+        let td = tr[i].getElementsByTagName("td")[4]; 
         if (td) {
             let cellText = (td.textContent || td.innerText).toUpperCase();
             if (val === "All" || cellText.includes(filterText)) tr[i].style.display = "";
@@ -131,7 +129,6 @@ function renderInventory() {
     equipTbody.innerHTML = "";
     prodTbody.innerHTML = "";
     let alertsHtml = "";
-
     let ops = 0, maint = 0, low = 0, totalMachines = 0;
 
     inventoryData.forEach((item) => {
@@ -331,11 +328,9 @@ function renderAttendance() {
 
     let today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     let gold = 0, silver = 0, walkin = 0;
-
     let todayAtt = attendanceData.filter(a => a.date === today).sort((a,b) => b.timestamp - a.timestamp);
 
     todayAtt.forEach(a => {
-        let badgeClass = a.type.includes('Gold') ? 'gold' : a.type.includes('Silver') ? 'silver' : 'walkin';
         attTbody.innerHTML += `<tr>
             <td>${a.name}</td>
             <td><strong>${a.type}</strong></td>
@@ -352,7 +347,6 @@ function renderAttendance() {
         servicesChartInstance.data.datasets[0].data = [gold, silver, walkin];
         servicesChartInstance.update();
     }
-
     if(document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = gold + silver + walkin;
 }
 
@@ -382,25 +376,25 @@ function renderMembers() {
         let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let plan = m.plan || 'Standard Member'; 
         
-        // 30 Days Expiration Logic
         let daysLeftText = "N/A";
         let timerBadgeClass = "active";
         
         if (m.dateRegistered) {
-            const expiryDate = m.dateRegistered + (30 * 24 * 60 * 60 * 1000); // 30 days
+            const expiryDate = m.dateRegistered + (30 * 24 * 60 * 60 * 1000); 
             const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
             
             if (diffDays > 0) {
                 daysLeftText = `${diffDays} Days`;
-                if (diffDays <= 7) timerBadgeClass = "pending"; // Warning for < 7 days
+                if (diffDays <= 7) timerBadgeClass = "pending"; 
             } else {
                 daysLeftText = "Expired";
                 timerBadgeClass = "broken"; 
             }
         } else {
-            daysLeftText = "30 Days"; // Fallback
+            daysLeftText = "30 Days";
         }
         
+        // FIXED COLUMN ALIGNMENT
         memTbody.innerHTML += `<tr>
             <td>${m.givenName || m.name}</td>
             <td>${m.mi || ''}</td>
@@ -410,7 +404,7 @@ function renderMembers() {
             <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
             <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
             <td>
-                <button class="btn-icon btn-edit" title="Edit Membership" onclick="alert('Membership Edit coming soon!')"><i class="fa-solid fa-edit"></i></button>
+                <button class="btn-icon btn-edit" title="Edit Membership" onclick="alert('Membership Edit Form Coming Soon!')"><i class="fa-solid fa-edit"></i></button>
                 <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`;
@@ -516,7 +510,7 @@ if(document.getElementById('batchMemberForm')) {
         e.preventDefault();
         const rows = document.querySelectorAll('#batchMemberBody tr');
         let addedCount = 0;
-        const currentTimestamp = new Date().getTime(); // For the 30-day timer
+        const currentTimestamp = new Date().getTime(); 
 
         for (let row of rows) {
             const given = row.querySelector('.bm-first').value;
@@ -530,7 +524,7 @@ if(document.getElementById('batchMemberForm')) {
                 name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
                 role: "Member", email: email, status: "Active", plan: plan,
                 password: randomPassword,
-                dateRegistered: currentTimestamp // Saved for timer calculation
+                dateRegistered: currentTimestamp
             });
 
             try {

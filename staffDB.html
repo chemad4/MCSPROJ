@@ -61,8 +61,8 @@
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('inventory', this)"><i class="fa-solid fa-dumbbell"></i> View Equipments</li>
-                <li class="sub-item" onclick="switchTab('inventory', this)"><i class="fa-solid fa-wine-bottle"></i> View Products</li>
+                <li class="sub-item" onclick="switchTab('equipment', this)"><i class="fa-solid fa-dumbbell"></i> View Equipment</li>
+                <li class="sub-item" onclick="switchTab('products', this)"><i class="fa-solid fa-wine-bottle"></i> View Products</li>
             </ul>
             
             <li class="nav-item nav-clickable" onclick="switchTab('payments', this)">
@@ -96,10 +96,10 @@
                     <i class="fa-solid fa-clock"></i>
                     <div class="value">Shift Started</div>
                 </div>
-                <div class="stat-card card-red" onclick="switchTab('inventory')">
+                <div class="stat-card card-red" onclick="switchTab('equipment')">
                     <span class="stat-badge" id="dashInventoryTotal">0</span>
                     <i class="fa-solid fa-clipboard-list"></i>
-                    <div class="value">Inventory Items</div>
+                    <div class="value">Total Inventory</div>
                 </div>
             </div>
 
@@ -116,14 +116,14 @@
                 <div class="panel" style="background: none; border: none; box-shadow: none; margin-bottom: 0; padding: 0;">
                     <div class="grid-stats" style="grid-template-columns: 1fr 1fr;">
                         <div class="grid-stat-box border-black" onclick="switchTab('members')"><div class="num" id="gridMembers">0</div><div class="label">Registered Members</div></div>
-                        <div class="grid-stat-box border-red" onclick="switchTab('inventory')"><div class="num" id="gridEquip">0</div><div class="label">Operational Equipments</div></div>
+                        <div class="grid-stat-box border-red" onclick="switchTab('equipment')"><div class="num" id="gridEquip">0</div><div class="label">Operational Equipments</div></div>
                         <div class="grid-stat-box border-black" onclick="switchTab('pos')"><div class="num" id="presentMembers">0</div><div class="label">Total Check-ins Today</div></div>
                     </div>
                 </div>
             </div>
 
             <div class="bottom-section" style="margin-top: 20px;">
-                <div class="panel" onclick="switchTab('inventory')" style="cursor: pointer;">
+                <div class="panel" onclick="switchTab('equipment')" style="cursor: pointer;">
                     <div class="panel-header"><i class="fa-solid fa-clipboard-list"></i> Inventory Alerts</div>
                     <div class="panel-body" id="dashInventoryAlerts">
                         <p style="color: var(--text-muted); font-size: 14px;">Loading alerts...</p>
@@ -145,7 +145,8 @@
                     <div class="pos-body" style="padding: 0;">
                         <table id="posTable" style="box-shadow: none; border-radius: 0;">
                             <thead><tr><th>Product Name</th><th>Stock</th><th>Price (₱)</th><th>Action</th></tr></thead>
-                            <tbody id="posProductList"></tbody>
+                            <tbody id="posProductList">
+                                </tbody>
                         </table>
                     </div>
                 </div>
@@ -182,7 +183,7 @@
                         <option value="Silver">Silver</option>
                     </select>
                 </div>
-                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-users"></i> Register Members</button>
+                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-users"></i> Batch Register Members</button>
             </div>
             
             <div class="panel">
@@ -206,37 +207,48 @@
             </div>
         </div>
 
-        <div id="inventory" class="content-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="font-size: 1.2rem; color: var(--dark-black);">Inventory Management</h2>
-                <button class="action-btn" onclick="exportInventoryReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Full Inventory Report</button>
+        <div id="equipment" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="equipSearch" placeholder="Search equipment..." onkeyup="filterTable('machinesTable', 'equipSearch')">
+                </div>
+                <button class="action-btn" onclick="exportInventoryReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Report</button>
             </div>
 
-            <div class="inventory-split">
-                <div class="panel">
-                    <div class="panel-header" style="display: flex; justify-content: space-between;">
-                        <span><i class="fas fa-dumbbell"></i> Gym Equipment (Non-Consumable)</span>
-                        <button class="action-btn" onclick="openEquipmentModal()" style="padding: 5px 15px;"><i class="fas fa-plus"></i> Add Equipment</button>
-                    </div>
-                    <div class="table-container" style="box-shadow: none;">
-                        <table id="machinesTable">
-                            <thead><tr><th>Name of Equipment</th><th>Classification</th><th>Weight/Size</th><th>Qty</th><th>Status</th><th>Actions</th></tr></thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
+            <div class="panel">
+                <div class="panel-header" style="display: flex; justify-content: space-between;">
+                    <span><i class="fas fa-dumbbell"></i> Gym Equipment (Non-Consumable)</span>
+                    <button class="action-btn" onclick="openEquipmentModal()" style="padding: 5px 15px;"><i class="fas fa-plus"></i> Add Equipment</button>
                 </div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="machinesTable">
+                        <thead><tr><th>Name of Equipment</th><th>Classification</th><th>Weight/Size</th><th>Qty</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
-                <div class="panel">
-                    <div class="panel-header" style="display: flex; justify-content: space-between;">
-                        <span><i class="fas fa-wine-bottle"></i> Products & Consumables</span>
-                        <button class="action-btn" onclick="openProductModal()" style="padding: 5px 15px; background: var(--dark-black);"><i class="fas fa-plus"></i> Add Consumable</button>
-                    </div>
-                    <div class="table-container" style="box-shadow: none;">
-                        <table id="productsTable">
-                            <thead><tr><th>Product Name</th><th>Volume/Size</th><th>Stock Lvl</th><th>Expiration Date</th><th>Status</th><th>Actions</th></tr></thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
+        <div id="products" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="prodSearch" placeholder="Search products..." onkeyup="filterTable('productsTable', 'prodSearch')">
+                </div>
+                <button class="action-btn" onclick="exportInventoryReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Report</button>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header" style="display: flex; justify-content: space-between;">
+                    <span><i class="fas fa-wine-bottle"></i> Products & Consumables</span>
+                    <button class="action-btn" onclick="openProductModal()" style="padding: 5px 15px; background: var(--dark-black);"><i class="fas fa-plus"></i> Add Consumable</button>
+                </div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="productsTable">
+                        <thead><tr><th>Product Name</th><th>Volume/Size</th><th>Stock Lvl</th><th>Expiration Date</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -317,15 +329,24 @@
     <div id="memberModal" class="modal">
         <div class="modal-content" style="width: 800px; max-width: 95vw;">
             <div class="modal-header">
-                <h3 id="memberModalTitle">Register Members</h3>
+                <h3 id="memberModalTitle">Batch Register Members</h3>
                 <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
             </div>
-            
             <form class="modal-form" id="batchMemberForm">
                 <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
                     <table class="batch-table">
-                        <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Plan</th><th></th></tr></thead>
-                        <tbody id="batchMemberBody"></tbody>
+                        <thead>
+                            <tr>
+                                <th>Given Name</th>
+                                <th>M.I.</th>
+                                <th>Family Name</th>
+                                <th>Email</th>
+                                <th>Plan</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchMemberBody">
+                            </tbody>
                     </table>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -353,6 +374,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
     </script>
+
     <script type="module" src="js/script.js"></script>
 
 </body>
