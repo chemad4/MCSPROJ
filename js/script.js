@@ -134,7 +134,6 @@ function renderInventory() {
     inventoryData.forEach((item) => {
         let isConsumable = ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
         
-        // Dynamic Status Calculation based on Qty
         let currentStatus = item.status || (isConsumable ? 'In Stock' : 'Operational');
         let badge = 'operational';
         let isProblematic = false;
@@ -159,6 +158,17 @@ function renderInventory() {
         if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
         if (!isConsumable) totalMachines++;
 
+        // ADDED EDIT BUTTON LOGIC FOR EQUIPMENT
+        let actionButtons = '';
+        if(!isConsumable) {
+            actionButtons = `
+                <button class="btn-icon btn-edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
+                <button class="btn-icon btn-delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
+            `;
+        } else {
+            actionButtons = `<button class="btn-icon btn-delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>`;
+        }
+
         let rowHTML = `<tr>
             <td>${item.name}</td>
             <td>${item.cat}</td>
@@ -166,7 +176,7 @@ function renderInventory() {
             ${isConsumable ? `<td>${item.expiry || 'N/A'}</td>` : ''}
             <td>${item.qty}</td>
             <td><span class="badge ${badge}">${currentStatus}</span></td>
-            <td><button class="btn-icon btn-delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button></td>
+            <td>${actionButtons}</td>
         </tr>`;
 
         if(isConsumable) prodTbody.innerHTML += rowHTML;
@@ -192,12 +202,40 @@ window.openEquipmentModal = () => { document.getElementById('equipmentForm').res
 window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
 window.deleteInventoryItem = async (id) => { if(confirm("Delete this inventory item?")) await deleteDoc(doc(db, "inventory", id)); }
 
+// EDIT EQUIPMENT LOGIC
+window.openEditEquipModal = function(id) {
+    const item = inventoryData.find(i => i.id === id);
+    if (!item) return;
+    document.getElementById('editEquipId').value = item.id;
+    document.getElementById('editEquipName').value = item.name;
+    document.getElementById('editEquipCategory').value = item.cat;
+    document.getElementById('editEquipSize').value = item.size;
+    document.getElementById('editEquipQty').value = item.qty;
+    document.getElementById('editEquipStatus').value = item.status || 'Operational';
+    document.getElementById('editEquipModal').style.display = 'flex';
+}
+
+if(document.getElementById('editEquipForm')) {
+    document.getElementById('editEquipForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editEquipId').value;
+        const updatedData = {
+            name: document.getElementById('editEquipName').value.trim(),
+            cat: document.getElementById('editEquipCategory').value,
+            size: document.getElementById('editEquipSize').value,
+            qty: Number(document.getElementById('editEquipQty').value),
+            status: document.getElementById('editEquipStatus').value
+        };
+        await updateDoc(doc(db, "inventory", id), updatedData);
+        window.closeModal('editEquipModal');
+        alert("Equipment updated successfully!");
+    });
+}
+
 async function handleInventorySubmit(e, isProduct) {
     e.preventDefault();
     const nameStr = document.getElementById(isProduct ? 'prodName' : 'equipName').value.trim();
     const addQty = Number(document.getElementById(isProduct ? 'prodQty' : 'equipQty').value);
-    
-    // AUTOMATED INVENTORY ADDITION
     const existingItem = inventoryData.find(i => i.name.toLowerCase() === nameStr.toLowerCase());
 
     if (existingItem) {
@@ -209,7 +247,7 @@ async function handleInventorySubmit(e, isProduct) {
             cat: document.getElementById(isProduct ? 'prodCategory' : 'equipCategory').value, 
             size: document.getElementById(isProduct ? 'prodVol' : 'equipSize').value, 
             qty: addQty, 
-            status: isProduct ? 'In Stock' : 'Operational', // Automatically assumes good status
+            status: isProduct ? 'In Stock' : 'Operational', 
             price: isProduct ? Number(document.getElementById('prodPrice').value) : 0,
             expiry: isProduct ? document.getElementById('prodExpiry').value : null
         };

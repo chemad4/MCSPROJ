@@ -16,7 +16,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" hrefcss/styles.css">
     <style>
         .pos-container { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: calc(100vh - 150px); }
         .pos-products { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
@@ -217,7 +217,7 @@
 
             <div class="panel">
                 <div class="panel-header" style="display: flex; justify-content: space-between;">
-                    <span><i class="fas fa-dumbbell"></i> Gym Equipment (Non-Consumable)</span>
+                    <span><i class="fas fa-dumbbell"></i> Gym Equipment</span>
                     <button class="action-btn" onclick="openEquipmentModal()" style="padding: 5px 15px;"><i class="fas fa-plus"></i> Add Equipment</button>
                 </div>
                 <div class="table-container" style="box-shadow: none;">
@@ -294,6 +294,34 @@
         </div>
     </div>
 
+    <div id="editEquipModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Equipment</h3>
+                <span class="close-btn" onclick="closeModal('editEquipModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="editEquipForm">
+                <input type="hidden" id="editEquipId">
+                <input type="text" id="editEquipName" placeholder="Specific Name of Equipment" required>
+                <select id="editEquipCategory">
+                    <option value="Cardio (Treadmill, Bike, etc.)">Cardio (Treadmills, Bikes, etc.)</option>
+                    <option value="Strength (Weights, Machines)">Strength (Weights, Machines)</option>
+                    <option value="Accessories (Mats, Balls, Bands)">Accessories (Mats, Balls, Bands)</option>
+                </select>
+                <input type="text" id="editEquipSize" placeholder="Weight (e.g. 50kg) or Dimensions" required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Total Quantity:</p>
+                <input type="number" id="editEquipQty" placeholder="Total pieces" required min="0">
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Status:</p>
+                <select id="editEquipStatus">
+                    <option value="Operational">Operational</option>
+                    <option value="Maintenance">Flag for Maintenance</option>
+                    <option value="Out of Order">Out of Order</option>
+                </select>
+                <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
     <div id="productModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -308,7 +336,7 @@
                     <option value="Merch">Apparel / Merchandise</option>
                 </select>
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="prodVol" placeholder="Selling Unit (e.g. 1 Capsule, 500mL, 1 Bottle)" required style="width: 50%;">
+                    <input type="text" id="prodVol" placeholder="Selling Unit (e.g. 1 Capsule, 500mL)" required style="width: 50%;">
                     <input type="number" id="prodPrice" placeholder="Selling Price (₱) per unit" required style="width: 50%;">
                 </div>
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Expiration Date (Mandatory for Consumables):</p>
