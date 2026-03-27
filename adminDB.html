@@ -171,7 +171,8 @@
                     <div class="pos-body" style="padding: 0;">
                         <table id="posTable" style="box-shadow: none; border-radius: 0;">
                             <thead><tr><th>Product Name</th><th>Stock</th><th>Price (₱)</th><th>Action</th></tr></thead>
-                            <tbody id="posProductList"></tbody>
+                            <tbody id="posProductList">
+                                </tbody>
                         </table>
                     </div>
                 </div>
@@ -440,7 +441,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
     </script>
-
     <script type="module" src="js/script.js"></script>
 
 </body>

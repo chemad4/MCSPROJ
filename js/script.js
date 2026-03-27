@@ -64,28 +64,30 @@ window.closeModal = function(modalId) { document.getElementById(modalId).style.d
 window.exportReport = function() { window.print(); }
 window.exportInventoryReport = function() { window.print(); }
 
+// Search Table Global Function
 window.filterTable = function(tableId, inputId) {
     const filter = document.getElementById(inputId).value.toUpperCase();
     const tr = document.getElementById(tableId).getElementsByTagName("tr");
     for (let i = 1; i < tr.length; i++) {
-        let td = tr[i].getElementsByTagName("td")[0]; 
-        if(tableId === 'membersTable') {
-            let tdPlan = tr[i].getElementsByTagName("td")[4]; 
-            let text = (td ? td.textContent : "") + " " + (tdPlan ? tdPlan.textContent : "");
-            if (text.toUpperCase().indexOf(filter) > -1) tr[i].style.display = "";
+        let tdName = tr[i].getElementsByTagName("td")[0]; 
+        let tdPlan = tr[i].getElementsByTagName("td")[4]; 
+        
+        if (tdName) {
+            let text = (tdName.textContent || tdName.innerText).toUpperCase();
+            if (tdPlan) text += " " + (tdPlan.textContent || tdPlan.innerText).toUpperCase();
+            
+            if (text.indexOf(filter) > -1) tr[i].style.display = "";
             else tr[i].style.display = "none";
-        } else {
-            if (td) tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
         }
     }
 }
 
-// Gold/Silver Filter Dropdown for Members Table
+// Plan Filter Dropdown Global Function
 window.filterByPlan = function(val) {
     const filterText = val.toUpperCase();
     const tr = document.getElementById('membersTable').getElementsByTagName("tr");
     for (let i = 1; i < tr.length; i++) {
-        let td = tr[i].getElementsByTagName("td")[4]; // Index 4 is Membership Plan
+        let td = tr[i].getElementsByTagName("td")[4]; // Index 4 is Plan
         if (td) {
             let cellText = (td.textContent || td.innerText).toUpperCase();
             if (val === "All" || cellText.includes(filterText)) tr[i].style.display = "";
@@ -167,7 +169,7 @@ function renderInventory() {
 
     if(document.getElementById('dashInventoryTotal')) document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
     if(document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
-    if(document.getElementById('navInventoryCount')) document.getElementById('navInventoryCount').innerText = inventoryData.length;
+    if(document.getElementById('navInventoryCount')) document.getElementById('navInventoryCount').innerText = ` ${inventoryData.length} `;
     
     const dashAlerts = document.getElementById('dashInventoryAlerts');
     if(dashAlerts) dashAlerts.innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
@@ -289,10 +291,8 @@ window.processPayment = async function(grandTotal) {
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
-    // 1. Log Payment
     await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "POS Sale", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr, time: timeStr });
 
-    // 2. Update Inventory & Track Attendance
     for(let item of posCart) {
         if (item.id === 'WALKIN') {
             for(let w = 0; w < item.qty; w++) {
@@ -387,23 +387,26 @@ function renderMembers() {
         let timerBadgeClass = "active";
         
         if (m.dateRegistered) {
-            const expiryDate = m.dateRegistered + (30 * 24 * 60 * 60 * 1000); // 30 days in ms
+            const expiryDate = m.dateRegistered + (30 * 24 * 60 * 60 * 1000); // 30 days
             const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
             
             if (diffDays > 0) {
                 daysLeftText = `${diffDays} Days`;
-                if (diffDays <= 7) timerBadgeClass = "pending"; // Warning color for < 7 days
+                if (diffDays <= 7) timerBadgeClass = "pending"; // Warning for < 7 days
             } else {
                 daysLeftText = "Expired";
-                timerBadgeClass = "broken"; // Red badge
+                timerBadgeClass = "broken"; 
             }
         } else {
-            daysLeftText = "30 Days"; // Fallback for old accounts
+            daysLeftText = "30 Days"; // Fallback
         }
         
         memTbody.innerHTML += `<tr>
-            <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
-            <td>${m.email}</td><td><strong>${plan}</strong></td>
+            <td>${m.givenName || m.name}</td>
+            <td>${m.mi || ''}</td>
+            <td>${m.familyName || ''}</td>
+            <td>${m.email}</td>
+            <td><strong>${plan}</strong></td>
             <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
             <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
             <td>
@@ -571,7 +574,7 @@ window.addStaffBatchRow = function() {
 
 window.openStaffModal = (role) => { 
     document.getElementById('hiddenStaffRole').value = role;
-    document.getElementById('staffModalTitle').innerText = `Batch Register ${role}s (Up to 20)`;
+    document.getElementById('staffModalTitle').innerText = `Batch Register ${role}s`;
     document.getElementById('batchStaffBody').innerHTML = `
         <tr>
             <td><input type="text" class="bs-first" required></td>
