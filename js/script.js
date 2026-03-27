@@ -54,7 +54,7 @@ window.switchTab = function(tabId, element) {
         'pos': 'Point of Sale (POS)',
         'payments': 'Financial Reports',
         'members': 'Member Directory', 
-        'staff': 'General Staff Management',
+        'staff': 'Staff Directory',
         'trainers': 'Trainer Management'
     };
     document.getElementById('pageTitle').innerText = titles[tabId] || 'Dashboard';
@@ -76,6 +76,20 @@ window.filterTable = function(tableId, inputId) {
             else tr[i].style.display = "none";
         } else {
             if (td) tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+        }
+    }
+}
+
+// Gold/Silver Filter Dropdown for Members Table
+window.filterByPlan = function(val) {
+    const filterText = val.toUpperCase();
+    const tr = document.getElementById('membersTable').getElementsByTagName("tr");
+    for (let i = 1; i < tr.length; i++) {
+        let td = tr[i].getElementsByTagName("td")[4]; // Index 4 is Membership Plan
+        if (td) {
+            let cellText = (td.textContent || td.innerText).toUpperCase();
+            if (val === "All" || cellText.includes(filterText)) tr[i].style.display = "";
+            else tr[i].style.display = "none";
         }
     }
 }
@@ -153,6 +167,7 @@ function renderInventory() {
 
     if(document.getElementById('dashInventoryTotal')) document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
     if(document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
+    if(document.getElementById('navInventoryCount')) document.getElementById('navInventoryCount').innerText = inventoryData.length;
     
     const dashAlerts = document.getElementById('dashInventoryAlerts');
     if(dashAlerts) dashAlerts.innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
@@ -274,8 +289,10 @@ window.processPayment = async function(grandTotal) {
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
+    // 1. Log Payment
     await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "POS Sale", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr, time: timeStr });
 
+    // 2. Update Inventory & Track Attendance
     for(let item of posCart) {
         if (item.id === 'WALKIN') {
             for(let w = 0; w < item.qty; w++) {
@@ -339,21 +356,6 @@ function renderAttendance() {
     if(document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = gold + silver + walkin;
 }
 
-window.checkInMember = async function(name, plan) {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-    await addDoc(attendanceCol, {
-        name: name,
-        type: plan,
-        date: dateStr,
-        time: timeStr,
-        timestamp: now.getTime()
-    });
-    alert(`${name} has been successfully checked in!`);
-}
-
 onSnapshot(usersCol, (snapshot) => {
     allUsersData = [];
     membersData = [];
@@ -373,19 +375,39 @@ function renderMembers() {
     memTbody.innerHTML = "";
     
     let activeMembers = 0;
+    const now = new Date().getTime();
 
     membersData.forEach(m => {
         const statusStr = (m.status || "Active").trim().toLowerCase();
         let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let plan = m.plan || 'Standard Member'; 
-        let fullName = `${m.givenName || m.name} ${m.familyName || ''}`;
+        
+        // 30 Days Expiration Logic
+        let daysLeftText = "N/A";
+        let timerBadgeClass = "active";
+        
+        if (m.dateRegistered) {
+            const expiryDate = m.dateRegistered + (30 * 24 * 60 * 60 * 1000); // 30 days in ms
+            const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays > 0) {
+                daysLeftText = `${diffDays} Days`;
+                if (diffDays <= 7) timerBadgeClass = "pending"; // Warning color for < 7 days
+            } else {
+                daysLeftText = "Expired";
+                timerBadgeClass = "broken"; // Red badge
+            }
+        } else {
+            daysLeftText = "30 Days"; // Fallback for old accounts
+        }
         
         memTbody.innerHTML += `<tr>
             <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
             <td>${m.email}</td><td><strong>${plan}</strong></td>
+            <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
             <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
             <td>
-                <button class="btn-icon" style="color: #2ecc71;" title="Check-in Member" onclick="checkInMember('${fullName}', '${plan}')"><i class="fa-solid fa-right-to-bracket"></i></button>
+                <button class="btn-icon btn-edit" title="Edit Membership" onclick="alert('Membership Edit coming soon!')"><i class="fa-solid fa-edit"></i></button>
                 <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`;
@@ -491,6 +513,7 @@ if(document.getElementById('batchMemberForm')) {
         e.preventDefault();
         const rows = document.querySelectorAll('#batchMemberBody tr');
         let addedCount = 0;
+        const currentTimestamp = new Date().getTime(); // For the 30-day timer
 
         for (let row of rows) {
             const given = row.querySelector('.bm-first').value;
@@ -503,7 +526,8 @@ if(document.getElementById('batchMemberForm')) {
             await addDoc(usersCol, { 
                 name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
                 role: "Member", email: email, status: "Active", plan: plan,
-                password: randomPassword 
+                password: randomPassword,
+                dateRegistered: currentTimestamp // Saved for timer calculation
             });
 
             try {

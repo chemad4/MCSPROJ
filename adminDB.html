@@ -57,24 +57,17 @@
 
             <li class="nav-item has-submenu">
                 <i class="fa-solid fa-boxes-stacked"></i> <span class="menu-text">Gym Inventory</span>
-                <span class="badge-nav" style="background-color: #555;" id="navInventoryCount">0</span>
+                <span class="badge-nav" style="background-color: #555; margin-left: 10px; padding: 2px 8px; border-radius: 10px;" id="navInventoryCount"> 0 </span>
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('inventory', this)"><i class="fa-solid fa-arrow-right"></i> View Inventory</li>
-                <li class="sub-item" onclick="switchTab('inventory', this); openEquipmentModal();"><i class="fa-solid fa-arrow-right"></i> Add Equipment</li>
-                <li class="sub-item" onclick="switchTab('inventory', this); openProductModal();"><i class="fa-solid fa-arrow-right"></i> Add Consumable</li>
-                <li class="sub-item" onclick="exportInventoryReport();"><i class="fa-solid fa-print"></i> Print Report</li>
+                <li class="sub-item" onclick="switchTab('inventory', this)"><i class="fa-solid fa-dumbbell"></i> View Equipments</li>
+                <li class="sub-item" onclick="switchTab('inventory', this)"><i class="fa-solid fa-wine-bottle"></i> View Products</li>
             </ul>
             
-            <li class="nav-item has-submenu">
+            <li class="nav-item nav-clickable" onclick="switchTab('payments', this)">
                 <i class="fa-solid fa-chart-line"></i> <span class="menu-text">Financial Reports</span>
-                <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
-            <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('payments', this)"><i class="fa-solid fa-arrow-right"></i> View Transactions</li>
-                <li class="sub-item" onclick="exportReport();"><i class="fa-solid fa-print"></i> Print Sales Report</li>
-            </ul>
             
             <li class="nav-item has-submenu">
                 <i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff Management</span>
@@ -82,6 +75,7 @@
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View All Staff</li>
+                <li class="sub-item" onclick="alert('Chat integration coming soon!');"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
 
             <li class="nav-item has-submenu">
@@ -90,6 +84,7 @@
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('trainers', this)"><i class="fa-solid fa-arrow-right"></i> View Trainers</li>
+                <li class="sub-item" onclick="alert('Chat integration coming soon!');"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
         </ul>
     </aside>
@@ -142,7 +137,7 @@
                         <div class="grid-stat-box border-black" onclick="switchTab('members')"><div class="num" id="gridMembers">0</div><div class="label">Registered Members</div></div>
                         <div class="grid-stat-box border-red" onclick="switchTab('trainers')"><div class="num" id="gridTrainers">0</div><div class="label">Total Trainers</div></div>
                         <div class="grid-stat-box border-red" onclick="switchTab('inventory')"><div class="num" id="gridEquip">0</div><div class="label">Operational Equipments</div></div>
-                        <div class="grid-stat-box border-black" onclick="switchTab('members')"><div class="num" id="presentMembers">0</div><div class="label">Total Check-ins Today</div></div>
+                        <div class="grid-stat-box border-black" onclick="switchTab('pos')"><div class="num" id="presentMembers">0</div><div class="label">Total Check-ins Today</div></div>
                     </div>
                 </div>
             </div>
@@ -176,8 +171,7 @@
                     <div class="pos-body" style="padding: 0;">
                         <table id="posTable" style="box-shadow: none; border-radius: 0;">
                             <thead><tr><th>Product Name</th><th>Stock</th><th>Price (₱)</th><th>Action</th></tr></thead>
-                            <tbody id="posProductList">
-                                </tbody>
+                            <tbody id="posProductList"></tbody>
                         </table>
                     </div>
                 </div>
@@ -203,18 +197,25 @@
 
         <div id="members" class="content-section">
             <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="memberSearch" placeholder="Search name or plan (e.g. Gold)..." onkeyup="filterTable('membersTable', 'memberSearch')">
+                <div class="search-box" style="display: flex; gap: 10px; width: 500px;">
+                    <div style="position: relative; flex-grow: 1;">
+                        <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999;"></i>
+                        <input type="text" id="memberSearch" placeholder="Search members..." onkeyup="filterTable('membersTable', 'memberSearch')" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px;">
+                    </div>
+                    <select id="planFilter" onchange="filterByPlan(this.value)" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; background: white;">
+                        <option value="All">All Plans</option>
+                        <option value="Gold">Gold</option>
+                        <option value="Silver">Silver</option>
+                    </select>
                 </div>
-                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-users"></i> Batch Register Members</button>
+                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-users"></i> Register Members</button>
             </div>
             
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-address-card"></i> Registered Member Directory</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="membersTable">
-                        <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Membership Plan</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Membership Plan</th><th>Days Left</th><th>Status</th><th>Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -232,6 +233,11 @@
         </div>
 
         <div id="inventory" class="content-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="font-size: 1.2rem; color: var(--dark-black);">Inventory Management</h2>
+                <button class="action-btn" onclick="exportInventoryReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Full Inventory Report</button>
+            </div>
+
             <div class="inventory-split">
                 <div class="panel">
                     <div class="panel-header" style="display: flex; justify-content: space-between;">
@@ -267,7 +273,7 @@
                     <i class="fas fa-search"></i>
                     <input type="text" id="paymentSearch" placeholder="Search receipt..." onkeyup="filterTable('paymentTable', 'paymentSearch')">
                 </div>
-                <button class="action-btn" onclick="exportReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Report</button>
+                <button class="action-btn" onclick="exportReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Sales Report</button>
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-money-check-alt"></i> Transaction History (Receipts)</div>
@@ -289,7 +295,7 @@
                 <button class="action-btn" onclick="openStaffModal('Staff')"><i class="fas fa-plus"></i> Add General Staff</button>
             </div>
             <div class="panel">
-                <div class="panel-header"><i class="fas fa-id-badge"></i> Non-Trainer Staff Directory</div>
+                <div class="panel-header"><i class="fas fa-id-badge"></i> Staff Directory</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="staffTable">
                         <thead><tr><th>Full Name</th><th>Role</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
@@ -383,17 +389,8 @@
                 <input type="hidden" id="hiddenStaffRole" value="Staff">
                 <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
                     <table class="batch-table">
-                        <thead>
-                            <tr>
-                                <th>Given Name</th>
-                                <th>Family Name</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="batchStaffBody">
-                        </tbody>
+                        <thead><tr><th>Given Name</th><th>Family Name</th><th>Email</th><th>Status</th><th></th></tr></thead>
+                        <tbody id="batchStaffBody"></tbody>
                     </table>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -407,25 +404,15 @@
     <div id="memberModal" class="modal">
         <div class="modal-content" style="width: 800px; max-width: 95vw;">
             <div class="modal-header">
-                <h3 id="memberModalTitle">Batch Register Members (Up to 20)</h3>
+                <h3 id="memberModalTitle">Register Members</h3>
                 <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
             </div>
             
             <form class="modal-form" id="batchMemberForm">
                 <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
                     <table class="batch-table">
-                        <thead>
-                            <tr>
-                                <th>Given Name</th>
-                                <th>M.I.</th>
-                                <th>Family Name</th>
-                                <th>Email</th>
-                                <th>Plan</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="batchMemberBody">
-                        </tbody>
+                        <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Plan</th><th></th></tr></thead>
+                        <tbody id="batchMemberBody"></tbody>
                     </table>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -453,6 +440,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
     </script>
+
     <script type="module" src="js/script.js"></script>
 
 </body>
