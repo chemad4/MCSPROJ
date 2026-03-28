@@ -55,6 +55,7 @@ window.switchTab = function(tabId, element) {
         'pos': 'Point of Sale (POS)',
         'payments': 'Financial Reports',
         'members': 'Member Directory', 
+        'attendance': 'Attendance Log',
         'staff': 'Staff Directory',
         'trainers': 'Trainer Management'
     };
@@ -70,9 +71,15 @@ window.filterTable = function(tableId, inputId) {
     const tr = document.getElementById(tableId).getElementsByTagName("tr");
     for (let i = 1; i < tr.length; i++) {
         let td = tr[i].getElementsByTagName("td")[0]; 
+        
         if(tableId === 'membersTable') {
             let tdPlan = tr[i].getElementsByTagName("td")[4]; 
             let text = (td ? td.textContent : "") + " " + (tdPlan ? tdPlan.textContent : "");
+            if (text.toUpperCase().indexOf(filter) > -1) tr[i].style.display = "";
+            else tr[i].style.display = "none";
+        } else if (tableId === 'attendanceTable') {
+            let tdType = tr[i].getElementsByTagName("td")[1]; 
+            let text = (td ? td.textContent : "") + " " + (tdType ? tdType.textContent : "");
             if (text.toUpperCase().indexOf(filter) > -1) tr[i].style.display = "";
             else tr[i].style.display = "none";
         } else {
@@ -158,11 +165,10 @@ function renderInventory() {
         if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
         if (!isConsumable) totalMachines++;
 
-        // ADDED EDIT BUTTON LOGIC FOR EQUIPMENT
         let actionButtons = '';
         if(!isConsumable) {
             actionButtons = `
-                <button class="btn-icon btn-edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
+                <button class="btn-icon btn-edit" style="color: var(--dark-black);" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
                 <button class="btn-icon btn-delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
             `;
         } else {
@@ -202,7 +208,6 @@ window.openEquipmentModal = () => { document.getElementById('equipmentForm').res
 window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
 window.deleteInventoryItem = async (id) => { if(confirm("Delete this inventory item?")) await deleteDoc(doc(db, "inventory", id)); }
 
-// EDIT EQUIPMENT LOGIC
 window.openEditEquipModal = function(id) {
     const item = inventoryData.find(i => i.id === id);
     if (!item) return;
@@ -461,7 +466,7 @@ function renderMembers() {
             <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
             <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
             <td>
-                <button class="btn-icon btn-edit" title="Edit Membership" onclick="alert('Membership Edit Form Coming Soon!')"><i class="fa-solid fa-edit"></i></button>
+                <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Member" onclick="openEditMemberModal('${m.id}')"><i class="fa-solid fa-edit"></i></button>
                 <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`;
@@ -471,6 +476,40 @@ function renderMembers() {
 
     if(document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
     if(document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = membersData.length; 
+}
+
+window.openEditMemberModal = function(id) {
+    const member = membersData.find(m => m.id === id);
+    if (!member) return;
+    
+    document.getElementById('editMemberId').value = member.id;
+    document.getElementById('editMemberGiven').value = member.givenName || '';
+    document.getElementById('editMemberMI').value = member.mi || '';
+    document.getElementById('editMemberFamily').value = member.familyName || '';
+    
+    document.getElementById('editMemberModal').style.display = 'flex';
+}
+
+if(document.getElementById('editMemberForm')) {
+    document.getElementById('editMemberForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const id = document.getElementById('editMemberId').value;
+        const given = document.getElementById('editMemberGiven').value.trim();
+        const mi = document.getElementById('editMemberMI').value.trim();
+        const family = document.getElementById('editMemberFamily').value.trim();
+        
+        const updatedData = {
+            givenName: given,
+            mi: mi,
+            familyName: family,
+            name: `${given} ${family}`
+        };
+        
+        await updateDoc(doc(db, "users", id), updatedData);
+        window.closeModal('editMemberModal');
+        alert("Member details updated successfully!");
+    });
 }
 
 function renderStaff() {

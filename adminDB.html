@@ -48,9 +48,16 @@
             <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)">
                 <i class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span>
             </li>
-            <li class="nav-item nav-clickable" onclick="switchTab('members', this)">
+            
+            <li class="nav-item has-submenu">
                 <i class="fa-solid fa-address-card"></i> <span class="menu-text">Manage Members</span>
+                <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
+            <ul class="submenu">
+                <li class="sub-item" onclick="switchTab('members', this)"><i class="fa-solid fa-users"></i> Member Directory</li>
+                <li class="sub-item" onclick="switchTab('attendance', this)"><i class="fa-solid fa-clipboard-user"></i> Attendance Log</li>
+            </ul>
+
             <li class="nav-item nav-clickable" onclick="switchTab('pos', this)">
                 <i class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale (POS)</span>
             </li>
@@ -123,7 +130,7 @@
             </div>
 
             <div class="middle-section">
-                <div class="panel" style="margin-bottom: 0;" onclick="switchTab('members')">
+                <div class="panel" style="margin-bottom: 0;" onclick="switchTab('attendance')">
                     <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Live Daily Attendance</div>
                     <div class="panel-body">
                         <div class="chart-container">
@@ -137,7 +144,7 @@
                         <div class="grid-stat-box border-black" onclick="switchTab('members')"><div class="num" id="gridMembers">0</div><div class="label">Registered Members</div></div>
                         <div class="grid-stat-box border-red" onclick="switchTab('trainers')"><div class="num" id="gridTrainers">0</div><div class="label">Total Trainers</div></div>
                         <div class="grid-stat-box border-red" onclick="switchTab('equipment')"><div class="num" id="gridEquip">0</div><div class="label">Operational Equipments</div></div>
-                        <div class="grid-stat-box border-black" onclick="switchTab('pos')"><div class="num" id="presentMembers">0</div><div class="label">Total Check-ins Today</div></div>
+                        <div class="grid-stat-box border-black" onclick="switchTab('attendance')"><div class="num" id="presentMembers">0</div><div class="label">Total Check-ins Today</div></div>
                     </div>
                 </div>
             </div>
@@ -220,8 +227,18 @@
                     </table>
                 </div>
             </div>
+        </div>
 
-            <div class="panel" style="margin-top: 20px;">
+        <div id="attendance" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="attendanceSearch" placeholder="Search name or membership..." onkeyup="filterTable('attendanceTable', 'attendanceSearch')">
+                </div>
+                <button class="action-btn" onclick="exportReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Report</button>
+            </div>
+
+            <div class="panel">
                 <div class="panel-header"><i class="fas fa-clipboard-user"></i> Live Daily Attendance Log (Timestamps)</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="attendanceTable">
@@ -470,6 +487,22 @@
                     <button type="button" onclick="addBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
                     <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
                 </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="editMemberModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Member Details</h3>
+                <span class="close-btn" onclick="closeModal('editMemberModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="editMemberForm">
+                <input type="hidden" id="editMemberId">
+                <input type="text" id="editMemberGiven" placeholder="Given Name" required>
+                <input type="text" id="editMemberMI" placeholder="M.I. (Opt.)" maxlength="2">
+                <input type="text" id="editMemberFamily" placeholder="Family Name" required>
+                <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
             </form>
         </div>
     </div>
