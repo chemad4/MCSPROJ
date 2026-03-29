@@ -423,9 +423,9 @@
             </div>
             <form class="modal-form" id="editMemberForm">
                 <input type="hidden" id="editMemberId">
-                <input type="text" id="editMemberGiven" placeholder="Given Name" required>
-                <input type="text" id="editMemberMI" placeholder="M.I. (Opt.)" maxlength="2">
-                <input type="text" id="editMemberFamily" placeholder="Family Name" required>
+                <input type="text" id="editMemberGiven" placeholder="Given Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
+                <input type="text" id="editMemberMI" placeholder="M.I. (Opt.)" maxlength="2" oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')">
+                <input type="text" id="editMemberFamily" placeholder="Family Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
                 <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
             </form>
         </div>

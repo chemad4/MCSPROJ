@@ -472,6 +472,9 @@ function renderMembers() {
                         <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')">
                             <i class="fas fa-box-open"></i>
                         </button>
+                        <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${m.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </td>
                 </tr>`;
             }
@@ -613,9 +616,9 @@ window.addBatchRow = function() {
     const tbody = document.getElementById('batchMemberBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td><input type="text" class="bm-first" required></td>
-        <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt."></td>
-        <td><input type="text" class="bm-last" required></td>
+        <td><input type="text" class="bm-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
+        <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
+        <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
         <td><input type="email" class="bm-email" required></td>
         <td>
             <select class="bm-plan">
@@ -632,9 +635,9 @@ window.addBatchRow = function() {
 window.openMemberModal = () => { 
     document.getElementById('batchMemberBody').innerHTML = `
         <tr>
-            <td><input type="text" class="bm-first" required></td>
-            <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt."></td>
-            <td><input type="text" class="bm-last" required></td>
+            <td><input type="text" class="bm-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
+            <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
+            <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
             <td><input type="email" class="bm-email" required></td>
             <td><select class="bm-plan"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
             <td></td>
@@ -701,8 +704,8 @@ window.addStaffBatchRow = function() {
     const tbody = document.getElementById('batchStaffBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td><input type="text" class="bs-first" required></td>
-        <td><input type="text" class="bs-last" required></td>
+        <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
+        <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
         <td><input type="email" class="bs-email" required></td>
         <td>
             <select class="bs-status">
@@ -721,8 +724,8 @@ window.openStaffModal = (role) => {
     document.getElementById('staffModalTitle').innerText = `Batch Register ${role}s`;
     document.getElementById('batchStaffBody').innerHTML = `
         <tr>
-            <td><input type="text" class="bs-first" required></td>
-            <td><input type="text" class="bs-last" required></td>
+            <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
+            <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
             <td><input type="email" class="bs-email" required></td>
             <td>
                 <select class="bs-status">
