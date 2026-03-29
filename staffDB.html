@@ -55,6 +55,7 @@
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('members', this)"><i class="fa-solid fa-users"></i> Member Directory</li>
+                <li class="sub-item" onclick="switchTab('archivedMembers', this)"><i class="fa-solid fa-box-archive"></i> Archived Members</li>
                 <li class="sub-item" onclick="switchTab('attendance', this)"><i class="fa-solid fa-clipboard-user"></i> Attendance Log</li>
             </ul>
 
@@ -197,6 +198,24 @@
                 <div class="table-container" style="box-shadow: none;">
                     <table id="membersTable">
                         <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Membership Plan</th><th>Days Left</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="archivedMembers" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="archivedSearch" placeholder="Search archived members..." onkeyup="filterTable('archivedMembersTable', 'archivedSearch')">
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-box-archive"></i> Archived Members</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="archivedMembersTable">
+                        <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Membership Plan</th><th>Status</th><th>Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>

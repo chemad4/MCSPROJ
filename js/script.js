@@ -55,6 +55,7 @@ window.switchTab = function(tabId, element) {
         'pos': 'Point of Sale (POS)',
         'payments': 'Financial Reports',
         'members': 'Member Directory', 
+        'archivedMembers': 'Archived Members',
         'attendance': 'Attendance Log',
         'staff': 'Staff Directory',
         'trainers': 'Trainer Management'
@@ -72,7 +73,7 @@ window.filterTable = function(tableId, inputId) {
     for (let i = 1; i < tr.length; i++) {
         let td = tr[i].getElementsByTagName("td")[0]; 
         
-        if(tableId === 'membersTable') {
+        if(tableId === 'membersTable' || tableId === 'archivedMembersTable') {
             let tdPlan = tr[i].getElementsByTagName("td")[4]; 
             let text = (td ? td.textContent : "") + " " + (tdPlan ? tdPlan.textContent : "");
             if (text.toUpperCase().indexOf(filter) > -1) tr[i].style.display = "";
@@ -428,15 +429,16 @@ onSnapshot(usersCol, (snapshot) => {
 
 function renderMembers() {
     const memTbody = document.querySelector('#membersTable tbody');
-    if(!memTbody) return;
-    memTbody.innerHTML = "";
+    const arcTbody = document.querySelector('#archivedMembersTable tbody');
+    if(memTbody) memTbody.innerHTML = "";
+    if(arcTbody) arcTbody.innerHTML = "";
     
     let activeMembers = 0;
+    let totalNonArchived = 0;
     const now = new Date().getTime();
 
     membersData.forEach(m => {
         const statusStr = (m.status || "Active").trim().toLowerCase();
-        let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let plan = m.plan || 'Standard Member'; 
         
         let daysLeftText = "N/A";
@@ -457,25 +459,48 @@ function renderMembers() {
             daysLeftText = "30 Days";
         }
         
-        memTbody.innerHTML += `<tr>
-            <td>${m.givenName || m.name}</td>
-            <td>${m.mi || ''}</td>
-            <td>${m.familyName || ''}</td>
-            <td>${m.email}</td>
-            <td><strong>${plan}</strong></td>
-            <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
-            <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
-            <td>
-                <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Member" onclick="openEditMemberModal('${m.id}')"><i class="fa-solid fa-edit"></i></button>
-                <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
-            </td>
-        </tr>`;
-
-        if(statusStr === 'active') activeMembers++;
+        if (statusStr === 'archived') {
+            if(arcTbody) {
+                arcTbody.innerHTML += `<tr>
+                    <td>${m.givenName || m.name}</td>
+                    <td>${m.mi || ''}</td>
+                    <td>${m.familyName || ''}</td>
+                    <td>${m.email}</td>
+                    <td><strong>${plan}</strong></td>
+                    <td><span class="badge maintenance">Archived</span></td>
+                    <td>
+                        <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')">
+                            <i class="fas fa-box-open"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }
+        } else {
+            totalNonArchived++;
+            let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
+            if(memTbody) {
+                memTbody.innerHTML += `<tr>
+                    <td>${m.givenName || m.name}</td>
+                    <td>${m.mi || ''}</td>
+                    <td>${m.familyName || ''}</td>
+                    <td>${m.email}</td>
+                    <td><strong>${plan}</strong></td>
+                    <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
+                    <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
+                    <td>
+                        <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Member" onclick="openEditMemberModal('${m.id}')"><i class="fa-solid fa-edit"></i></button>
+                        <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Archive Account" onclick="archiveUser('${m.id}', '${m.status || 'Active'}')">
+                            <i class="fas fa-box-archive"></i>
+                        </button>
+                    </td>
+                </tr>`;
+            }
+            if(statusStr === 'active') activeMembers++;
+        }
     });
 
     if(document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
-    if(document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = membersData.length; 
+    if(document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = totalNonArchived; 
 }
 
 window.openEditMemberModal = function(id) {
@@ -524,11 +549,16 @@ function renderStaff() {
     allUsersData.forEach(u => {
         const roleStr = (u.role || "").trim().toLowerCase();
         const statusStr = (u.status || "Active").trim().toLowerCase();
+        let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
 
         const rowHtml = `<tr>
             <td>${u.givenName || u.name} ${u.familyName || ''}</td><td>${u.role}</td><td>${u.email}</td>
-            <td><span class="badge active">${u.status || 'Active'}</span></td>
-            <td><button class="btn-icon btn-delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button></td>
+            <td><span class="badge ${badgeClass}">${u.status || 'Active'}</span></td>
+            <td>
+                <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${u.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
         </tr>`;
 
         if(roleStr === 'trainer') {
@@ -558,7 +588,21 @@ function renderStaff() {
     if(dashTrainers) dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
 }
 
-window.deleteUser = async (id) => { if(confirm("Remove this account?")) await deleteDoc(doc(db, "users", id)); }
+window.archiveUser = async (id, currentStatus) => { 
+    const actionText = currentStatus === 'Archived' ? 'Restore' : 'Archive';
+    const newStatus = currentStatus === 'Archived' ? 'Active' : 'Archived';
+    
+    if(confirm(`Are you sure you want to ${actionText.toLowerCase()} this account?`)) { 
+        await updateDoc(doc(db, "users", id), { status: newStatus });
+        alert(`Account successfully ${newStatus.toLowerCase()}.`);
+    } 
+}
+
+window.deleteUser = async (id) => { 
+    if(confirm("Remove this account completely? This action cannot be undone.")) {
+        await deleteDoc(doc(db, "users", id)); 
+    }
+}
 
 // ==========================================
 // 4. BATCH REGISTRATION (MEMBERS & STAFF)
@@ -606,6 +650,8 @@ if(document.getElementById('batchMemberForm')) {
         e.preventDefault();
         const rows = document.querySelectorAll('#batchMemberBody tr');
         let addedCount = 0;
+        let emailSuccessCount = 0; 
+        let emailFailCount = 0;    
         const currentTimestamp = new Date().getTime(); 
 
         for (let row of rows) {
@@ -630,13 +676,21 @@ if(document.getElementById('batchMemberForm')) {
                     generated_password: randomPassword,
                     plan: plan
                 });
+                emailSuccessCount++; 
             } catch(err) {
                 console.error("EmailJS failed:", err);
+                emailFailCount++;    
             }
             addedCount++;
         }
         window.closeModal('memberModal');
-        alert(`Successfully registered ${addedCount} member(s)! Verification emails and passwords have been sent.`);
+        
+        let alertMsg = `Successfully registered ${addedCount} member(s) to the database!\n\n`;
+        alertMsg += `✅ ${emailSuccessCount} email(s) verified and sent.\n`;
+        if (emailFailCount > 0) {
+            alertMsg += `❌ ${emailFailCount} email(s) failed to send. Please verify the email addresses were typed correctly.`;
+        }
+        alert(alertMsg);
     });
 }
 
@@ -688,6 +742,8 @@ if(document.getElementById('batchStaffForm')) {
         const rows = document.querySelectorAll('#batchStaffBody tr');
         const role = document.getElementById('hiddenStaffRole').value;
         let addedCount = 0;
+        let emailSuccessCount = 0; 
+        let emailFailCount = 0;
 
         for (let row of rows) {
             const given = row.querySelector('.bs-first').value;
@@ -709,13 +765,21 @@ if(document.getElementById('batchStaffForm')) {
                     generated_password: randomPassword,
                     plan: `${role} Account`
                 });
+                emailSuccessCount++;
             } catch(err) {
                 console.error("EmailJS failed:", err);
+                emailFailCount++;
             }
             addedCount++;
         }
         window.closeModal('staffModal');
-        alert(`Successfully registered ${addedCount} ${role}(s)! Verification emails and passwords have been sent.`);
+
+        let alertMsg = `Successfully registered ${addedCount} ${role}(s) to the database!\n\n`;
+        alertMsg += `✅ ${emailSuccessCount} email(s) verified and sent.\n`;
+        if (emailFailCount > 0) {
+            alertMsg += `❌ ${emailFailCount} email(s) failed to send. Please verify the email addresses were typed correctly.`;
+        }
+        alert(alertMsg);
     });
 }
 
