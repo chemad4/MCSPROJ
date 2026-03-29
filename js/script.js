@@ -553,9 +553,10 @@ function renderStaff() {
         const roleStr = (u.role || "").trim().toLowerCase();
         const statusStr = (u.status || "Active").trim().toLowerCase();
         let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
+        let fullName = `${u.givenName || u.name} ${u.mi ? u.mi + '. ' : ''}${u.familyName || ''}`.trim();
 
         const rowHtml = `<tr>
-            <td>${u.givenName || u.name} ${u.familyName || ''}</td><td>${u.role}</td><td>${u.email}</td>
+            <td>${fullName}</td><td>${u.role}</td><td>${u.email}</td>
             <td><span class="badge ${badgeClass}">${u.status || 'Active'}</span></td>
             <td>
                 <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${u.id}')">
@@ -573,7 +574,7 @@ function renderStaff() {
                 trainersFeed += `<div class="list-item">
                     <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
                     <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <div><div class="trainer-name">${u.givenName || u.name}</div><p style="font-size: 12px; color: var(--text-muted);">${u.email}</p></div>
+                        <div><div class="trainer-name">${fullName}</div><p style="font-size: 12px; color: var(--text-muted);">${u.email}</p></div>
                         <span class="status-badge status-progress">On Floor</span>
                     </div>
                 </div>`;
@@ -708,6 +709,7 @@ window.addStaffBatchRow = function() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
         <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
+        <td><input type="text" class="bs-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
         <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
         <td><input type="email" class="bs-email" required></td>
         <td>
@@ -728,6 +730,7 @@ window.openStaffModal = (role) => {
     document.getElementById('batchStaffBody').innerHTML = `
         <tr>
             <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
+            <td><input type="text" class="bs-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
             <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
             <td><input type="email" class="bs-email" required></td>
             <td>
@@ -753,6 +756,7 @@ if(document.getElementById('batchStaffForm')) {
 
         for (let row of rows) {
             const given = row.querySelector('.bs-first').value;
+            const mi = row.querySelector('.bs-mi').value;
             const family = row.querySelector('.bs-last').value;
             const email = row.querySelector('.bs-email').value;
             const status = row.querySelector('.bs-status').value;
@@ -769,7 +773,7 @@ if(document.getElementById('batchStaffForm')) {
 
                 // If the email succeeds, save to the database
                 await addDoc(usersCol, { 
-                    name: `${given} ${family}`, givenName: given, familyName: family,
+                    name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
                     role: role, email: email, status: status,
                     password: randomPassword 
                 });

@@ -384,6 +384,38 @@
         </div>
     </div>
 
+    <div id="staffModal" class="modal">
+        <div class="modal-content" style="width: 800px; max-width: 95vw;">
+            <div class="modal-header">
+                <h3 id="staffModalTitle">Batch Register Staff</h3>
+                <span class="close-btn" onclick="closeModal('staffModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="batchStaffForm">
+                <input type="hidden" id="hiddenStaffRole" value="Staff">
+                <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
+                    <table class="batch-table">
+                        <thead>
+                            <tr>
+                                <th>Given Name</th>
+                                <th>M.I.</th>
+                                <th>Family Name</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchStaffBody">
+                        </tbody>
+                    </table>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" onclick="addStaffBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
+                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="memberModal" class="modal">
         <div class="modal-content" style="width: 800px; max-width: 95vw;">
             <div class="modal-header">
