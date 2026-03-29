@@ -665,33 +665,36 @@ if(document.getElementById('batchMemberForm')) {
             const plan = row.querySelector('.bm-plan').value;
             const randomPassword = generatePassword();
 
-            await addDoc(usersCol, { 
-                name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
-                role: "Member", email: email, status: "Active", plan: plan,
-                password: randomPassword,
-                dateRegistered: currentTimestamp 
-            });
-
             try {
+                // Try sending the email FIRST
                 await emailjs.send("service_x90mti6", "template_nda1wjc", {
                     to_name: given,
                     to_email: email,
                     generated_password: randomPassword,
                     plan: plan
                 });
+                
+                // If the email succeeds, save to the database
+                await addDoc(usersCol, { 
+                    name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
+                    role: "Member", email: email, status: "Active", plan: plan,
+                    password: randomPassword,
+                    dateRegistered: currentTimestamp 
+                });
+                
                 emailSuccessCount++; 
+                addedCount++;
             } catch(err) {
                 console.error("EmailJS failed:", err);
                 emailFailCount++;    
             }
-            addedCount++;
         }
         window.closeModal('memberModal');
         
-        let alertMsg = `Successfully registered ${addedCount} member(s) to the database!\n\n`;
-        alertMsg += `✅ ${emailSuccessCount} email(s) verified and sent.\n`;
+        let alertMsg = `Batch Registration Summary:\n\n`;
+        alertMsg += `✅ ${emailSuccessCount} user(s) received emails and were saved to the database.\n`;
         if (emailFailCount > 0) {
-            alertMsg += `❌ ${emailFailCount} email(s) failed to send. Please verify the email addresses were typed correctly.`;
+            alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved to the database.`;
         }
         alert(alertMsg);
     });
@@ -755,32 +758,35 @@ if(document.getElementById('batchStaffForm')) {
             const status = row.querySelector('.bs-status').value;
             const randomPassword = generatePassword();
 
-            await addDoc(usersCol, { 
-                name: `${given} ${family}`, givenName: given, familyName: family,
-                role: role, email: email, status: status,
-                password: randomPassword 
-            });
-
             try {
+                // Try sending the email FIRST
                 await emailjs.send("service_x90mti6", "template_nda1wjc", {
                     to_name: given,
                     to_email: email,
                     generated_password: randomPassword,
                     plan: `${role} Account`
                 });
+
+                // If the email succeeds, save to the database
+                await addDoc(usersCol, { 
+                    name: `${given} ${family}`, givenName: given, familyName: family,
+                    role: role, email: email, status: status,
+                    password: randomPassword 
+                });
+                
                 emailSuccessCount++;
+                addedCount++;
             } catch(err) {
                 console.error("EmailJS failed:", err);
                 emailFailCount++;
             }
-            addedCount++;
         }
         window.closeModal('staffModal');
 
-        let alertMsg = `Successfully registered ${addedCount} ${role}(s) to the database!\n\n`;
-        alertMsg += `✅ ${emailSuccessCount} email(s) verified and sent.\n`;
+        let alertMsg = `Batch Registration Summary:\n\n`;
+        alertMsg += `✅ ${emailSuccessCount} ${role}(s) received emails and were saved to the database.\n`;
         if (emailFailCount > 0) {
-            alertMsg += `❌ ${emailFailCount} email(s) failed to send. Please verify the email addresses were typed correctly.`;
+            alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved to the database.`;
         }
         alert(alertMsg);
     });
