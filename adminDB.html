@@ -57,6 +57,7 @@
                 <li class="sub-item" onclick="switchTab('members', this)"><i class="fa-solid fa-users"></i> Member Directory</li>
                 <li class="sub-item" onclick="switchTab('archivedMembers', this)"><i class="fa-solid fa-box-archive"></i> Archived Members</li>
                 <li class="sub-item" onclick="switchTab('attendance', this)"><i class="fa-solid fa-clipboard-user"></i> Attendance Log</li>
+                <li class="sub-item" onclick="openChatTab('member', this, 'Member Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
 
             <li class="nav-item nav-clickable" onclick="switchTab('pos', this)">
@@ -83,7 +84,7 @@
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View All Staff</li>
-                <li class="sub-item" onclick="switchTab('chats', this)"><i class="fa-solid fa-comments"></i> Internal Chats</li>
+                <li class="sub-item" onclick="openChatTab('staff', this, 'Staff Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
 
             <li class="nav-item has-submenu">
@@ -92,7 +93,7 @@
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('trainers', this)"><i class="fa-solid fa-arrow-right"></i> View Trainers</li>
-                <li class="sub-item" onclick="switchTab('chats', this)"><i class="fa-solid fa-comments"></i> Internal Chats</li>
+                <li class="sub-item" onclick="openChatTab('trainer', this, 'Trainer Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
         </ul>
     </aside>
@@ -169,8 +170,14 @@
         <div id="chats" class="content-section" style="padding: 0;">
             <div class="chat-container">
                 <div class="chat-sidebar">
-                    <div style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white);">
-                        <i class="fa-solid fa-address-book"></i> Contacts Directory
+                    <div id="chatDirectoryTitle" style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white);">
+                        <i class="fa-solid fa-address-book"></i> Contacts
+                    </div>
+                    <div style="padding: 10px; border-bottom: 1px solid var(--border-color); background: #fafafa;">
+                        <div class="search-box" style="width: 100%;">
+                            <i class="fas fa-search" style="left: 10px;"></i>
+                            <input type="text" id="chatSearch" placeholder="Search users..." onkeyup="filterChatUsers()" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px; outline: none;">
+                        </div>
                     </div>
                     <div id="chatUserList" style="overflow-y: auto; flex-grow: 1;">
                         </div>

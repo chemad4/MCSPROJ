@@ -115,6 +115,7 @@ let attendanceData = [];
 let messagesData = [];
 let posCart = []; 
 let currentChatUser = null;
+let currentChatRoleFilter = 'all';
 
 const inventoryCol = collection(db, "inventory");
 const paymentsCol = collection(db, "payments");
@@ -127,6 +128,22 @@ let servicesChartInstance = null;
 // ==========================================
 // INTERNAL MESSENGER LOGIC
 // ==========================================
+
+// This function acts as a router to show only the selected roles
+window.openChatTab = function(role, element, title) {
+    currentChatRoleFilter = role;
+    document.getElementById('chatDirectoryTitle').innerHTML = `<i class="fa-solid fa-address-book"></i> ${title}`;
+    currentChatUser = null;
+    document.getElementById('chatHeader').innerText = 'Select a user to start chatting';
+    document.getElementById('chatHistory').innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;"><i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i><p>No chat selected</p></div>';
+    document.getElementById('chatInput').disabled = true;
+    document.getElementById('chatSendBtn').disabled = true;
+    document.getElementById('chatSearch').value = ""; 
+    
+    renderChatUserList();
+    switchTab('chats', element);
+}
+
 onSnapshot(messagesCol, (snapshot) => {
     messagesData = [];
     snapshot.forEach(doc => messagesData.push({ id: doc.id, ...doc.data() }));
@@ -139,35 +156,49 @@ function renderChatUserList() {
     const myName = localStorage.getItem("loggedInUser");
     let html = "";
     
-    // Define the categories for the sidebar
-    const categories = [
-        { title: "Admins", roles: ["admin"] },
-        { title: "Staff", roles: ["staff"] },
-        { title: "Trainers", roles: ["trainer"] },
-        { title: "Members", roles: ["member"] }
-    ];
-    
-    categories.forEach(cat => {
-        const usersInCat = chatUsers.filter(u => cat.roles.includes((u.role || "").toLowerCase()) && u.name !== myName);
-        
-        if (usersInCat.length > 0) {
-            html += `<div class="chat-category">${cat.title}</div>`;
-            usersInCat.forEach(u => {
-                let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
-                html += `
-                    <div class="chat-user" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
-                        <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
-                        <div>
-                            <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
-                            <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
-                        </div>
-                    </div>
-                `;
-            });
-        }
+    // Filter users based on the selected sidebar menu
+    const filteredUsers = chatUsers.filter(u => {
+        if (u.name === myName) return false;
+        const uRole = (u.role || "").toLowerCase();
+        if (currentChatRoleFilter === 'member' && uRole === 'member') return true;
+        if (currentChatRoleFilter === 'staff' && uRole === 'staff') return true;
+        if (currentChatRoleFilter === 'trainer' && uRole === 'trainer') return true;
+        if (currentChatRoleFilter === 'all') return true; 
+        return false;
     });
     
+    if (filteredUsers.length === 0) {
+        html = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No users found in this category.</div>`;
+    } else {
+        filteredUsers.forEach(u => {
+            let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
+            html += `
+                <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
+                    <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
+                    <div>
+                        <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
     list.innerHTML = html;
+}
+
+window.filterChatUsers = function() {
+    const filter = document.getElementById('chatSearch').value.toLowerCase();
+    const users = document.querySelectorAll('.chat-user-item');
+    
+    users.forEach(user => {
+        const name = user.getAttribute('data-name');
+        if (name.includes(filter)) {
+            user.style.display = "flex";
+        } else {
+            user.style.display = "none";
+        }
+    });
 }
 
 window.openChat = function(userName) {
@@ -540,7 +571,7 @@ onSnapshot(usersCol, (snapshot) => {
     });
     renderStaff();
     renderMembers(); 
-    renderChatUserList();
+    if(document.getElementById('chatUserList')) renderChatUserList();
 });
 
 function renderMembers() {

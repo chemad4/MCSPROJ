@@ -57,6 +57,7 @@
                 <li class="sub-item" onclick="switchTab('members', this)"><i class="fa-solid fa-users"></i> Member Directory</li>
                 <li class="sub-item" onclick="switchTab('archivedMembers', this)"><i class="fa-solid fa-box-archive"></i> Archived Members</li>
                 <li class="sub-item" onclick="switchTab('attendance', this)"><i class="fa-solid fa-clipboard-user"></i> Attendance Log</li>
+                <li class="sub-item" onclick="openChatTab('member', this, 'Member Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
 
             <li class="nav-item nav-clickable" onclick="switchTab('pos', this)">
@@ -77,9 +78,23 @@
                 <i class="fa-solid fa-chart-line"></i> <span class="menu-text">Financial Reports</span>
             </li>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('chats', this)">
-                <i class="fa-solid fa-comments"></i> <span class="menu-text">Internal Chats</span>
+            <li class="nav-item has-submenu">
+                <i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff Management</span>
+                <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
+            <ul class="submenu">
+                <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View All Staff</li>
+                <li class="sub-item" onclick="openChatTab('staff', this, 'Staff Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
+            </ul>
+
+            <li class="nav-item has-submenu">
+                <i class="fa-solid fa-users-gear"></i> <span class="menu-text">Trainer Management</span>
+                <i class="fa-solid fa-chevron-down chevron-icon"></i>
+            </li>
+            <ul class="submenu">
+                <li class="sub-item" onclick="switchTab('trainers', this)"><i class="fa-solid fa-arrow-right"></i> View Trainers</li>
+                <li class="sub-item" onclick="openChatTab('trainer', this, 'Trainer Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
+            </ul>
         </ul>
     </aside>
 
@@ -147,8 +162,14 @@
         <div id="chats" class="content-section" style="padding: 0;">
             <div class="chat-container">
                 <div class="chat-sidebar">
-                    <div style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white);">
-                        <i class="fa-solid fa-address-book"></i> Contacts Directory
+                    <div id="chatDirectoryTitle" style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white);">
+                        <i class="fa-solid fa-address-book"></i> Contacts
+                    </div>
+                    <div style="padding: 10px; border-bottom: 1px solid var(--border-color); background: #fafafa;">
+                        <div class="search-box" style="width: 100%;">
+                            <i class="fas fa-search" style="left: 10px;"></i>
+                            <input type="text" id="chatSearch" placeholder="Search users..." onkeyup="filterChatUsers()" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px; outline: none;">
+                        </div>
                     </div>
                     <div id="chatUserList" style="overflow-y: auto; flex-grow: 1;">
                         </div>
@@ -332,6 +353,44 @@
                 <div class="table-container" style="box-shadow: none;">
                     <table id="paymentTable">
                         <thead><tr><th>Customer Name</th><th>Items Purchased</th><th>Date & Time</th><th>Gross Total</th><th>VAT</th><th>Net Total</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="staff" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="staffSearch" placeholder="Search staff..." onkeyup="filterTable('staffTable', 'staffSearch')">
+                </div>
+                <button class="action-btn" onclick="openStaffModal('Staff')"><i class="fas fa-users"></i> Batch Register Staff</button>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-id-badge"></i> Staff Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="staffTable">
+                        <thead><tr><th>Full Name</th><th>Role</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="trainers" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="trainerSearch" placeholder="Search trainers..." onkeyup="filterTable('trainerTable', 'trainerSearch')">
+                </div>
+                <button class="action-btn" onclick="openStaffModal('Trainer')"><i class="fas fa-users"></i> Batch Register Trainers</button>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-dumbbell"></i> Trainer Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="trainerTable">
+                        <thead><tr><th>Full Name</th><th>Role</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
