@@ -26,10 +26,6 @@
         .pos-totals { background: var(--dark-black); color: white; padding: 20px; border-radius: 0 0 8px 8px; }
         .total-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
         .total-line.grand { font-size: 20px; font-weight: bold; color: var(--primary-red); border-top: 1px solid #444; padding-top: 10px; margin-top: 10px; }
-        .inventory-split { display: grid; grid-template-columns: 1fr; gap: 30px; }
-        
-        .stat-card, .grid-stat-box { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-        .stat-card:hover, .grid-stat-box:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
         
         .batch-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
         .batch-table th { text-align: left; padding: 8px; background: #f4f6f9; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }
@@ -303,49 +299,19 @@
         </div>
 
         <div id="equipment" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="equipSearch" placeholder="Search equipment..." onkeyup="filterTable('machinesTable', 'equipSearch')">
+            <div class="inventory-header-large">Gym Equipment</div>
+            <input type="text" class="inventory-search-bar" id="equipSearchGrid" placeholder="Search equipment by name, category, or status..." onkeyup="filterGrid('machinesGrid', 'equipSearchGrid')">
+            <div class="inventory-grid" id="machinesGrid">
                 </div>
-                <button class="action-btn" onclick="exportInventoryReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Report</button>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header" style="display: flex; justify-content: space-between;">
-                    <span><i class="fas fa-dumbbell"></i> Gym Equipment</span>
-                    <button class="action-btn" onclick="openEquipmentModal()" style="padding: 5px 15px;"><i class="fas fa-plus"></i> Add Equipment</button>
-                </div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="machinesTable">
-                        <thead><tr><th>Name of Equipment</th><th>Classification</th><th>Weight/Size</th><th>Qty</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
+            <button class="fab-btn" onclick="openEquipmentModal()"><i class="fas fa-plus"></i></button>
         </div>
 
         <div id="products" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="prodSearch" placeholder="Search products..." onkeyup="filterTable('productsTable', 'prodSearch')">
+            <div class="inventory-header-large">Products & Consumables</div>
+            <input type="text" class="inventory-search-bar" id="prodSearchGrid" placeholder="Search products by name, category, or status..." onkeyup="filterGrid('productsGrid', 'prodSearchGrid')">
+            <div class="inventory-grid" id="productsGrid">
                 </div>
-                <button class="action-btn" onclick="exportInventoryReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Report</button>
-            </div>
-
-            <div class="panel">
-                <div class="panel-header" style="display: flex; justify-content: space-between;">
-                    <span><i class="fas fa-wine-bottle"></i> Products & Consumables</span>
-                    <button class="action-btn" onclick="openProductModal()" style="padding: 5px 15px; background: var(--dark-black);"><i class="fas fa-plus"></i> Add Consumable</button>
-                </div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="productsTable">
-                        <thead><tr><th>Product Name</th><th>Volume/Size</th><th>Stock Lvl</th><th>Expiration Date</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
+            <button class="fab-btn" onclick="openProductModal()"><i class="fas fa-plus"></i></button>
         </div>
 
         <div id="payments" class="content-section">

@@ -154,18 +154,16 @@ function renderChatUserList() {
     const myName = localStorage.getItem("loggedInUser");
     let html = "";
     
-    // Only fetch Admins if the user clicked the "Staff" chat tab (or all)
     let admins = [];
     if (currentChatRoleFilter === 'staff' || currentChatRoleFilter === 'all') {
         admins = chatUsers.filter(u => (u.role || "").toLowerCase() === 'admin' && u.name !== myName);
     }
     
-    // Fetch the users for the specific role clicked in the sidebar
     const targetUsers = chatUsers.filter(u => {
         if (u.name === myName) return false;
         const uRole = (u.role || "").toLowerCase();
         
-        if (currentChatRoleFilter === 'all') return uRole !== 'admin'; // Admins already handled
+        if (currentChatRoleFilter === 'all') return uRole !== 'admin'; 
         return uRole === currentChatRoleFilter;
     });
     
@@ -173,7 +171,6 @@ function renderChatUserList() {
         html = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No users found.</div>`;
     } else {
         
-        // 1. Force Admins to render first (Only if viewing Staff Team)
         if (admins.length > 0) {
             html += `<div class="chat-category">Admins</div>`;
             admins.forEach(u => {
@@ -190,7 +187,6 @@ function renderChatUserList() {
             });
         }
 
-        // 2. Render the specific target role (Staff, Trainer, or Member)
         if (targetUsers.length > 0) {
             let catTitle = "Users";
             if(currentChatRoleFilter === 'staff') catTitle = "Staff Team";
@@ -291,7 +287,7 @@ window.sendMessage = async function() {
 
 
 // ==========================================
-// 1. INVENTORY LOGIC (Live Listener)
+// 1. NEW INVENTORY LOGIC (CARD GRID)
 // ==========================================
 onSnapshot(inventoryCol, (snapshot) => {
     inventoryData = [];
@@ -300,13 +296,25 @@ onSnapshot(inventoryCol, (snapshot) => {
     renderPOSProducts();
 });
 
-function renderInventory() {
-    const equipTbody = document.querySelector('#machinesTable tbody');
-    const prodTbody = document.querySelector('#productsTable tbody');
-    if(!equipTbody || !prodTbody) return;
+// Function to map categories to specific font-awesome icons
+function getCategoryIcon(catName) {
+    const c = (catName || "").toLowerCase();
+    if (c.includes('cardio')) return '<i class="fa-solid fa-person-running"></i>';
+    if (c.includes('strength')) return '<i class="fa-solid fa-dumbbell"></i>';
+    if (c.includes('accessories')) return '<i class="fa-solid fa-mats"></i>';
+    if (c.includes('supplements')) return '<i class="fa-solid fa-capsules"></i>';
+    if (c.includes('beverage')) return '<i class="fa-solid fa-bottle-water"></i>';
+    if (c.includes('merch')) return '<i class="fa-solid fa-shirt"></i>';
+    return '<i class="fa-solid fa-box"></i>'; // Default
+}
 
-    equipTbody.innerHTML = "";
-    prodTbody.innerHTML = "";
+function renderInventory() {
+    const equipGrid = document.getElementById('machinesGrid');
+    const prodGrid = document.getElementById('productsGrid');
+    if(!equipGrid || !prodGrid) return;
+
+    equipGrid.innerHTML = "";
+    prodGrid.innerHTML = "";
     let alertsHtml = "";
     let ops = 0, maint = 0, low = 0, totalMachines = 0;
 
@@ -337,28 +345,46 @@ function renderInventory() {
         if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
         if (!isConsumable) totalMachines++;
 
+        // Build the icon
+        const iconHtml = getCategoryIcon(item.cat);
+
+        // Build Action Buttons
         let actionButtons = '';
         if(!isConsumable) {
             actionButtons = `
-                <button class="btn-icon btn-edit" style="color: var(--dark-black);" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
-                <button class="btn-icon btn-delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
+                <button class="btn-icon btn-edit" title="Edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
+                <button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
             `;
         } else {
-            actionButtons = `<button class="btn-icon btn-delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>`;
+            actionButtons = `<button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>`;
         }
 
-        let rowHTML = `<tr>
-            <td>${item.name}</td>
-            <td>${item.cat}</td>
-            <td>${item.size || 'N/A'}</td>
-            ${isConsumable ? `<td>${item.expiry || 'N/A'}</td>` : ''}
-            <td>${item.qty}</td>
-            <td><span class="badge ${badge}">${currentStatus}</span></td>
-            <td>${actionButtons}</td>
-        </tr>`;
+        // --- NEW CARD HTML ---
+        let cardHTML = `
+            <div class="inventory-card inventory-item-filter" data-search="${item.name.toLowerCase()} ${item.cat.toLowerCase()} ${currentStatus.toLowerCase()}">
+                <div class="inventory-icon-box">
+                    ${iconHtml}
+                </div>
+                <div class="inventory-details">
+                    <div class="inventory-title">${item.name}</div>
+                    <div class="inventory-category">${item.cat}</div>
+                    <div class="inventory-desc">
+                        ${item.size ? `Size/Vol: <strong>${item.size}</strong><br>` : ''}
+                        ${isConsumable && item.expiry ? `Expiry: <strong>${item.expiry}</strong><br>` : ''}
+                        Qty: <strong>${item.qty} units</strong>
+                    </div>
+                    <div class="inventory-meta">
+                        <span class="badge ${badge}">${currentStatus}</span>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    ${actionButtons}
+                </div>
+            </div>
+        `;
 
-        if(isConsumable) prodTbody.innerHTML += rowHTML;
-        else equipTbody.innerHTML += rowHTML;
+        if(isConsumable) prodGrid.innerHTML += cardHTML;
+        else equipGrid.innerHTML += cardHTML;
 
         if(isProblematic) {
             alertsHtml += `<div class="list-item">
@@ -374,6 +400,23 @@ function renderInventory() {
     
     const dashAlerts = document.getElementById('dashInventoryAlerts');
     if(dashAlerts) dashAlerts.innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
+}
+
+// NEW FILTER FUNCTION FOR GRIDS
+window.filterGrid = function(gridId, inputId) {
+    const filter = document.getElementById(inputId).value.toLowerCase();
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+    
+    const cards = grid.querySelectorAll('.inventory-item-filter');
+    cards.forEach(card => {
+        const searchData = card.getAttribute('data-search');
+        if (searchData.includes(filter)) {
+            card.style.display = "flex";
+        } else {
+            card.style.display = "none";
+        }
+    });
 }
 
 window.openEquipmentModal = () => { document.getElementById('equipmentForm').reset(); document.getElementById('equipmentModal').style.display = 'flex'; }
