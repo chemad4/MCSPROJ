@@ -58,7 +58,8 @@ window.switchTab = function(tabId, element) {
         'archivedMembers': 'Archived Members',
         'attendance': 'Attendance Log',
         'staff': 'Staff Directory',
-        'trainers': 'Trainer Management'
+        'trainers': 'Trainer Management',
+        'chats': 'Internal Messages'
     };
     document.getElementById('pageTitle').innerText = titles[tabId] || 'Dashboard';
 }
@@ -108,16 +109,108 @@ window.filterByPlan = function(val) {
 let inventoryData = [];
 let allUsersData = []; 
 let membersData = []; 
+let chatUsers = [];
 let paymentsData = [];
 let attendanceData = [];
+let messagesData = [];
 let posCart = []; 
+let currentChatUser = null;
 
 const inventoryCol = collection(db, "inventory");
 const paymentsCol = collection(db, "payments");
 const usersCol = collection(db, "users");
 const attendanceCol = collection(db, "attendance");
+const messagesCol = collection(db, "messages");
 
 let servicesChartInstance = null;
+
+// ==========================================
+// INTERNAL MESSENGER LOGIC
+// ==========================================
+onSnapshot(messagesCol, (snapshot) => {
+    messagesData = [];
+    snapshot.forEach(doc => messagesData.push({ id: doc.id, ...doc.data() }));
+    renderChatHistory();
+});
+
+function renderChatUserList() {
+    const list = document.getElementById('chatUserList');
+    if(!list) return;
+    const myName = localStorage.getItem("loggedInUser");
+    list.innerHTML = "";
+    
+    chatUsers.forEach(u => {
+        if(u.name === myName) return; 
+        let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
+        
+        list.innerHTML += `
+            <div class="chat-user" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
+                <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
+                <div>
+                    <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
+                    <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
+                </div>
+            </div>
+        `;
+    });
+}
+
+window.openChat = function(userName) {
+    currentChatUser = userName;
+    document.getElementById('chatHeader').innerText = `Chatting with ${userName}`;
+    document.getElementById('chatInput').disabled = false;
+    document.getElementById('chatSendBtn').disabled = false;
+    
+    document.querySelectorAll('.chat-user').forEach(el => el.classList.remove('active'));
+    document.getElementById(`chat-user-${userName.replace(/[^a-zA-Z0-9]/g, '')}`).classList.add('active');
+    
+    renderChatHistory();
+}
+
+function renderChatHistory() {
+    const hist = document.getElementById('chatHistory');
+    if(!hist || !currentChatUser) return;
+    
+    const myName = localStorage.getItem("loggedInUser");
+    const relevantMsgs = messagesData.filter(m => 
+        (m.sender === myName && m.receiver === currentChatUser) || 
+        (m.sender === currentChatUser && m.receiver === myName)
+    ).sort((a,b) => a.timestamp - b.timestamp);
+    
+    if (relevantMsgs.length === 0) {
+        hist.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;"><p>Say hello to ${currentChatUser}!</p></div>`;
+        return;
+    }
+
+    hist.innerHTML = relevantMsgs.map(m => {
+        const isMe = m.sender === myName;
+        const time = new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        return `<div class="msg-bubble ${isMe ? 'msg-sent' : 'msg-received'}">
+            <div>${m.text}</div>
+            <div class="msg-time">${time}</div>
+        </div>`;
+    }).join('');
+    
+    hist.scrollTop = hist.scrollHeight; 
+}
+
+window.sendMessage = async function() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if(!text || !currentChatUser) return;
+    
+    const myName = localStorage.getItem("loggedInUser");
+    
+    await addDoc(messagesCol, {
+        sender: myName,
+        receiver: currentChatUser,
+        text: text,
+        timestamp: new Date().getTime()
+    });
+    
+    input.value = "";
+}
+
 
 // ==========================================
 // 1. INVENTORY LOGIC (Live Listener)
@@ -417,14 +510,20 @@ function renderAttendance() {
 onSnapshot(usersCol, (snapshot) => {
     allUsersData = [];
     membersData = [];
+    chatUsers = [];
     snapshot.forEach(doc => {
         const data = doc.data();
         const roleStr = (data.role || "").trim().toLowerCase(); 
-        if(roleStr === 'member') membersData.push({ id: doc.id, ...data });
-        else if(roleStr !== 'admin') allUsersData.push({ id: doc.id, ...data });
+        if(roleStr === 'member') {
+            membersData.push({ id: doc.id, ...data });
+        } else {
+            chatUsers.push({ id: doc.id, ...data });
+            if(roleStr !== 'admin') allUsersData.push({ id: doc.id, ...data });
+        }
     });
     renderStaff();
     renderMembers(); 
+    renderChatUserList();
 });
 
 function renderMembers() {
@@ -667,7 +766,6 @@ if(document.getElementById('batchMemberForm')) {
             const randomPassword = generatePassword();
 
             try {
-                // Try sending the email FIRST
                 await emailjs.send("service_x90mti6", "template_nda1wjc", {
                     to_name: given,
                     to_email: email,
@@ -675,7 +773,6 @@ if(document.getElementById('batchMemberForm')) {
                     plan: plan
                 });
                 
-                // If the email succeeds, save to the database
                 await addDoc(usersCol, { 
                     name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
                     role: "Member", email: email, status: "Active", plan: plan,
@@ -763,7 +860,6 @@ if(document.getElementById('batchStaffForm')) {
             const randomPassword = generatePassword();
 
             try {
-                // Try sending the email FIRST
                 await emailjs.send("service_x90mti6", "template_nda1wjc", {
                     to_name: given,
                     to_email: email,
@@ -771,7 +867,6 @@ if(document.getElementById('batchStaffForm')) {
                     plan: `${role} Account`
                 });
 
-                // If the email succeeds, save to the database
                 await addDoc(usersCol, { 
                     name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
                     role: role, email: email, status: status,

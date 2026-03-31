@@ -83,7 +83,7 @@
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View All Staff</li>
-                <li class="sub-item" onclick="alert('Chat integration coming soon!');"><i class="fa-solid fa-comments"></i> Internal Chats</li>
+                <li class="sub-item" onclick="switchTab('chats', this)"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
 
             <li class="nav-item has-submenu">
@@ -92,7 +92,7 @@
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('trainers', this)"><i class="fa-solid fa-arrow-right"></i> View Trainers</li>
-                <li class="sub-item" onclick="alert('Chat integration coming soon!');"><i class="fa-solid fa-comments"></i> Internal Chats</li>
+                <li class="sub-item" onclick="switchTab('chats', this)"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
         </ul>
     </aside>
@@ -161,6 +161,33 @@
                     <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Active Trainers on Floor</div>
                     <div class="panel-body" id="dashActiveTrainersFeed">
                         <p style="color: var(--text-muted); font-size: 14px;">Loading trainers...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="chats" class="content-section" style="padding: 0;">
+            <div class="chat-container">
+                <div class="chat-sidebar">
+                    <div style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white);">
+                        <i class="fa-solid fa-address-book"></i> Staff Directory
+                    </div>
+                    <div id="chatUserList" style="overflow-y: auto; flex-grow: 1;">
+                        </div>
+                </div>
+                <div class="chat-main">
+                    <div id="chatHeader" style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); font-weight: bold;">
+                        Select a user to start chatting
+                    </div>
+                    <div id="chatHistory" class="chat-history">
+                        <div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;">
+                            <i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i>
+                            <p>No chat selected</p>
+                        </div>
+                    </div>
+                    <div style="padding: 20px; background: var(--white); border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
+                        <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()" style="flex-grow: 1; padding: 12px 20px; border: 1px solid var(--border-color); border-radius: 25px; outline: none;" disabled>
+                        <button id="chatSendBtn" onclick="sendMessage()" style="background: var(--primary-red); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; transition: 0.2s;" disabled><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             </div>

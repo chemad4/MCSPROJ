@@ -76,6 +76,10 @@
             <li class="nav-item nav-clickable" onclick="switchTab('payments', this)">
                 <i class="fa-solid fa-chart-line"></i> <span class="menu-text">Financial Reports</span>
             </li>
+
+            <li class="nav-item nav-clickable" onclick="switchTab('chats', this)">
+                <i class="fa-solid fa-comments"></i> <span class="menu-text">Internal Chats</span>
+            </li>
         </ul>
     </aside>
 
@@ -135,6 +139,33 @@
                     <div class="panel-header"><i class="fa-solid fa-clipboard-list"></i> Inventory Alerts</div>
                     <div class="panel-body" id="dashInventoryAlerts">
                         <p style="color: var(--text-muted); font-size: 14px;">Loading alerts...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="chats" class="content-section" style="padding: 0;">
+            <div class="chat-container">
+                <div class="chat-sidebar">
+                    <div style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white);">
+                        <i class="fa-solid fa-address-book"></i> Staff Directory
+                    </div>
+                    <div id="chatUserList" style="overflow-y: auto; flex-grow: 1;">
+                        </div>
+                </div>
+                <div class="chat-main">
+                    <div id="chatHeader" style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); font-weight: bold;">
+                        Select a user to start chatting
+                    </div>
+                    <div id="chatHistory" class="chat-history">
+                        <div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;">
+                            <i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i>
+                            <p>No chat selected</p>
+                        </div>
+                    </div>
+                    <div style="padding: 20px; background: var(--white); border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
+                        <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()" style="flex-grow: 1; padding: 12px 20px; border: 1px solid var(--border-color); border-radius: 25px; outline: none;" disabled>
+                        <button id="chatSendBtn" onclick="sendMessage()" style="background: var(--primary-red); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; transition: 0.2s;" disabled><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             </div>
@@ -380,38 +411,6 @@
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Total Pieces/Servings to Add (For 'Tingi', input total capsules):</p>
                 <input type="number" id="prodQty" placeholder="Amount to add" required min="1">
                 <button type="submit" style="background-color: var(--dark-black);">Add to Stock</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="staffModal" class="modal">
-        <div class="modal-content" style="width: 800px; max-width: 95vw;">
-            <div class="modal-header">
-                <h3 id="staffModalTitle">Batch Register Staff</h3>
-                <span class="close-btn" onclick="closeModal('staffModal')">&times;</span>
-            </div>
-            <form class="modal-form" id="batchStaffForm">
-                <input type="hidden" id="hiddenStaffRole" value="Staff">
-                <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
-                    <table class="batch-table">
-                        <thead>
-                            <tr>
-                                <th>Given Name</th>
-                                <th>M.I.</th>
-                                <th>Family Name</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="batchStaffBody">
-                        </tbody>
-                    </table>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button type="button" onclick="addStaffBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
-                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
-                </div>
             </form>
         </div>
     </div>
