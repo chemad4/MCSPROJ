@@ -153,6 +153,8 @@ tr:hover { background-color: #F8F9FA; }
 /* --- INTERNAL MESSENGER STYLES --- */
 .chat-container { display: flex; height: 100%; border-radius: 8px; overflow: hidden; background: var(--white); box-shadow: var(--card-shadow); border: 1px solid var(--border-color); }
 .chat-sidebar { width: 300px; border-right: 1px solid var(--border-color); background: #fafafa; display: flex; flex-direction: column; flex-shrink: 0; }
+.chat-category { padding: 10px 20px; font-size: 12px; font-weight: bold; color: var(--text-muted); background: #eee; text-transform: uppercase; border-bottom: 1px solid var(--border-color); border-top: 1px solid var(--border-color); }
+.chat-category:first-child { border-top: none; }
 .chat-user { padding: 15px 20px; border-bottom: 1px solid var(--border-color); cursor: pointer; display: flex; align-items: center; gap: 12px; transition: 0.2s; }
 .chat-user:hover, .chat-user.active { background: #fff; border-left: 4px solid var(--primary-red); }
 .chat-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--dark-black); color: var(--white); display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }

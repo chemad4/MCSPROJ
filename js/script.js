@@ -137,22 +137,37 @@ function renderChatUserList() {
     const list = document.getElementById('chatUserList');
     if(!list) return;
     const myName = localStorage.getItem("loggedInUser");
-    list.innerHTML = "";
+    let html = "";
     
-    chatUsers.forEach(u => {
-        if(u.name === myName) return; 
-        let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
+    // Define the categories for the sidebar
+    const categories = [
+        { title: "Admins", roles: ["admin"] },
+        { title: "Staff", roles: ["staff"] },
+        { title: "Trainers", roles: ["trainer"] },
+        { title: "Members", roles: ["member"] }
+    ];
+    
+    categories.forEach(cat => {
+        const usersInCat = chatUsers.filter(u => cat.roles.includes((u.role || "").toLowerCase()) && u.name !== myName);
         
-        list.innerHTML += `
-            <div class="chat-user" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
-                <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
-                <div>
-                    <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
-                    <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
-                </div>
-            </div>
-        `;
+        if (usersInCat.length > 0) {
+            html += `<div class="chat-category">${cat.title}</div>`;
+            usersInCat.forEach(u => {
+                let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
+                html += `
+                    <div class="chat-user" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
+                        <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
+                        <div>
+                            <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
     });
+    
+    list.innerHTML = html;
 }
 
 window.openChat = function(userName) {
@@ -514,10 +529,12 @@ onSnapshot(usersCol, (snapshot) => {
     snapshot.forEach(doc => {
         const data = doc.data();
         const roleStr = (data.role || "").trim().toLowerCase(); 
+        
+        chatUsers.push({ id: doc.id, ...data });
+
         if(roleStr === 'member') {
             membersData.push({ id: doc.id, ...data });
         } else {
-            chatUsers.push({ id: doc.id, ...data });
             if(roleStr !== 'admin') allUsersData.push({ id: doc.id, ...data });
         }
     });
