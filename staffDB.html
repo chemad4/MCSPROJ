@@ -79,20 +79,18 @@
             </li>
 
             <li class="nav-item has-submenu">
-                <i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff Management</span>
+                <i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff Team</span>
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View All Staff</li>
                 <li class="sub-item" onclick="openChatTab('staff', this, 'Staff Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
 
             <li class="nav-item has-submenu">
-                <i class="fa-solid fa-users-gear"></i> <span class="menu-text">Trainer Management</span>
+                <i class="fa-solid fa-users-gear"></i> <span class="menu-text">Trainer Team</span>
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('trainers', this)"><i class="fa-solid fa-arrow-right"></i> View Trainers</li>
                 <li class="sub-item" onclick="openChatTab('trainer', this, 'Trainer Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
         </ul>
@@ -359,44 +357,6 @@
             </div>
         </div>
 
-        <div id="staff" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="staffSearch" placeholder="Search staff..." onkeyup="filterTable('staffTable', 'staffSearch')">
-                </div>
-                <button class="action-btn" onclick="openStaffModal('Staff')"><i class="fas fa-users"></i> Batch Register Staff</button>
-            </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-id-badge"></i> Staff Directory</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="staffTable">
-                        <thead><tr><th>Full Name</th><th>Role</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="trainers" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="trainerSearch" placeholder="Search trainers..." onkeyup="filterTable('trainerTable', 'trainerSearch')">
-                </div>
-                <button class="action-btn" onclick="openStaffModal('Trainer')"><i class="fas fa-users"></i> Batch Register Trainers</button>
-            </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-dumbbell"></i> Trainer Directory</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="trainerTable">
-                        <thead><tr><th>Full Name</th><th>Role</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
     </main>
 
     <div id="equipmentModal" class="modal">
@@ -470,38 +430,6 @@
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Total Pieces/Servings to Add (For 'Tingi', input total capsules):</p>
                 <input type="number" id="prodQty" placeholder="Amount to add" required min="1">
                 <button type="submit" style="background-color: var(--dark-black);">Add to Stock</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="staffModal" class="modal">
-        <div class="modal-content" style="width: 800px; max-width: 95vw;">
-            <div class="modal-header">
-                <h3 id="staffModalTitle">Batch Register Staff</h3>
-                <span class="close-btn" onclick="closeModal('staffModal')">&times;</span>
-            </div>
-            <form class="modal-form" id="batchStaffForm">
-                <input type="hidden" id="hiddenStaffRole" value="Staff">
-                <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
-                    <table class="batch-table">
-                        <thead>
-                            <tr>
-                                <th>Given Name</th>
-                                <th>M.I.</th>
-                                <th>Family Name</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="batchStaffBody">
-                        </tbody>
-                    </table>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button type="button" onclick="addStaffBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
-                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
-                </div>
             </form>
         </div>
     </div>

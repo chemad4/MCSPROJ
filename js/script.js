@@ -128,8 +128,6 @@ let servicesChartInstance = null;
 // ==========================================
 // INTERNAL MESSENGER LOGIC
 // ==========================================
-
-// This function acts as a router to show only the selected roles
 window.openChatTab = function(role, element, title) {
     currentChatRoleFilter = role;
     document.getElementById('chatDirectoryTitle').innerHTML = `<i class="fa-solid fa-address-book"></i> ${title}`;
@@ -156,7 +154,6 @@ function renderChatUserList() {
     const myName = localStorage.getItem("loggedInUser");
     let html = "";
     
-    // Filter users based on the selected sidebar menu
     const filteredUsers = chatUsers.filter(u => {
         if (u.name === myName) return false;
         const uRole = (u.role || "").toLowerCase();
@@ -256,7 +253,6 @@ window.sendMessage = async function() {
     
     input.value = "";
 }
-
 
 // ==========================================
 // 1. INVENTORY LOGIC (Live Listener)
@@ -750,6 +746,10 @@ window.archiveUser = async (id, currentStatus) => {
 }
 
 window.deleteUser = async (id) => { 
+    if(localStorage.getItem("userRole") !== "Admin") {
+        alert("Action Denied: You do not have permission to delete accounts.");
+        return;
+    }
     if(confirm("Remove this account completely? This action cannot be undone.")) {
         await deleteDoc(doc(db, "users", id)); 
     }
@@ -870,6 +870,10 @@ window.addStaffBatchRow = function() {
 }
 
 window.openStaffModal = (role) => { 
+    if(localStorage.getItem("userRole") !== "Admin") {
+        alert("Action Denied: Only Admins can register Staff and Trainers.");
+        return;
+    }
     document.getElementById('hiddenStaffRole').value = role;
     document.getElementById('staffModalTitle').innerText = `Batch Register ${role}s`;
     document.getElementById('batchStaffBody').innerHTML = `
@@ -893,6 +897,8 @@ window.openStaffModal = (role) => {
 if(document.getElementById('batchStaffForm')) {
     document.getElementById('batchStaffForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if(localStorage.getItem("userRole") !== "Admin") return;
+
         const rows = document.querySelectorAll('#batchStaffBody tr');
         const role = document.getElementById('hiddenStaffRole').value;
         let addedCount = 0;
