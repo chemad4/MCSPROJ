@@ -154,52 +154,66 @@ function renderChatUserList() {
     const myName = localStorage.getItem("loggedInUser");
     let html = "";
     
-    let targetRoles = [];
-    if (currentChatRoleFilter === 'staff') {
-        targetRoles = ['admin', 'staff'];
-    } else if (currentChatRoleFilter === 'trainer') {
-        targetRoles = ['admin', 'trainer']; 
-    } else if (currentChatRoleFilter === 'member') {
-        targetRoles = ['admin', 'member']; 
-    } else {
-        targetRoles = ['admin', 'staff', 'trainer', 'member'];
+    // Only fetch Admins if the user clicked the "Staff" chat tab (or all)
+    let admins = [];
+    if (currentChatRoleFilter === 'staff' || currentChatRoleFilter === 'all') {
+        admins = chatUsers.filter(u => (u.role || "").toLowerCase() === 'admin' && u.name !== myName);
     }
-
-    const filteredUsers = chatUsers.filter(u => {
+    
+    // Fetch the users for the specific role clicked in the sidebar
+    const targetUsers = chatUsers.filter(u => {
         if (u.name === myName) return false;
         const uRole = (u.role || "").toLowerCase();
-        return targetRoles.includes(uRole);
+        
+        if (currentChatRoleFilter === 'all') return uRole !== 'admin'; // Admins already handled
+        return uRole === currentChatRoleFilter;
     });
     
-    if (filteredUsers.length === 0) {
+    if (admins.length === 0 && targetUsers.length === 0) {
         html = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No users found.</div>`;
     } else {
-        const renderGroup = (roleName, displayTitle) => {
-            const groupUsers = filteredUsers.filter(u => (u.role || "").toLowerCase() === roleName);
-            if (groupUsers.length > 0) {
-                if (targetRoles.length > 1) {
-                    html += `<div class="chat-category">${displayTitle}</div>`;
-                }
-                groupUsers.forEach(u => {
-                    let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
-                    html += `
-                        <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
-                            <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
-                            <div>
-                                <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
-                                <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
-                            </div>
+        
+        // 1. Force Admins to render first (Only if viewing Staff Team)
+        if (admins.length > 0) {
+            html += `<div class="chat-category">Admins</div>`;
+            admins.forEach(u => {
+                let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
+                html += `
+                    <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
+                        <div class="chat-avatar" style="background: var(--primary-red);"><i class="fa-solid fa-crown" style="font-size: 14px;"></i></div>
+                        <div>
+                            <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
                         </div>
-                    `;
-                });
-            }
-        };
+                    </div>
+                `;
+            });
+        }
 
-        // Render Admins first directly under the search bar, then follow with the selected team
-        renderGroup('admin', 'Admins');
-        renderGroup('staff', 'Staff');
-        renderGroup('trainer', 'Trainers');
-        renderGroup('member', 'Members');
+        // 2. Render the specific target role (Staff, Trainer, or Member)
+        if (targetUsers.length > 0) {
+            let catTitle = "Users";
+            if(currentChatRoleFilter === 'staff') catTitle = "Staff Team";
+            if(currentChatRoleFilter === 'trainer') catTitle = "Trainers";
+            if(currentChatRoleFilter === 'member') catTitle = "Members";
+
+            if (currentChatRoleFilter !== 'all') {
+                 html += `<div class="chat-category">${catTitle}</div>`;
+            }
+
+            targetUsers.forEach(u => {
+                let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
+                html += `
+                    <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
+                        <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
+                        <div>
+                            <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
     }
     
     list.innerHTML = html;
