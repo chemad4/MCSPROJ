@@ -154,31 +154,52 @@ function renderChatUserList() {
     const myName = localStorage.getItem("loggedInUser");
     let html = "";
     
+    let targetRoles = [];
+    if (currentChatRoleFilter === 'staff') {
+        targetRoles = ['admin', 'staff'];
+    } else if (currentChatRoleFilter === 'trainer') {
+        targetRoles = ['admin', 'trainer']; 
+    } else if (currentChatRoleFilter === 'member') {
+        targetRoles = ['admin', 'member']; 
+    } else {
+        targetRoles = ['admin', 'staff', 'trainer', 'member'];
+    }
+
     const filteredUsers = chatUsers.filter(u => {
         if (u.name === myName) return false;
         const uRole = (u.role || "").toLowerCase();
-        if (currentChatRoleFilter === 'member' && uRole === 'member') return true;
-        if (currentChatRoleFilter === 'staff' && uRole === 'staff') return true;
-        if (currentChatRoleFilter === 'trainer' && uRole === 'trainer') return true;
-        if (currentChatRoleFilter === 'all') return true; 
-        return false;
+        return targetRoles.includes(uRole);
     });
     
     if (filteredUsers.length === 0) {
-        html = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No users found in this category.</div>`;
+        html = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No users found.</div>`;
     } else {
-        filteredUsers.forEach(u => {
-            let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
-            html += `
-                <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
-                    <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
-                    <div>
-                        <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
-                        <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
-                    </div>
-                </div>
-            `;
-        });
+        const renderGroup = (roleName, displayTitle) => {
+            const groupUsers = filteredUsers.filter(u => (u.role || "").toLowerCase() === roleName);
+            if (groupUsers.length > 0) {
+                if (targetRoles.length > 1) {
+                    html += `<div class="chat-category">${displayTitle}</div>`;
+                }
+                groupUsers.forEach(u => {
+                    let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
+                    html += `
+                        <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
+                            <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
+                            <div>
+                                <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
+                                <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        };
+
+        // Render Admins first directly under the search bar, then follow with the selected team
+        renderGroup('admin', 'Admins');
+        renderGroup('staff', 'Staff');
+        renderGroup('trainer', 'Trainers');
+        renderGroup('member', 'Members');
     }
     
     list.innerHTML = html;
@@ -253,6 +274,7 @@ window.sendMessage = async function() {
     
     input.value = "";
 }
+
 
 // ==========================================
 // 1. INVENTORY LOGIC (Live Listener)
