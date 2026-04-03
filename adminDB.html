@@ -26,6 +26,10 @@
         .pos-totals { background: var(--dark-black); color: white; padding: 20px; border-radius: 0 0 8px 8px; }
         .total-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
         .total-line.grand { font-size: 20px; font-weight: bold; color: var(--primary-red); border-top: 1px solid #444; padding-top: 10px; margin-top: 10px; }
+        .inventory-split { display: grid; grid-template-columns: 1fr; gap: 30px; }
+        
+        .stat-card, .grid-stat-box { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover, .grid-stat-box:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
         
         .batch-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
         .batch-table th { text-align: left; padding: 8px; background: #f4f6f9; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }
@@ -527,23 +531,6 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
-            authDomain: "fit-track-ca8d1.firebaseapp.com",
-            projectId: "fit-track-ca8d1",
-            storageBucket: "fit-track-ca8d1.firebasestorage.app",
-            messagingSenderId: "157593985795",
-            appId: "1:157593985795:web:07156961dda8e2254fbf36",
-            measurementId: "G-NYGGEMMJMC"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-    </script>
     <script type="module" src="js/script.js"></script>
 
 </body>

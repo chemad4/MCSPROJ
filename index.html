@@ -2,160 +2,71 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Fit Track - Login</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#111111">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
 
     <script>
-        const activeUser = localStorage.getItem("loggedInUser");
-        const activeRole = localStorage.getItem("userRole");
-        
-        if (activeUser) {
-            if (activeRole === "Admin") {
-                window.location.replace("adminDB.html"); 
-            } else if (activeRole === "Staff") {
-                window.location.replace("staffDB.html");
-            }
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => console.log('ServiceWorker registered!'))
+                    .catch(err => console.log('ServiceWorker failed: ', err));
+            });
         }
     </script>
 
     <style>
-        :root {
-            --brand-red: #bb131a;     
-            --brand-dark-red: #900f14;
-            --brand-black: #111111;   
-        }
-
-        body {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #2a2a2a; 
-            margin: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 20px;
-        }
-
-        .login-container {
-            width: 100%;
-            max-width: 450px;
-            background: rgba(17, 17, 17, 0.85); 
-            backdrop-filter: blur(12px); 
-            -webkit-backdrop-filter: blur(12px);
-            padding: 40px 40px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
-            text-align: center;
-            position: relative;
-        }
-
-        .logo-header { margin-bottom: 30px; }
+        body { display: flex; align-items: center; justify-content: center; background-color: var(--dark-black); height: 100vh; margin: 0; font-family: 'Roboto', sans-serif; }
+        .login-container { background: var(--white); padding: 40px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 90%; max-width: 400px; text-align: center; }
+        .login-logo { font-size: 2.2rem; font-weight: 700; margin-bottom: 30px; letter-spacing: 1px; color: var(--dark-black); }
+        .login-logo span { color: var(--primary-red); }
         
-        .logo-header h3 { 
-            color: #fff; 
-            font-size: 3.2rem; 
-            font-family: Arial, Helvetica, sans-serif; 
-            font-weight: bold; 
-            text-transform: uppercase; 
-            letter-spacing: 1px; 
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+        .login-form input { width: 100%; padding: 15px; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; font-size: 15px; box-sizing: border-box; }
+        .login-form input:focus { border-color: var(--primary-red); }
         
-        .logo-header span { color: var(--brand-red); font-weight: bold; }
-
-        .input-group {
-            margin-bottom: 20px !important;
-            border-radius: 6px;
-            overflow: hidden;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
-        }
-
-        .input-group:focus-within { border-color: var(--brand-red); box-shadow: 0 0 10px rgba(187, 19, 26, 0.3); }
-
-        .input-group-text { background-color: rgba(0, 0, 0, 0.5); color: #888; border: none; padding: 0 18px; }
-        .form-control { background-color: rgba(0, 0, 0, 0.5); border: none; color: #fff; padding: 15px 12px; }
-        .form-control::placeholder { color: #666; }
-        .form-control:focus { background-color: rgba(0, 0, 0, 0.7); color: #fff; box-shadow: none; }
-
-        .password-toggle { cursor: pointer; background-color: rgba(0, 0, 0, 0.5); border: none; color: #888; }
-        .password-toggle:hover { color: var(--brand-red); }
-
-        .btn-brand {
-            width: 100%; background-color: var(--brand-red); color: white; font-weight: 700;
-            letter-spacing: 1px; padding: 15px; border-radius: 6px; border: none;
-            text-transform: uppercase; transition: all 0.3s ease; margin-top: 10px;
-            box-shadow: 0 6px 15px rgba(187, 19, 26, 0.3);
-        }
+        .login-btn { width: 100%; padding: 15px; background-color: var(--primary-red); color: white; border: none; border-radius: 4px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .login-btn:hover { background-color: #900f14; }
+        .login-btn:disabled { background-color: #e0abae; cursor: not-allowed; }
         
-        .btn-brand:hover { background-color: var(--brand-dark-red); color: white; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(187, 19, 26, 0.5); }
-
-        .link-text { color: #888; text-decoration: none; cursor: pointer; font-size: 0.9rem; transition: 0.3s; }
-        .link-text:hover { color: #fff; text-decoration: underline; }
-
-        .form-box { display: none; }
-        .active-form { display: block; animation: fadeIn 0.4s ease forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        #errorMsg { color: var(--primary-red); margin-bottom: 15px; font-size: 14px; display: none; font-weight: 500; }
+        
+        /* Custom Install Button */
+        #installAppBtn { display: none; width: 100%; padding: 15px; margin-top: 15px; background-color: var(--dark-black); color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        #installAppBtn:hover { background-color: #333; }
     </style>
 </head>
 <body>
 
     <div class="login-container">
-        <div class="logo-header">
-            <h3>FIT<span>TRACK</span></h3>
-        </div>
+        <div class="login-logo">FIT<span>TRACK</span></div>
+        <div id="errorMsg">Invalid email or password.</div>
+        
+        <form class="login-form" id="loginForm">
+            <input type="email" id="loginEmail" placeholder="Email Address" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+            <button type="submit" class="login-btn" id="loginSubmitBtn">Log In</button>
+        </form>
 
-        <div id="loginBox" class="form-box active-form">
-            <form id="loginForm">
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-user"></i></span>
-                    <input type="email" id="emailInput" class="form-control" placeholder="Email Address" required>
-                </div>
-
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                    <input type="password" id="passwordInput" class="form-control" placeholder="Password" required>
-                    <span class="input-group-text password-toggle" onclick="togglePassword('passwordInput', 'toggleIcon')">
-                        <i class="fas fa-eye" id="toggleIcon"></i>
-                    </span>
-                </div>
-
-                <button type="submit" class="btn btn-brand mb-3">LOGIN</button>
-                <div class="text-end mt-2 px-1">
-                    <span class="link-text" onclick="switchForm('forgot')">Forgot Password?</span>
-                </div>
-            </form>
-        </div>
-
-        <div id="forgotBox" class="form-box">
-            <form id="forgotForm">
-                <p class="text-light mb-4" style="font-size: 0.9rem;">Enter your email to receive a password reset link.</p>
-                <div class="input-group mb-4">
-                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                    <input type="email" class="form-control" placeholder="Email Address" required>
-                </div>
-                <button type="submit" class="btn btn-brand mb-4">SEND LINK</button>
-                <div class="pt-2 border-top border-secondary mt-2">
-                    <span class="link-text" onclick="switchForm('login')"><i class="fas fa-arrow-left me-2"></i> Back to Login</span>
-                </div>
-            </form>
-        </div>
+        <button id="installAppBtn">
+            <i class="fa-solid fa-download"></i> Install Fit Track App
+        </button>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        const firebaseConfig = {
+        const loginConfig = {
             apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
             authDomain: "fit-track-ca8d1.firebaseapp.com",
             projectId: "fit-track-ca8d1",
@@ -165,72 +76,103 @@
             measurementId: "G-NYGGEMMJMC"
         };
 
-        const app = initializeApp(firebaseConfig);
+        const app = initializeApp(loginConfig);
         const db = getFirestore(app);
 
-        window.switchForm = function(view) {
-            const loginBox = document.getElementById('loginBox');
-            const forgotBox = document.getElementById('forgotBox');
-            
-            loginBox.classList.remove('active-form');
-            forgotBox.classList.remove('active-form');
+        // Auto-redirect if already logged in
+        const currentUser = localStorage.getItem("loggedInUser");
+        const currentRole = localStorage.getItem("userRole");
+        if (currentUser && currentRole) {
+            if (currentRole === "Admin") window.location.replace("adminDB.html");
+            else if (currentRole === "Staff" || currentRole === "Trainer") window.location.replace("staffDB.html");
+            else if (currentRole === "Member") window.location.replace("memberDB.html");
+        }
 
-            setTimeout(() => {
-                if (view === 'forgot') { forgotBox.classList.add('active-form'); } 
-                else { loginBox.classList.add('active-form'); }
-            }, 50);
-        };
+        // Handle Login Form Submission
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            const errorMsg = document.getElementById('errorMsg');
+            const submitBtn = document.getElementById('loginSubmitBtn');
 
-        window.togglePassword = function(inputId, iconId) {
-            const input = document.getElementById(inputId);
-            const icon = document.getElementById(iconId);
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                input.type = 'password';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
-            }
-        };
-
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault(); 
-            const email = document.getElementById('emailInput').value.trim();
-            const password = document.getElementById('passwordInput').value.trim();
+            submitBtn.innerText = "Authenticating...";
+            submitBtn.disabled = true;
+            errorMsg.style.display = "none";
 
             try {
-                const usersRef = collection(db, "users");
-                const q = query(usersRef, where("email", "==", email), where("password", "==", password));
+                const q = query(collection(db, "users"), where("email", "==", email), where("password", "==", password));
                 const querySnapshot = await getDocs(q);
 
-                if (!querySnapshot.empty) {
-                    const userData = querySnapshot.docs[0].data(); 
+                if (querySnapshot.empty) {
+                    errorMsg.innerText = "Invalid email or password.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                } else {
+                    const userData = querySnapshot.docs[0].data();
                     
-                    localStorage.setItem("loggedInUser", userData.name);
+                    if (userData.status === 'Archived') {
+                        errorMsg.innerText = "This account has been archived. Please contact admin.";
+                        errorMsg.style.display = "block";
+                        submitBtn.innerText = "Log In";
+                        submitBtn.disabled = false;
+                        return;
+                    }
+
+                    localStorage.setItem("loggedInUser", userData.name || userData.givenName);
                     localStorage.setItem("userRole", userData.role);
 
                     if (userData.role === "Admin") {
-                        window.location.replace('adminDB.html'); 
-                    } else if (userData.role === "Staff") {
-                        window.location.replace('staffDB.html');
+                        window.location.replace("adminDB.html");
+                    } else if (userData.role === "Staff" || userData.role === "Trainer") {
+                        window.location.replace("staffDB.html");
+                    } else if (userData.role === "Member") {
+                        window.location.replace("memberDB.html");
                     } else {
-                        alert("Login Successful! Welcome, " + (userData.givenName || userData.name));
+                        errorMsg.innerText = "Account role is undefined.";
+                        errorMsg.style.display = "block";
+                        submitBtn.innerText = "Log In";
+                        submitBtn.disabled = false;
                     }
-                } else {
-                    alert("Invalid Email or Password. Please try again.");
                 }
             } catch (error) {
-                console.error("Database error: ", error);
-                alert("Could not connect to the database. Please check your internet connection.");
+                console.error("Error logging in:", error);
+                errorMsg.innerText = "Connection error. Check your internet and try again.";
+                errorMsg.style.display = "block";
+                submitBtn.innerText = "Log In";
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+
+    <script>
+        let deferredPrompt;
+        const installBtn = document.getElementById('installAppBtn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'block';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt !== null) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('User accepted the PWA install prompt');
+                } else {
+                    console.log('User dismissed the PWA install prompt');
+                }
+                deferredPrompt = null;
+                installBtn.style.display = 'none';
             }
         });
 
-        document.getElementById('forgotForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            alert("Reset link sent to your email!");
-            window.switchForm('login'); 
+        window.addEventListener('appinstalled', () => {
+            installBtn.style.display = 'none';
+            console.log('Fit Track PWA was installed successfully');
         });
     </script>
 </body>
