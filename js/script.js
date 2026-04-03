@@ -1,8 +1,12 @@
-// 1. Import Firebase dependencies
+// ==========================================
+// 1. IMPORT FIREBASE DEPENDENCIES
+// ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// 2. YOUR Actual Fit Track Firebase Config
+// ==========================================
+// 2. FIREBASE & EMAILJS CONFIGURATION
+// ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
     authDomain: "fit-track-ca8d1.firebaseapp.com",
@@ -13,15 +17,14 @@ const firebaseConfig = {
     measurementId: "G-NYGGEMMJMC"
 };
 
-// 3. Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 4. Initialize EmailJS 
+// Initialize EmailJS
 emailjs.init("ZqQKGRo5j5KpAhH98");
 
 // ==========================================
-// GLOBAL EXPORTS FOR HTML ONCLICK BUTTONS
+// 3. GLOBAL EXPORTS (HTML ONCLICK BUTTONS)
 // ==========================================
 
 window.handleLogout = function() {
@@ -31,23 +34,37 @@ window.handleLogout = function() {
 };
 
 window.switchTab = function(tabId, element) {
-    if(event) event.stopPropagation();
-    document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active-section'));
-    if(document.getElementById(tabId)) document.getElementById(tabId).classList.add('active-section');
+    if (event) event.stopPropagation();
     
+    // Hide all sections
+    document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active-section'));
+    
+    // Show target section
+    if (document.getElementById(tabId)) {
+        document.getElementById(tabId).classList.add('active-section');
+    }
+    
+    // Remove active state from sidebar links
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.sub-item').forEach(el => el.classList.remove('active'));
 
-    if(element && !element.classList.contains('stat-card') && !element.classList.contains('grid-stat-box')) {
+    // Apply active state
+    if (element && !element.classList.contains('stat-card') && !element.classList.contains('grid-stat-box')) {
         element.classList.add('active');
-        if(element.classList.contains('sub-item')) element.parentElement.previousElementSibling.classList.add('active');
+        if (element.classList.contains('sub-item')) {
+            element.parentElement.previousElementSibling.classList.add('active');
+        }
     } else {
         const targetNav = document.querySelector(`.nav-menu li[onclick*="switchTab('${tabId}'"]`);
-        if(targetNav) {
+        if (targetNav) {
             targetNav.classList.add('active');
-            if(targetNav.classList.contains('sub-item')) targetNav.parentElement.previousElementSibling.classList.add('active');
+            if (targetNav.classList.contains('sub-item')) {
+                targetNav.parentElement.previousElementSibling.classList.add('active');
+            }
         }
     }
+
+    // Update Topbar Title
     const titles = {
         'dashboard': 'Dashboard',
         'equipment': 'Equipment Management',
@@ -61,31 +78,43 @@ window.switchTab = function(tabId, element) {
         'trainers': 'Trainer Management',
         'chats': 'Internal Messages'
     };
-    document.getElementById('pageTitle').innerText = titles[tabId] || 'Dashboard';
+    
+    if (document.getElementById('pageTitle')) {
+        document.getElementById('pageTitle').innerText = titles[tabId] || 'Dashboard';
+    }
 }
 
-window.closeModal = function(modalId) { document.getElementById(modalId).style.display = 'none'; }
-window.exportReport = function() { window.print(); }
-window.exportInventoryReport = function() { window.print(); }
+window.closeModal = function(modalId) { 
+    document.getElementById(modalId).style.display = 'none'; 
+}
+
+window.exportReport = function() { 
+    window.print(); 
+}
+
+window.exportInventoryReport = function() { 
+    window.print(); 
+}
 
 window.filterTable = function(tableId, inputId) {
     const filter = document.getElementById(inputId).value.toUpperCase();
     const tr = document.getElementById(tableId).getElementsByTagName("tr");
+    
     for (let i = 1; i < tr.length; i++) {
         let td = tr[i].getElementsByTagName("td")[0]; 
         
-        if(tableId === 'membersTable' || tableId === 'archivedMembersTable') {
+        if (tableId === 'membersTable' || tableId === 'archivedMembersTable') {
             let tdPlan = tr[i].getElementsByTagName("td")[4]; 
             let text = (td ? td.textContent : "") + " " + (tdPlan ? tdPlan.textContent : "");
-            if (text.toUpperCase().indexOf(filter) > -1) tr[i].style.display = "";
-            else tr[i].style.display = "none";
+            tr[i].style.display = text.toUpperCase().indexOf(filter) > -1 ? "" : "none";
         } else if (tableId === 'attendanceTable') {
             let tdType = tr[i].getElementsByTagName("td")[1]; 
             let text = (td ? td.textContent : "") + " " + (tdType ? tdType.textContent : "");
-            if (text.toUpperCase().indexOf(filter) > -1) tr[i].style.display = "";
-            else tr[i].style.display = "none";
+            tr[i].style.display = text.toUpperCase().indexOf(filter) > -1 ? "" : "none";
         } else {
-            if (td) tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+            if (td) {
+                tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+            }
         }
     }
 }
@@ -93,18 +122,38 @@ window.filterTable = function(tableId, inputId) {
 window.filterByPlan = function(val) {
     const filterText = val.toUpperCase();
     const tr = document.getElementById('membersTable').getElementsByTagName("tr");
+    
     for (let i = 1; i < tr.length; i++) {
         let td = tr[i].getElementsByTagName("td")[4]; 
         if (td) {
             let cellText = (td.textContent || td.innerText).toUpperCase();
-            if (val === "All" || cellText.includes(filterText)) tr[i].style.display = "";
-            else tr[i].style.display = "none";
+            if (val === "All" || cellText.includes(filterText)) {
+                tr[i].style.display = "";
+            } else {
+                tr[i].style.display = "none";
+            }
         }
     }
 }
 
+window.filterGrid = function(gridId, inputId) {
+    const filter = document.getElementById(inputId).value.toLowerCase();
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+    
+    const cards = grid.querySelectorAll('.inventory-item-filter');
+    cards.forEach(card => {
+        const searchData = card.getAttribute('data-search');
+        if (searchData.includes(filter)) {
+            card.style.display = "flex";
+        } else {
+            card.style.display = "none";
+        }
+    });
+}
+
 // ==========================================
-// STATE ARRAYS & COLLECTIONS
+// 4. STATE ARRAYS & COLLECTIONS
 // ==========================================
 let inventoryData = [];
 let allUsersData = []; 
@@ -114,6 +163,7 @@ let paymentsData = [];
 let attendanceData = [];
 let messagesData = [];
 let posCart = []; 
+
 let currentChatUser = null;
 let currentChatRoleFilter = 'all';
 
@@ -126,7 +176,7 @@ const messagesCol = collection(db, "messages");
 let servicesChartInstance = null;
 
 // ==========================================
-// INTERNAL MESSENGER LOGIC
+// 5. INTERNAL MESSENGER LOGIC
 // ==========================================
 window.openChatTab = function(role, element, title) {
     currentChatRoleFilter = role;
@@ -150,15 +200,18 @@ onSnapshot(messagesCol, (snapshot) => {
 
 function renderChatUserList() {
     const list = document.getElementById('chatUserList');
-    if(!list) return;
+    if (!list) return;
+    
     const myName = localStorage.getItem("loggedInUser");
     let html = "";
     
+    // Fetch Admins if the user clicked the "Staff" chat tab (or all)
     let admins = [];
     if (currentChatRoleFilter === 'staff' || currentChatRoleFilter === 'all') {
         admins = chatUsers.filter(u => (u.role || "").toLowerCase() === 'admin' && u.name !== myName);
     }
     
+    // Fetch the users for the specific role clicked in the sidebar
     const targetUsers = chatUsers.filter(u => {
         if (u.name === myName) return false;
         const uRole = (u.role || "").toLowerCase();
@@ -170,14 +223,16 @@ function renderChatUserList() {
     if (admins.length === 0 && targetUsers.length === 0) {
         html = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No users found.</div>`;
     } else {
-        
+        // Render Admins
         if (admins.length > 0) {
             html += `<div class="chat-category">Admins</div>`;
             admins.forEach(u => {
                 let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
                 html += `
                     <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
-                        <div class="chat-avatar" style="background: var(--primary-red);"><i class="fa-solid fa-crown" style="font-size: 14px;"></i></div>
+                        <div class="chat-avatar" style="background: var(--primary-red);">
+                            <i class="fa-solid fa-crown" style="font-size: 14px;"></i>
+                        </div>
                         <div>
                             <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
                             <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
@@ -187,11 +242,12 @@ function renderChatUserList() {
             });
         }
 
+        // Render target role
         if (targetUsers.length > 0) {
             let catTitle = "Users";
-            if(currentChatRoleFilter === 'staff') catTitle = "Staff Team";
-            if(currentChatRoleFilter === 'trainer') catTitle = "Trainers";
-            if(currentChatRoleFilter === 'member') catTitle = "Members";
+            if (currentChatRoleFilter === 'staff') catTitle = "Staff Team";
+            if (currentChatRoleFilter === 'trainer') catTitle = "Trainers";
+            if (currentChatRoleFilter === 'member') catTitle = "Members";
 
             if (currentChatRoleFilter !== 'all') {
                  html += `<div class="chat-category">${catTitle}</div>`;
@@ -243,7 +299,7 @@ window.openChat = function(userName) {
 
 function renderChatHistory() {
     const hist = document.getElementById('chatHistory');
-    if(!hist || !currentChatUser) return;
+    if (!hist || !currentChatUser) return;
     
     const myName = localStorage.getItem("loggedInUser");
     const relevantMsgs = messagesData.filter(m => 
@@ -259,10 +315,12 @@ function renderChatHistory() {
     hist.innerHTML = relevantMsgs.map(m => {
         const isMe = m.sender === myName;
         const time = new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        return `<div class="msg-bubble ${isMe ? 'msg-sent' : 'msg-received'}">
-            <div>${m.text}</div>
-            <div class="msg-time">${time}</div>
-        </div>`;
+        return `
+            <div class="msg-bubble ${isMe ? 'msg-sent' : 'msg-received'}">
+                <div>${m.text}</div>
+                <div class="msg-time">${time}</div>
+            </div>
+        `;
     }).join('');
     
     hist.scrollTop = hist.scrollHeight; 
@@ -271,7 +329,8 @@ function renderChatHistory() {
 window.sendMessage = async function() {
     const input = document.getElementById('chatInput');
     const text = input.value.trim();
-    if(!text || !currentChatUser) return;
+    
+    if (!text || !currentChatUser) return;
     
     const myName = localStorage.getItem("loggedInUser");
     
@@ -285,9 +344,8 @@ window.sendMessage = async function() {
     input.value = "";
 }
 
-
 // ==========================================
-// 1. NEW INVENTORY LOGIC (CARD GRID)
+// 6. INVENTORY LOGIC
 // ==========================================
 onSnapshot(inventoryCol, (snapshot) => {
     inventoryData = [];
@@ -296,7 +354,6 @@ onSnapshot(inventoryCol, (snapshot) => {
     renderPOSProducts();
 });
 
-// Function to map categories to specific font-awesome icons
 function getCategoryIcon(catName) {
     const c = (catName || "").toLowerCase();
     if (c.includes('cardio')) return '<i class="fa-solid fa-person-running"></i>';
@@ -305,22 +362,25 @@ function getCategoryIcon(catName) {
     if (c.includes('supplements')) return '<i class="fa-solid fa-capsules"></i>';
     if (c.includes('beverage')) return '<i class="fa-solid fa-bottle-water"></i>';
     if (c.includes('merch')) return '<i class="fa-solid fa-shirt"></i>';
-    return '<i class="fa-solid fa-box"></i>'; // Default
+    return '<i class="fa-solid fa-box"></i>'; 
 }
 
 function renderInventory() {
     const equipGrid = document.getElementById('machinesGrid');
     const prodGrid = document.getElementById('productsGrid');
-    if(!equipGrid || !prodGrid) return;
+    if (!equipGrid || !prodGrid) return;
 
     equipGrid.innerHTML = "";
     prodGrid.innerHTML = "";
+    
     let alertsHtml = "";
-    let ops = 0, maint = 0, low = 0, totalMachines = 0;
+    let ops = 0;
+    let maint = 0;
+    let low = 0;
+    let totalMachines = 0;
 
     inventoryData.forEach((item) => {
         let isConsumable = ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
-        
         let currentStatus = item.status || (isConsumable ? 'In Stock' : 'Operational');
         let badge = 'operational';
         let isProblematic = false;
@@ -337,20 +397,21 @@ function renderInventory() {
                 low++;
             }
         } else if (currentStatus === 'Maintenance') { 
-            badge = 'maintenance'; maint++; isProblematic = true; 
+            badge = 'maintenance'; 
+            maint++; 
+            isProblematic = true; 
         } else if (currentStatus === 'Out of Order') { 
-            badge = 'broken'; isProblematic = true; 
+            badge = 'broken'; 
+            isProblematic = true; 
         }
         
         if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
         if (!isConsumable) totalMachines++;
 
-        // Build the icon
         const iconHtml = getCategoryIcon(item.cat);
 
-        // Build Action Buttons
         let actionButtons = '';
-        if(!isConsumable) {
+        if (!isConsumable) {
             actionButtons = `
                 <button class="btn-icon btn-edit" title="Edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
                 <button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
@@ -359,7 +420,6 @@ function renderInventory() {
             actionButtons = `<button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>`;
         }
 
-        // --- NEW CARD HTML ---
         let cardHTML = `
             <div class="inventory-card inventory-item-filter" data-search="${item.name.toLowerCase()} ${item.cat.toLowerCase()} ${currentStatus.toLowerCase()}">
                 <div class="inventory-icon-box">
@@ -383,49 +443,57 @@ function renderInventory() {
             </div>
         `;
 
-        if(isConsumable) prodGrid.innerHTML += cardHTML;
-        else equipGrid.innerHTML += cardHTML;
+        if (isConsumable) {
+            prodGrid.innerHTML += cardHTML;
+        } else {
+            equipGrid.innerHTML += cardHTML;
+        }
 
-        if(isProblematic) {
-            alertsHtml += `<div class="list-item">
-                <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                <div class="list-content"><h4>Status: ${currentStatus}</h4><p><strong>${item.name}</strong> requires attention.</p></div>
-            </div>`;
+        if (isProblematic) {
+            alertsHtml += `
+                <div class="list-item">
+                    <div class="list-icon" style="background-color: var(--dark-black);">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="list-content">
+                        <h4>Status: ${currentStatus}</h4>
+                        <p><strong>${item.name}</strong> requires attention.</p>
+                    </div>
+                </div>
+            `;
         }
     });
 
-    if(document.getElementById('dashInventoryTotal')) document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
-    if(document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
-    if(document.getElementById('navInventoryCount')) document.getElementById('navInventoryCount').innerText = ` ${inventoryData.length} `;
+    if (document.getElementById('dashInventoryTotal')) document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
+    if (document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
+    if (document.getElementById('navInventoryCount')) document.getElementById('navInventoryCount').innerText = ` ${inventoryData.length} `;
     
     const dashAlerts = document.getElementById('dashInventoryAlerts');
-    if(dashAlerts) dashAlerts.innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
+    if (dashAlerts) {
+        dashAlerts.innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
+    }
 }
 
-// NEW FILTER FUNCTION FOR GRIDS
-window.filterGrid = function(gridId, inputId) {
-    const filter = document.getElementById(inputId).value.toLowerCase();
-    const grid = document.getElementById(gridId);
-    if (!grid) return;
-    
-    const cards = grid.querySelectorAll('.inventory-item-filter');
-    cards.forEach(card => {
-        const searchData = card.getAttribute('data-search');
-        if (searchData.includes(filter)) {
-            card.style.display = "flex";
-        } else {
-            card.style.display = "none";
-        }
-    });
+window.openEquipmentModal = () => { 
+    document.getElementById('equipmentForm').reset(); 
+    document.getElementById('equipmentModal').style.display = 'flex'; 
 }
 
-window.openEquipmentModal = () => { document.getElementById('equipmentForm').reset(); document.getElementById('equipmentModal').style.display = 'flex'; }
-window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
-window.deleteInventoryItem = async (id) => { if(confirm("Delete this inventory item?")) await deleteDoc(doc(db, "inventory", id)); }
+window.openProductModal = () => { 
+    document.getElementById('productForm').reset(); 
+    document.getElementById('productModal').style.display = 'flex'; 
+}
+
+window.deleteInventoryItem = async (id) => { 
+    if (confirm("Delete this inventory item?")) {
+        await deleteDoc(doc(db, "inventory", id)); 
+    }
+}
 
 window.openEditEquipModal = function(id) {
     const item = inventoryData.find(i => i.id === id);
     if (!item) return;
+    
     document.getElementById('editEquipId').value = item.id;
     document.getElementById('editEquipName').value = item.name;
     document.getElementById('editEquipCategory').value = item.cat;
@@ -435,7 +503,7 @@ window.openEditEquipModal = function(id) {
     document.getElementById('editEquipModal').style.display = 'flex';
 }
 
-if(document.getElementById('editEquipForm')) {
+if (document.getElementById('editEquipForm')) {
     document.getElementById('editEquipForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const id = document.getElementById('editEquipId').value;
@@ -446,6 +514,7 @@ if(document.getElementById('editEquipForm')) {
             qty: Number(document.getElementById('editEquipQty').value),
             status: document.getElementById('editEquipStatus').value
         };
+        
         await updateDoc(doc(db, "inventory", id), updatedData);
         window.closeModal('editEquipModal');
         alert("Equipment updated successfully!");
@@ -474,18 +543,23 @@ async function handleInventorySubmit(e, isProduct) {
         await addDoc(inventoryCol, newItem);
         alert(`New ${isProduct ? 'product' : 'equipment'} registered successfully!`);
     }
+    
     window.closeModal(isProduct ? 'productModal' : 'equipmentModal');
 }
 
-if(document.getElementById('equipmentForm')) document.getElementById('equipmentForm').addEventListener('submit', (e) => handleInventorySubmit(e, false));
-if(document.getElementById('productForm')) document.getElementById('productForm').addEventListener('submit', (e) => handleInventorySubmit(e, true));
+if (document.getElementById('equipmentForm')) {
+    document.getElementById('equipmentForm').addEventListener('submit', (e) => handleInventorySubmit(e, false));
+}
+if (document.getElementById('productForm')) {
+    document.getElementById('productForm').addEventListener('submit', (e) => handleInventorySubmit(e, true));
+}
 
 // ==========================================
-// 2. POINT OF SALE (POS) LOGIC
+// 7. POINT OF SALE (POS) LOGIC
 // ==========================================
 function renderPOSProducts() {
     const posBody = document.getElementById('posProductList');
-    if(!posBody) return;
+    if (!posBody) return;
     
     posBody.innerHTML = `
         <tr style="background-color: #fff9e6;">
@@ -498,32 +572,41 @@ function renderPOSProducts() {
     
     inventoryData.forEach(item => {
         let isConsumable = ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
-        if(isConsumable && item.qty > 0) {
+        if (isConsumable && item.qty > 0) {
             let price = item.price || 0;
-            posBody.innerHTML += `<tr>
-                <td>${item.name}</td><td>${item.qty}</td><td>₱${price.toFixed(2)}</td>
-                <td><button class="action-btn" style="padding: 5px 10px;" onclick="addToCart('${item.id}', '${item.name}', ${price}, ${item.qty})">Add</button></td>
-            </tr>`;
+            posBody.innerHTML += `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.qty}</td>
+                    <td>₱${price.toFixed(2)}</td>
+                    <td><button class="action-btn" style="padding: 5px 10px;" onclick="addToCart('${item.id}', '${item.name}', ${price}, ${item.qty})">Add</button></td>
+                </tr>
+            `;
         }
     });
 }
 
 window.addToCart = function(id, name, price, maxQty) {
     let existing = posCart.find(i => i.id === id);
-    if(existing) {
-        if(existing.qty < maxQty) existing.qty++;
+    if (existing) {
+        if (existing.qty < maxQty) existing.qty++;
         else alert("Not enough stock available!");
-    } else posCart.push({id, name, price, qty: 1, maxQty});
+    } else {
+        posCart.push({id, name, price, qty: 1, maxQty});
+    }
     renderCart();
 }
 
-window.removeFromCart = function(id) { posCart = posCart.filter(i => i.id !== id); renderCart(); }
+window.removeFromCart = function(id) { 
+    posCart = posCart.filter(i => i.id !== id); 
+    renderCart(); 
+}
 
 function renderCart() {
     const cartBody = document.getElementById('posCartBody');
-    if(!cartBody) return;
+    if (!cartBody) return;
 
-    if(posCart.length === 0) {
+    if (posCart.length === 0) {
         cartBody.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>`;
         updatePOSTotals(0, 0, 0, 0);
         return;
@@ -531,46 +614,71 @@ function renderCart() {
 
     cartBody.innerHTML = posCart.map(item => `
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
-            <div style="flex-grow:1;"><strong>${item.name}</strong><br><small>₱${item.price} x ${item.qty}</small></div>
+            <div style="flex-grow:1;">
+                <strong>${item.name}</strong><br>
+                <small>₱${item.price} x ${item.qty}</small>
+            </div>
             <div style="font-weight: bold; margin-right: 15px;">₱${(item.price * item.qty).toFixed(2)}</div>
-            <button onclick="removeFromCart('${item.id}')" style="background: none; border: none; color: #ff4c4c; cursor: pointer;"><i class="fas fa-times"></i></button>
+            <button onclick="removeFromCart('${item.id}')" style="background: none; border: none; color: #ff4c4c; cursor: pointer;">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
     `).join('');
 
     let subtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
     let vat = subtotal * 0.12;
-    let isSenior = document.getElementById('seniorDiscount').checked;
+    let isSenior = document.getElementById('seniorDiscount')?.checked || false;
     let discount = isSenior ? (subtotal * 0.20) : 0;
     updatePOSTotals(subtotal, vat, discount, subtotal + vat - discount);
 }
 
 function updatePOSTotals(sub, vat, disc, grand) {
     const totalsDiv = document.querySelector('.pos-totals');
-    if(!totalsDiv) return;
+    if (!totalsDiv) return;
     totalsDiv.innerHTML = `
-        <div class="total-line"><span>Subtotal:</span> <span>₱${sub.toFixed(2)}</span></div>
-        <div class="total-line"><span>VAT (12%):</span> <span>₱${vat.toFixed(2)}</span></div>
+        <div class="total-line">
+            <span>Subtotal:</span> 
+            <span>₱${sub.toFixed(2)}</span>
+        </div>
+        <div class="total-line">
+            <span>VAT (12%):</span> 
+            <span>₱${vat.toFixed(2)}</span>
+        </div>
         <div class="total-line" style="display: flex; align-items: center; justify-content: space-between;">
             <span><input type="checkbox" id="seniorDiscount" style="accent-color: var(--primary-red);" ${disc > 0 ? 'checked' : ''} onchange="renderCart()"> Senior Citizen / PWD (20%)</span>
             <span style="color: #ff4c4c;">- ₱${disc.toFixed(2)}</span>
         </div>
-        <div class="total-line grand"><span>TOTAL:</span> <span>₱${grand.toFixed(2)}</span></div>
-        <button class="action-btn" onclick="processPayment(${grand})" style="width: 100%; justify-content: center; margin-top: 15px; font-size: 16px;"><i class="fa-solid fa-check"></i> PROCESS PAYMENT</button>
+        <div class="total-line grand">
+            <span>TOTAL:</span> 
+            <span>₱${grand.toFixed(2)}</span>
+        </div>
+        <button class="action-btn" onclick="processPayment(${grand})" style="width: 100%; justify-content: center; margin-top: 15px; font-size: 16px;">
+            <i class="fa-solid fa-check"></i> PROCESS PAYMENT
+        </button>
     `;
 }
 
 window.processPayment = async function(grandTotal) {
-    if(posCart.length === 0) return alert("Cart is empty!");
+    if (posCart.length === 0) return alert("Cart is empty!");
+    
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
-    await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "POS Sale", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr, time: timeStr });
+    await addDoc(paymentsCol, { 
+        name: "Walk-in POS Customer", 
+        type: "POS Sale", 
+        items: itemsStr, 
+        amount: grandTotal, 
+        status: "Paid", 
+        date: dateStr, 
+        time: timeStr 
+    });
 
-    for(let item of posCart) {
+    for (let item of posCart) {
         if (item.id === 'WALKIN') {
-            for(let w = 0; w < item.qty; w++) {
+            for (let w = 0; w < item.qty; w++) {
                 await addDoc(attendanceCol, {
                     name: "Walk-in Guest",
                     type: "Walk-in",
@@ -591,7 +699,7 @@ window.processPayment = async function(grandTotal) {
 }
 
 // ==========================================
-// 3. MASTER DIRECTORY & ATTENDANCE LOGIC
+// 8. MASTER DIRECTORY & ATTENDANCE LOGIC
 // ==========================================
 onSnapshot(attendanceCol, (snapshot) => {
     attendanceData = [];
@@ -601,7 +709,7 @@ onSnapshot(attendanceCol, (snapshot) => {
 
 function renderAttendance() {
     const attTbody = document.querySelector('#attendanceTable tbody');
-    if(!attTbody) return;
+    if (!attTbody) return;
     attTbody.innerHTML = "";
 
     let today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -609,51 +717,63 @@ function renderAttendance() {
     let todayAtt = attendanceData.filter(a => a.date === today).sort((a,b) => b.timestamp - a.timestamp);
 
     todayAtt.forEach(a => {
-        attTbody.innerHTML += `<tr>
-            <td>${a.name}</td>
-            <td><strong>${a.type}</strong></td>
-            <td>${a.date}</td>
-            <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${a.time}</span></td>
-        </tr>`;
+        attTbody.innerHTML += `
+            <tr>
+                <td>${a.name}</td>
+                <td><strong>${a.type}</strong></td>
+                <td>${a.date}</td>
+                <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${a.time}</span></td>
+            </tr>
+        `;
 
-        if(a.type.includes('Gold')) gold++;
-        else if(a.type.includes('Silver')) silver++;
-        else if(a.type.includes('Walk-in')) walkin++;
+        if (a.type.includes('Gold')) gold++;
+        else if (a.type.includes('Silver')) silver++;
+        else if (a.type.includes('Walk-in')) walkin++;
     });
 
-    if(servicesChartInstance) {
+    if (servicesChartInstance) {
         servicesChartInstance.data.datasets[0].data = [gold, silver, walkin];
         servicesChartInstance.update();
     }
-    if(document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = gold + silver + walkin;
+    
+    if (document.getElementById('presentMembers')) {
+        document.getElementById('presentMembers').innerText = gold + silver + walkin;
+    }
 }
 
 onSnapshot(usersCol, (snapshot) => {
     allUsersData = [];
     membersData = [];
     chatUsers = [];
+    
     snapshot.forEach(doc => {
         const data = doc.data();
         const roleStr = (data.role || "").trim().toLowerCase(); 
         
         chatUsers.push({ id: doc.id, ...data });
 
-        if(roleStr === 'member') {
+        if (roleStr === 'member') {
             membersData.push({ id: doc.id, ...data });
         } else {
-            if(roleStr !== 'admin') allUsersData.push({ id: doc.id, ...data });
+            if (roleStr !== 'admin') {
+                allUsersData.push({ id: doc.id, ...data });
+            }
         }
     });
+    
     renderStaff();
     renderMembers(); 
-    if(document.getElementById('chatUserList')) renderChatUserList();
+    if (document.getElementById('chatUserList')) {
+        renderChatUserList();
+    }
 });
 
 function renderMembers() {
     const memTbody = document.querySelector('#membersTable tbody');
     const arcTbody = document.querySelector('#archivedMembersTable tbody');
-    if(memTbody) memTbody.innerHTML = "";
-    if(arcTbody) arcTbody.innerHTML = "";
+    
+    if (memTbody) memTbody.innerHTML = "";
+    if (arcTbody) arcTbody.innerHTML = "";
     
     let activeMembers = 0;
     let totalNonArchived = 0;
@@ -682,50 +802,57 @@ function renderMembers() {
         }
         
         if (statusStr === 'archived') {
-            if(arcTbody) {
-                arcTbody.innerHTML += `<tr>
-                    <td>${m.givenName || m.name}</td>
-                    <td>${m.mi || ''}</td>
-                    <td>${m.familyName || ''}</td>
-                    <td>${m.email}</td>
-                    <td><strong>${plan}</strong></td>
-                    <td><span class="badge maintenance">Archived</span></td>
-                    <td>
-                        <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')">
-                            <i class="fas fa-box-open"></i>
-                        </button>
-                        <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${m.id}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                </tr>`;
+            if (arcTbody) {
+                arcTbody.innerHTML += `
+                    <tr>
+                        <td>${m.givenName || m.name}</td>
+                        <td>${m.mi || ''}</td>
+                        <td>${m.familyName || ''}</td>
+                        <td>${m.email}</td>
+                        <td><strong>${plan}</strong></td>
+                        <td><span class="badge maintenance">Archived</span></td>
+                        <td>
+                            <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')">
+                                <i class="fas fa-box-open"></i>
+                            </button>
+                            <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${m.id}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
             }
         } else {
             totalNonArchived++;
             let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
-            if(memTbody) {
-                memTbody.innerHTML += `<tr>
-                    <td>${m.givenName || m.name}</td>
-                    <td>${m.mi || ''}</td>
-                    <td>${m.familyName || ''}</td>
-                    <td>${m.email}</td>
-                    <td><strong>${plan}</strong></td>
-                    <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
-                    <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
-                    <td>
-                        <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Member" onclick="openEditMemberModal('${m.id}')"><i class="fa-solid fa-edit"></i></button>
-                        <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Archive Account" onclick="archiveUser('${m.id}', '${m.status || 'Active'}')">
-                            <i class="fas fa-box-archive"></i>
-                        </button>
-                    </td>
-                </tr>`;
+            
+            if (memTbody) {
+                memTbody.innerHTML += `
+                    <tr>
+                        <td>${m.givenName || m.name}</td>
+                        <td>${m.mi || ''}</td>
+                        <td>${m.familyName || ''}</td>
+                        <td>${m.email}</td>
+                        <td><strong>${plan}</strong></td>
+                        <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
+                        <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
+                        <td>
+                            <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Member" onclick="openEditMemberModal('${m.id}')">
+                                <i class="fa-solid fa-edit"></i>
+                            </button>
+                            <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Archive Account" onclick="archiveUser('${m.id}', '${m.status || 'Active'}')">
+                                <i class="fas fa-box-archive"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
             }
-            if(statusStr === 'active') activeMembers++;
+            if (statusStr === 'active') activeMembers++;
         }
     });
 
-    if(document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
-    if(document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = totalNonArchived; 
+    if (document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
+    if (document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = totalNonArchived; 
 }
 
 window.openEditMemberModal = function(id) {
@@ -740,7 +867,7 @@ window.openEditMemberModal = function(id) {
     document.getElementById('editMemberModal').style.display = 'flex';
 }
 
-if(document.getElementById('editMemberForm')) {
+if (document.getElementById('editMemberForm')) {
     document.getElementById('editMemberForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -765,10 +892,13 @@ if(document.getElementById('editMemberForm')) {
 function renderStaff() {
     const staffTbody = document.querySelector('#staffTable tbody');
     const trainerTbody = document.querySelector('#trainerTable tbody'); 
-    if(staffTbody) staffTbody.innerHTML = "";
-    if(trainerTbody) trainerTbody.innerHTML = "";
     
-    let totalTrainers = 0, totalEmployees = 0, activeTrainers = 0; 
+    if (staffTbody) staffTbody.innerHTML = "";
+    if (trainerTbody) trainerTbody.innerHTML = "";
+    
+    let totalTrainers = 0;
+    let totalEmployees = 0;
+    let activeTrainers = 0; 
     let trainersFeed = "";
 
     allUsersData.forEach(u => {
@@ -777,69 +907,84 @@ function renderStaff() {
         let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let fullName = `${u.givenName || u.name} ${u.mi ? u.mi + '. ' : ''}${u.familyName || ''}`.trim();
 
-        const rowHtml = `<tr>
-            <td>${fullName}</td><td>${u.role}</td><td>${u.email}</td>
-            <td><span class="badge ${badgeClass}">${u.status || 'Active'}</span></td>
-            <td>
-                <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${u.id}')">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        </tr>`;
+        const rowHtml = `
+            <tr>
+                <td>${fullName}</td>
+                <td>${u.role}</td>
+                <td>${u.email}</td>
+                <td><span class="badge ${badgeClass}">${u.status || 'Active'}</span></td>
+                <td>
+                    <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${u.id}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
 
-        if(roleStr === 'trainer') {
-            if(trainerTbody) trainerTbody.innerHTML += rowHtml;
+        if (roleStr === 'trainer') {
+            if (trainerTbody) trainerTbody.innerHTML += rowHtml;
             totalTrainers++;
             
-            if(statusStr === 'active') {
+            if (statusStr === 'active') {
                 activeTrainers++;
-                trainersFeed += `<div class="list-item">
-                    <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
-                    <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <div><div class="trainer-name">${fullName}</div><p style="font-size: 12px; color: var(--text-muted);">${u.email}</p></div>
-                        <span class="status-badge status-progress">On Floor</span>
+                trainersFeed += `
+                    <div class="list-item">
+                        <div class="list-icon" style="background-color: var(--dark-black);">
+                            <i class="fa-solid fa-user"></i>
+                        </div>
+                        <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <div>
+                                <div class="trainer-name">${fullName}</div>
+                                <p style="font-size: 12px; color: var(--text-muted);">${u.email}</p>
+                            </div>
+                            <span class="status-badge status-progress">On Floor</span>
+                        </div>
                     </div>
-                </div>`;
+                `;
             }
         } else {
-            if(staffTbody) staffTbody.innerHTML += rowHtml;
+            if (staffTbody) staffTbody.innerHTML += rowHtml;
             totalEmployees++; 
         }
     });
 
-    if(document.getElementById('dashStaffTotal')) document.getElementById('dashStaffTotal').innerText = totalEmployees;
-    if(document.getElementById('gridTrainers')) document.getElementById('gridTrainers').innerText = totalTrainers;
+    if (document.getElementById('dashStaffTotal')) document.getElementById('dashStaffTotal').innerText = totalEmployees;
+    if (document.getElementById('gridTrainers')) document.getElementById('gridTrainers').innerText = totalTrainers;
     
     const dashTrainers = document.getElementById('dashActiveTrainersFeed');
-    if(dashTrainers) dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
+    if (dashTrainers) {
+        dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
+    }
 }
 
 window.archiveUser = async (id, currentStatus) => { 
     const actionText = currentStatus === 'Archived' ? 'Restore' : 'Archive';
     const newStatus = currentStatus === 'Archived' ? 'Active' : 'Archived';
     
-    if(confirm(`Are you sure you want to ${actionText.toLowerCase()} this account?`)) { 
+    if (confirm(`Are you sure you want to ${actionText.toLowerCase()} this account?`)) { 
         await updateDoc(doc(db, "users", id), { status: newStatus });
         alert(`Account successfully ${newStatus.toLowerCase()}.`);
     } 
 }
 
 window.deleteUser = async (id) => { 
-    if(localStorage.getItem("userRole") !== "Admin") {
+    if (localStorage.getItem("userRole") !== "Admin") {
         alert("Action Denied: You do not have permission to delete accounts.");
         return;
     }
-    if(confirm("Remove this account completely? This action cannot be undone.")) {
+    if (confirm("Remove this account completely? This action cannot be undone.")) {
         await deleteDoc(doc(db, "users", id)); 
     }
 }
 
 // ==========================================
-// 4. BATCH REGISTRATION (MEMBERS & STAFF)
+// 9. BATCH REGISTRATION
 // ==========================================
 let batchRowCount = 1;
+
 window.addBatchRow = function() {
-    if(batchRowCount >= 20) return alert("Maximum 20 members can be registered at once.");
+    if (batchRowCount >= 20) return alert("Maximum 20 members can be registered at once.");
+    
     const tbody = document.getElementById('batchMemberBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -853,7 +998,11 @@ window.addBatchRow = function() {
                 <option value="Silver Plan">Silver</option>
             </select>
         </td>
-        <td><button type="button" onclick="this.parentElement.parentElement.remove(); batchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
+        <td>
+            <button type="button" onclick="this.parentElement.parentElement.remove(); batchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
     `;
     tbody.appendChild(tr);
     batchRowCount++;
@@ -866,18 +1015,25 @@ window.openMemberModal = () => {
             <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
             <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
             <td><input type="email" class="bm-email" required></td>
-            <td><select class="bm-plan"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
+            <td>
+                <select class="bm-plan">
+                    <option value="Gold Plan">Gold</option>
+                    <option value="Silver Plan">Silver</option>
+                </select>
+            </td>
             <td></td>
-        </tr>`;
+        </tr>
+    `;
     batchRowCount = 1;
     document.getElementById('memberModal').style.display = 'flex'; 
 }
 
 const generatePassword = () => Math.random().toString(36).slice(-8);
 
-if(document.getElementById('batchMemberForm')) {
+if (document.getElementById('batchMemberForm')) {
     document.getElementById('batchMemberForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
         const rows = document.querySelectorAll('#batchMemberBody tr');
         let addedCount = 0;
         let emailSuccessCount = 0; 
@@ -901,8 +1057,14 @@ if(document.getElementById('batchMemberForm')) {
                 });
                 
                 await addDoc(usersCol, { 
-                    name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
-                    role: "Member", email: email, status: "Active", plan: plan,
+                    name: `${given} ${family}`, 
+                    givenName: given, 
+                    mi: mi, 
+                    familyName: family,
+                    role: "Member", 
+                    email: email, 
+                    status: "Active", 
+                    plan: plan,
                     password: randomPassword,
                     dateRegistered: currentTimestamp 
                 });
@@ -914,6 +1076,7 @@ if(document.getElementById('batchMemberForm')) {
                 emailFailCount++;    
             }
         }
+        
         window.closeModal('memberModal');
         
         let alertMsg = `Batch Registration Summary:\n\n`;
@@ -925,10 +1088,11 @@ if(document.getElementById('batchMemberForm')) {
     });
 }
 
-// BATCH REGISTRATION FOR STAFF/TRAINERS
 let staffBatchRowCount = 1;
+
 window.addStaffBatchRow = function() {
-    if(staffBatchRowCount >= 20) return alert("Maximum 20 accounts can be registered at once.");
+    if (staffBatchRowCount >= 20) return alert("Maximum 20 accounts can be registered at once.");
+    
     const tbody = document.getElementById('batchStaffBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -942,17 +1106,22 @@ window.addStaffBatchRow = function() {
                 <option value="On Leave">On Leave</option>
             </select>
         </td>
-        <td><button type="button" onclick="this.parentElement.parentElement.remove(); staffBatchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
+        <td>
+            <button type="button" onclick="this.parentElement.parentElement.remove(); staffBatchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
     `;
     tbody.appendChild(tr);
     staffBatchRowCount++;
 }
 
 window.openStaffModal = (role) => { 
-    if(localStorage.getItem("userRole") !== "Admin") {
+    if (localStorage.getItem("userRole") !== "Admin") {
         alert("Action Denied: Only Admins can register Staff and Trainers.");
         return;
     }
+    
     document.getElementById('hiddenStaffRole').value = role;
     document.getElementById('staffModalTitle').innerText = `Batch Register ${role}s`;
     document.getElementById('batchStaffBody').innerHTML = `
@@ -968,15 +1137,17 @@ window.openStaffModal = (role) => {
                 </select>
             </td>
             <td></td>
-        </tr>`;
+        </tr>
+    `;
     staffBatchRowCount = 1;
     document.getElementById('staffModal').style.display = 'flex'; 
 }
 
-if(document.getElementById('batchStaffForm')) {
+if (document.getElementById('batchStaffForm')) {
     document.getElementById('batchStaffForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if(localStorage.getItem("userRole") !== "Admin") return;
+        
+        if (localStorage.getItem("userRole") !== "Admin") return;
 
         const rows = document.querySelectorAll('#batchStaffBody tr');
         const role = document.getElementById('hiddenStaffRole').value;
@@ -1001,8 +1172,13 @@ if(document.getElementById('batchStaffForm')) {
                 });
 
                 await addDoc(usersCol, { 
-                    name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
-                    role: role, email: email, status: status,
+                    name: `${given} ${family}`, 
+                    givenName: given, 
+                    mi: mi, 
+                    familyName: family,
+                    role: role, 
+                    email: email, 
+                    status: status,
                     password: randomPassword 
                 });
                 
@@ -1013,6 +1189,7 @@ if(document.getElementById('batchStaffForm')) {
                 emailFailCount++;
             }
         }
+        
         window.closeModal('staffModal');
 
         let alertMsg = `Batch Registration Summary:\n\n`;
@@ -1025,7 +1202,7 @@ if(document.getElementById('batchStaffForm')) {
 }
 
 // ==========================================
-// 5. FINANCIALS
+// 10. FINANCIALS
 // ==========================================
 onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
@@ -1035,26 +1212,31 @@ onSnapshot(paymentsCol, (snapshot) => {
 
 function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
-    if(payTbody) payTbody.innerHTML = "";
+    if (!payTbody) return;
+    
+    payTbody.innerHTML = "";
     
     paymentsData.forEach(t => {
         let vat = (t.amount * 0.12).toFixed(2);
-        if(payTbody) {
-            payTbody.innerHTML += `<tr>
-                <td>${t.name}</td><td>${t.items || t.type}</td>
+        payTbody.innerHTML += `
+            <tr>
+                <td>${t.name}</td>
+                <td>${t.items || t.type}</td>
                 <td>${t.date} <span style="color:#888; font-size:12px;">${t.time || ''}</span></td>
-                <td>₱${t.amount}</td><td>₱${vat}</td>
+                <td>₱${t.amount}</td>
+                <td>₱${vat}</td>
                 <td style="font-weight:bold; color:var(--primary-red);">₱${t.amount}</td>
-            </tr>`;
-        }
+            </tr>
+        `;
     });
 }
 
 // ==========================================
-// UI INITIALIZATION
+// 11. UI INITIALIZATION
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     initDashboardCharts();
+    
     const submenuToggles = document.querySelectorAll('.has-submenu');
     submenuToggles.forEach(toggle => {
         toggle.addEventListener('click', function() {
@@ -1065,12 +1247,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateClock() {
         const clockElement = document.getElementById('liveClock');
-        if(clockElement) {
+        if (clockElement) {
             const now = new Date();
-            const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            const options = { 
+                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', 
+                hour: '2-digit', minute: '2-digit', second: '2-digit' 
+            };
             clockElement.innerHTML = `<i class="fa-regular fa-clock"></i> ${now.toLocaleDateString('en-US', options)}`;
         }
     }
+    
     setInterval(updateClock, 1000);
     updateClock();
 });
@@ -1086,9 +1272,16 @@ function initDashboardCharts() {
             datasets: [{ 
                 label: 'Daily Check-ins',
                 data: [0, 0, 0], 
-                backgroundColor: '#C01718', hoverBackgroundColor: '#111111', borderRadius: 4 
+                backgroundColor: '#C01718', 
+                hoverBackgroundColor: '#111111', 
+                borderRadius: 4 
             }] 
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } } } }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { display: false } }, 
+            scales: { x: { grid: { display: false } } } 
+        }
     });
 }

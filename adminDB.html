@@ -17,24 +17,96 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     
     <link rel="stylesheet" href="css/styles.css">
+    
     <style>
-        .pos-container { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: calc(100vh - 150px); }
-        .pos-products { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
-        .pos-cart { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
-        .pos-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: #FAFAFA; }
-        .pos-body { padding: 20px; overflow-y: auto; flex-grow: 1; }
-        .pos-totals { background: var(--dark-black); color: white; padding: 20px; border-radius: 0 0 8px 8px; }
-        .total-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
-        .total-line.grand { font-size: 20px; font-weight: bold; color: var(--primary-red); border-top: 1px solid #444; padding-top: 10px; margin-top: 10px; }
-        .inventory-split { display: grid; grid-template-columns: 1fr; gap: 30px; }
-        
-        .stat-card, .grid-stat-box { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-        .stat-card:hover, .grid-stat-box:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
-        
-        .batch-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-        .batch-table th { text-align: left; padding: 8px; background: #f4f6f9; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }
-        .batch-table td { padding: 5px; }
-        .batch-table input, .batch-table select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        /* Specific layouts for Admin POS and Batch Tables */
+        .pos-container { 
+            display: grid; 
+            grid-template-columns: 2fr 1fr; 
+            gap: 20px; 
+            height: calc(100vh - 150px); 
+        }
+        .pos-products { 
+            background: var(--panel-bg); 
+            border-radius: 8px; 
+            border: 1px solid var(--border-color); 
+            display: flex; 
+            flex-direction: column; 
+        }
+        .pos-cart { 
+            background: var(--panel-bg); 
+            border-radius: 8px; 
+            border: 1px solid var(--border-color); 
+            display: flex; 
+            flex-direction: column; 
+        }
+        .pos-header { 
+            padding: 15px 20px; 
+            border-bottom: 1px solid var(--border-color); 
+            font-weight: bold; 
+            background: #FAFAFA; 
+        }
+        .pos-body { 
+            padding: 20px; 
+            overflow-y: auto; 
+            flex-grow: 1; 
+        }
+        .pos-totals { 
+            background: var(--dark-black); 
+            color: white; 
+            padding: 20px; 
+            border-radius: 0 0 8px 8px; 
+        }
+        .total-line { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 10px; 
+            font-size: 14px; 
+        }
+        .total-line.grand { 
+            font-size: 20px; 
+            font-weight: bold; 
+            color: var(--primary-red); 
+            border-top: 1px solid #444; 
+            padding-top: 10px; 
+            margin-top: 10px; 
+        }
+        .inventory-split { 
+            display: grid; 
+            grid-template-columns: 1fr; 
+            gap: 30px; 
+        }
+        .stat-card, .grid-stat-box { 
+            cursor: pointer; 
+            transition: transform 0.2s, box-shadow 0.2s; 
+        }
+        .stat-card:hover, .grid-stat-box:hover { 
+            transform: translateY(-3px); 
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1); 
+        }
+        .batch-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 15px; 
+        }
+        .batch-table th { 
+            text-align: left; 
+            padding: 8px; 
+            background: #f4f6f9; 
+            border-bottom: 2px solid #ddd; 
+            font-size: 13px; 
+            color: #555; 
+        }
+        .batch-table td { 
+            padding: 5px; 
+        }
+        .batch-table input, .batch-table select { 
+            width: 100%; 
+            padding: 8px; 
+            border: 1px solid #ccc; 
+            border-radius: 4px; 
+            font-size: 13px; 
+        }
     </style>
 </head>
 <body>
@@ -143,10 +215,22 @@
 
                 <div class="panel" style="background: none; border: none; box-shadow: none; margin-bottom: 0; padding: 0;">
                     <div class="grid-stats" style="grid-template-columns: 1fr 1fr;">
-                        <div class="grid-stat-box border-black" onclick="switchTab('members')"><div class="num" id="gridMembers">0</div><div class="label">Registered Members</div></div>
-                        <div class="grid-stat-box border-red" onclick="switchTab('trainers')"><div class="num" id="gridTrainers">0</div><div class="label">Total Trainers</div></div>
-                        <div class="grid-stat-box border-red" onclick="switchTab('equipment')"><div class="num" id="gridEquip">0</div><div class="label">Operational Equipments</div></div>
-                        <div class="grid-stat-box border-black" onclick="switchTab('attendance')"><div class="num" id="presentMembers">0</div><div class="label">Total Check-ins Today</div></div>
+                        <div class="grid-stat-box border-black" onclick="switchTab('members')">
+                            <div class="num" id="gridMembers">0</div>
+                            <div class="label">Registered Members</div>
+                        </div>
+                        <div class="grid-stat-box border-red" onclick="switchTab('trainers')">
+                            <div class="num" id="gridTrainers">0</div>
+                            <div class="label">Total Trainers</div>
+                        </div>
+                        <div class="grid-stat-box border-red" onclick="switchTab('equipment')">
+                            <div class="num" id="gridEquip">0</div>
+                            <div class="label">Operational Equipments</div>
+                        </div>
+                        <div class="grid-stat-box border-black" onclick="switchTab('attendance')">
+                            <div class="num" id="presentMembers">0</div>
+                            <div class="label">Total Check-ins Today</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -212,7 +296,14 @@
                     </div>
                     <div class="pos-body" style="padding: 0;">
                         <table id="posTable" style="box-shadow: none; border-radius: 0;">
-                            <thead><tr><th>Product Name</th><th>Stock</th><th>Price (₱)</th><th>Action</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Stock</th>
+                                    <th>Price (₱)</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
                             <tbody id="posProductList"></tbody>
                         </table>
                     </div>
@@ -224,15 +315,7 @@
                         <p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>
                     </div>
                     <div class="pos-totals">
-                        <div class="total-line"><span>Subtotal:</span> <span>₱0.00</span></div>
-                        <div class="total-line"><span>VAT (12%):</span> <span>₱0.00</span></div>
-                        <div class="total-line" style="display: flex; align-items: center; justify-content: space-between;">
-                            <span><input type="checkbox" id="seniorDiscount" style="accent-color: var(--primary-red);" onchange="renderCart()"> Senior Citizen / PWD (20%)</span>
-                            <span style="color: #ff4c4c;">- ₱0.00</span>
                         </div>
-                        <div class="total-line grand"><span>TOTAL:</span> <span>₱0.00</span></div>
-                        <button class="action-btn" onclick="processPayment(0)" style="width: 100%; justify-content: center; margin-top: 15px; font-size: 16px;"><i class="fa-solid fa-check"></i> PROCESS PAYMENT</button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -257,7 +340,18 @@
                 <div class="panel-header"><i class="fas fa-address-card"></i> Registered Member Directory</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="membersTable">
-                        <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Membership Plan</th><th>Days Left</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Given Name</th>
+                                <th>M.I.</th>
+                                <th>Family Name</th>
+                                <th>Email</th>
+                                <th>Membership Plan</th>
+                                <th>Days Left</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -275,7 +369,17 @@
                 <div class="panel-header"><i class="fas fa-box-archive"></i> Archived Members</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="archivedMembersTable">
-                        <thead><tr><th>Given Name</th><th>M.I.</th><th>Family Name</th><th>Email</th><th>Membership Plan</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Given Name</th>
+                                <th>M.I.</th>
+                                <th>Family Name</th>
+                                <th>Email</th>
+                                <th>Membership Plan</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -292,10 +396,17 @@
             </div>
 
             <div class="panel">
-                <div class="panel-header"><i class="fas fa-clipboard-user"></i> Live Daily Attendance Log (Timestamps)</div>
+                <div class="panel-header"><i class="fas fa-clipboard-user"></i> Live Daily Attendance Log</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="attendanceTable">
-                        <thead><tr><th>Guest / Member Name</th><th>Membership Type</th><th>Date Logged</th><th>Time In</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Guest / Member Name</th>
+                                <th>Membership Type</th>
+                                <th>Date Logged</th>
+                                <th>Time In</th>
+                            </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -330,7 +441,16 @@
                 <div class="panel-header"><i class="fas fa-money-check-alt"></i> Transaction History (Receipts)</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="paymentTable">
-                        <thead><tr><th>Customer Name</th><th>Items Purchased</th><th>Date & Time</th><th>Gross Total</th><th>VAT</th><th>Net Total</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Customer Name</th>
+                                <th>Items Purchased</th>
+                                <th>Date & Time</th>
+                                <th>Gross Total</th>
+                                <th>VAT</th>
+                                <th>Net Total</th>
+                            </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -349,7 +469,15 @@
                 <div class="panel-header"><i class="fas fa-id-badge"></i> Staff Directory</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="staffTable">
-                        <thead><tr><th>Full Name</th><th>Role</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Full Name</th>
+                                <th>Role</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -368,7 +496,15 @@
                 <div class="panel-header"><i class="fas fa-dumbbell"></i> Trainer Directory</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="trainerTable">
-                        <thead><tr><th>Full Name</th><th>Role</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Full Name</th>
+                                <th>Role</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -384,13 +520,13 @@
                 <span class="close-btn" onclick="closeModal('equipmentModal')">&times;</span>
             </div>
             <form class="modal-form" id="equipmentForm">
-                <input type="text" id="equipName" placeholder="Specific Name of Equipment (e.g. Hex Dumbbell)" required>
+                <input type="text" id="equipName" placeholder="Specific Name of Equipment" required>
                 <select id="equipCategory">
                     <option value="Cardio (Treadmill, Bike, etc.)">Cardio (Treadmills, Bikes, etc.)</option>
                     <option value="Strength (Weights, Machines)">Strength (Weights, Machines)</option>
                     <option value="Accessories (Mats, Balls, Bands)">Accessories (Mats, Balls, Bands)</option>
                 </select>
-                <input type="text" id="equipSize" placeholder="Weight (e.g. 50kg) or Dimensions (e.g. 2x2m)" required>
+                <input type="text" id="equipSize" placeholder="Weight or Dimensions" required>
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Quantity to Add (Automated Addition logic built-in):</p>
                 <input type="number" id="equipQty" placeholder="Total pieces to add" required min="1">
                 <button type="submit" id="equipSubmitBtn">Register Equipment</button>
@@ -412,7 +548,7 @@
                     <option value="Strength (Weights, Machines)">Strength (Weights, Machines)</option>
                     <option value="Accessories (Mats, Balls, Bands)">Accessories (Mats, Balls, Bands)</option>
                 </select>
-                <input type="text" id="editEquipSize" placeholder="Weight (e.g. 50kg) or Dimensions" required>
+                <input type="text" id="editEquipSize" placeholder="Weight or Dimensions" required>
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Total Quantity:</p>
                 <input type="number" id="editEquipQty" placeholder="Total pieces" required min="0">
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Status:</p>
@@ -433,19 +569,19 @@
                 <span class="close-btn" onclick="closeModal('productModal')">&times;</span>
             </div>
             <form class="modal-form" id="productForm">
-                <input type="text" id="prodName" placeholder="Product Name (e.g. Optimum Nutrition Whey)" required>
+                <input type="text" id="prodName" placeholder="Product Name" required>
                 <select id="prodCategory">
                     <option value="Supplements">Supplements (Powder/Capsules)</option>
                     <option value="Beverages">Beverages (Bottled Drinks)</option>
                     <option value="Merch">Apparel / Merchandise</option>
                 </select>
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="prodVol" placeholder="Selling Unit (e.g. 1 Capsule, 500mL)" required style="width: 50%;">
-                    <input type="number" id="prodPrice" placeholder="Selling Price (₱) per unit" required style="width: 50%;">
+                    <input type="text" id="prodVol" placeholder="Selling Unit" required style="width: 50%;">
+                    <input type="number" id="prodPrice" placeholder="Selling Price (₱)" required style="width: 50%;">
                 </div>
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Expiration Date (Mandatory for Consumables):</p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Expiration Date:</p>
                 <input type="date" id="prodExpiry" required>
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Total Pieces/Servings to Add (For 'Tingi', input total capsules):</p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Total Pieces/Servings to Add:</p>
                 <input type="number" id="prodQty" placeholder="Amount to add" required min="1">
                 <button type="submit" style="background-color: var(--dark-black);">Add to Stock</button>
             </form>
@@ -455,7 +591,7 @@
     <div id="staffModal" class="modal">
         <div class="modal-content" style="width: 800px; max-width: 95vw;">
             <div class="modal-header">
-                <h3 id="staffModalTitle">Batch Register Staff</h3>
+                <h3 id="staffModalTitle">Batch Register</h3>
                 <span class="close-btn" onclick="closeModal('staffModal')">&times;</span>
             </div>
             <form class="modal-form" id="batchStaffForm">
@@ -473,7 +609,7 @@
                             </tr>
                         </thead>
                         <tbody id="batchStaffBody">
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -504,7 +640,7 @@
                             </tr>
                         </thead>
                         <tbody id="batchMemberBody">
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
