@@ -160,15 +160,36 @@
         const app = initializeApp(loginConfig);
         const db = getFirestore(app);
 
+        // --- DEVICE DETECTION HELPER ---
+        const isMobileDevice = () => {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
+        };
+
         const currentUser = localStorage.getItem("loggedInUser");
         const currentRole = localStorage.getItem("userRole");
+        const onMobile = isMobileDevice();
+
+        // Auto-redirect if already logged in (with strict device enforcement)
         if (currentUser && currentRole) {
-            if (currentRole === "Admin") {
-                window.location.replace("adminDB.html");
-            } else if (currentRole === "Staff" || currentRole === "Trainer") {
-                window.location.replace("staffDB.html");
-            } else if (currentRole === "Member") {
-                window.location.replace("memberDB.html");
+            if ((currentRole === "Admin" || currentRole === "Staff") && onMobile) {
+                // Kick Admins/Staff off mobile
+                localStorage.removeItem("loggedInUser");
+                localStorage.removeItem("userRole");
+            } else if ((currentRole === "Member" || currentRole === "Trainer") && !onMobile) {
+                // Kick Members/Trainers off desktop
+                localStorage.removeItem("loggedInUser");
+                localStorage.removeItem("userRole");
+            } else {
+                // Safe to proceed to respective dashboards
+                if (currentRole === "Admin") {
+                    window.location.replace("adminDB.html");
+                } else if (currentRole === "Staff") {
+                    window.location.replace("staffDB.html");
+                } else if (currentRole === "Trainer") {
+                    window.location.replace("trainerDB.html");
+                } else if (currentRole === "Member") {
+                    window.location.replace("memberDB.html");
+                }
             }
         }
 
@@ -203,13 +224,35 @@
                         return;
                     }
 
+                    // --- STRICT DEVICE RULES APPLIED HERE ---
+                    const userOnMobile = isMobileDevice();
+                    
+                    if ((userData.role === "Admin" || userData.role === "Staff") && userOnMobile) {
+                        errorMsg.innerText = "Access Denied: Admins and Staff must log in using a Desktop/PC.";
+                        errorMsg.style.display = "block";
+                        submitBtn.innerText = "Log In";
+                        submitBtn.disabled = false;
+                        return;
+                    }
+
+                    if ((userData.role === "Member" || userData.role === "Trainer") && !userOnMobile) {
+                        errorMsg.innerText = "Access Denied: Members and Trainers must log in using the Mobile App.";
+                        errorMsg.style.display = "block";
+                        submitBtn.innerText = "Log In";
+                        submitBtn.disabled = false;
+                        return;
+                    }
+
+                    // If they pass the device check, let them in!
                     localStorage.setItem("loggedInUser", userData.name || userData.givenName);
                     localStorage.setItem("userRole", userData.role);
 
                     if (userData.role === "Admin") {
                         window.location.replace("adminDB.html");
-                    } else if (userData.role === "Staff" || userData.role === "Trainer") {
+                    } else if (userData.role === "Staff") {
                         window.location.replace("staffDB.html");
+                    } else if (userData.role === "Trainer") {
+                        window.location.replace("trainerDB.html");
                     } else if (userData.role === "Member") {
                         window.location.replace("memberDB.html");
                     } else {

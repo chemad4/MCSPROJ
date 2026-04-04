@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#111111">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/png" href="images/icon-192.png">
+    
+    <title>Fit Track - Trainer App</title>
+    
+    <script>
+        if (!localStorage.getItem("loggedInUser") || localStorage.getItem("userRole") !== "Trainer") {
+            window.location.replace("index.html"); 
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => console.log('ServiceWorker registered!'))
+                    .catch(err => console.log('ServiceWorker failed: ', err));
+            });
+        }
+    </script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <style>
+        body { background-color: #F4F6F9; display: flex; flex-direction: column; height: 100vh; overflow: hidden; margin: 0; padding: 0; }
+        .mobile-topbar { background-color: var(--dark-black); color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 100; flex-shrink: 0; }
+        .mobile-logo { font-size: 1.8rem; font-weight: 700; letter-spacing: 1px; }
+        .mobile-logo span { color: var(--primary-red); }
+        .notification-bell { position: relative; font-size: 1.4rem; cursor: pointer; }
+        .notification-dot { position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; background-color: var(--primary-red); border-radius: 50%; }
+
+        .mobile-content { flex-grow: 1; overflow-y: auto; padding: 25px 15px; padding-bottom: 120px; position: relative; }
+        .mobile-section { display: none; animation: fadeIn 0.3s; }
+        .active-section { display: block; }
+        
+        .app-card { background: white; border-radius: 15px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid var(--border-color); }
+        .app-card h3 { font-size: 18px; margin-bottom: 15px; color: var(--dark-black); display: flex; justify-content: space-between; align-items: center; }
+        
+        .status-card { background: linear-gradient(135deg, var(--primary-red), #900f14); color: white; text-align: center; padding: 30px 20px; border-radius: 20px; margin-bottom: 25px; position: relative; overflow: hidden; box-shadow: 0 8px 20px rgba(192, 23, 24, 0.3); }
+        .status-card::after { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); pointer-events: none; }
+        
+        .client-list { display: flex; flex-direction: column; gap: 15px; }
+        .client-item { display: flex; align-items: center; gap: 15px; background: white; padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); }
+        .client-avatar { width: 50px; height: 50px; border-radius: 50%; background: var(--dark-black); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold; flex-shrink: 0; }
+
+        /* MOBILE CHAT STYLES */
+        .chat-contact { background: white; padding: 15px; border-radius: 12px; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); border: 1px solid var(--border-color); margin-bottom: 10px; cursor: pointer; }
+        .chat-active-room { display: none; flex-direction: column; height: calc(100vh - 190px); }
+        .chat-room-header { display: flex; align-items: center; gap: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); margin-bottom: 15px; font-weight: bold; font-size: 18px; }
+        .back-btn { background: none; border: none; font-size: 20px; color: var(--primary-red); cursor: pointer; }
+        .mobile-chat-history { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 15px; }
+        .mobile-chat-input-area { display: flex; gap: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); background: #F4F6F9; }
+        .mobile-chat-input-area input { flex-grow: 1; padding: 15px; border-radius: 25px; border: 1px solid var(--border-color); outline: none; font-size: 15px; }
+        .mobile-chat-input-area input:focus { border-color: var(--primary-red); }
+        .mobile-chat-input-area button { background: var(--primary-red); color: white; border: none; width: 50px; border-radius: 50%; font-size: 16px; cursor: pointer; }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 80px; background: var(--white); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100; }
+        .nav-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; width: 25%; transition: color 0.2s; height: 100%;}
+        .nav-tab i { font-size: 24px; margin-bottom: 4px; }
+        .nav-tab span { font-size: 12px; font-weight: 500;}
+        .nav-tab.active { color: var(--primary-red); }
+        .nav-tab.active span { font-weight: 700; }
+    </style>
+</head>
+<body>
+
+    <header class="mobile-topbar">
+        <div class="mobile-logo">FIT<span>TRACK</span></div>
+        <div class="notification-bell" onclick="alert('You have no new notifications.')">
+            <i class="fa-regular fa-bell"></i>
+            <div class="notification-dot"></div>
+        </div>
+    </header>
+
+    <main class="mobile-content">
+
+        <div id="homeTab" class="mobile-section active-section">
+            <h2 style="font-size: 22px; margin-bottom: 20px; color: var(--dark-black);">Hello, <br><span id="trainerNameDisplay" style="color: var(--primary-red);">Trainer</span></h2>
+            
+            <div class="status-card">
+                <i class="fa-solid fa-dumbbell" style="font-size: 3rem; margin-bottom: 10px;"></i>
+                <h3 style="margin-bottom: 5px; font-size: 20px;">Trainer Dashboard</h3>
+                <p style="font-size: 14px; opacity: 0.9;">You are currently <strong>Active</strong> on the floor.</p>
+            </div>
+
+            <div class="app-card">
+                <h3>Today's Schedule <i class="fa-regular fa-calendar" style="color: var(--primary-red);"></i></h3>
+                <div style="text-align: center; padding: 20px 0; color: var(--text-muted);">
+                    <p>No sessions booked for today yet.</p>
+                    <p style="font-size: 12px; margin-top: 5px;">(Booking calendar syncing soon)</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="clientsTab" class="mobile-section">
+            <h2 style="font-size: 22px; margin-bottom: 20px; color: var(--dark-black);">Gym Members</h2>
+            <div class="client-list" id="mobileClientList">
+                <p style="text-align: center; color: var(--text-muted);">Loading members...</p>
+            </div>
+        </div>
+
+        <div id="messagesTab" class="mobile-section">
+            <div id="chatContactList">
+                <h2 style="font-size: 22px; margin-bottom: 20px; color: var(--dark-black);">Messages</h2>
+                <div id="mobileContactsContainer">
+                    <p style="text-align: center; color: var(--text-muted);">Loading contacts...</p>
+                </div>
+            </div>
+
+            <div id="chatActiveRoom" class="chat-active-room">
+                <div class="chat-room-header">
+                    <button class="back-btn" onclick="closeTrainerChat()"><i class="fa-solid fa-arrow-left"></i></button>
+                    <span id="activeChatName">Contact Name</span>
+                </div>
+                <div class="mobile-chat-history" id="mobileChatHistory"></div>
+                <div class="mobile-chat-input-area">
+                    <input type="text" id="mobileChatInput" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendTrainerMessage()">
+                    <button onclick="sendTrainerMessage()"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="profileTab" class="mobile-section">
+            <h2 style="font-size: 22px; margin-bottom: 20px; color: var(--dark-black);">My Profile</h2>
+            <div class="app-card" style="text-align: center;">
+                <div class="client-avatar" style="margin: 0 auto 15px; width: 80px; height: 80px; font-size: 2.5rem;" id="profileAvatar">T</div>
+                <h3 style="justify-content: center;" id="profileName">Trainer Name</h3>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 5px;" id="profileEmail">email@example.com</p>
+                <span class="badge active">Certified Trainer</span>
+            </div>
+            
+            <button class="action-btn" style="width: 100%; padding: 15px; background: #eee; color: var(--dark-black); border-radius: 8px; font-size: 18px; margin-top: 20px;" onclick="handleLogout()">
+                <i class="fa-solid fa-power-off"></i> Log Out
+            </button>
+        </div>
+
+    </main>
+
+    <nav class="bottom-nav">
+        <div class="nav-tab active" onclick="switchMobileTab('homeTab', this)">
+            <i class="fa-solid fa-house"></i><span>Home</span>
+        </div>
+        <div class="nav-tab" onclick="switchMobileTab('clientsTab', this)">
+            <i class="fa-solid fa-users"></i><span>Members</span>
+        </div>
+        <div class="nav-tab" onclick="switchMobileTab('messagesTab', this)">
+            <i class="fa-solid fa-message"></i><span>Chat</span>
+        </div>
+        <div class="nav-tab" onclick="switchMobileTab('profileTab', this)">
+            <i class="fa-solid fa-user"></i><span>Profile</span>
+        </div>
+    </nav>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const trainerConfig = {
+            apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
+            authDomain: "fit-track-ca8d1.firebaseapp.com",
+            projectId: "fit-track-ca8d1",
+            storageBucket: "fit-track-ca8d1.firebasestorage.app",
+            messagingSenderId: "157593985795",
+            appId: "1:157593985795:web:07156961dda8e2254fbf36",
+            measurementId: "G-NYGGEMMJMC"
+        };
+
+        const app = initializeApp(trainerConfig);
+        const db = getFirestore(app);
+
+        // UI Logic
+        window.switchMobileTab = function(tabId, element) {
+            document.querySelectorAll('.mobile-section').forEach(sec => sec.classList.remove('active-section'));
+            document.getElementById(tabId).classList.add('active-section');
+            
+            document.querySelectorAll('.nav-tab').forEach(nav => nav.classList.remove('active'));
+            element.classList.add('active');
+
+            if(tabId === 'messagesTab') {
+                closeTrainerChat();
+            }
+        };
+
+        window.handleLogout = function() {
+            localStorage.removeItem("loggedInUser");
+            localStorage.removeItem("userRole");
+            window.location.replace("index.html"); 
+        };
+
+        const userName = localStorage.getItem("loggedInUser");
+        if (userName) {
+            document.getElementById('trainerNameDisplay').innerText = userName;
+            document.getElementById('profileName').innerText = userName;
+            document.getElementById('profileAvatar').innerText = userName.charAt(0).toUpperCase();
+        }
+
+        // Fetch Trainer Data
+        async function fetchMyData() {
+            if (!userName) return;
+            const q = query(collection(db, "users"), where("name", "==", userName));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                const myData = snapshot.docs[0].data();
+                document.getElementById('profileEmail').innerText = myData.email;
+            }
+        }
+        fetchMyData();
+
+        // -----------------------------------------
+        // REAL-TIME CLIENTS & CHAT CONTACTS
+        // -----------------------------------------
+        onSnapshot(collection(db, "users"), (snapshot) => {
+            const clientList = document.getElementById('mobileClientList');
+            const contactList = document.getElementById('mobileContactsContainer');
+            
+            clientList.innerHTML = "";
+            contactList.innerHTML = "";
+            let clientsFound = false;
+            let contactsFound = false;
+
+            snapshot.forEach(doc => {
+                const user = doc.data();
+                const role = (user.role || "").toLowerCase();
+
+                // Populate Clients Tab (Only Members)
+                if (role === 'member' && user.status !== 'Archived') {
+                    clientsFound = true;
+                    clientList.innerHTML += `
+                        <div class="client-item">
+                            <div class="client-avatar">${user.name.charAt(0).toUpperCase()}</div>
+                            <div style="flex-grow: 1;">
+                                <h4 style="margin: 0; font-size: 16px; color: var(--dark-black);">${user.name}</h4>
+                                <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-muted);">${user.plan || 'Standard Plan'}</p>
+                            </div>
+                            <button class="action-btn" style="padding: 6px 12px; font-size: 12px; border-radius: 20px;" onclick="switchMobileTab('messagesTab', document.querySelectorAll('.nav-tab')[2]); openTrainerChat('${user.name}')">Message</button>
+                        </div>
+                    `;
+                }
+
+                // Populate Chat Contacts (Admin, Staff, Member)
+                if ((role === 'admin' || role === 'staff' || role === 'member') && user.status !== 'Archived') {
+                    contactsFound = true;
+                    
+                    let roleDisplay = "Gym Member";
+                    if (role === 'admin') roleDisplay = "Gym Manager";
+                    if (role === 'staff') roleDisplay = "Gym Staff";
+
+                    contactList.innerHTML += `
+                        <div class="chat-contact" onclick="openTrainerChat('${user.name}')">
+                            <div class="client-avatar" style="width: 50px; height: 50px; font-size: 1.2rem;">${user.name.charAt(0).toUpperCase()}</div>
+                            <div>
+                                <h4 style="margin: 0; font-size: 16px; color: var(--dark-black);">${user.name}</h4>
+                                <p style="margin: 3px 0 0; font-size: 13px; color: var(--text-muted);">${roleDisplay}</p>
+                            </div>
+                            <i class="fa-solid fa-chevron-right" style="margin-left: auto; color: #ccc;"></i>
+                        </div>
+                    `;
+                }
+            });
+
+            if (!clientsFound) clientList.innerHTML = "<p style='text-align: center; color: #999;'>No members currently registered.</p>";
+            if (!contactsFound) contactList.innerHTML = "<p style='text-align: center; color: #999;'>No contacts available to chat.</p>";
+        });
+
+        // -----------------------------------------
+        // REAL-TIME MESSAGING LOGIC
+        // -----------------------------------------
+        let trainerMessages = [];
+        let currentChatTarget = null;
+        const messagesCol = collection(db, "messages");
+
+        onSnapshot(messagesCol, (snapshot) => {
+            trainerMessages = [];
+            snapshot.forEach(doc => trainerMessages.push(doc.data()));
+            if(currentChatTarget) renderTrainerChatHistory();
+        });
+
+        window.openTrainerChat = function(targetName) {
+            currentChatTarget = targetName;
+            document.getElementById('activeChatName').innerText = targetName;
+            
+            document.getElementById('chatContactList').style.display = 'none';
+            document.getElementById('chatActiveRoom').style.display = 'flex';
+            
+            renderTrainerChatHistory();
+        };
+
+        window.closeTrainerChat = function() {
+            currentChatTarget = null;
+            document.getElementById('chatActiveRoom').style.display = 'none';
+            document.getElementById('chatContactList').style.display = 'block';
+        };
+
+        function renderTrainerChatHistory() {
+            const historyDiv = document.getElementById('mobileChatHistory');
+            if (!currentChatTarget || !userName) return;
+
+            const relevantMsgs = trainerMessages.filter(m => 
+                (m.sender === userName && m.receiver === currentChatTarget) || 
+                (m.sender === currentChatTarget && m.receiver === userName)
+            ).sort((a,b) => a.timestamp - b.timestamp);
+
+            if (relevantMsgs.length === 0) {
+                historyDiv.innerHTML = `<p style="text-align: center; color: #999; margin-top: 50px;">Send a message to start the conversation.</p>`;
+                return;
+            }
+
+            historyDiv.innerHTML = relevantMsgs.map(m => {
+                const isMe = m.sender === userName;
+                const time = new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                return `
+                    <div class="msg-bubble ${isMe ? 'msg-sent' : 'msg-received'}">
+                        <div>${m.text}</div>
+                        <div class="msg-time">${time}</div>
+                    </div>
+                `;
+            }).join('');
+
+            historyDiv.scrollTop = historyDiv.scrollHeight;
+        }
+
+        window.sendTrainerMessage = async function() {
+            const input = document.getElementById('mobileChatInput');
+            const text = input.value.trim();
+            
+            if (!text || !currentChatTarget || !userName) return;
+
+            await addDoc(messagesCol, {
+                sender: userName,
+                receiver: currentChatTarget,
+                text: text,
+                timestamp: new Date().getTime()
+            });
+
+            input.value = "";
+        };
+    </script>
+</body>
+</html>
