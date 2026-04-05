@@ -1234,17 +1234,8 @@ function renderPayments() {
 // ==========================================
 // 11. UI INITIALIZATION
 // ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    initDashboardCharts();
-    
-    const submenuToggles = document.querySelectorAll('.has-submenu');
-    submenuToggles.forEach(toggle => {
-        toggle.addEventListener('click', function() {
-            this.classList.toggle('open');
-            this.nextElementSibling.classList.toggle('open');
-        });
-    });
-
+function initUI() {
+    // 1. START THE CLOCK FIRST (Never fails)
     function updateClock() {
         const clockElement = document.getElementById('liveClock');
         if (clockElement) {
@@ -1256,10 +1247,59 @@ document.addEventListener('DOMContentLoaded', () => {
             clockElement.innerHTML = `<i class="fa-regular fa-clock"></i> ${now.toLocaleDateString('en-US', options)}`;
         }
     }
-    
     setInterval(updateClock, 1000);
     updateClock();
-});
+
+    // 2. ATTACH THE DROPDOWNS SECOND
+    const submenuToggles = document.querySelectorAll('.has-submenu');
+    submenuToggles.forEach(toggle => {
+        toggle.onclick = function() {
+            this.classList.toggle('open');
+            if (this.nextElementSibling && this.nextElementSibling.classList.contains('submenu')) {
+                this.nextElementSibling.classList.toggle('open');
+            }
+        };
+    });
+
+    // 3. LOAD THE CHARTS LAST (Wrapped in a safety net)
+    try {
+        initDashboardCharts();
+    } catch (error) {
+        console.warn("Chart tool delayed, skipping chart render so the rest of the app doesn't break.", error);
+    }
+}
+
+// Bulletproof loading check
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initUI);
+} else {
+    initUI();
+}
+
+function initDashboardCharts() {
+    const ctxServices = document.getElementById('servicesChart');
+    if (!ctxServices || typeof Chart === 'undefined') return; // Safety check
+
+    servicesChartInstance = new Chart(ctxServices.getContext('2d'), {
+        type: 'bar',
+        data: { 
+            labels: ['Gold Members', 'Silver Members', 'Walk-in Guests'], 
+            datasets: [{ 
+                label: 'Daily Check-ins',
+                data: [0, 0, 0], 
+                backgroundColor: '#C01718', 
+                hoverBackgroundColor: '#111111', 
+                borderRadius: 4 
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            plugins: { legend: { display: false } }, 
+            scales: { x: { grid: { display: false } } } 
+        }
+    });
+}
 
 // ==========================================
 // 12. SMART USB RFID GHOST LISTENER
