@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fit Track - Staff Dashboard</title>
-
-    <link rel="icon" type="image/png" href="images/icon-192.png">
     
+    <link rel="icon" type="image/png" href="images/icon-192.png">
+
     <script>
         if (!localStorage.getItem("loggedInUser") || localStorage.getItem("userRole") !== "Staff") {
             window.location.replace("index.html");
@@ -22,101 +22,31 @@
     
     <style>
         /* Specific layouts for Staff POS and Batch Tables */
-        .pos-container { 
-            display: grid; 
-            grid-template-columns: 2fr 1fr; 
-            gap: 20px; 
-            height: calc(100vh - 150px); 
-        }
-        .pos-products { 
-            background: var(--panel-bg); 
-            border-radius: 8px; 
-            border: 1px solid var(--border-color); 
-            display: flex; 
-            flex-direction: column; 
-        }
-        .pos-cart { 
-            background: var(--panel-bg); 
-            border-radius: 8px; 
-            border: 1px solid var(--border-color); 
-            display: flex; 
-            flex-direction: column; 
-        }
-        .pos-header { 
-            padding: 15px 20px; 
-            border-bottom: 1px solid var(--border-color); 
-            font-weight: bold; 
-            background: #FAFAFA; 
-        }
-        .pos-body { 
-            padding: 20px; 
-            overflow-y: auto; 
-            flex-grow: 1; 
-        }
-        .pos-totals { 
-            background: var(--dark-black); 
-            color: white; 
-            padding: 20px; 
-            border-radius: 0 0 8px 8px; 
-        }
-        .total-line { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 10px; 
-            font-size: 14px; 
-        }
-        .total-line.grand { 
-            font-size: 20px; 
-            font-weight: bold; 
-            color: var(--primary-red); 
-            border-top: 1px solid #444; 
-            padding-top: 10px; 
-            margin-top: 10px; 
-        }
-        .inventory-split { 
-            display: grid; 
-            grid-template-columns: 1fr; 
-            gap: 30px; 
-        }
-        .stat-card, .grid-stat-box { 
-            cursor: pointer; 
-            transition: transform 0.2s, box-shadow 0.2s; 
-        }
-        .stat-card:hover, .grid-stat-box:hover { 
-            transform: translateY(-3px); 
-            box-shadow: 0 8px 15px rgba(0,0,0,0.1); 
-        }
-        .batch-table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-bottom: 15px; 
-        }
-        .batch-table th { 
-            text-align: left; 
-            padding: 8px; 
-            background: #f4f6f9; 
-            border-bottom: 2px solid #ddd; 
-            font-size: 13px; 
-            color: #555; 
-        }
-        .batch-table td { 
-            padding: 5px; 
-        }
-        .batch-table input, .batch-table select { 
-            width: 100%; 
-            padding: 8px; 
-            border: 1px solid #ccc; 
-            border-radius: 4px; 
-            font-size: 13px; 
-        }
+        .pos-container { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: calc(100vh - 150px); }
+        .pos-products { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .pos-cart { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .pos-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: #FAFAFA; display: flex; justify-content: space-between; align-items: center; }
+        .pos-body { padding: 20px; overflow-y: auto; flex-grow: 1; }
+        .pos-totals { background: var(--dark-black); color: white; padding: 20px; border-radius: 0 0 8px 8px; }
+        .total-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .total-line.grand { font-size: 20px; font-weight: bold; color: var(--primary-red); border-top: 1px solid #444; padding-top: 10px; margin-top: 10px; }
+        
+        .stat-card, .grid-stat-box { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover, .grid-stat-box:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        
+        .batch-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .batch-table th { text-align: left; padding: 8px; background: #f4f6f9; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }
+        .batch-table td { padding: 5px; }
+        .batch-table input, .batch-table select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
+        
+        .rfid-register-input { background-color: #fffde7; border: 1px solid #f1c40f !important; }
+        .rfid-register-input:focus { border-color: var(--primary-red) !important; background-color: #fff; }
     </style>
 </head>
 <body>
 
     <aside class="sidebar">
-        <div class="logo-area">
-            FIT <span>TRACK</span>
-        </div>
+        <div class="logo-area">FIT <span>TRACK</span></div>
 
         <ul class="nav-menu" id="navMenu">
             <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)">
@@ -276,7 +206,7 @@
         <div id="pos" class="content-section">
             <div class="pos-container">
                 <div class="pos-products">
-                    <div class="pos-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="pos-header">
                         <span><i class="fa-solid fa-box-open"></i> Available Consumables</span>
                         <div class="search-box" style="width: 200px;">
                             <i class="fas fa-search"></i>
@@ -523,45 +453,16 @@
         </div>
     </div>
 
-    <div id="staffModal" class="modal">
-        <div class="modal-content" style="width: 800px; max-width: 95vw;">
-            <div class="modal-header">
-                <h3 id="staffModalTitle">Batch Register</h3>
-                <span class="close-btn" onclick="closeModal('staffModal')">&times;</span>
-            </div>
-            <form class="modal-form" id="batchStaffForm">
-                <input type="hidden" id="hiddenStaffRole" value="Staff">
-                <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
-                    <table class="batch-table">
-                        <thead>
-                            <tr>
-                                <th>Given Name</th>
-                                <th>M.I.</th>
-                                <th>Family Name</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="batchStaffBody">
-                            </tbody>
-                    </table>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button type="button" onclick="addStaffBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
-                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <div id="memberModal" class="modal">
-        <div class="modal-content" style="width: 800px; max-width: 95vw;">
+        <div class="modal-content" style="width: 900px; max-width: 95vw;">
             <div class="modal-header">
-                <h3 id="memberModalTitle">Register Members</h3>
+                <h3 id="memberModalTitle">Register Members & Assign RFID</h3>
                 <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
             </div>
             <form class="modal-form" id="batchMemberForm">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
+                    <i class="fas fa-info-circle"></i> To assign a card, click inside the "RFID Tag" box and tap the card on the scanner.
+                </p>
                 <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
                     <table class="batch-table">
                         <thead>
@@ -571,6 +472,7 @@
                                 <th>Family Name</th>
                                 <th>Email</th>
                                 <th>Plan</th>
+                                <th>RFID Tag (Tap Card)</th>
                                 <th></th>
                             </tr>
                         </thead>

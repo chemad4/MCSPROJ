@@ -2,7 +2,7 @@
 // 1. IMPORT FIREBASE DEPENDENCIES
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ==========================================
 // 2. FIREBASE & EMAILJS CONFIGURATION
@@ -205,13 +205,11 @@ function renderChatUserList() {
     const myName = localStorage.getItem("loggedInUser");
     let html = "";
     
-    // Fetch Admins if the user clicked the "Staff" chat tab (or all)
     let admins = [];
     if (currentChatRoleFilter === 'staff' || currentChatRoleFilter === 'all') {
         admins = chatUsers.filter(u => (u.role || "").toLowerCase() === 'admin' && u.name !== myName);
     }
     
-    // Fetch the users for the specific role clicked in the sidebar
     const targetUsers = chatUsers.filter(u => {
         if (u.name === myName) return false;
         const uRole = (u.role || "").toLowerCase();
@@ -223,7 +221,6 @@ function renderChatUserList() {
     if (admins.length === 0 && targetUsers.length === 0) {
         html = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No users found.</div>`;
     } else {
-        // Render Admins
         if (admins.length > 0) {
             html += `<div class="chat-category">Admins</div>`;
             admins.forEach(u => {
@@ -242,7 +239,6 @@ function renderChatUserList() {
             });
         }
 
-        // Render target role
         if (targetUsers.length > 0) {
             let catTitle = "Users";
             if (currentChatRoleFilter === 'staff') catTitle = "Staff Team";
@@ -978,7 +974,7 @@ window.deleteUser = async (id) => {
 }
 
 // ==========================================
-// 9. BATCH REGISTRATION
+// 9. BATCH REGISTRATION (WITH RFID)
 // ==========================================
 let batchRowCount = 1;
 
@@ -998,6 +994,7 @@ window.addBatchRow = function() {
                 <option value="Silver Plan">Silver</option>
             </select>
         </td>
+        <td><input type="text" class="bm-rfid rfid-register-input" placeholder="Tap Card..." required></td>
         <td>
             <button type="button" onclick="this.parentElement.parentElement.remove(); batchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;">
                 <i class="fas fa-trash"></i>
@@ -1021,6 +1018,7 @@ window.openMemberModal = () => {
                     <option value="Silver Plan">Silver</option>
                 </select>
             </td>
+            <td><input type="text" class="bm-rfid rfid-register-input" placeholder="Tap Card..." required></td>
             <td></td>
         </tr>
     `;
@@ -1041,11 +1039,12 @@ if (document.getElementById('batchMemberForm')) {
         const currentTimestamp = new Date().getTime(); 
 
         for (let row of rows) {
-            const given = row.querySelector('.bm-first').value;
-            const mi = row.querySelector('.bm-mi').value;
-            const family = row.querySelector('.bm-last').value;
-            const email = row.querySelector('.bm-email').value;
+            const given = row.querySelector('.bm-first').value.trim();
+            const mi = row.querySelector('.bm-mi').value.trim();
+            const family = row.querySelector('.bm-last').value.trim();
+            const email = row.querySelector('.bm-email').value.trim();
             const plan = row.querySelector('.bm-plan').value;
+            const rfidTag = row.querySelector('.bm-rfid').value.trim();
             const randomPassword = generatePassword();
 
             try {
@@ -1065,6 +1064,7 @@ if (document.getElementById('batchMemberForm')) {
                     email: email, 
                     status: "Active", 
                     plan: plan,
+                    rfid: rfidTag,
                     password: randomPassword,
                     dateRegistered: currentTimestamp 
                 });
@@ -1156,10 +1156,10 @@ if (document.getElementById('batchStaffForm')) {
         let emailFailCount = 0;
 
         for (let row of rows) {
-            const given = row.querySelector('.bs-first').value;
-            const mi = row.querySelector('.bs-mi').value;
-            const family = row.querySelector('.bs-last').value;
-            const email = row.querySelector('.bs-email').value;
+            const given = row.querySelector('.bs-first').value.trim();
+            const mi = row.querySelector('.bs-mi').value.trim();
+            const family = row.querySelector('.bs-last').value.trim();
+            const email = row.querySelector('.bs-email').value.trim();
             const status = row.querySelector('.bs-status').value;
             const randomPassword = generatePassword();
 
@@ -1284,4 +1284,71 @@ function initDashboardCharts() {
             scales: { x: { grid: { display: false } } } 
         }
     });
+}
+
+// ==========================================
+// 12. USB RFID GHOST LISTENER
+// ==========================================
+let rfidBuffer = "";
+let lastKeyTime = Date.now();
+
+document.addEventListener('keydown', (e) => {
+    // OVERRIDE: If the staff clicks inside any input box or search bar, 
+    // let them type normally (or let the scanner type directly into the registration box).
+    if (document.activeElement) {
+        const activeTag = document.activeElement.tagName.toLowerCase();
+        if (activeTag === 'input' || activeTag === 'textarea') {
+            return; 
+        }
+    }
+
+    // Measure typing speed to detect if it's a scanner (superhuman speed) or a keyboard
+    const currentTime = Date.now();
+    if (currentTime - lastKeyTime > 50) { 
+        rfidBuffer = ""; 
+    }
+
+    // Capture the Enter key (Scanners automatically press Enter after the ID)
+    if (e.key === 'Enter' && rfidBuffer.length > 5) {
+        processRfidAttendance(rfidBuffer);
+        rfidBuffer = "";
+    } else if (e.key.length === 1) { 
+        rfidBuffer += e.key;
+    }
+    
+    lastKeyTime = currentTime;
+});
+
+async function processRfidAttendance(scannedTag) {
+    // 1. Check if the card belongs to anyone in the database
+    const q = query(usersCol, where("rfid", "==", scannedTag));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+        alert(`❌ Unrecognized Card Scanned (ID: ${scannedTag}). Please register this card to a user.`);
+        return;
+    }
+    
+    const user = snapshot.docs[0].data();
+    
+    if (user.status === 'Archived') {
+        alert(`⚠️ Access Denied. ${user.name || user.givenName}'s account is archived.`);
+        return;
+    }
+
+    // 2. Log them into the live attendance database
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    
+    await addDoc(attendanceCol, {
+        name: user.name || `${user.givenName} ${user.familyName}`,
+        type: user.plan || user.role || "Member",
+        date: dateStr,
+        time: timeStr,
+        timestamp: now.getTime()
+    });
+    
+    // 3. Flash a quick success message on the screen for the staff
+    alert(`✅ Welcome, ${user.name || user.givenName}! Checked in successfully.`);
 }
