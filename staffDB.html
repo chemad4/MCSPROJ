@@ -95,6 +95,7 @@
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
+                <li class="sub-item" onclick="switchTab('bookings', this)"><i class="fa-solid fa-calendar-check"></i> Booking Calendar</li>
                 <li class="sub-item" onclick="openChatTab('trainer', this, 'Trainer Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
         </ul>
@@ -154,7 +155,7 @@
                         </div>
                         <div class="grid-stat-box border-black" onclick="switchTab('pos')">
                             <div class="num" id="presentMembers">0</div>
-                            <div class="label">Total Check-ins Today</div>
+                            <div class="label">Currently On Floor</div>
                         </div>
                     </div>
                 </div>
@@ -235,6 +236,39 @@
                     </div>
                     <div class="pos-totals">
                         </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="bookings" class="content-section">
+            <div class="table-controls">
+                <div class="search-box" style="display: flex; gap: 10px; width: 600px;">
+                    <div style="position: relative; flex-grow: 1;">
+                        <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999;"></i>
+                        <input type="text" id="bookingSearch" placeholder="Search member or trainer..." onkeyup="filterTable('bookingsTable', 'bookingSearch')" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px;">
+                    </div>
+                    <input type="date" id="bookingDateFilter" onchange="filterBookingsByDate()" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; background: white;">
+                </div>
+                <button class="action-btn" onclick="openBookingModal()"><i class="fas fa-calendar-plus"></i> Book Session</button>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-calendar-alt"></i> Scheduled PT Sessions</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="bookingsTable">
+                        <thead>
+                            <tr>
+                                <th>Member Name</th>
+                                <th>Assigned Trainer</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookingsBody">
+                            </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -324,6 +358,8 @@
                                 <th>Membership Type</th>
                                 <th>Date Logged</th>
                                 <th>Time In</th>
+                                <th>Time Out</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -500,6 +536,59 @@
                 <input type="text" id="editMemberMI" placeholder="M.I. (Opt.)" maxlength="2" oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')">
                 <input type="text" id="editMemberFamily" placeholder="Family Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
                 <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="bookingModalTitle">Book Personal Training</h3>
+                <span class="close-btn" onclick="closeModal('bookingModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="bookingForm">
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Select Member:</p>
+                <select id="bookMember" required>
+                    </select>
+                
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px; margin-top: 10px;">Select Trainer:</p>
+                <select id="bookTrainer" required>
+                    </select>
+                
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <div style="flex: 1;">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Date:</p>
+                        <input type="date" id="bookDate" required style="width: 100%;">
+                    </div>
+                    <div style="flex: 1;">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Time:</p>
+                        <input type="time" id="bookTime" required style="width: 100%;">
+                    </div>
+                </div>
+                
+                <button type="submit" style="background-color: var(--primary-red); margin-top: 20px;">Confirm Booking</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="editBookingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Update Session Status</h3>
+                <span class="close-btn" onclick="closeModal('editBookingModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="editBookingForm">
+                <input type="hidden" id="editBookingId">
+                <p style="font-size: 14px; margin-bottom: 10px;">Session: <strong id="editBookingDetails"></strong></p>
+                
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Update Status:</p>
+                <select id="editBookingStatus" required>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="No Show">No Show</option>
+                </select>
+                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
             </form>
         </div>
     </div>
