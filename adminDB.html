@@ -647,6 +647,27 @@
         </div>
     </div>
 
+    <div id="editStaffModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Staff/Trainer Details</h3>
+                <span class="close-btn" onclick="closeModal('editStaffModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="editStaffForm">
+                <input type="hidden" id="editStaffId">
+                <input type="text" id="editStaffGiven" placeholder="Given Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
+                <input type="text" id="editStaffMI" placeholder="M.I. (Opt.)" maxlength="2" oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')">
+                <input type="text" id="editStaffFamily" placeholder="Family Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Update Role:</p>
+                <select id="editStaffRole" required>
+                    <option value="Staff">Staff</option>
+                    <option value="Trainer">Trainer</option>
+                </select>
+                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
     <div id="memberModal" class="modal">
         <div class="modal-content" style="width: 900px; max-width: 95vw;">
             <div class="modal-header">

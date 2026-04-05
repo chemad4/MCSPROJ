@@ -1004,12 +1004,13 @@ function renderStaff() {
         } else {
             let badgeClass = (statusStr === 'active' || statusStr === 'on leave') ? 'active' : 'inactive';
             
+            // --- UPDATE: Edit and Archive buttons for Active Staff/Trainers ---
             let actionBtns = `
+                <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Details" onclick="openEditStaffModal('${u.id}')">
+                    <i class="fa-solid fa-edit"></i>
+                </button>
                 <button class="btn-icon btn-delete" style="color: #f39c12;" title="Archive Account" onclick="archiveUser('${u.id}', '${u.status || 'Active'}')">
                     <i class="fas fa-box-archive"></i>
-                </button>
-                <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Delete Account" onclick="deleteUser('${u.id}')">
-                    <i class="fas fa-trash"></i>
                 </button>
             `;
 
@@ -1069,6 +1070,44 @@ function renderStaff() {
     if (dashTrainers) {
         dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
     }
+}
+
+// --- NEW: Open Staff/Trainer Edit Modal ---
+window.openEditStaffModal = function(id) {
+    const user = allUsersData.find(u => u.id === id);
+    if (!user) return;
+    
+    document.getElementById('editStaffId').value = user.id;
+    document.getElementById('editStaffGiven').value = user.givenName || '';
+    document.getElementById('editStaffMI').value = user.mi || '';
+    document.getElementById('editStaffFamily').value = user.familyName || '';
+    document.getElementById('editStaffRole').value = user.role || 'Staff';
+    
+    document.getElementById('editStaffModal').style.display = 'flex';
+}
+
+if (document.getElementById('editStaffForm')) {
+    document.getElementById('editStaffForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const id = document.getElementById('editStaffId').value;
+        const given = document.getElementById('editStaffGiven').value.trim();
+        const mi = document.getElementById('editStaffMI').value.trim();
+        const family = document.getElementById('editStaffFamily').value.trim();
+        const role = document.getElementById('editStaffRole').value;
+        
+        const updatedData = {
+            givenName: given,
+            mi: mi,
+            familyName: family,
+            name: `${given} ${family}`.trim(),
+            role: role
+        };
+        
+        await updateDoc(doc(db, "users", id), updatedData);
+        window.closeModal('editStaffModal');
+        alert(`${role} details updated successfully!`);
+    });
 }
 
 window.archiveUser = async (id, currentStatus) => { 
