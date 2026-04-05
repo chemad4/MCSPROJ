@@ -24,23 +24,48 @@ const db = getFirestore(app);
 emailjs.init("ZqQKGRo5j5KpAhH98");
 
 // ==========================================
-// 3. GLOBAL EXPORTS (HTML ONCLICK BUTTONS)
+// 3. DYNAMIC SESSION OVERRIDE LISTENER
+// ==========================================
+const currentUserId = localStorage.getItem("userId");
+const currentSessionId = localStorage.getItem("sessionId");
+
+if (currentUserId && currentSessionId) {
+    onSnapshot(doc(db, "users", currentUserId), (docSnap) => {
+        if (docSnap.exists()) {
+            const userData = docSnap.data();
+            // If the session ID in the database changes, kick this old device out!
+            if (userData.currentSession && userData.currentSession !== currentSessionId) {
+                alert("Session Override: Your account was just logged in from another device. Logging out here to protect your data.");
+                
+                // We do a "silent" local logout here. We do NOT update Firebase to "Off Shift" 
+                // because the new device is now legitimately using the shift!
+                localStorage.removeItem("loggedInUser");
+                localStorage.removeItem("userRole");
+                localStorage.removeItem("userRfid"); 
+                localStorage.removeItem("userId"); 
+                localStorage.removeItem("shiftStart"); 
+                localStorage.removeItem("sessionId");
+                window.location.replace("index.html");
+            }
+        }
+    });
+}
+
+// ==========================================
+// 4. GLOBAL EXPORTS (HTML ONCLICK BUTTONS)
 // ==========================================
 
 window.handleLogout = async function() {
     const userId = localStorage.getItem("userId");
     const userRole = localStorage.getItem("userRole");
     
-    // Remove the Active Session lock and set shift status to 'Off Shift' before logging out
+    // Normal Logout: Remove the Session ID and set shift status to 'Off Shift'
     if (userId) {
         try {
-            let updateData = { activeSession: false };
-            
-            // Only update shift status for Admin and Staff
+            let updateData = { currentSession: null };
             if (userRole === "Admin" || userRole === "Staff") {
                 updateData.shiftStatus = "Off Shift";
             }
-            
             await updateDoc(doc(db, "users", userId), updateData);
         } catch (error) {
             console.error("Failed to update session/shift status:", error);
@@ -52,6 +77,7 @@ window.handleLogout = async function() {
     localStorage.removeItem("userRfid"); 
     localStorage.removeItem("userId"); 
     localStorage.removeItem("shiftStart"); 
+    localStorage.removeItem("sessionId"); 
     window.location.replace("index.html"); 
 };
 
@@ -182,7 +208,7 @@ window.filterGrid = function(gridId, inputId) {
 }
 
 // ==========================================
-// 4. STATE ARRAYS & COLLECTIONS
+// 5. STATE ARRAYS & COLLECTIONS
 // ==========================================
 let inventoryData = [];
 let allUsersData = []; 
@@ -207,7 +233,7 @@ const bookingsCol = collection(db, "bookings");
 let servicesChartInstance = null;
 
 // ==========================================
-// 5. INTERNAL MESSENGER LOGIC
+// 6. INTERNAL MESSENGER LOGIC
 // ==========================================
 window.openChatTab = function(role, element, title) {
     currentChatRoleFilter = role;
@@ -372,7 +398,7 @@ window.sendMessage = async function() {
 }
 
 // ==========================================
-// 6. INVENTORY LOGIC
+// 7. INVENTORY LOGIC
 // ==========================================
 onSnapshot(inventoryCol, (snapshot) => {
     inventoryData = [];
@@ -582,7 +608,7 @@ if (document.getElementById('productForm')) {
 }
 
 // ==========================================
-// 7. POINT OF SALE (POS) LOGIC
+// 8. POINT OF SALE (POS) LOGIC
 // ==========================================
 function renderPOSProducts() {
     const posBody = document.getElementById('posProductList');
@@ -728,7 +754,7 @@ window.processPayment = async function(grandTotal) {
 }
 
 // ==========================================
-// 8. MASTER DIRECTORY & ATTENDANCE LOGIC
+// 9. MASTER DIRECTORY & ATTENDANCE LOGIC
 // ==========================================
 onSnapshot(attendanceCol, (snapshot) => {
     attendanceData = [];
@@ -1066,7 +1092,7 @@ window.deleteUser = async (id) => {
 }
 
 // ==========================================
-// 9. BATCH REGISTRATION (WITH RFID AND DUPLICATE CHECK)
+// 10. BATCH REGISTRATION (WITH RFID AND DUPLICATE CHECK)
 // ==========================================
 let batchRowCount = 1;
 
@@ -1345,7 +1371,7 @@ if (document.getElementById('batchStaffForm')) {
 }
 
 // ==========================================
-// 10. FINANCIALS
+// 11. FINANCIALS
 // ==========================================
 onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
@@ -1375,7 +1401,7 @@ function renderPayments() {
 }
 
 // ==========================================
-// 11. UI INITIALIZATION & SHIFT TIMER
+// 12. UI INITIALIZATION & SHIFT TIMER
 // ==========================================
 function initUI() {
     // 1. START THE CLOCK FIRST (Never fails)
@@ -1475,7 +1501,7 @@ function initDashboardCharts() {
 }
 
 // ==========================================
-// 12. BOOKING CALENDAR LOGIC
+// 13. BOOKING CALENDAR LOGIC
 // ==========================================
 onSnapshot(bookingsCol, (snapshot) => {
     bookingsData = [];
@@ -1601,7 +1627,7 @@ window.deleteBooking = async (id) => {
 }
 
 // ==========================================
-// 13. SMART USB RFID GHOST LISTENER
+// 14. SMART USB RFID GHOST LISTENER
 // ==========================================
 let rfidBuffer = "";
 let lastKeyTime = Date.now();

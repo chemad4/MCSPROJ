@@ -28,17 +28,88 @@
     </script>
 
     <style>
-        body { display: flex; align-items: center; justify-content: center; background-color: var(--dark-black); height: 100vh; margin: 0; padding: 20px; }
-        .login-container { background: var(--white); padding: 40px 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 450px; text-align: center; }
-        .login-logo { font-size: 2.8rem; font-weight: 700; margin-bottom: 40px; letter-spacing: 1px; color: var(--dark-black); }
-        .login-logo span { color: var(--primary-red); }
-        .login-form input { width: 100%; padding: 18px; margin-bottom: 20px; border: 1px solid var(--border-color); border-radius: 8px; outline: none; font-size: 16px; box-sizing: border-box; }
-        .login-form input:focus { border-color: var(--primary-red); }
-        .login-btn { width: 100%; padding: 18px; background-color: var(--primary-red); color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .login-btn:hover { background-color: #900f14; }
-        .login-btn:disabled { background-color: #e0abae; cursor: not-allowed; }
-        #errorMsg { color: var(--primary-red); margin-bottom: 15px; font-size: 14px; display: none; font-weight: 500; line-height: 1.4; }
-        #installAppBtn { display: none; width: 100%; padding: 18px; margin-top: 20px; background-color: #333; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        body { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background-color: var(--dark-black); 
+            height: 100vh; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .login-container { 
+            background: var(--white); 
+            padding: 40px 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+            width: 100%; 
+            max-width: 450px; 
+            text-align: center; 
+        }
+        .login-logo { 
+            font-size: 2.8rem; 
+            font-weight: 700; 
+            margin-bottom: 40px; 
+            letter-spacing: 1px; 
+            color: var(--dark-black); 
+        }
+        .login-logo span { 
+            color: var(--primary-red); 
+        }
+        .login-form input { 
+            width: 100%; 
+            padding: 18px; 
+            margin-bottom: 20px; 
+            border: 1px solid var(--border-color); 
+            border-radius: 8px; 
+            outline: none; 
+            font-size: 16px; 
+            box-sizing: border-box; 
+        }
+        .login-form input:focus { 
+            border-color: var(--primary-red); 
+        }
+        .login-btn { 
+            width: 100%; 
+            padding: 18px; 
+            background-color: var(--primary-red); 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: 0.3s; 
+        }
+        .login-btn:hover { 
+            background-color: #900f14; 
+        }
+        .login-btn:disabled { 
+            background-color: #e0abae; 
+            cursor: not-allowed; 
+        }
+        #errorMsg { 
+            color: var(--primary-red); 
+            margin-bottom: 15px; 
+            font-size: 14px; 
+            display: none; 
+            font-weight: 500; 
+            line-height: 1.4; 
+        }
+        #installAppBtn { 
+            display: none; 
+            width: 100%; 
+            padding: 18px; 
+            margin-top: 20px; 
+            background-color: #333; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            transition: 0.3s; 
+        }
     </style>
 </head>
 <body>
@@ -164,17 +235,9 @@
                     return;
                 }
 
-                // 3. UNIVERSAL DUPLICATE LOGIN CHECK (Active Session Lock)
-                if (userData.activeSession === true) {
-                    errorMsg.innerHTML = "<strong>Access Denied:</strong> This account is currently logged in on another device.<br><small>Please log out from the active session first.</small>";
-                    errorMsg.style.display = "block";
-                    submitBtn.innerText = "Log In";
-                    submitBtn.disabled = false;
-                    return;
-                }
-
-                // 4. LOCK THE ACCOUNT (ACTIVE SESSION) & LOG SHIFT START
-                let updateData = { activeSession: true };
+                // 3. GENERATE UNIQUE SESSION ID TO OVERRIDE ANY PREVIOUS LOGINS
+                const newSessionId = Math.random().toString(36).substring(2, 15);
+                let updateData = { currentSession: newSessionId };
 
                 if (userRole === "Admin" || userRole === "Staff") {
                     const now = Date.now();
@@ -183,13 +246,14 @@
                     localStorage.setItem("shiftStart", now);
                 }
 
-                // Update database
+                // Save to Firebase
                 await updateDoc(doc(db, "users", userId), updateData);
                 
-                // Save universally needed items to local storage
+                // Save universally needed items to Local Storage
                 localStorage.setItem("userId", userId);
                 localStorage.setItem("loggedInUser", userData.name || userData.givenName);
                 localStorage.setItem("userRole", userRole);
+                localStorage.setItem("sessionId", newSessionId); // Save Session ID locally!
                 if(userData.rfid) localStorage.setItem("userRfid", userData.rfid);
 
                 // Redirect
