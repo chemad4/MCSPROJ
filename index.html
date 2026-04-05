@@ -138,6 +138,10 @@
             <button type="submit" class="login-btn" id="loginSubmitBtn">Log In</button>
         </form>
 
+        <p style="color: #888; font-size: 13px; margin-top: 20px;">
+            <i class="fas fa-id-badge"></i> Or simply tap your ID Card to log in.
+        </p>
+
         <button id="installAppBtn">
             <i class="fa-solid fa-download"></i> Install Fit Track App
         </button>
@@ -172,31 +176,73 @@
         // Auto-redirect if already logged in (with strict device enforcement)
         if (currentUser && currentRole) {
             if ((currentRole === "Admin" || currentRole === "Staff") && onMobile) {
-                // Kick Admins/Staff off mobile
                 localStorage.removeItem("loggedInUser");
                 localStorage.removeItem("userRole");
             } else if ((currentRole === "Member" || currentRole === "Trainer") && !onMobile) {
-                // Kick Members/Trainers off desktop
                 localStorage.removeItem("loggedInUser");
                 localStorage.removeItem("userRole");
             } else {
-                // Safe to proceed to respective dashboards
-                if (currentRole === "Admin") {
-                    window.location.replace("adminDB.html");
-                } else if (currentRole === "Staff") {
-                    window.location.replace("staffDB.html");
-                } else if (currentRole === "Trainer") {
-                    window.location.replace("trainerDB.html");
-                } else if (currentRole === "Member") {
-                    window.location.replace("memberDB.html");
-                }
+                if (currentRole === "Admin") window.location.replace("adminDB.html");
+                else if (currentRole === "Staff") window.location.replace("staffDB.html");
+                else if (currentRole === "Trainer") window.location.replace("trainerDB.html");
+                else if (currentRole === "Member") window.location.replace("memberDB.html");
             }
         }
 
+        // ==========================================
+        // STANDARD EMAIL & PASSWORD LOGIN
+        // ==========================================
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('loginEmail').value.trim();
             const password = document.getElementById('loginPassword').value.trim();
+            
+            await authenticateUser(query(collection(db, "users"), where("email", "==", email), where("password", "==", password)));
+        });
+
+        // ==========================================
+        // SMART USB RFID GHOST LISTENER (LOGIN PAGE)
+        // ==========================================
+        let rfidBuffer = "";
+        let lastKeyTime = Date.now();
+
+        document.addEventListener('keydown', async (e) => {
+            const currentTime = Date.now();
+
+            if (currentTime - lastKeyTime > 50) { 
+                rfidBuffer = ""; 
+            }
+
+            if (e.key === 'Enter' && rfidBuffer.length > 5) {
+                e.preventDefault(); // Stop the form from submitting normally
+
+                const activeEl = document.activeElement;
+                // Clean up text boxes if they were focused so we don't leave scanner garbage behind
+                if (activeEl && activeEl.tagName === 'INPUT') {
+                    let currentVal = activeEl.value;
+                    if (currentVal.endsWith(rfidBuffer)) {
+                        activeEl.value = currentVal.slice(0, -rfidBuffer.length);
+                    }
+                    activeEl.blur(); 
+                }
+
+                const scannedRfid = rfidBuffer;
+                rfidBuffer = ""; // Clear buffer
+                
+                // Authenticate using the RFID!
+                await authenticateUser(query(collection(db, "users"), where("rfid", "==", scannedRfid)));
+                
+            } else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) { 
+                rfidBuffer += e.key;
+            }
+            
+            lastKeyTime = currentTime;
+        });
+
+        // ==========================================
+        // CORE AUTHENTICATION LOGIC (Shared by both)
+        // ==========================================
+        async function authenticateUser(dbQuery) {
             const errorMsg = document.getElementById('errorMsg');
             const submitBtn = document.getElementById('loginSubmitBtn');
 
@@ -205,63 +251,60 @@
             errorMsg.style.display = "none";
 
             try {
-                const q = query(collection(db, "users"), where("email", "==", email), where("password", "==", password));
-                const querySnapshot = await getDocs(q);
+                const querySnapshot = await getDocs(dbQuery);
 
                 if (querySnapshot.empty) {
-                    errorMsg.innerText = "Invalid email or password.";
+                    errorMsg.innerText = "Invalid credentials or unrecognized ID Card.";
                     errorMsg.style.display = "block";
                     submitBtn.innerText = "Log In";
                     submitBtn.disabled = false;
-                } else {
-                    const userData = querySnapshot.docs[0].data();
-                    
-                    if (userData.status === 'Archived') {
-                        errorMsg.innerText = "This account has been archived. Please contact admin.";
-                        errorMsg.style.display = "block";
-                        submitBtn.innerText = "Log In";
-                        submitBtn.disabled = false;
-                        return;
-                    }
-
-                    // --- STRICT DEVICE RULES APPLIED HERE ---
-                    const userOnMobile = isMobileDevice();
-                    
-                    if ((userData.role === "Admin" || userData.role === "Staff") && userOnMobile) {
-                        errorMsg.innerText = "Access Denied: Admins and Staff must log in using a Desktop/PC.";
-                        errorMsg.style.display = "block";
-                        submitBtn.innerText = "Log In";
-                        submitBtn.disabled = false;
-                        return;
-                    }
-
-                    if ((userData.role === "Member" || userData.role === "Trainer") && !userOnMobile) {
-                        errorMsg.innerText = "Access Denied: Members and Trainers must log in using the Mobile App.";
-                        errorMsg.style.display = "block";
-                        submitBtn.innerText = "Log In";
-                        submitBtn.disabled = false;
-                        return;
-                    }
-
-                    // If they pass the device check, let them in!
-                    localStorage.setItem("loggedInUser", userData.name || userData.givenName);
-                    localStorage.setItem("userRole", userData.role);
-
-                    if (userData.role === "Admin") {
-                        window.location.replace("adminDB.html");
-                    } else if (userData.role === "Staff") {
-                        window.location.replace("staffDB.html");
-                    } else if (userData.role === "Trainer") {
-                        window.location.replace("trainerDB.html");
-                    } else if (userData.role === "Member") {
-                        window.location.replace("memberDB.html");
-                    } else {
-                        errorMsg.innerText = "Account role is undefined.";
-                        errorMsg.style.display = "block";
-                        submitBtn.innerText = "Log In";
-                        submitBtn.disabled = false;
-                    }
+                    return;
+                } 
+                
+                const userData = querySnapshot.docs[0].data();
+                
+                if (userData.status === 'Archived') {
+                    errorMsg.innerText = "This account has been archived. Please contact admin.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                    return;
                 }
+
+                const userOnMobile = isMobileDevice();
+                
+                if ((userData.role === "Admin" || userData.role === "Staff") && userOnMobile) {
+                    errorMsg.innerText = "Access Denied: Admins and Staff must log in using a Desktop/PC.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                if ((userData.role === "Member" || userData.role === "Trainer") && !userOnMobile) {
+                    errorMsg.innerText = "Access Denied: Members and Trainers must log in using the Mobile App.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                localStorage.setItem("loggedInUser", userData.name || userData.givenName);
+                localStorage.setItem("userRole", userData.role);
+                // Save the RFID to local storage so the dashboard knows the ID of the logged-in user
+                if(userData.rfid) localStorage.setItem("userRfid", userData.rfid);
+
+                if (userData.role === "Admin") window.location.replace("adminDB.html");
+                else if (userData.role === "Staff") window.location.replace("staffDB.html");
+                else if (userData.role === "Trainer") window.location.replace("trainerDB.html");
+                else if (userData.role === "Member") window.location.replace("memberDB.html");
+                else {
+                    errorMsg.innerText = "Account role is undefined.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                }
+                
             } catch (error) {
                 console.error("Error logging in:", error);
                 errorMsg.innerText = "Connection error. Check your internet and try again.";
@@ -269,20 +312,17 @@
                 submitBtn.innerText = "Log In";
                 submitBtn.disabled = false;
             }
-        });
+        }
     </script>
 
     <script>
         let deferredPrompt;
         const installBtn = document.getElementById('installAppBtn');
 
-        // Check if the user is actually on a mobile device
         const isMobilePWA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
 
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
-            
-            // ONLY show the install button if they are on a phone
             if (isMobilePWA) {
                 deferredPrompt = e;
                 installBtn.style.display = 'block';

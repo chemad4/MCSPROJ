@@ -30,6 +30,7 @@ emailjs.init("ZqQKGRo5j5KpAhH98");
 window.handleLogout = function() {
     localStorage.removeItem("loggedInUser");
     localStorage.removeItem("userRole");
+    localStorage.removeItem("userRfid"); // Clear the RFID on logout
     window.location.replace("index.html"); 
 };
 
@@ -1484,8 +1485,15 @@ document.addEventListener('keydown', (e) => {
             activeEl.style.borderColor = "#2e7d32";
             activeEl.blur(); // Remove cursor to prevent double-scanning
         } else {
-            // They are doing something else, so this is a Member Checking In!
-            processRfidAttendance(rfidBuffer);
+            // Check if it's the currently logged-in Staff Member scanning out
+            const loggedInRfid = localStorage.getItem("userRfid");
+            if (loggedInRfid && rfidBuffer === loggedInRfid) {
+                alert("Shift Ended. Logging out...");
+                window.handleLogout();
+            } else {
+                // They are doing something else, so this is a Member Checking In!
+                processRfidAttendance(rfidBuffer);
+            }
         }
 
         rfidBuffer = ""; // Clear buffer
