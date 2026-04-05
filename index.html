@@ -28,102 +28,17 @@
     </script>
 
     <style>
-        /* Mobile-Optimized Login Styles */
-        body { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            background-color: var(--dark-black); 
-            height: 100vh; 
-            margin: 0; 
-            padding: 20px; 
-        }
-
-        .login-container { 
-            background: var(--white); 
-            padding: 40px 30px; 
-            border-radius: 12px; 
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
-            width: 100%; 
-            max-width: 450px; 
-            text-align: center; 
-        }
-
-        .login-logo { 
-            font-size: 2.8rem; 
-            font-weight: 700; 
-            margin-bottom: 40px; 
-            letter-spacing: 1px; 
-            color: var(--dark-black); 
-        }
-
-        .login-logo span { 
-            color: var(--primary-red); 
-        }
-        
-        .login-form input { 
-            width: 100%; 
-            padding: 18px; 
-            margin-bottom: 20px; 
-            border: 1px solid var(--border-color); 
-            border-radius: 8px; 
-            outline: none; 
-            font-size: 16px; 
-            box-sizing: border-box; 
-        }
-
-        .login-form input:focus { 
-            border-color: var(--primary-red); 
-        }
-        
-        .login-btn { 
-            width: 100%; 
-            padding: 18px; 
-            background-color: var(--primary-red); 
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            font-size: 18px; 
-            font-weight: bold; 
-            cursor: pointer; 
-            transition: 0.3s; 
-        }
-
-        .login-btn:hover { 
-            background-color: #900f14; 
-        }
-
-        .login-btn:disabled { 
-            background-color: #e0abae; 
-            cursor: not-allowed; 
-        }
-        
-        #errorMsg { 
-            color: var(--primary-red); 
-            margin-bottom: 15px; 
-            font-size: 14px; 
-            display: none; 
-            font-weight: 500; 
-        }
-        
-        #installAppBtn { 
-            display: none; 
-            width: 100%; 
-            padding: 18px; 
-            margin-top: 20px; 
-            background-color: #333; 
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            font-size: 16px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            transition: 0.3s; 
-        }
-
-        #installAppBtn:hover { 
-            background-color: #111; 
-        }
+        body { display: flex; align-items: center; justify-content: center; background-color: var(--dark-black); height: 100vh; margin: 0; padding: 20px; }
+        .login-container { background: var(--white); padding: 40px 30px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 450px; text-align: center; }
+        .login-logo { font-size: 2.8rem; font-weight: 700; margin-bottom: 40px; letter-spacing: 1px; color: var(--dark-black); }
+        .login-logo span { color: var(--primary-red); }
+        .login-form input { width: 100%; padding: 18px; margin-bottom: 20px; border: 1px solid var(--border-color); border-radius: 8px; outline: none; font-size: 16px; box-sizing: border-box; }
+        .login-form input:focus { border-color: var(--primary-red); }
+        .login-btn { width: 100%; padding: 18px; background-color: var(--primary-red); color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .login-btn:hover { background-color: #900f14; }
+        .login-btn:disabled { background-color: #e0abae; cursor: not-allowed; }
+        #errorMsg { color: var(--primary-red); margin-bottom: 15px; font-size: 14px; display: none; font-weight: 500; line-height: 1.4; }
+        #installAppBtn { display: none; width: 100%; padding: 18px; margin-top: 20px; background-color: #333; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; transition: 0.3s; }
     </style>
 </head>
 <body>
@@ -164,95 +79,51 @@
         const app = initializeApp(loginConfig);
         const db = getFirestore(app);
 
-        // --- DEVICE DETECTION HELPER ---
-        const isMobileDevice = () => {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
-        };
-
-        const currentUser = localStorage.getItem("loggedInUser");
-        const currentRole = localStorage.getItem("userRole");
-        const onMobile = isMobileDevice();
-
-        // Auto-redirect if already logged in (with strict device enforcement)
-        if (currentUser && currentRole) {
-            if ((currentRole === "Admin" || currentRole === "Staff") && onMobile) {
-                localStorage.removeItem("loggedInUser");
-                localStorage.removeItem("userRole");
-            } else if ((currentRole === "Member" || currentRole === "Trainer") && !onMobile) {
-                localStorage.removeItem("loggedInUser");
-                localStorage.removeItem("userRole");
-            } else {
-                if (currentRole === "Admin") window.location.replace("adminDB.html");
-                else if (currentRole === "Staff") window.location.replace("staffDB.html");
-                else if (currentRole === "Trainer") window.location.replace("trainerDB.html");
-                else if (currentRole === "Member") window.location.replace("memberDB.html");
-            }
-        }
+        const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
 
         // ==========================================
-        // STANDARD EMAIL & PASSWORD LOGIN
-        // ==========================================
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value.trim();
-            const password = document.getElementById('loginPassword').value.trim();
-            
-            await authenticateUser(query(collection(db, "users"), where("email", "==", email), where("password", "==", password)));
-        });
-
-        // ==========================================
-        // SMART USB RFID GHOST LISTENER (LOGIN PAGE)
+        // SMART USB RFID GHOST LISTENER
         // ==========================================
         let rfidBuffer = "";
         let lastKeyTime = Date.now();
 
         document.addEventListener('keydown', async (e) => {
             const currentTime = Date.now();
-
-            if (currentTime - lastKeyTime > 50) { 
-                rfidBuffer = ""; 
-            }
+            if (currentTime - lastKeyTime > 50) rfidBuffer = ""; 
 
             if (e.key === 'Enter' && rfidBuffer.length > 5) {
-                e.preventDefault(); // Stop the form from submitting normally
-
+                e.preventDefault();
                 const activeEl = document.activeElement;
-                // Clean up text boxes if they were focused so we don't leave scanner garbage behind
                 if (activeEl && activeEl.tagName === 'INPUT') {
                     let currentVal = activeEl.value;
-                    if (currentVal.endsWith(rfidBuffer)) {
-                        activeEl.value = currentVal.slice(0, -rfidBuffer.length);
-                    }
+                    if (currentVal.endsWith(rfidBuffer)) activeEl.value = currentVal.slice(0, -rfidBuffer.length);
                     activeEl.blur(); 
                 }
-
                 const scannedRfid = rfidBuffer;
-                rfidBuffer = ""; // Clear buffer
-                
-                // Authenticate using the RFID!
+                rfidBuffer = "";
                 await authenticateUser(query(collection(db, "users"), where("rfid", "==", scannedRfid)));
-                
             } else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) { 
                 rfidBuffer += e.key;
             }
-            
             lastKeyTime = currentTime;
         });
 
-        // ==========================================
-        // CORE AUTHENTICATION LOGIC (Shared by both)
-        // ==========================================
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            await authenticateUser(query(collection(db, "users"), where("email", "==", email), where("password", "==", password)));
+        });
+
         async function authenticateUser(dbQuery) {
             const errorMsg = document.getElementById('errorMsg');
             const submitBtn = document.getElementById('loginSubmitBtn');
-
             submitBtn.innerText = "Authenticating...";
             submitBtn.disabled = true;
             errorMsg.style.display = "none";
 
             try {
                 const querySnapshot = await getDocs(dbQuery);
-
                 if (querySnapshot.empty) {
                     errorMsg.innerText = "Invalid credentials or unrecognized ID Card.";
                     errorMsg.style.display = "block";
@@ -264,102 +135,77 @@
                 const userDoc = querySnapshot.docs[0];
                 const userData = userDoc.data();
                 const userId = userDoc.id;
-                
-                if (userData.status === 'Archived') {
-                    errorMsg.innerText = "This account has been archived. Please contact admin.";
-                    errorMsg.style.display = "block";
-                    submitBtn.innerText = "Log In";
-                    submitBtn.disabled = false;
-                    return;
-                }
-
+                const userRole = userData.role;
                 const userOnMobile = isMobileDevice();
-                
-                if ((userData.role === "Admin" || userData.role === "Staff") && userOnMobile) {
-                    errorMsg.innerText = "Access Denied: Admins and Staff must log in using a Desktop/PC.";
+
+                // 1. ARCHIVE CHECK
+                if (userData.status === 'Archived') {
+                    errorMsg.innerText = "This account has been archived. Please contact management.";
                     errorMsg.style.display = "block";
                     submitBtn.innerText = "Log In";
                     submitBtn.disabled = false;
                     return;
                 }
 
-                if ((userData.role === "Member" || userData.role === "Trainer") && !userOnMobile) {
-                    errorMsg.innerText = "Access Denied: Members and Trainers must log in using the Mobile App.";
+                // 2. DEVICE RESTRICTION CHECK
+                if ((userRole === "Admin" || userRole === "Staff") && userOnMobile) {
+                    errorMsg.innerText = "Access Denied: Admins/Staff must use Desktop.";
                     errorMsg.style.display = "block";
                     submitBtn.innerText = "Log In";
                     submitBtn.disabled = false;
                     return;
                 }
 
-                // LOG SHIFT START TIME FOR STAFF AND ADMINS
-                if (userData.role === "Admin" || userData.role === "Staff") {
+                if ((userRole === "Member" || userRole === "Trainer") && !userOnMobile) {
+                    errorMsg.innerText = "Access Denied: Use the Mobile App.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                // 3. UNIVERSAL DUPLICATE LOGIN CHECK (Active Session Lock)
+                if (userData.activeSession === true) {
+                    errorMsg.innerHTML = "<strong>Access Denied:</strong> This account is currently logged in on another device.<br><small>Please log out from the active session first.</small>";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                // 4. LOCK THE ACCOUNT (ACTIVE SESSION) & LOG SHIFT START
+                let updateData = { activeSession: true };
+
+                if (userRole === "Admin" || userRole === "Staff") {
                     const now = Date.now();
-                    await updateDoc(doc(db, "users", userId), {
-                        shiftStatus: "On Shift",
-                        shiftStart: now
-                    });
+                    updateData.shiftStatus = "On Shift";
+                    updateData.shiftStart = now;
                     localStorage.setItem("shiftStart", now);
-                    localStorage.setItem("userId", userId);
                 }
 
+                // Update database
+                await updateDoc(doc(db, "users", userId), updateData);
+                
+                // Save universally needed items to local storage
+                localStorage.setItem("userId", userId);
                 localStorage.setItem("loggedInUser", userData.name || userData.givenName);
-                localStorage.setItem("userRole", userData.role);
-                // Save the RFID to local storage so the dashboard knows the ID of the logged-in user
+                localStorage.setItem("userRole", userRole);
                 if(userData.rfid) localStorage.setItem("userRfid", userData.rfid);
 
-                if (userData.role === "Admin") window.location.replace("adminDB.html");
-                else if (userData.role === "Staff") window.location.replace("staffDB.html");
-                else if (userData.role === "Trainer") window.location.replace("trainerDB.html");
-                else if (userData.role === "Member") window.location.replace("memberDB.html");
-                else {
-                    errorMsg.innerText = "Account role is undefined.";
-                    errorMsg.style.display = "block";
-                    submitBtn.innerText = "Log In";
-                    submitBtn.disabled = false;
-                }
+                // Redirect
+                if (userRole === "Admin") window.location.replace("adminDB.html");
+                else if (userRole === "Staff") window.location.replace("staffDB.html");
+                else if (userRole === "Trainer") window.location.replace("trainerDB.html");
+                else window.location.replace("memberDB.html");
                 
             } catch (error) {
-                console.error("Error logging in:", error);
-                errorMsg.innerText = "Connection error. Check your internet and try again.";
+                console.error("Login Error:", error);
+                errorMsg.innerText = "Connection error. Please try again.";
                 errorMsg.style.display = "block";
                 submitBtn.innerText = "Log In";
                 submitBtn.disabled = false;
             }
         }
-    </script>
-
-    <script>
-        let deferredPrompt;
-        const installBtn = document.getElementById('installAppBtn');
-
-        const isMobilePWA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
-
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            if (isMobilePWA) {
-                deferredPrompt = e;
-                installBtn.style.display = 'block';
-            }
-        });
-
-        installBtn.addEventListener('click', async () => {
-            if (deferredPrompt !== null) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    console.log('User accepted the PWA install prompt');
-                } else {
-                    console.log('User dismissed the PWA install prompt');
-                }
-                deferredPrompt = null;
-                installBtn.style.display = 'none';
-            }
-        });
-
-        window.addEventListener('appinstalled', () => {
-            installBtn.style.display = 'none';
-            console.log('Fit Track PWA was installed successfully');
-        });
     </script>
 </body>
 </html>

@@ -29,13 +29,21 @@ emailjs.init("ZqQKGRo5j5KpAhH98");
 
 window.handleLogout = async function() {
     const userId = localStorage.getItem("userId");
+    const userRole = localStorage.getItem("userRole");
     
-    // Set shift status to 'Off Shift' before logging out
+    // Remove the Active Session lock and set shift status to 'Off Shift' before logging out
     if (userId) {
         try {
-            await updateDoc(doc(db, "users", userId), { shiftStatus: "Off Shift" });
+            let updateData = { activeSession: false };
+            
+            // Only update shift status for Admin and Staff
+            if (userRole === "Admin" || userRole === "Staff") {
+                updateData.shiftStatus = "Off Shift";
+            }
+            
+            await updateDoc(doc(db, "users", userId), updateData);
         } catch (error) {
-            console.error("Failed to update shift status:", error);
+            console.error("Failed to update session/shift status:", error);
         }
     }
 
@@ -941,7 +949,6 @@ function renderStaff() {
         const statusStr = (u.status || "Active").trim().toLowerCase();
         let fullName = `${u.givenName || u.name} ${u.mi ? u.mi + '. ' : ''}${u.familyName || ''}`.trim();
 
-        // 1. IS THIS ACCOUNT ARCHIVED?
         if (statusStr === 'archived') {
             let actionBtns = `
                 <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${u.id}', 'Archived')">
@@ -969,7 +976,6 @@ function renderStaff() {
             }
 
         } else {
-            // 2. ACTIVE ACCOUNT LOGIC (Goes to regular tables)
             let badgeClass = (statusStr === 'active' || statusStr === 'on leave') ? 'active' : 'inactive';
             
             let actionBtns = `
@@ -981,7 +987,6 @@ function renderStaff() {
                 </button>
             `;
 
-            // "ON SHIFT" BADGE LOGIC
             let shiftBadge = '';
             if (roleStr === 'staff' || roleStr === 'admin') {
                 const isWorking = u.shiftStatus === 'On Shift';
@@ -1061,7 +1066,7 @@ window.deleteUser = async (id) => {
 }
 
 // ==========================================
-// 9. BATCH REGISTRATION (WITH RFID)
+// 9. BATCH REGISTRATION (WITH RFID AND DUPLICATE CHECK)
 // ==========================================
 let batchRowCount = 1;
 
@@ -1123,6 +1128,7 @@ if (document.getElementById('batchMemberForm')) {
         let addedCount = 0;
         let emailSuccessCount = 0; 
         let emailFailCount = 0;    
+        let duplicateCount = 0;
         const currentTimestamp = new Date().getTime(); 
 
         for (let row of rows) {
@@ -1133,6 +1139,25 @@ if (document.getElementById('batchMemberForm')) {
             const plan = row.querySelector('.bm-plan').value;
             const rfidTag = row.querySelector('.bm-rfid').value.trim();
             const randomPassword = generatePassword();
+
+            // --- GATEKEEPER: Check for duplicates before saving ---
+            const emailQuery = query(usersCol, where("email", "==", email));
+            const emailSnap = await getDocs(emailQuery);
+            let isDuplicate = !emailSnap.empty;
+
+            if (!isDuplicate && rfidTag !== "") {
+                const rfidQuery = query(usersCol, where("rfid", "==", rfidTag));
+                const rfidSnap = await getDocs(rfidQuery);
+                if (!rfidSnap.empty) {
+                    isDuplicate = true;
+                }
+            }
+
+            if (isDuplicate) {
+                duplicateCount++;
+                continue; // Skip this row entirely
+            }
+            // ------------------------------------------------------
 
             try {
                 await emailjs.send("service_x90mti6", "template_nda1wjc", {
@@ -1168,14 +1193,17 @@ if (document.getElementById('batchMemberForm')) {
         
         let alertMsg = `Batch Registration Summary:\n\n`;
         alertMsg += `✅ ${emailSuccessCount} user(s) received emails and were saved to the database.\n`;
+        if (duplicateCount > 0) {
+            alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
+        }
         if (emailFailCount > 0) {
-            alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved to the database.`;
+            alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
         }
         alert(alertMsg);
     });
 }
 
-// ----- UPDATED STAFF BATCH REGISTRATION (WITH RFID) -----
+// ----- UPDATED STAFF BATCH REGISTRATION (WITH DUPLICATE CHECK) -----
 let staffBatchRowCount = 1;
 
 window.addStaffBatchRow = function() {
@@ -1244,6 +1272,7 @@ if (document.getElementById('batchStaffForm')) {
         let addedCount = 0;
         let emailSuccessCount = 0; 
         let emailFailCount = 0;
+        let duplicateCount = 0;
 
         for (let row of rows) {
             const given = row.querySelector('.bs-first').value.trim();
@@ -1253,6 +1282,25 @@ if (document.getElementById('batchStaffForm')) {
             const status = row.querySelector('.bs-status').value;
             const rfidTag = row.querySelector('.bs-rfid').value.trim();
             const randomPassword = generatePassword();
+
+            // --- GATEKEEPER: Check for duplicates before saving ---
+            const emailQuery = query(usersCol, where("email", "==", email));
+            const emailSnap = await getDocs(emailQuery);
+            let isDuplicate = !emailSnap.empty;
+
+            if (!isDuplicate && rfidTag !== "") {
+                const rfidQuery = query(usersCol, where("rfid", "==", rfidTag));
+                const rfidSnap = await getDocs(rfidQuery);
+                if (!rfidSnap.empty) {
+                    isDuplicate = true;
+                }
+            }
+
+            if (isDuplicate) {
+                duplicateCount++;
+                continue; // Skip this row entirely
+            }
+            // ------------------------------------------------------
 
             try {
                 await emailjs.send("service_x90mti6", "template_nda1wjc", {
@@ -1286,8 +1334,11 @@ if (document.getElementById('batchStaffForm')) {
 
         let alertMsg = `Batch Registration Summary:\n\n`;
         alertMsg += `✅ ${emailSuccessCount} ${role}(s) received emails and were saved to the database.\n`;
+        if (duplicateCount > 0) {
+            alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
+        }
         if (emailFailCount > 0) {
-            alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved to the database.`;
+            alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
         }
         alert(alertMsg);
     });
