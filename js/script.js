@@ -1455,36 +1455,42 @@ let lastKeyTime = Date.now();
 document.addEventListener('keydown', (e) => {
     const currentTime = Date.now();
 
-    // If typing is too slow (human), reset the buffer. Scanners type incredibly fast.
+    // 1. Reset buffer if typing is slow (human typing)
     if (currentTime - lastKeyTime > 50) { 
         rfidBuffer = ""; 
     }
 
-    // Scanners always send an 'Enter' key at the very end of the scan
+    // 2. Scanner always fires an 'Enter' key at the very end
     if (e.key === 'Enter' && rfidBuffer.length > 5) {
-        e.preventDefault(); // STOP the Enter key from prematurely submitting the form!
+        e.preventDefault(); // Stop forms from submitting!
 
-        // CHECK: Is the registration modal open?
-        const memberModal = document.getElementById('memberModal');
-        if (memberModal && memberModal.style.display === 'flex') {
-            // We are in registration mode! Find the empty RFID box and fill it automatically.
-            const rfidInputs = document.querySelectorAll('.bm-rfid');
-            let targetInput = Array.from(rfidInputs).find(input => input.value === "");
-            if (!targetInput && rfidInputs.length > 0) targetInput = rfidInputs[rfidInputs.length - 1];
+        const activeEl = document.activeElement;
+        const isRegistrationBox = activeEl && activeEl.classList.contains('bm-rfid');
 
-            if (targetInput) {
-                targetInput.value = rfidBuffer;
-                targetInput.style.backgroundColor = "#c8e6c9"; // Flash green for success!
-                targetInput.style.borderColor = "#2e7d32";
+        // 3. CLEANUP: If staff was typing in a normal text box (like Name or Search), 
+        // the scanner just dumped numbers into it. We need to silently erase those numbers.
+        if (activeEl && activeEl.tagName === 'INPUT' && !isRegistrationBox) {
+            let currentVal = activeEl.value;
+            if (currentVal.endsWith(rfidBuffer)) {
+                activeEl.value = currentVal.slice(0, -rfidBuffer.length);
             }
+        }
+
+        // 4. ROUTE THE SCAN
+        if (isRegistrationBox) {
+            // They clicked the RFID box on purpose to register a new card
+            activeEl.value = rfidBuffer;
+            activeEl.style.backgroundColor = "#c8e6c9"; // Turn green
+            activeEl.style.borderColor = "#2e7d32";
+            activeEl.blur(); // Remove cursor to prevent double-scanning
         } else {
-            // Modal is closed, treat it as a front-desk attendance check-in!
+            // They are doing something else, so this is a Member Checking In!
             processRfidAttendance(rfidBuffer);
         }
 
-        rfidBuffer = ""; // Reset buffer after processing
+        rfidBuffer = ""; // Clear buffer
     } 
-    // Only capture letters and numbers (ignores Shift, Ctrl, etc.)
+    // 5. Build the buffer with characters
     else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) { 
         rfidBuffer += e.key;
     }
