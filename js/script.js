@@ -1261,58 +1261,46 @@ document.addEventListener('DOMContentLoaded', () => {
     updateClock();
 });
 
-function initDashboardCharts() {
-    const ctxServices = document.getElementById('servicesChart');
-    if (!ctxServices) return;
-
-    servicesChartInstance = new Chart(ctxServices.getContext('2d'), {
-        type: 'bar',
-        data: { 
-            labels: ['Gold Members', 'Silver Members', 'Walk-in Guests'], 
-            datasets: [{ 
-                label: 'Daily Check-ins',
-                data: [0, 0, 0], 
-                backgroundColor: '#C01718', 
-                hoverBackgroundColor: '#111111', 
-                borderRadius: 4 
-            }] 
-        },
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            plugins: { legend: { display: false } }, 
-            scales: { x: { grid: { display: false } } } 
-        }
-    });
-}
-
 // ==========================================
-// 12. USB RFID GHOST LISTENER
+// 12. SMART USB RFID GHOST LISTENER
 // ==========================================
 let rfidBuffer = "";
 let lastKeyTime = Date.now();
 
 document.addEventListener('keydown', (e) => {
-    // OVERRIDE: If the staff clicks inside any input box or search bar, 
-    // let them type normally (or let the scanner type directly into the registration box).
-    if (document.activeElement) {
-        const activeTag = document.activeElement.tagName.toLowerCase();
-        if (activeTag === 'input' || activeTag === 'textarea') {
-            return; 
-        }
-    }
-
-    // Measure typing speed to detect if it's a scanner (superhuman speed) or a keyboard
     const currentTime = Date.now();
+
+    // If typing is too slow (human), reset the buffer. Scanners type incredibly fast.
     if (currentTime - lastKeyTime > 50) { 
         rfidBuffer = ""; 
     }
 
-    // Capture the Enter key (Scanners automatically press Enter after the ID)
+    // Scanners always send an 'Enter' key at the very end of the scan
     if (e.key === 'Enter' && rfidBuffer.length > 5) {
-        processRfidAttendance(rfidBuffer);
-        rfidBuffer = "";
-    } else if (e.key.length === 1) { 
+        e.preventDefault(); // STOP the Enter key from prematurely submitting the form!
+
+        // CHECK: Is the registration modal open?
+        const memberModal = document.getElementById('memberModal');
+        if (memberModal && memberModal.style.display === 'flex') {
+            // We are in registration mode! Find the empty RFID box and fill it automatically.
+            const rfidInputs = document.querySelectorAll('.bm-rfid');
+            let targetInput = Array.from(rfidInputs).find(input => input.value === "");
+            if (!targetInput && rfidInputs.length > 0) targetInput = rfidInputs[rfidInputs.length - 1];
+
+            if (targetInput) {
+                targetInput.value = rfidBuffer;
+                targetInput.style.backgroundColor = "#c8e6c9"; // Flash green for success!
+                targetInput.style.borderColor = "#2e7d32";
+            }
+        } else {
+            // Modal is closed, treat it as a front-desk attendance check-in!
+            processRfidAttendance(rfidBuffer);
+        }
+
+        rfidBuffer = ""; // Reset buffer after processing
+    } 
+    // Only capture letters and numbers (ignores Shift, Ctrl, etc.)
+    else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) { 
         rfidBuffer += e.key;
     }
     
