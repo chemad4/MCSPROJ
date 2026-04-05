@@ -632,7 +632,7 @@ onSnapshot(usersCol, (snapshot) => {
     });
     renderStaff(); 
     renderMembers(); 
-    renderMemberTrainers(); // NEW: Refresh the Trainer Grid on the Member Dashboard
+    renderMemberTrainers(); 
     if (document.getElementById('chatUserList')) renderChatUserList();
 });
 
@@ -695,6 +695,7 @@ function renderMembers() {
     if (document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = totalNonArchived; 
 }
 
+// --- UPDATE: Open Member Edit Modal now fetches the Plan ---
 window.openEditMemberModal = function(id) {
     const member = membersData.find(m => m.id === id);
     if (!member) return;
@@ -702,9 +703,15 @@ window.openEditMemberModal = function(id) {
     document.getElementById('editMemberGiven').value = member.givenName || '';
     document.getElementById('editMemberMI').value = member.mi || '';
     document.getElementById('editMemberFamily').value = member.familyName || '';
+    
+    if (document.getElementById('editMemberPlan')) {
+        document.getElementById('editMemberPlan').value = member.plan || 'Gold Plan';
+    }
+    
     document.getElementById('editMemberModal').style.display = 'flex';
 }
 
+// --- UPDATE: Edit Member Form saves the updated Plan ---
 if (document.getElementById('editMemberForm')) {
     document.getElementById('editMemberForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -712,7 +719,17 @@ if (document.getElementById('editMemberForm')) {
         const given = document.getElementById('editMemberGiven').value.trim();
         const mi = document.getElementById('editMemberMI').value.trim();
         const family = document.getElementById('editMemberFamily').value.trim();
-        const updatedData = { givenName: given, mi: mi, familyName: family, name: `${given} ${family}` };
+        
+        const updatedData = { 
+            givenName: given, 
+            mi: mi, 
+            familyName: family, 
+            name: `${given} ${family}`.trim() 
+        };
+        
+        if (document.getElementById('editMemberPlan')) {
+            updatedData.plan = document.getElementById('editMemberPlan').value;
+        }
         
         await updateDoc(doc(db, "users", id), updatedData);
         window.closeModal('editMemberModal');
@@ -737,7 +754,7 @@ function renderStaff() {
         const roleStr = (u.role || "").trim().toLowerCase();
         const statusStr = (u.status || "Active").trim().toLowerCase();
         let fullName = `${u.givenName || u.name} ${u.mi ? u.mi + '. ' : ''}${u.familyName || ''}`.trim();
-        let specialty = u.specialty || '-'; // NEW: Grabs the specialty data
+        let specialty = u.specialty || '-'; 
 
         if (statusStr === 'archived') {
             let actionBtns = `
@@ -800,14 +817,11 @@ function renderStaff() {
     if (dashTrainers) { dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>'; }
 }
 
-// --- NEW: Render Trainer Grid for Member Dashboard ---
 function renderMemberTrainers() {
     const grid = document.getElementById('memberTrainerGrid');
-    if (!grid) return; // This will gracefully skip if you are not currently on memberDB.html
+    if (!grid) return; 
 
     grid.innerHTML = "";
-    
-    // Filter out Admins, Staff, and Archived Trainers
     let activeTrainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer' && u.status !== 'Archived');
 
     if (activeTrainers.length === 0) {
@@ -831,14 +845,13 @@ function renderMemberTrainers() {
                     <div class="trainer-name">${fullName}</div>
                     <div class="trainer-specialty">${specialty}</div>
                 </div>
-                <div>
-                    ${badgeHtml}
-                </div>
+                <div>${badgeHtml}</div>
             </div>
         `;
     });
 }
 
+// --- UPDATE: Edit Staff Modal logic removed Role drop-down processing ---
 window.openEditStaffModal = function(id) {
     const user = allUsersData.find(u => u.id === id);
     if (!user) return;
@@ -847,8 +860,11 @@ window.openEditStaffModal = function(id) {
     document.getElementById('editStaffGiven').value = user.givenName || '';
     document.getElementById('editStaffMI').value = user.mi || '';
     document.getElementById('editStaffFamily').value = user.familyName || '';
-    document.getElementById('editStaffRole').value = user.role || 'Staff';
-    document.getElementById('editStaffSpecialty').value = user.specialty || ''; // Populates existing specialty
+    
+    if (document.getElementById('editStaffSpecialty')) {
+        document.getElementById('editStaffSpecialty').value = user.specialty || ''; 
+    }
+    
     document.getElementById('editStaffModal').style.display = 'flex';
 }
 
@@ -859,21 +875,21 @@ if (document.getElementById('editStaffForm')) {
         const given = document.getElementById('editStaffGiven').value.trim();
         const mi = document.getElementById('editStaffMI').value.trim();
         const family = document.getElementById('editStaffFamily').value.trim();
-        const role = document.getElementById('editStaffRole').value;
-        const specialty = document.getElementById('editStaffSpecialty').value.trim(); // Grabs updated specialty
+        
+        const specialtyEl = document.getElementById('editStaffSpecialty');
+        const specialty = specialtyEl ? specialtyEl.value.trim() : ''; 
         
         const updatedData = { 
             givenName: given, 
             mi: mi, 
             familyName: family, 
-            name: `${given} ${family}`.trim(), 
-            role: role,
+            name: `${given} ${family}`.trim(),
             specialty: specialty 
         };
         
         await updateDoc(doc(db, "users", id), updatedData);
         window.closeModal('editStaffModal');
-        alert(`${role} details updated successfully!`);
+        alert(`Details updated successfully!`);
     });
 }
 
@@ -1016,7 +1032,7 @@ if (document.getElementById('batchStaffForm')) {
         for (let row of rows) {
             const given = row.querySelector('.bs-first').value.trim(), mi = row.querySelector('.bs-mi').value.trim(), family = row.querySelector('.bs-last').value.trim();
             const email = row.querySelector('.bs-email').value.trim(), status = row.querySelector('.bs-status').value, rfidTag = row.querySelector('.bs-rfid').value.trim();
-            const specialty = row.querySelector('.bs-specialty').value.trim(); // NEW: captures specialty input
+            const specialty = row.querySelector('.bs-specialty').value.trim(); 
             const randomPassword = generatePassword();
 
             const emailQuery = query(usersCol, where("email", "==", email));

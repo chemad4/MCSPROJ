@@ -665,11 +665,6 @@
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Specialty (For Trainers Only):</p>
                 <input type="text" id="editStaffSpecialty" placeholder="e.g. Powerlifting, Yoga, HIIT">
                 
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px; margin-top: 10px;">Update Role:</p>
-                <select id="editStaffRole" required>
-                    <option value="Staff">Staff</option>
-                    <option value="Trainer">Trainer</option>
-                </select>
                 <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
             </form>
         </div>
@@ -721,7 +716,14 @@
                 <input type="text" id="editMemberGiven" placeholder="Given Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
                 <input type="text" id="editMemberMI" placeholder="M.I. (Opt.)" maxlength="2" oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')">
                 <input type="text" id="editMemberFamily" placeholder="Family Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
-                <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
+                
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px; margin-top: 10px;">Update Membership Plan:</p>
+                <select id="editMemberPlan" required>
+                    <option value="Gold Plan">Gold Plan</option>
+                    <option value="Silver Plan">Silver Plan</option>
+                </select>
+
+                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
             </form>
         </div>
     </div>

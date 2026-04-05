@@ -8,6 +8,7 @@
     <link rel="icon" type="image/png" href="images/icon-192.png">
 
     <script>
+        // Security check for Staff
         if (!localStorage.getItem("loggedInUser") || localStorage.getItem("userRole") !== "Staff") {
             window.location.replace("index.html");
         }
@@ -21,7 +22,6 @@
     <link rel="stylesheet" href="css/styles.css">
     
     <style>
-        /* Specific layouts for Staff POS and Batch Tables */
         .pos-container { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: calc(100vh - 150px); }
         .pos-products { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
         .pos-cart { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
@@ -82,22 +82,13 @@
                 <i class="fa-solid fa-chart-line"></i> <span class="menu-text">Financial Reports</span>
             </li>
 
-            <li class="nav-item has-submenu">
-                <i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff Team</span>
-                <i class="fa-solid fa-chevron-down chevron-icon"></i>
+            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)">
+                <i class="fa-solid fa-calendar-check"></i> <span class="menu-text">Trainer Bookings</span>
             </li>
-            <ul class="submenu">
-                <li class="sub-item" onclick="openChatTab('staff', this, 'Staff Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
-            </ul>
 
-            <li class="nav-item has-submenu">
-                <i class="fa-solid fa-users-gear"></i> <span class="menu-text">Trainer Team</span>
-                <i class="fa-solid fa-chevron-down chevron-icon"></i>
+            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Staff Chats')">
+                <i class="fa-solid fa-comments"></i> <span class="menu-text">Internal Messages</span>
             </li>
-            <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('bookings', this)"><i class="fa-solid fa-calendar-check"></i> Booking Calendar</li>
-                <li class="sub-item" onclick="openChatTab('trainer', this, 'Trainer Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
-            </ul>
         </ul>
     </aside>
 
@@ -122,10 +113,10 @@
                     <i class="fa-solid fa-user-check"></i>
                     <div class="value">Active Members</div>
                 </div>
-                <div class="stat-card card-black">
+                <div class="stat-card card-black" style="cursor: default;">
                     <i class="fa-solid fa-clock"></i>
                     <div class="value">Shift Started</div>
-                </div>
+                    </div>
                 <div class="stat-card card-red" onclick="switchTab('equipment')">
                     <span class="stat-badge" id="dashInventoryTotal">0</span>
                     <i class="fa-solid fa-clipboard-list"></i>
@@ -149,19 +140,26 @@
                             <div class="num" id="gridMembers">0</div>
                             <div class="label">Registered Members</div>
                         </div>
-                        <div class="grid-stat-box border-red" onclick="switchTab('equipment')">
-                            <div class="num" id="gridEquip">0</div>
-                            <div class="label">Operational Equipments</div>
-                        </div>
-                        <div class="grid-stat-box border-black" onclick="switchTab('pos')">
+                        <div class="grid-stat-box border-red" onclick="switchTab('pos')">
                             <div class="num" id="presentMembers">0</div>
                             <div class="label">Currently On Floor</div>
+                        </div>
+                        <div class="grid-stat-box border-black" onclick="switchTab('equipment')">
+                            <div class="num" id="gridEquip">0</div>
+                            <div class="label">Operational Equipments</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="bottom-section" style="margin-top: 20px;">
+                <div class="panel">
+                    <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Active Trainers on Floor</div>
+                    <div class="panel-body" id="dashActiveTrainersFeed">
+                        <p style="color: var(--text-muted); font-size: 14px;">Loading...</p>
+                    </div>
+                </div>
+
                 <div class="panel" onclick="switchTab('equipment')" style="cursor: pointer;">
                     <div class="panel-header"><i class="fa-solid fa-clipboard-list"></i> Inventory Alerts</div>
                     <div class="panel-body" id="dashInventoryAlerts">
@@ -535,7 +533,14 @@
                 <input type="text" id="editMemberGiven" placeholder="Given Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
                 <input type="text" id="editMemberMI" placeholder="M.I. (Opt.)" maxlength="2" oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')">
                 <input type="text" id="editMemberFamily" placeholder="Family Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
-                <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
+                
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px; margin-top: 10px;">Update Membership Plan:</p>
+                <select id="editMemberPlan" required>
+                    <option value="Gold Plan">Gold Plan</option>
+                    <option value="Silver Plan">Silver Plan</option>
+                </select>
+
+                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
             </form>
         </div>
     </div>
