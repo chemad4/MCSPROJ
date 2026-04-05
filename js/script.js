@@ -933,14 +933,38 @@ function renderStaff() {
     allUsersData.forEach(u => {
         const roleStr = (u.role || "").trim().toLowerCase();
         const statusStr = (u.status || "Active").trim().toLowerCase();
-        let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let fullName = `${u.givenName || u.name} ${u.mi ? u.mi + '. ' : ''}${u.familyName || ''}`.trim();
 
-        // 1. ADD THE NEW "ON SHIFT" BADGE HERE
+        // 1. DYNAMIC STATUS BADGE AND ACTION BUTTONS
+        let badgeClass = (statusStr === 'active' || statusStr === 'on leave') ? 'active' : 'inactive';
+        if (statusStr === 'archived') badgeClass = 'maintenance';
+
+        let actionBtns = '';
+        if (statusStr === 'archived') {
+            actionBtns = `
+                <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${u.id}', 'Archived')">
+                    <i class="fas fa-box-open"></i>
+                </button>
+                <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${u.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+        } else {
+            actionBtns = `
+                <button class="btn-icon btn-delete" style="color: #f39c12;" title="Archive Account" onclick="archiveUser('${u.id}', '${u.status || 'Active'}')">
+                    <i class="fas fa-box-archive"></i>
+                </button>
+                <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Delete Account" onclick="deleteUser('${u.id}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            `;
+        }
+
+        // 2. "ON SHIFT" BADGE LOGIC
         let shiftBadge = '';
         if (roleStr === 'staff' || roleStr === 'admin') {
             const isWorking = u.shiftStatus === 'On Shift';
-            shiftBadge = `<br><span class="badge ${isWorking ? 'active' : 'inactive'}" style="margin-top: 5px; ${isWorking ? 'background: var(--dark-black);' : ''}">${isWorking ? 'On Shift' : 'Off Shift'}</span>`;
+            shiftBadge = `<span class="badge ${isWorking ? 'active' : 'inactive'}" style="${isWorking ? 'background: var(--dark-black); color: white;' : ''}">${isWorking ? 'On Shift' : 'Off Shift'}</span>`;
         }
 
         const rowHtml = `
@@ -948,12 +972,13 @@ function renderStaff() {
                 <td>${fullName}</td>
                 <td>${u.role}</td>
                 <td>${u.email}</td>
-                <td><span class="badge ${badgeClass}">${u.status || 'Active'}</span>${shiftBadge}</td>
                 <td>
-                    <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${u.id}')">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <div style="display: flex; gap: 5px;">
+                        <span class="badge ${badgeClass}">${u.status || 'Active'}</span>
+                        ${shiftBadge}
+                    </div>
                 </td>
+                <td>${actionBtns}</td>
             </tr>
         `;
 
