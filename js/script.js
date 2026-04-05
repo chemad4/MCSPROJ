@@ -89,7 +89,9 @@ window.switchTab = function(tabId, element) {
         'archivedMembers': 'Archived Members',
         'attendance': 'Attendance Log',
         'staff': 'Staff Directory',
+        'archivedStaff': 'Archived Staff',
         'trainers': 'Trainer Management',
+        'archivedTrainers': 'Archived Trainers',
         'bookings': 'Trainer Booking Calendar',
         'chats': 'Internal Messages'
     };
@@ -921,9 +923,13 @@ if (document.getElementById('editMemberForm')) {
 function renderStaff() {
     const staffTbody = document.querySelector('#staffTable tbody');
     const trainerTbody = document.querySelector('#trainerTable tbody'); 
+    const arcStaffTbody = document.querySelector('#archivedStaffTable tbody');
+    const arcTrainerTbody = document.querySelector('#archivedTrainerTable tbody');
     
     if (staffTbody) staffTbody.innerHTML = "";
     if (trainerTbody) trainerTbody.innerHTML = "";
+    if (arcStaffTbody) arcStaffTbody.innerHTML = "";
+    if (arcTrainerTbody) arcTrainerTbody.innerHTML = "";
     
     let totalTrainers = 0;
     let totalEmployees = 0;
@@ -935,13 +941,9 @@ function renderStaff() {
         const statusStr = (u.status || "Active").trim().toLowerCase();
         let fullName = `${u.givenName || u.name} ${u.mi ? u.mi + '. ' : ''}${u.familyName || ''}`.trim();
 
-        // 1. DYNAMIC STATUS BADGE AND ACTION BUTTONS
-        let badgeClass = (statusStr === 'active' || statusStr === 'on leave') ? 'active' : 'inactive';
-        if (statusStr === 'archived') badgeClass = 'maintenance';
-
-        let actionBtns = '';
+        // 1. IS THIS ACCOUNT ARCHIVED?
         if (statusStr === 'archived') {
-            actionBtns = `
+            let actionBtns = `
                 <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${u.id}', 'Archived')">
                     <i class="fas fa-box-open"></i>
                 </button>
@@ -949,8 +951,28 @@ function renderStaff() {
                     <i class="fas fa-trash"></i>
                 </button>
             `;
+
+            const rowHtml = `
+                <tr>
+                    <td>${fullName}</td>
+                    <td>${u.role}</td>
+                    <td>${u.email}</td>
+                    <td><span class="badge maintenance">Archived</span></td>
+                    <td>${actionBtns}</td>
+                </tr>
+            `;
+
+            if (roleStr === 'trainer') {
+                if (arcTrainerTbody) arcTrainerTbody.innerHTML += rowHtml;
+            } else {
+                if (arcStaffTbody) arcStaffTbody.innerHTML += rowHtml;
+            }
+
         } else {
-            actionBtns = `
+            // 2. ACTIVE ACCOUNT LOGIC (Goes to regular tables)
+            let badgeClass = (statusStr === 'active' || statusStr === 'on leave') ? 'active' : 'inactive';
+            
+            let actionBtns = `
                 <button class="btn-icon btn-delete" style="color: #f39c12;" title="Archive Account" onclick="archiveUser('${u.id}', '${u.status || 'Active'}')">
                     <i class="fas fa-box-archive"></i>
                 </button>
@@ -958,54 +980,54 @@ function renderStaff() {
                     <i class="fas fa-trash"></i>
                 </button>
             `;
-        }
 
-        // 2. "ON SHIFT" BADGE LOGIC
-        let shiftBadge = '';
-        if (roleStr === 'staff' || roleStr === 'admin') {
-            const isWorking = u.shiftStatus === 'On Shift';
-            shiftBadge = `<span class="badge ${isWorking ? 'active' : 'inactive'}" style="${isWorking ? 'background: var(--dark-black); color: white;' : ''}">${isWorking ? 'On Shift' : 'Off Shift'}</span>`;
-        }
-
-        const rowHtml = `
-            <tr>
-                <td>${fullName}</td>
-                <td>${u.role}</td>
-                <td>${u.email}</td>
-                <td>
-                    <div style="display: flex; gap: 5px;">
-                        <span class="badge ${badgeClass}">${u.status || 'Active'}</span>
-                        ${shiftBadge}
-                    </div>
-                </td>
-                <td>${actionBtns}</td>
-            </tr>
-        `;
-
-        if (roleStr === 'trainer') {
-            if (trainerTbody) trainerTbody.innerHTML += rowHtml;
-            totalTrainers++;
-            
-            if (statusStr === 'active') {
-                activeTrainers++;
-                trainersFeed += `
-                    <div class="list-item">
-                        <div class="list-icon" style="background-color: var(--dark-black);">
-                            <i class="fa-solid fa-user"></i>
-                        </div>
-                        <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                            <div>
-                                <div class="trainer-name">${fullName}</div>
-                                <p style="font-size: 12px; color: var(--text-muted);">${u.email}</p>
-                            </div>
-                            <span class="status-badge status-progress">On Floor</span>
-                        </div>
-                    </div>
-                `;
+            // "ON SHIFT" BADGE LOGIC
+            let shiftBadge = '';
+            if (roleStr === 'staff' || roleStr === 'admin') {
+                const isWorking = u.shiftStatus === 'On Shift';
+                shiftBadge = `<span class="badge ${isWorking ? 'active' : 'inactive'}" style="${isWorking ? 'background: var(--dark-black); color: white;' : ''}">${isWorking ? 'On Shift' : 'Off Shift'}</span>`;
             }
-        } else {
-            if (staffTbody) staffTbody.innerHTML += rowHtml;
-            totalEmployees++; 
+
+            const rowHtml = `
+                <tr>
+                    <td>${fullName}</td>
+                    <td>${u.role}</td>
+                    <td>${u.email}</td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            <span class="badge ${badgeClass}">${u.status || 'Active'}</span>
+                            ${shiftBadge}
+                        </div>
+                    </td>
+                    <td>${actionBtns}</td>
+                </tr>
+            `;
+
+            if (roleStr === 'trainer') {
+                if (trainerTbody) trainerTbody.innerHTML += rowHtml;
+                totalTrainers++;
+                
+                if (statusStr === 'active') {
+                    activeTrainers++;
+                    trainersFeed += `
+                        <div class="list-item">
+                            <div class="list-icon" style="background-color: var(--dark-black);">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                                <div>
+                                    <div class="trainer-name">${fullName}</div>
+                                    <p style="font-size: 12px; color: var(--text-muted);">${u.email}</p>
+                                </div>
+                                <span class="status-badge status-progress">On Floor</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else {
+                if (staffTbody) staffTbody.innerHTML += rowHtml;
+                totalEmployees++; 
+            }
         }
     });
 

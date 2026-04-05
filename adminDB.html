@@ -88,6 +88,7 @@
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-clipboard-list"></i> Manage Staff</li>
+                <li class="sub-item" onclick="switchTab('archivedStaff', this)"><i class="fa-solid fa-box-archive"></i> Archived Staff</li>
                 <li class="sub-item" onclick="openChatTab('staff', this, 'Staff Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
 
@@ -97,6 +98,7 @@
             </li>
             <ul class="submenu">
                 <li class="sub-item" onclick="switchTab('trainers', this)"><i class="fa-solid fa-clipboard-list"></i> Manage Trainers</li>
+                <li class="sub-item" onclick="switchTab('archivedTrainers', this)"><i class="fa-solid fa-box-archive"></i> Archived Trainers</li>
                 <li class="sub-item" onclick="switchTab('bookings', this)"><i class="fa-solid fa-calendar-check"></i> Booking Calendar</li>
                 <li class="sub-item" onclick="openChatTab('trainer', this, 'Trainer Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
@@ -314,6 +316,32 @@
             </div>
         </div>
 
+        <div id="archivedStaff" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="archivedStaffSearch" placeholder="Search archived staff..." onkeyup="filterTable('archivedStaffTable', 'archivedStaffSearch')">
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-box-archive"></i> Archived Staff Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="archivedStaffTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Role</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div id="trainers" class="content-section">
             <div class="table-controls">
                 <div class="search-box">
@@ -326,6 +354,32 @@
                 <div class="panel-header"><i class="fas fa-users-gear"></i> Trainer Directory</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="trainerTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Role</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="archivedTrainers" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="archivedTrainerSearch" placeholder="Search archived trainers..." onkeyup="filterTable('archivedTrainerTable', 'archivedTrainerSearch')">
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-box-archive"></i> Archived Trainer Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="archivedTrainerTable">
                         <thead>
                             <tr>
                                 <th>Name</th>
