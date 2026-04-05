@@ -33,12 +33,8 @@ if (currentUserId && currentSessionId) {
     onSnapshot(doc(db, "users", currentUserId), (docSnap) => {
         if (docSnap.exists()) {
             const userData = docSnap.data();
-            // If the session ID in the database changes, kick this old device out!
             if (userData.currentSession && userData.currentSession !== currentSessionId) {
                 alert("Session Override: Your account was just logged in from another device. Logging out here to protect your data.");
-                
-                // We do a "silent" local logout here. We do NOT update Firebase to "Off Shift" 
-                // because the new device is now legitimately using the shift!
                 localStorage.removeItem("loggedInUser");
                 localStorage.removeItem("userRole");
                 localStorage.removeItem("userRfid"); 
@@ -59,7 +55,6 @@ window.handleLogout = async function() {
     const userId = localStorage.getItem("userId");
     const userRole = localStorage.getItem("userRole");
     
-    // Normal Logout: Remove the Session ID and set shift status to 'Off Shift'
     if (userId) {
         try {
             let updateData = { currentSession: null };
@@ -84,19 +79,12 @@ window.handleLogout = async function() {
 window.switchTab = function(tabId, element) {
     if (event) event.stopPropagation();
     
-    // Hide all sections
     document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active-section'));
+    if (document.getElementById(tabId)) document.getElementById(tabId).classList.add('active-section');
     
-    // Show target section
-    if (document.getElementById(tabId)) {
-        document.getElementById(tabId).classList.add('active-section');
-    }
-    
-    // Remove active state from sidebar links
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.sub-item').forEach(el => el.classList.remove('active'));
 
-    // Apply active state
     if (element && !element.classList.contains('stat-card') && !element.classList.contains('grid-stat-box')) {
         element.classList.add('active');
         if (element.classList.contains('sub-item')) {
@@ -112,7 +100,6 @@ window.switchTab = function(tabId, element) {
         }
     }
 
-    // Update Topbar Title
     const titles = {
         'dashboard': 'Dashboard',
         'equipment': 'Equipment Management',
@@ -135,25 +122,15 @@ window.switchTab = function(tabId, element) {
     }
 }
 
-window.closeModal = function(modalId) { 
-    document.getElementById(modalId).style.display = 'none'; 
-}
-
-window.exportReport = function() { 
-    window.print(); 
-}
-
-window.exportInventoryReport = function() { 
-    window.print(); 
-}
+window.closeModal = function(modalId) { document.getElementById(modalId).style.display = 'none'; }
+window.exportReport = function() { window.print(); }
+window.exportInventoryReport = function() { window.print(); }
 
 window.filterTable = function(tableId, inputId) {
     const filter = document.getElementById(inputId).value.toUpperCase();
     const tr = document.getElementById(tableId).getElementsByTagName("tr");
-    
     for (let i = 1; i < tr.length; i++) {
         let td = tr[i].getElementsByTagName("td")[0]; 
-        
         if (tableId === 'membersTable' || tableId === 'archivedMembersTable') {
             let tdPlan = tr[i].getElementsByTagName("td")[4]; 
             let text = (td ? td.textContent : "") + " " + (tdPlan ? tdPlan.textContent : "");
@@ -167,9 +144,7 @@ window.filterTable = function(tableId, inputId) {
             let text = (td ? td.textContent : "") + " " + (tdTrainer ? tdTrainer.textContent : "");
             tr[i].style.display = text.toUpperCase().indexOf(filter) > -1 ? "" : "none";
         } else {
-            if (td) {
-                tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
-            }
+            if (td) tr[i].style.display = td.textContent.toUpperCase().indexOf(filter) > -1 ? "" : "none";
         }
     }
 }
@@ -177,16 +152,12 @@ window.filterTable = function(tableId, inputId) {
 window.filterByPlan = function(val) {
     const filterText = val.toUpperCase();
     const tr = document.getElementById('membersTable').getElementsByTagName("tr");
-    
     for (let i = 1; i < tr.length; i++) {
         let td = tr[i].getElementsByTagName("td")[4]; 
         if (td) {
             let cellText = (td.textContent || td.innerText).toUpperCase();
-            if (val === "All" || cellText.includes(filterText)) {
-                tr[i].style.display = "";
-            } else {
-                tr[i].style.display = "none";
-            }
+            if (val === "All" || cellText.includes(filterText)) tr[i].style.display = "";
+            else tr[i].style.display = "none";
         }
     }
 }
@@ -195,15 +166,11 @@ window.filterGrid = function(gridId, inputId) {
     const filter = document.getElementById(inputId).value.toLowerCase();
     const grid = document.getElementById(gridId);
     if (!grid) return;
-    
     const cards = grid.querySelectorAll('.inventory-item-filter');
     cards.forEach(card => {
         const searchData = card.getAttribute('data-search');
-        if (searchData.includes(filter)) {
-            card.style.display = "flex";
-        } else {
-            card.style.display = "none";
-        }
+        if (searchData.includes(filter)) card.style.display = "flex";
+        else card.style.display = "none";
     });
 }
 
@@ -244,7 +211,6 @@ window.openChatTab = function(role, element, title) {
     document.getElementById('chatInput').disabled = true;
     document.getElementById('chatSendBtn').disabled = true;
     document.getElementById('chatSearch').value = ""; 
-    
     renderChatUserList();
     switchTab('chats', element);
 }
@@ -270,7 +236,6 @@ function renderChatUserList() {
     const targetUsers = chatUsers.filter(u => {
         if (u.name === myName) return false;
         const uRole = (u.role || "").toLowerCase();
-        
         if (currentChatRoleFilter === 'all') return uRole !== 'admin'; 
         return uRole === currentChatRoleFilter;
     });
@@ -295,16 +260,12 @@ function renderChatUserList() {
                 `;
             });
         }
-
         if (targetUsers.length > 0) {
             let catTitle = "Users";
             if (currentChatRoleFilter === 'staff') catTitle = "Staff Team";
             if (currentChatRoleFilter === 'trainer') catTitle = "Trainers";
             if (currentChatRoleFilter === 'member') catTitle = "Members";
-
-            if (currentChatRoleFilter !== 'all') {
-                 html += `<div class="chat-category">${catTitle}</div>`;
-            }
+            if (currentChatRoleFilter !== 'all') html += `<div class="chat-category">${catTitle}</div>`;
 
             targetUsers.forEach(u => {
                 let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
@@ -320,21 +281,16 @@ function renderChatUserList() {
             });
         }
     }
-    
     list.innerHTML = html;
 }
 
 window.filterChatUsers = function() {
     const filter = document.getElementById('chatSearch').value.toLowerCase();
     const users = document.querySelectorAll('.chat-user-item');
-    
     users.forEach(user => {
         const name = user.getAttribute('data-name');
-        if (name.includes(filter)) {
-            user.style.display = "flex";
-        } else {
-            user.style.display = "none";
-        }
+        if (name.includes(filter)) user.style.display = "flex";
+        else user.style.display = "none";
     });
 }
 
@@ -346,7 +302,6 @@ window.openChat = function(userName) {
     
     document.querySelectorAll('.chat-user').forEach(el => el.classList.remove('active'));
     document.getElementById(`chat-user-${userName.replace(/[^a-zA-Z0-9]/g, '')}`).classList.add('active');
-    
     renderChatHistory();
 }
 
@@ -375,25 +330,16 @@ function renderChatHistory() {
             </div>
         `;
     }).join('');
-    
     hist.scrollTop = hist.scrollHeight; 
 }
 
 window.sendMessage = async function() {
     const input = document.getElementById('chatInput');
     const text = input.value.trim();
-    
     if (!text || !currentChatUser) return;
     
     const myName = localStorage.getItem("loggedInUser");
-    
-    await addDoc(messagesCol, {
-        sender: myName,
-        receiver: currentChatUser,
-        text: text,
-        timestamp: new Date().getTime()
-    });
-    
+    await addDoc(messagesCol, { sender: myName, receiver: currentChatUser, text: text, timestamp: new Date().getTime() });
     input.value = "";
 }
 
@@ -425,12 +371,8 @@ function renderInventory() {
 
     equipGrid.innerHTML = "";
     prodGrid.innerHTML = "";
-    
     let alertsHtml = "";
-    let ops = 0;
-    let maint = 0;
-    let low = 0;
-    let totalMachines = 0;
+    let ops = 0, maint = 0, low = 0, totalMachines = 0;
 
     inventoryData.forEach((item) => {
         let isConsumable = ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
@@ -438,46 +380,25 @@ function renderInventory() {
         let badge = 'operational';
         let isProblematic = false;
 
-        if (item.qty === 0) {
-            currentStatus = "Out of Stock";
-            badge = 'broken';
-            isProblematic = true;
-        } else if (item.qty <= 5) {
-            if (currentStatus !== 'Maintenance' && currentStatus !== 'Out of Order') {
-                currentStatus = "Low Stock";
-                badge = 'stock-low';
-                isProblematic = true;
-                low++;
-            }
-        } else if (currentStatus === 'Maintenance') { 
-            badge = 'maintenance'; 
-            maint++; 
-            isProblematic = true; 
-        } else if (currentStatus === 'Out of Order') { 
-            badge = 'broken'; 
-            isProblematic = true; 
-        }
+        if (item.qty === 0) { currentStatus = "Out of Stock"; badge = 'broken'; isProblematic = true; } 
+        else if (item.qty <= 5) {
+            if (currentStatus !== 'Maintenance' && currentStatus !== 'Out of Order') { currentStatus = "Low Stock"; badge = 'stock-low'; isProblematic = true; low++; }
+        } 
+        else if (currentStatus === 'Maintenance') { badge = 'maintenance'; maint++; isProblematic = true; } 
+        else if (currentStatus === 'Out of Order') { badge = 'broken'; isProblematic = true; }
         
         if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
         if (!isConsumable) totalMachines++;
 
         const iconHtml = getCategoryIcon(item.cat);
-
-        let actionButtons = '';
-        if (!isConsumable) {
-            actionButtons = `
+        let actionButtons = !isConsumable ? `
                 <button class="btn-icon btn-edit" title="Edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
                 <button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
-            `;
-        } else {
-            actionButtons = `<button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>`;
-        }
+            ` : `<button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>`;
 
         let cardHTML = `
             <div class="inventory-card inventory-item-filter" data-search="${item.name.toLowerCase()} ${item.cat.toLowerCase()} ${currentStatus.toLowerCase()}">
-                <div class="inventory-icon-box">
-                    ${iconHtml}
-                </div>
+                <div class="inventory-icon-box">${iconHtml}</div>
                 <div class="inventory-details">
                     <div class="inventory-title">${item.name}</div>
                     <div class="inventory-category">${item.cat}</div>
@@ -486,32 +407,20 @@ function renderInventory() {
                         ${isConsumable && item.expiry ? `Expiry: <strong>${item.expiry}</strong><br>` : ''}
                         Qty: <strong>${item.qty} units</strong>
                     </div>
-                    <div class="inventory-meta">
-                        <span class="badge ${badge}">${currentStatus}</span>
-                    </div>
+                    <div class="inventory-meta"><span class="badge ${badge}">${currentStatus}</span></div>
                 </div>
-                <div class="card-actions">
-                    ${actionButtons}
-                </div>
+                <div class="card-actions">${actionButtons}</div>
             </div>
         `;
 
-        if (isConsumable) {
-            prodGrid.innerHTML += cardHTML;
-        } else {
-            equipGrid.innerHTML += cardHTML;
-        }
+        if (isConsumable) prodGrid.innerHTML += cardHTML;
+        else equipGrid.innerHTML += cardHTML;
 
         if (isProblematic) {
             alertsHtml += `
                 <div class="list-item">
-                    <div class="list-icon" style="background-color: var(--dark-black);">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                    </div>
-                    <div class="list-content">
-                        <h4>Status: ${currentStatus}</h4>
-                        <p><strong>${item.name}</strong> requires attention.</p>
-                    </div>
+                    <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="list-content"><h4>Status: ${currentStatus}</h4><p><strong>${item.name}</strong> requires attention.</p></div>
                 </div>
             `;
         }
@@ -520,33 +429,16 @@ function renderInventory() {
     if (document.getElementById('dashInventoryTotal')) document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
     if (document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
     if (document.getElementById('navInventoryCount')) document.getElementById('navInventoryCount').innerText = ` ${inventoryData.length} `;
-    
-    const dashAlerts = document.getElementById('dashInventoryAlerts');
-    if (dashAlerts) {
-        dashAlerts.innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
-    }
+    if (document.getElementById('dashInventoryAlerts')) document.getElementById('dashInventoryAlerts').innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
 }
 
-window.openEquipmentModal = () => { 
-    document.getElementById('equipmentForm').reset(); 
-    document.getElementById('equipmentModal').style.display = 'flex'; 
-}
-
-window.openProductModal = () => { 
-    document.getElementById('productForm').reset(); 
-    document.getElementById('productModal').style.display = 'flex'; 
-}
-
-window.deleteInventoryItem = async (id) => { 
-    if (confirm("Delete this inventory item?")) {
-        await deleteDoc(doc(db, "inventory", id)); 
-    }
-}
+window.openEquipmentModal = () => { document.getElementById('equipmentForm').reset(); document.getElementById('equipmentModal').style.display = 'flex'; }
+window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
+window.deleteInventoryItem = async (id) => { if (confirm("Delete this inventory item?")) await deleteDoc(doc(db, "inventory", id)); }
 
 window.openEditEquipModal = function(id) {
     const item = inventoryData.find(i => i.id === id);
     if (!item) return;
-    
     document.getElementById('editEquipId').value = item.id;
     document.getElementById('editEquipName').value = item.name;
     document.getElementById('editEquipCategory').value = item.cat;
@@ -567,7 +459,6 @@ if (document.getElementById('editEquipForm')) {
             qty: Number(document.getElementById('editEquipQty').value),
             status: document.getElementById('editEquipStatus').value
         };
-        
         await updateDoc(doc(db, "inventory", id), updatedData);
         window.closeModal('editEquipModal');
         alert("Equipment updated successfully!");
@@ -585,27 +476,17 @@ async function handleInventorySubmit(e, isProduct) {
         alert(`Automated Update: Added ${addQty} units to existing stock. New Total: ${existingItem.qty + addQty} units.`);
     } else {
         const newItem = { 
-            name: nameStr, 
-            cat: document.getElementById(isProduct ? 'prodCategory' : 'equipCategory').value, 
-            size: document.getElementById(isProduct ? 'prodVol' : 'equipSize').value, 
-            qty: addQty, 
-            status: isProduct ? 'In Stock' : 'Operational', 
-            price: isProduct ? Number(document.getElementById('prodPrice').value) : 0,
-            expiry: isProduct ? document.getElementById('prodExpiry').value : null
+            name: nameStr, cat: document.getElementById(isProduct ? 'prodCategory' : 'equipCategory').value, size: document.getElementById(isProduct ? 'prodVol' : 'equipSize').value, 
+            qty: addQty, status: isProduct ? 'In Stock' : 'Operational', price: isProduct ? Number(document.getElementById('prodPrice').value) : 0, expiry: isProduct ? document.getElementById('prodExpiry').value : null
         };
         await addDoc(inventoryCol, newItem);
         alert(`New ${isProduct ? 'product' : 'equipment'} registered successfully!`);
     }
-    
     window.closeModal(isProduct ? 'productModal' : 'equipmentModal');
 }
 
-if (document.getElementById('equipmentForm')) {
-    document.getElementById('equipmentForm').addEventListener('submit', (e) => handleInventorySubmit(e, false));
-}
-if (document.getElementById('productForm')) {
-    document.getElementById('productForm').addEventListener('submit', (e) => handleInventorySubmit(e, true));
-}
+if (document.getElementById('equipmentForm')) document.getElementById('equipmentForm').addEventListener('submit', (e) => handleInventorySubmit(e, false));
+if (document.getElementById('productForm')) document.getElementById('productForm').addEventListener('submit', (e) => handleInventorySubmit(e, true));
 
 // ==========================================
 // 8. POINT OF SALE (POS) LOGIC
@@ -616,9 +497,7 @@ function renderPOSProducts() {
     
     posBody.innerHTML = `
         <tr style="background-color: #fff9e6;">
-            <td><strong>Walk-in Gym Access (Day Pass)</strong></td>
-            <td>Unlimited</td>
-            <td>₱150.00</td>
+            <td><strong>Walk-in Gym Access (Day Pass)</strong></td><td>Unlimited</td><td>₱150.00</td>
             <td><button class="action-btn" style="padding: 5px 10px; background-color: var(--dark-black);" onclick="addToCart('WALKIN', 'Walk-in Gym Access', 150, 999)">Add</button></td>
         </tr>
     `;
@@ -629,9 +508,7 @@ function renderPOSProducts() {
             let price = item.price || 0;
             posBody.innerHTML += `
                 <tr>
-                    <td>${item.name}</td>
-                    <td>${item.qty}</td>
-                    <td>₱${price.toFixed(2)}</td>
+                    <td>${item.name}</td><td>${item.qty}</td><td>₱${price.toFixed(2)}</td>
                     <td><button class="action-btn" style="padding: 5px 10px;" onclick="addToCart('${item.id}', '${item.name}', ${price}, ${item.qty})">Add</button></td>
                 </tr>
             `;
@@ -641,40 +518,23 @@ function renderPOSProducts() {
 
 window.addToCart = function(id, name, price, maxQty) {
     let existing = posCart.find(i => i.id === id);
-    if (existing) {
-        if (existing.qty < maxQty) existing.qty++;
-        else alert("Not enough stock available!");
-    } else {
-        posCart.push({id, name, price, qty: 1, maxQty});
-    }
+    if (existing) { if (existing.qty < maxQty) existing.qty++; else alert("Not enough stock available!"); } 
+    else { posCart.push({id, name, price, qty: 1, maxQty}); }
     renderCart();
 }
 
-window.removeFromCart = function(id) { 
-    posCart = posCart.filter(i => i.id !== id); 
-    renderCart(); 
-}
+window.removeFromCart = function(id) { posCart = posCart.filter(i => i.id !== id); renderCart(); }
 
 function renderCart() {
     const cartBody = document.getElementById('posCartBody');
     if (!cartBody) return;
-
-    if (posCart.length === 0) {
-        cartBody.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>`;
-        updatePOSTotals(0, 0, 0, 0);
-        return;
-    }
+    if (posCart.length === 0) { cartBody.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>`; updatePOSTotals(0, 0, 0, 0); return; }
 
     cartBody.innerHTML = posCart.map(item => `
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
-            <div style="flex-grow:1;">
-                <strong>${item.name}</strong><br>
-                <small>₱${item.price} x ${item.qty}</small>
-            </div>
+            <div style="flex-grow:1;"><strong>${item.name}</strong><br><small>₱${item.price} x ${item.qty}</small></div>
             <div style="font-weight: bold; margin-right: 15px;">₱${(item.price * item.qty).toFixed(2)}</div>
-            <button onclick="removeFromCart('${item.id}')" style="background: none; border: none; color: #ff4c4c; cursor: pointer;">
-                <i class="fas fa-times"></i>
-            </button>
+            <button onclick="removeFromCart('${item.id}')" style="background: none; border: none; color: #ff4c4c; cursor: pointer;"><i class="fas fa-times"></i></button>
         </div>
     `).join('');
 
@@ -689,68 +549,38 @@ function updatePOSTotals(sub, vat, disc, grand) {
     const totalsDiv = document.querySelector('.pos-totals');
     if (!totalsDiv) return;
     totalsDiv.innerHTML = `
-        <div class="total-line">
-            <span>Subtotal:</span> 
-            <span>₱${sub.toFixed(2)}</span>
-        </div>
-        <div class="total-line">
-            <span>VAT (12%):</span> 
-            <span>₱${vat.toFixed(2)}</span>
-        </div>
+        <div class="total-line"><span>Subtotal:</span> <span>₱${sub.toFixed(2)}</span></div>
+        <div class="total-line"><span>VAT (12%):</span> <span>₱${vat.toFixed(2)}</span></div>
         <div class="total-line" style="display: flex; align-items: center; justify-content: space-between;">
             <span><input type="checkbox" id="seniorDiscount" style="accent-color: var(--primary-red);" ${disc > 0 ? 'checked' : ''} onchange="renderCart()"> Senior Citizen / PWD (20%)</span>
             <span style="color: #ff4c4c;">- ₱${disc.toFixed(2)}</span>
         </div>
-        <div class="total-line grand">
-            <span>TOTAL:</span> 
-            <span>₱${grand.toFixed(2)}</span>
-        </div>
-        <button class="action-btn" onclick="processPayment(${grand})" style="width: 100%; justify-content: center; margin-top: 15px; font-size: 16px;">
-            <i class="fa-solid fa-check"></i> PROCESS PAYMENT
-        </button>
+        <div class="total-line grand"><span>TOTAL:</span> <span>₱${grand.toFixed(2)}</span></div>
+        <button class="action-btn" onclick="processPayment(${grand})" style="width: 100%; justify-content: center; margin-top: 15px; font-size: 16px;"><i class="fa-solid fa-check"></i> PROCESS PAYMENT</button>
     `;
 }
 
 window.processPayment = async function(grandTotal) {
     if (posCart.length === 0) return alert("Cart is empty!");
-    
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
-    await addDoc(paymentsCol, { 
-        name: "Walk-in POS Customer", 
-        type: "POS Sale", 
-        items: itemsStr, 
-        amount: grandTotal, 
-        status: "Paid", 
-        date: dateStr, 
-        time: timeStr 
-    });
+    await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "POS Sale", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr, time: timeStr });
 
     for (let item of posCart) {
         if (item.id === 'WALKIN') {
             for (let w = 0; w < item.qty; w++) {
-                await addDoc(attendanceCol, {
-                    name: "Walk-in Guest",
-                    type: "Walk-in",
-                    date: dateStr,
-                    timeIn: timeStr,
-                    timeOut: "",
-                    status: "Checked In", 
-                    timestamp: now.getTime()
-                });
+                await addDoc(attendanceCol, { name: "Walk-in Guest", type: "Walk-in", date: dateStr, timeIn: timeStr, timeOut: "", status: "Checked In", timestamp: now.getTime() });
             }
             continue; 
         }
         let currentStock = inventoryData.find(i => i.id === item.id).qty;
         await updateDoc(doc(db, "inventory", item.id), { qty: currentStock - item.qty });
     }
-
     alert("Payment Processed Successfully! Walk-ins logged to Attendance.");
-    posCart = [];
-    renderCart();
+    posCart = []; renderCart();
 }
 
 // ==========================================
@@ -768,9 +598,7 @@ function renderAttendance() {
     attTbody.innerHTML = "";
 
     let today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    let gold = 0, silver = 0, walkin = 0;
-    let presentCount = 0; 
-    
+    let gold = 0, silver = 0, walkin = 0, presentCount = 0; 
     let todayAtt = attendanceData.filter(a => a.date === today).sort((a,b) => b.timestamp - a.timestamp);
 
     todayAtt.forEach(a => {
@@ -780,109 +608,64 @@ function renderAttendance() {
 
         attTbody.innerHTML += `
             <tr>
-                <td>${a.name}</td>
-                <td><strong>${a.type}</strong></td>
-                <td>${a.date}</td>
+                <td>${a.name}</td><td><strong>${a.type}</strong></td><td>${a.date}</td>
                 <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${timeInDisplay}</span></td>
-                <td>${timeOutDisplay}</td>
-                <td>${statusBadge}</td>
+                <td>${timeOutDisplay}</td><td>${statusBadge}</td>
             </tr>
         `;
-
-        if (a.type.includes('Gold')) gold++;
-        else if (a.type.includes('Silver')) silver++;
-        else if (a.type.includes('Walk-in')) walkin++;
-
+        if (a.type.includes('Gold')) gold++; else if (a.type.includes('Silver')) silver++; else if (a.type.includes('Walk-in')) walkin++;
         if (a.status === 'Checked In') presentCount++;
     });
 
-    if (servicesChartInstance) {
-        servicesChartInstance.data.datasets[0].data = [gold, silver, walkin];
-        servicesChartInstance.update();
-    }
-    
-    if (document.getElementById('presentMembers')) {
-        document.getElementById('presentMembers').innerText = presentCount; 
-    }
+    if (servicesChartInstance) { servicesChartInstance.data.datasets[0].data = [gold, silver, walkin]; servicesChartInstance.update(); }
+    if (document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = presentCount; 
 }
 
 onSnapshot(usersCol, (snapshot) => {
-    allUsersData = [];
-    membersData = [];
-    chatUsers = [];
-    
+    allUsersData = []; membersData = []; chatUsers = [];
     snapshot.forEach(doc => {
         const data = doc.data();
         const roleStr = (data.role || "").trim().toLowerCase(); 
-        
         chatUsers.push({ id: doc.id, ...data });
-
-        if (roleStr === 'member') {
-            membersData.push({ id: doc.id, ...data });
-        } else {
-            if (roleStr !== 'admin') {
-                allUsersData.push({ id: doc.id, ...data });
-            }
-        }
+        if (roleStr === 'member') membersData.push({ id: doc.id, ...data });
+        else if (roleStr !== 'admin') allUsersData.push({ id: doc.id, ...data });
     });
-    
-    renderStaff();
+    renderStaff(); 
     renderMembers(); 
-    if (document.getElementById('chatUserList')) {
-        renderChatUserList();
-    }
+    renderMemberTrainers(); // NEW: Refresh the Trainer Grid on the Member Dashboard
+    if (document.getElementById('chatUserList')) renderChatUserList();
 });
 
 function renderMembers() {
     const memTbody = document.querySelector('#membersTable tbody');
     const arcTbody = document.querySelector('#archivedMembersTable tbody');
-    
     if (memTbody) memTbody.innerHTML = "";
     if (arcTbody) arcTbody.innerHTML = "";
     
-    let activeMembers = 0;
-    let totalNonArchived = 0;
+    let activeMembers = 0, totalNonArchived = 0;
     const now = new Date().getTime();
 
     membersData.forEach(m => {
         const statusStr = (m.status || "Active").trim().toLowerCase();
         let plan = m.plan || 'Standard Member'; 
-        
-        let daysLeftText = "N/A";
-        let timerBadgeClass = "active";
+        let daysLeftText = "N/A", timerBadgeClass = "active";
         
         if (m.dateRegistered) {
             const expiryDate = m.dateRegistered + (30 * 24 * 60 * 60 * 1000); 
             const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-            
-            if (diffDays > 0) {
-                daysLeftText = `${diffDays} Days`;
-                if (diffDays <= 7) timerBadgeClass = "pending"; 
-            } else {
-                daysLeftText = "Expired";
-                timerBadgeClass = "broken"; 
-            }
-        } else {
-            daysLeftText = "30 Days";
-        }
+            if (diffDays > 0) { daysLeftText = `${diffDays} Days`; if (diffDays <= 7) timerBadgeClass = "pending"; } 
+            else { daysLeftText = "Expired"; timerBadgeClass = "broken"; }
+        } else { daysLeftText = "30 Days"; }
         
         if (statusStr === 'archived') {
             if (arcTbody) {
                 arcTbody.innerHTML += `
                     <tr>
-                        <td>${m.givenName || m.name}</td>
-                        <td>${m.mi || ''}</td>
-                        <td>${m.familyName || ''}</td>
-                        <td>${m.email}</td>
-                        <td><strong>${plan}</strong></td>
-                        <td><span class="badge maintenance">Archived</span></td>
+                        <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
+                        <td>${m.email}</td><td><strong>${plan}</strong></td><td><span class="badge maintenance">Archived</span></td>
                         <td>
-                            <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')">
-                                <i class="fas fa-box-open"></i>
-                            </button>
-                            <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${m.id}')">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
+                            <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>
                 `;
@@ -890,24 +673,16 @@ function renderMembers() {
         } else {
             totalNonArchived++;
             let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
-            
             if (memTbody) {
                 memTbody.innerHTML += `
                     <tr>
-                        <td>${m.givenName || m.name}</td>
-                        <td>${m.mi || ''}</td>
-                        <td>${m.familyName || ''}</td>
-                        <td>${m.email}</td>
-                        <td><strong>${plan}</strong></td>
+                        <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
+                        <td>${m.email}</td><td><strong>${plan}</strong></td>
                         <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
                         <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
                         <td>
-                            <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Member" onclick="openEditMemberModal('${m.id}')">
-                                <i class="fa-solid fa-edit"></i>
-                            </button>
-                            <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Archive Account" onclick="archiveUser('${m.id}', '${m.status || 'Active'}')">
-                                <i class="fas fa-box-archive"></i>
-                            </button>
+                            <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Member" onclick="openEditMemberModal('${m.id}')"><i class="fa-solid fa-edit"></i></button>
+                            <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Archive Account" onclick="archiveUser('${m.id}', '${m.status || 'Active'}')"><i class="fas fa-box-archive"></i></button>
                         </td>
                     </tr>
                 `;
@@ -923,30 +698,21 @@ function renderMembers() {
 window.openEditMemberModal = function(id) {
     const member = membersData.find(m => m.id === id);
     if (!member) return;
-    
     document.getElementById('editMemberId').value = member.id;
     document.getElementById('editMemberGiven').value = member.givenName || '';
     document.getElementById('editMemberMI').value = member.mi || '';
     document.getElementById('editMemberFamily').value = member.familyName || '';
-    
     document.getElementById('editMemberModal').style.display = 'flex';
 }
 
 if (document.getElementById('editMemberForm')) {
     document.getElementById('editMemberForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
         const id = document.getElementById('editMemberId').value;
         const given = document.getElementById('editMemberGiven').value.trim();
         const mi = document.getElementById('editMemberMI').value.trim();
         const family = document.getElementById('editMemberFamily').value.trim();
-        
-        const updatedData = {
-            givenName: given,
-            mi: mi,
-            familyName: family,
-            name: `${given} ${family}`
-        };
+        const updatedData = { givenName: given, mi: mi, familyName: family, name: `${given} ${family}` };
         
         await updateDoc(doc(db, "users", id), updatedData);
         window.closeModal('editMemberModal');
@@ -965,99 +731,63 @@ function renderStaff() {
     if (arcStaffTbody) arcStaffTbody.innerHTML = "";
     if (arcTrainerTbody) arcTrainerTbody.innerHTML = "";
     
-    let totalTrainers = 0;
-    let totalEmployees = 0;
-    let activeTrainers = 0; 
-    let trainersFeed = "";
+    let totalTrainers = 0, totalEmployees = 0, activeTrainers = 0, trainersFeed = "";
 
     allUsersData.forEach(u => {
         const roleStr = (u.role || "").trim().toLowerCase();
         const statusStr = (u.status || "Active").trim().toLowerCase();
         let fullName = `${u.givenName || u.name} ${u.mi ? u.mi + '. ' : ''}${u.familyName || ''}`.trim();
+        let specialty = u.specialty || '-'; // NEW: Grabs the specialty data
 
         if (statusStr === 'archived') {
             let actionBtns = `
-                <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${u.id}', 'Archived')">
-                    <i class="fas fa-box-open"></i>
-                </button>
-                <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${u.id}')">
-                    <i class="fas fa-trash"></i>
-                </button>
+                <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${u.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
+                <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button>
             `;
-
-            const rowHtml = `
-                <tr>
-                    <td>${fullName}</td>
-                    <td>${u.role}</td>
-                    <td>${u.email}</td>
-                    <td><span class="badge maintenance">Archived</span></td>
-                    <td>${actionBtns}</td>
-                </tr>
-            `;
-
-            if (roleStr === 'trainer') {
-                if (arcTrainerTbody) arcTrainerTbody.innerHTML += rowHtml;
-            } else {
-                if (arcStaffTbody) arcStaffTbody.innerHTML += rowHtml;
+            
+            if (roleStr === 'trainer') { 
+                if (arcTrainerTbody) arcTrainerTbody.innerHTML += `<tr><td>${fullName}</td><td>${u.role}</td><td>${specialty}</td><td>${u.email}</td><td><span class="badge maintenance">Archived</span></td><td>${actionBtns}</td></tr>`;
+            } 
+            else { 
+                if (arcStaffTbody) arcStaffTbody.innerHTML += `<tr><td>${fullName}</td><td>${u.role}</td><td>${u.email}</td><td><span class="badge maintenance">Archived</span></td><td>${actionBtns}</td></tr>`;
             }
-
         } else {
             let badgeClass = (statusStr === 'active' || statusStr === 'on leave') ? 'active' : 'inactive';
             
-            // --- UPDATE: Edit and Archive buttons for Active Staff/Trainers ---
             let actionBtns = `
-                <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Details" onclick="openEditStaffModal('${u.id}')">
-                    <i class="fa-solid fa-edit"></i>
-                </button>
-                <button class="btn-icon btn-delete" style="color: #f39c12;" title="Archive Account" onclick="archiveUser('${u.id}', '${u.status || 'Active'}')">
-                    <i class="fas fa-box-archive"></i>
-                </button>
+                <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Details" onclick="openEditStaffModal('${u.id}')"><i class="fa-solid fa-edit"></i></button>
+                <button class="btn-icon btn-delete" style="color: #f39c12;" title="Archive Account" onclick="archiveUser('${u.id}', '${u.status || 'Active'}')"><i class="fas fa-box-archive"></i></button>
             `;
 
             let shiftBadge = '';
             if (roleStr === 'staff' || roleStr === 'admin') {
                 const isWorking = u.shiftStatus === 'On Shift';
                 shiftBadge = `<span class="badge ${isWorking ? 'active' : 'inactive'}" style="${isWorking ? 'background: var(--dark-black); color: white;' : ''}">${isWorking ? 'On Shift' : 'Off Shift'}</span>`;
+            } else if (roleStr === 'trainer') {
+                const isOnFloor = u.shiftStatus === 'On Floor';
+                shiftBadge = `<span class="badge ${isOnFloor ? 'active' : 'inactive'}" style="${isOnFloor ? 'background: #3498db; color: white;' : ''}">${isOnFloor ? 'On Floor' : 'Off Floor'}</span>`;
             }
 
-            const rowHtml = `
-                <tr>
-                    <td>${fullName}</td>
-                    <td>${u.role}</td>
-                    <td>${u.email}</td>
-                    <td>
-                        <div style="display: flex; gap: 5px;">
-                            <span class="badge ${badgeClass}">${u.status || 'Active'}</span>
-                            ${shiftBadge}
-                        </div>
-                    </td>
-                    <td>${actionBtns}</td>
-                </tr>
-            `;
+            let statusHtml = `<div style="display: flex; gap: 5px;"><span class="badge ${badgeClass}">${u.status || 'Active'}</span>${shiftBadge}</div>`;
 
             if (roleStr === 'trainer') {
-                if (trainerTbody) trainerTbody.innerHTML += rowHtml;
+                if (trainerTbody) trainerTbody.innerHTML += `<tr><td>${fullName}</td><td>${u.role}</td><td>${specialty}</td><td>${u.email}</td><td>${statusHtml}</td><td>${actionBtns}</td></tr>`;
                 totalTrainers++;
                 
-                if (statusStr === 'active') {
+                if (statusStr === 'active' && u.shiftStatus === 'On Floor') {
                     activeTrainers++;
                     trainersFeed += `
                         <div class="list-item">
-                            <div class="list-icon" style="background-color: var(--dark-black);">
-                                <i class="fa-solid fa-user"></i>
-                            </div>
+                            <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
                             <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                <div>
-                                    <div class="trainer-name">${fullName}</div>
-                                    <p style="font-size: 12px; color: var(--text-muted);">${u.email}</p>
-                                </div>
-                                <span class="status-badge status-progress">On Floor</span>
+                                <div><div class="trainer-name">${fullName}</div><p style="font-size: 12px; color: var(--text-muted);">${specialty} | ${u.email}</p></div>
+                                <span class="status-badge status-progress" style="background: #3498db; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px;">On Floor</span>
                             </div>
                         </div>
                     `;
                 }
             } else {
-                if (staffTbody) staffTbody.innerHTML += rowHtml;
+                if (staffTbody) staffTbody.innerHTML += `<tr><td>${fullName}</td><td>${u.role}</td><td>${u.email}</td><td>${statusHtml}</td><td>${actionBtns}</td></tr>`;
                 totalEmployees++; 
             }
         }
@@ -1067,12 +797,48 @@ function renderStaff() {
     if (document.getElementById('gridTrainers')) document.getElementById('gridTrainers').innerText = totalTrainers;
     
     const dashTrainers = document.getElementById('dashActiveTrainersFeed');
-    if (dashTrainers) {
-        dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>';
-    }
+    if (dashTrainers) { dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>'; }
 }
 
-// --- NEW: Open Staff/Trainer Edit Modal ---
+// --- NEW: Render Trainer Grid for Member Dashboard ---
+function renderMemberTrainers() {
+    const grid = document.getElementById('memberTrainerGrid');
+    if (!grid) return; // This will gracefully skip if you are not currently on memberDB.html
+
+    grid.innerHTML = "";
+    
+    // Filter out Admins, Staff, and Archived Trainers
+    let activeTrainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer' && u.status !== 'Archived');
+
+    if (activeTrainers.length === 0) {
+        grid.innerHTML = "<p style='color: var(--text-muted);'>No trainers available at the moment.</p>";
+        return;
+    }
+
+    activeTrainers.forEach(t => {
+        let fullName = `${t.givenName || t.name} ${t.familyName || ''}`.trim();
+        let specialty = t.specialty || "General Fitness";
+        let isOnFloor = t.shiftStatus === 'On Floor';
+        
+        let badgeHtml = isOnFloor 
+            ? `<span class="badge" style="background: #3498db; color: white; padding: 3px 8px; font-size: 11px;">On Floor</span>` 
+            : `<span class="badge" style="background: #eee; color: #888; padding: 3px 8px; font-size: 11px;">Off Floor</span>`;
+
+        grid.innerHTML += `
+            <div class="trainer-card member-trainer-card" data-search="${fullName.toLowerCase()} ${specialty.toLowerCase()}">
+                <div class="trainer-avatar">${fullName.charAt(0).toUpperCase()}</div>
+                <div class="trainer-info">
+                    <div class="trainer-name">${fullName}</div>
+                    <div class="trainer-specialty">${specialty}</div>
+                </div>
+                <div>
+                    ${badgeHtml}
+                </div>
+            </div>
+        `;
+    });
+}
+
 window.openEditStaffModal = function(id) {
     const user = allUsersData.find(u => u.id === id);
     if (!user) return;
@@ -1082,26 +848,27 @@ window.openEditStaffModal = function(id) {
     document.getElementById('editStaffMI').value = user.mi || '';
     document.getElementById('editStaffFamily').value = user.familyName || '';
     document.getElementById('editStaffRole').value = user.role || 'Staff';
-    
+    document.getElementById('editStaffSpecialty').value = user.specialty || ''; // Populates existing specialty
     document.getElementById('editStaffModal').style.display = 'flex';
 }
 
 if (document.getElementById('editStaffForm')) {
     document.getElementById('editStaffForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
         const id = document.getElementById('editStaffId').value;
         const given = document.getElementById('editStaffGiven').value.trim();
         const mi = document.getElementById('editStaffMI').value.trim();
         const family = document.getElementById('editStaffFamily').value.trim();
         const role = document.getElementById('editStaffRole').value;
+        const specialty = document.getElementById('editStaffSpecialty').value.trim(); // Grabs updated specialty
         
-        const updatedData = {
-            givenName: given,
-            mi: mi,
-            familyName: family,
-            name: `${given} ${family}`.trim(),
-            role: role
+        const updatedData = { 
+            givenName: given, 
+            mi: mi, 
+            familyName: family, 
+            name: `${given} ${family}`.trim(), 
+            role: role,
+            specialty: specialty 
         };
         
         await updateDoc(doc(db, "users", id), updatedData);
@@ -1113,31 +880,23 @@ if (document.getElementById('editStaffForm')) {
 window.archiveUser = async (id, currentStatus) => { 
     const actionText = currentStatus === 'Archived' ? 'Restore' : 'Archive';
     const newStatus = currentStatus === 'Archived' ? 'Active' : 'Archived';
-    
     if (confirm(`Are you sure you want to ${actionText.toLowerCase()} this account?`)) { 
-        await updateDoc(doc(db, "users", id), { status: newStatus });
-        alert(`Account successfully ${newStatus.toLowerCase()}.`);
+        await updateDoc(doc(db, "users", id), { status: newStatus }); alert(`Account successfully ${newStatus.toLowerCase()}.`);
     } 
 }
 
 window.deleteUser = async (id) => { 
-    if (localStorage.getItem("userRole") !== "Admin") {
-        alert("Action Denied: You do not have permission to delete accounts.");
-        return;
-    }
-    if (confirm("Remove this account completely? This action cannot be undone.")) {
-        await deleteDoc(doc(db, "users", id)); 
-    }
+    if (localStorage.getItem("userRole") !== "Admin") { alert("Action Denied: You do not have permission to delete accounts."); return; }
+    if (confirm("Remove this account completely? This action cannot be undone.")) await deleteDoc(doc(db, "users", id)); 
 }
 
 // ==========================================
-// 10. BATCH REGISTRATION (WITH RFID AND DUPLICATE CHECK)
+// 10. BATCH REGISTRATION
 // ==========================================
 let batchRowCount = 1;
 
 window.addBatchRow = function() {
     if (batchRowCount >= 20) return alert("Maximum 20 members can be registered at once.");
-    
     const tbody = document.getElementById('batchMemberBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1145,21 +904,11 @@ window.addBatchRow = function() {
         <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
         <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
         <td><input type="email" class="bm-email" required></td>
-        <td>
-            <select class="bm-plan">
-                <option value="Gold Plan">Gold</option>
-                <option value="Silver Plan">Silver</option>
-            </select>
-        </td>
+        <td><select class="bm-plan"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
         <td><input type="text" class="bm-rfid rfid-register-input" placeholder="Tap Card..." required></td>
-        <td>
-            <button type="button" onclick="this.parentElement.parentElement.remove(); batchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;">
-                <i class="fas fa-trash"></i>
-            </button>
-        </td>
+        <td><button type="button" onclick="this.parentElement.parentElement.remove(); batchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
     `;
-    tbody.appendChild(tr);
-    batchRowCount++;
+    tbody.appendChild(tr); batchRowCount++;
 }
 
 window.openMemberModal = () => { 
@@ -1169,18 +918,12 @@ window.openMemberModal = () => {
             <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
             <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
             <td><input type="email" class="bm-email" required></td>
-            <td>
-                <select class="bm-plan">
-                    <option value="Gold Plan">Gold</option>
-                    <option value="Silver Plan">Silver</option>
-                </select>
-            </td>
+            <td><select class="bm-plan"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
             <td><input type="text" class="bm-rfid rfid-register-input" placeholder="Tap Card..." required></td>
             <td></td>
         </tr>
     `;
-    batchRowCount = 1;
-    document.getElementById('memberModal').style.display = 'flex'; 
+    batchRowCount = 1; document.getElementById('memberModal').style.display = 'flex'; 
 }
 
 const generatePassword = () => Math.random().toString(36).slice(-8);
@@ -1188,24 +931,15 @@ const generatePassword = () => Math.random().toString(36).slice(-8);
 if (document.getElementById('batchMemberForm')) {
     document.getElementById('batchMemberForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
         const rows = document.querySelectorAll('#batchMemberBody tr');
-        let addedCount = 0;
-        let emailSuccessCount = 0; 
-        let emailFailCount = 0;    
-        let duplicateCount = 0;
+        let addedCount = 0, emailSuccessCount = 0, emailFailCount = 0, duplicateCount = 0;
         const currentTimestamp = new Date().getTime(); 
 
         for (let row of rows) {
-            const given = row.querySelector('.bm-first').value.trim();
-            const mi = row.querySelector('.bm-mi').value.trim();
-            const family = row.querySelector('.bm-last').value.trim();
-            const email = row.querySelector('.bm-email').value.trim();
-            const plan = row.querySelector('.bm-plan').value;
-            const rfidTag = row.querySelector('.bm-rfid').value.trim();
+            const given = row.querySelector('.bm-first').value.trim(), mi = row.querySelector('.bm-mi').value.trim(), family = row.querySelector('.bm-last').value.trim();
+            const email = row.querySelector('.bm-email').value.trim(), plan = row.querySelector('.bm-plan').value, rfidTag = row.querySelector('.bm-rfid').value.trim();
             const randomPassword = generatePassword();
 
-            // --- GATEKEEPER: Check for duplicates before saving ---
             const emailQuery = query(usersCol, where("email", "==", email));
             const emailSnap = await getDocs(emailQuery);
             let isDuplicate = !emailSnap.empty;
@@ -1213,67 +947,30 @@ if (document.getElementById('batchMemberForm')) {
             if (!isDuplicate && rfidTag !== "") {
                 const rfidQuery = query(usersCol, where("rfid", "==", rfidTag));
                 const rfidSnap = await getDocs(rfidQuery);
-                if (!rfidSnap.empty) {
-                    isDuplicate = true;
-                }
+                if (!rfidSnap.empty) isDuplicate = true;
             }
 
-            if (isDuplicate) {
-                duplicateCount++;
-                continue; // Skip this row entirely
-            }
-            // ------------------------------------------------------
+            if (isDuplicate) { duplicateCount++; continue; }
 
             try {
-                await emailjs.send("service_x90mti6", "template_nda1wjc", {
-                    to_name: given,
-                    to_email: email,
-                    generated_password: randomPassword,
-                    plan: plan
-                });
-                
-                await addDoc(usersCol, { 
-                    name: `${given} ${family}`, 
-                    givenName: given, 
-                    mi: mi, 
-                    familyName: family,
-                    role: "Member", 
-                    email: email, 
-                    status: "Active", 
-                    plan: plan,
-                    rfid: rfidTag,
-                    password: randomPassword,
-                    dateRegistered: currentTimestamp 
-                });
-                
-                emailSuccessCount++; 
-                addedCount++;
-            } catch(err) {
-                console.error("EmailJS failed:", err);
-                emailFailCount++;    
-            }
+                await emailjs.send("service_x90mti6", "template_nda1wjc", { to_name: given, to_email: email, generated_password: randomPassword, plan: plan });
+                await addDoc(usersCol, { name: `${given} ${family}`, givenName: given, mi: mi, familyName: family, role: "Member", email: email, status: "Active", plan: plan, rfid: rfidTag, password: randomPassword, dateRegistered: currentTimestamp });
+                emailSuccessCount++; addedCount++;
+            } catch(err) { console.error("EmailJS failed:", err); emailFailCount++; }
         }
         
         window.closeModal('memberModal');
-        
-        let alertMsg = `Batch Registration Summary:\n\n`;
-        alertMsg += `✅ ${emailSuccessCount} user(s) received emails and were saved to the database.\n`;
-        if (duplicateCount > 0) {
-            alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
-        }
-        if (emailFailCount > 0) {
-            alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
-        }
+        let alertMsg = `Batch Registration Summary:\n\n✅ ${emailSuccessCount} user(s) received emails and were saved to the database.\n`;
+        if (duplicateCount > 0) alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
+        if (emailFailCount > 0) alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
         alert(alertMsg);
     });
 }
 
-// ----- UPDATED STAFF BATCH REGISTRATION (WITH DUPLICATE CHECK) -----
 let staffBatchRowCount = 1;
 
 window.addStaffBatchRow = function() {
     if (staffBatchRowCount >= 20) return alert("Maximum 20 accounts can be registered at once.");
-    
     const tbody = document.getElementById('batchStaffBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1281,29 +978,16 @@ window.addStaffBatchRow = function() {
         <td><input type="text" class="bs-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
         <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
         <td><input type="email" class="bs-email" required></td>
-        <td>
-            <select class="bs-status">
-                <option value="Active">Active</option>
-                <option value="On Leave">On Leave</option>
-            </select>
-        </td>
+        <td><input type="text" class="bs-specialty" placeholder="Opt. (e.g. Yoga)"></td>
+        <td><select class="bs-status"><option value="Active">Active</option><option value="On Leave">On Leave</option></select></td>
         <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required></td>
-        <td>
-            <button type="button" onclick="this.parentElement.parentElement.remove(); staffBatchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;">
-                <i class="fas fa-trash"></i>
-            </button>
-        </td>
+        <td><button type="button" onclick="this.parentElement.parentElement.remove(); staffBatchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
     `;
-    tbody.appendChild(tr);
-    staffBatchRowCount++;
+    tbody.appendChild(tr); staffBatchRowCount++;
 }
 
 window.openStaffModal = (role) => { 
-    if (localStorage.getItem("userRole") !== "Admin") {
-        alert("Action Denied: Only Admins can register Staff and Trainers.");
-        return;
-    }
-    
+    if (localStorage.getItem("userRole") !== "Admin") return alert("Action Denied: Only Admins can register Staff and Trainers.");
     document.getElementById('hiddenStaffRole').value = role;
     document.getElementById('staffModalTitle').innerText = `Batch Register ${role}s`;
     document.getElementById('batchStaffBody').innerHTML = `
@@ -1312,43 +996,29 @@ window.openStaffModal = (role) => {
             <td><input type="text" class="bs-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
             <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
             <td><input type="email" class="bs-email" required></td>
-            <td>
-                <select class="bs-status">
-                    <option value="Active">Active</option>
-                    <option value="On Leave">On Leave</option>
-                </select>
-            </td>
+            <td><input type="text" class="bs-specialty" placeholder="Opt. (e.g. Yoga)"></td>
+            <td><select class="bs-status"><option value="Active">Active</option><option value="On Leave">On Leave</option></select></td>
             <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required></td>
             <td></td>
         </tr>
     `;
-    staffBatchRowCount = 1;
-    document.getElementById('staffModal').style.display = 'flex'; 
+    staffBatchRowCount = 1; document.getElementById('staffModal').style.display = 'flex'; 
 }
 
 if (document.getElementById('batchStaffForm')) {
     document.getElementById('batchStaffForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        
         if (localStorage.getItem("userRole") !== "Admin") return;
-
         const rows = document.querySelectorAll('#batchStaffBody tr');
         const role = document.getElementById('hiddenStaffRole').value;
-        let addedCount = 0;
-        let emailSuccessCount = 0; 
-        let emailFailCount = 0;
-        let duplicateCount = 0;
+        let addedCount = 0, emailSuccessCount = 0, emailFailCount = 0, duplicateCount = 0;
 
         for (let row of rows) {
-            const given = row.querySelector('.bs-first').value.trim();
-            const mi = row.querySelector('.bs-mi').value.trim();
-            const family = row.querySelector('.bs-last').value.trim();
-            const email = row.querySelector('.bs-email').value.trim();
-            const status = row.querySelector('.bs-status').value;
-            const rfidTag = row.querySelector('.bs-rfid').value.trim();
+            const given = row.querySelector('.bs-first').value.trim(), mi = row.querySelector('.bs-mi').value.trim(), family = row.querySelector('.bs-last').value.trim();
+            const email = row.querySelector('.bs-email').value.trim(), status = row.querySelector('.bs-status').value, rfidTag = row.querySelector('.bs-rfid').value.trim();
+            const specialty = row.querySelector('.bs-specialty').value.trim(); // NEW: captures specialty input
             const randomPassword = generatePassword();
 
-            // --- GATEKEEPER: Check for duplicates before saving ---
             const emailQuery = query(usersCol, where("email", "==", email));
             const emailSnap = await getDocs(emailQuery);
             let isDuplicate = !emailSnap.empty;
@@ -1356,55 +1026,25 @@ if (document.getElementById('batchStaffForm')) {
             if (!isDuplicate && rfidTag !== "") {
                 const rfidQuery = query(usersCol, where("rfid", "==", rfidTag));
                 const rfidSnap = await getDocs(rfidQuery);
-                if (!rfidSnap.empty) {
-                    isDuplicate = true;
-                }
+                if (!rfidSnap.empty) isDuplicate = true;
             }
 
-            if (isDuplicate) {
-                duplicateCount++;
-                continue; // Skip this row entirely
-            }
-            // ------------------------------------------------------
+            if (isDuplicate) { duplicateCount++; continue; }
 
             try {
-                await emailjs.send("service_x90mti6", "template_nda1wjc", {
-                    to_name: given,
-                    to_email: email,
-                    generated_password: randomPassword,
-                    plan: `${role} Account`
-                });
-
+                await emailjs.send("service_x90mti6", "template_nda1wjc", { to_name: given, to_email: email, generated_password: randomPassword, plan: `${role} Account` });
                 await addDoc(usersCol, { 
-                    name: `${given} ${family}`, 
-                    givenName: given, 
-                    mi: mi, 
-                    familyName: family,
-                    role: role, 
-                    email: email, 
-                    status: status,
-                    rfid: rfidTag,
-                    password: randomPassword 
+                    name: `${given} ${family}`, givenName: given, mi: mi, familyName: family, 
+                    role: role, email: email, status: status, rfid: rfidTag, password: randomPassword, specialty: specialty 
                 });
-                
-                emailSuccessCount++;
-                addedCount++;
-            } catch(err) {
-                console.error("EmailJS failed:", err);
-                emailFailCount++;
-            }
+                emailSuccessCount++; addedCount++;
+            } catch(err) { console.error("EmailJS failed:", err); emailFailCount++; }
         }
         
         window.closeModal('staffModal');
-
-        let alertMsg = `Batch Registration Summary:\n\n`;
-        alertMsg += `✅ ${emailSuccessCount} ${role}(s) received emails and were saved to the database.\n`;
-        if (duplicateCount > 0) {
-            alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
-        }
-        if (emailFailCount > 0) {
-            alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
-        }
+        let alertMsg = `Batch Registration Summary:\n\n✅ ${emailSuccessCount} ${role}(s) received emails and were saved to the database.\n`;
+        if (duplicateCount > 0) alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
+        if (emailFailCount > 0) alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
         alert(alertMsg);
     });
 }
@@ -1421,19 +1061,13 @@ onSnapshot(paymentsCol, (snapshot) => {
 function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
     if (!payTbody) return;
-    
     payTbody.innerHTML = "";
-    
     paymentsData.forEach(t => {
         let vat = (t.amount * 0.12).toFixed(2);
         payTbody.innerHTML += `
             <tr>
-                <td>${t.name}</td>
-                <td>${t.items || t.type}</td>
-                <td>${t.date} <span style="color:#888; font-size:12px;">${t.time || ''}</span></td>
-                <td>₱${t.amount}</td>
-                <td>₱${vat}</td>
-                <td style="font-weight:bold; color:var(--primary-red);">₱${t.amount}</td>
+                <td>${t.name}</td><td>${t.items || t.type}</td><td>${t.date} <span style="color:#888; font-size:12px;">${t.time || ''}</span></td>
+                <td>₱${t.amount}</td><td>₱${vat}</td><td style="font-weight:bold; color:var(--primary-red);">₱${t.amount}</td>
             </tr>
         `;
     });
@@ -1443,99 +1077,55 @@ function renderPayments() {
 // 12. UI INITIALIZATION & SHIFT TIMER
 // ==========================================
 function initUI() {
-    // 1. START THE CLOCK FIRST (Never fails)
     function updateClock() {
         const clockElement = document.getElementById('liveClock');
         if (clockElement) {
             const now = new Date();
-            const options = { 
-                weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', 
-                hour: '2-digit', minute: '2-digit', second: '2-digit' 
-            };
+            const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
             clockElement.innerHTML = `<i class="fa-regular fa-clock"></i> ${now.toLocaleDateString('en-US', options)}`;
         }
     }
-    setInterval(updateClock, 1000);
-    updateClock();
+    setInterval(updateClock, 1000); updateClock();
 
-    // 2. ATTACH THE DROPDOWNS SECOND
     const submenuToggles = document.querySelectorAll('.has-submenu');
     submenuToggles.forEach(toggle => {
         toggle.onclick = function() {
             this.classList.toggle('open');
-            if (this.nextElementSibling && this.nextElementSibling.classList.contains('submenu')) {
-                this.nextElementSibling.classList.toggle('open');
-            }
+            if (this.nextElementSibling && this.nextElementSibling.classList.contains('submenu')) this.nextElementSibling.classList.toggle('open');
         };
     });
 
-    // 3. START THE SHIFT TIMER
     function updateShiftTimer() {
         const shiftStart = localStorage.getItem("shiftStart");
         if (shiftStart) {
-            const now = Date.now();
-            const diff = now - parseInt(shiftStart);
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-            const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const secs = Math.floor((diff % (1000 * 60)) / 1000);
-            
+            const diff = Date.now() - parseInt(shiftStart);
+            const hours = Math.floor(diff / (1000 * 60 * 60)), mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)), secs = Math.floor((diff % (1000 * 60)) / 1000);
             const timeString = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             
-            const blackCards = document.querySelectorAll('.card-black');
-            blackCards.forEach(card => {
+            document.querySelectorAll('.card-black').forEach(card => {
                 const valueDiv = card.querySelector('.value');
-                // Ensure we only inject the timer into the specific "Shift Started" box
                 if (valueDiv && valueDiv.innerText.includes('Shift')) {
                     let timerSpan = card.querySelector('.shift-timer');
-                    if (!timerSpan) {
-                        card.innerHTML += `<span class="shift-timer" style="position: absolute; top: 10px; right: 15px; font-size: 16px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">${timeString}</span>`;
-                    } else {
-                        timerSpan.innerText = timeString;
-                    }
+                    if (!timerSpan) card.innerHTML += `<span class="shift-timer" style="position: absolute; top: 10px; right: 15px; font-size: 16px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">${timeString}</span>`;
+                    else timerSpan.innerText = timeString;
                 }
             });
         }
     }
-    setInterval(updateShiftTimer, 1000);
-    updateShiftTimer();
+    setInterval(updateShiftTimer, 1000); updateShiftTimer();
 
-    // 4. LOAD THE CHARTS LAST (Wrapped in a safety net)
-    try {
-        initDashboardCharts();
-    } catch (error) {
-        console.warn("Chart tool delayed, skipping chart render so the rest of the app doesn't break.", error);
-    }
+    try { initDashboardCharts(); } catch (error) { console.warn("Chart tool delayed.", error); }
 }
 
-// Bulletproof loading check
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initUI);
-} else {
-    initUI();
-}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initUI); else initUI();
 
 function initDashboardCharts() {
     const ctxServices = document.getElementById('servicesChart');
-    if (!ctxServices || typeof Chart === 'undefined') return; // Safety check
-
+    if (!ctxServices || typeof Chart === 'undefined') return; 
     servicesChartInstance = new Chart(ctxServices.getContext('2d'), {
         type: 'bar',
-        data: { 
-            labels: ['Gold Members', 'Silver Members', 'Walk-in Guests'], 
-            datasets: [{ 
-                label: 'Daily Check-ins',
-                data: [0, 0, 0], 
-                backgroundColor: '#C01718', 
-                hoverBackgroundColor: '#111111', 
-                borderRadius: 4 
-            }] 
-        },
-        options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            plugins: { legend: { display: false } }, 
-            scales: { x: { grid: { display: false } } } 
-        }
+        data: { labels: ['Gold Members', 'Silver Members', 'Walk-in Guests'], datasets: [{ label: 'Daily Check-ins', data: [0, 0, 0], backgroundColor: '#C01718', hoverBackgroundColor: '#111111', borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } } } }
     });
 }
 
@@ -1554,29 +1144,19 @@ function renderBookings() {
     tbody.innerHTML = "";
 
     const dateFilter = document.getElementById('bookingDateFilter')?.value;
-
-    // Sort by Date, then Time chronologically
     let displayData = bookingsData.sort((a,b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-
-    if (dateFilter) {
-        displayData = displayData.filter(b => b.date === dateFilter);
-    }
+    if (dateFilter) displayData = displayData.filter(b => b.date === dateFilter);
 
     displayData.forEach(b => {
         let badgeClass = "active";
         if (b.status === "Completed") badgeClass = "maintenance"; 
         if (b.status === "Cancelled" || b.status === "No Show") badgeClass = "broken"; 
-
-        // Format Date nicely for display
         const dateObj = new Date(`${b.date}T${b.time}`);
-        const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
         tbody.innerHTML += `
             <tr>
-                <td>${b.memberName}</td>
-                <td>${b.trainerName}</td>
-                <td>${dateStr}</td>
+                <td>${b.memberName}</td><td>${b.trainerName}</td><td>${dateStr}</td>
                 <td><span class="badge active" style="background: var(--dark-black);"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
                 <td><span class="badge ${badgeClass}">${b.status}</span></td>
                 <td>
@@ -1591,57 +1171,31 @@ function renderBookings() {
 window.filterBookingsByDate = () => { renderBookings(); }
 
 window.openBookingModal = () => {
-    const memberSelect = document.getElementById('bookMember');
-    const trainerSelect = document.getElementById('bookTrainer');
-
-    // Populate the dropdowns dynamically based on current users in the database
-    memberSelect.innerHTML = '<option value="" disabled selected>Select a Member...</option>' + 
-        membersData.map(m => `<option value="${m.id}">${m.name || m.givenName + ' ' + m.familyName}</option>`).join('');
-    
+    const memberSelect = document.getElementById('bookMember'), trainerSelect = document.getElementById('bookTrainer');
+    memberSelect.innerHTML = '<option value="" disabled selected>Select a Member...</option>' + membersData.map(m => `<option value="${m.id}">${m.name || m.givenName + ' ' + m.familyName}</option>`).join('');
     const trainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer');
-    trainerSelect.innerHTML = '<option value="" disabled selected>Select an Assigned Trainer...</option>' + 
-        trainers.map(t => `<option value="${t.id}">${t.name || t.givenName + ' ' + t.familyName}</option>`).join('');
+    trainerSelect.innerHTML = '<option value="" disabled selected>Select an Assigned Trainer...</option>' + trainers.map(t => `<option value="${t.id}">${t.name || t.givenName + ' ' + t.familyName}</option>`).join('');
 
-    document.getElementById('bookingForm').reset();
-    document.getElementById('bookingModal').style.display = 'flex';
+    document.getElementById('bookingForm').reset(); document.getElementById('bookingModal').style.display = 'flex';
 }
 
 if (document.getElementById('bookingForm')) {
     document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const memberSelect = document.getElementById('bookMember');
-        const trainerSelect = document.getElementById('bookTrainer');
-        
-        const memberId = memberSelect.value;
-        const trainerId = trainerSelect.value;
-        const bookDate = document.getElementById('bookDate').value;
-        const bookTime = document.getElementById('bookTime').value;
+        const memberSelect = document.getElementById('bookMember'), trainerSelect = document.getElementById('bookTrainer');
+        const memberId = memberSelect.value, trainerId = trainerSelect.value, bookDate = document.getElementById('bookDate').value, bookTime = document.getElementById('bookTime').value;
+        const memberName = memberSelect.options[memberSelect.selectedIndex].text, trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
 
-        const memberName = memberSelect.options[memberSelect.selectedIndex].text;
-        const trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
-
-        await addDoc(bookingsCol, {
-            memberId, memberName,
-            trainerId, trainerName,
-            date: bookDate,
-            time: bookTime,
-            status: "Confirmed",
-            timestamp: new Date().getTime()
-        });
-        
-        window.closeModal('bookingModal');
-        alert("Personal Training Session booked successfully!");
+        await addDoc(bookingsCol, { memberId, memberName, trainerId, trainerName, date: bookDate, time: bookTime, status: "Confirmed", timestamp: new Date().getTime() });
+        window.closeModal('bookingModal'); alert("Personal Training Session booked successfully!");
     });
 }
 
 window.openEditBookingModal = (id) => {
     const b = bookingsData.find(x => x.id === id);
     if (!b) return;
-    
-    // Convert strict date to readable format for the modal title
     const dateObj = new Date(`${b.date}T${b.time}`);
-    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     document.getElementById('editBookingId').value = b.id;
     document.getElementById('editBookingDetails').innerText = `${b.memberName} with ${b.trainerName} on ${dateStr} at ${timeStr}`;
@@ -1652,18 +1206,13 @@ window.openEditBookingModal = (id) => {
 if (document.getElementById('editBookingForm')) {
     document.getElementById('editBookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const id = document.getElementById('editBookingId').value;
-        const status = document.getElementById('editBookingStatus').value;
+        const id = document.getElementById('editBookingId').value, status = document.getElementById('editBookingStatus').value;
         await updateDoc(doc(db, "bookings", id), { status: status });
         window.closeModal('editBookingModal');
     });
 }
 
-window.deleteBooking = async (id) => {
-    if (confirm("Are you sure you want to delete this booking record?")) {
-        await deleteDoc(doc(db, "bookings", id));
-    }
-}
+window.deleteBooking = async (id) => { if (confirm("Are you sure you want to delete this booking record?")) await deleteDoc(doc(db, "bookings", id)); }
 
 // ==========================================
 // 14. SMART USB RFID GHOST LISTENER
@@ -1673,61 +1222,40 @@ let lastKeyTime = Date.now();
 
 document.addEventListener('keydown', (e) => {
     const currentTime = Date.now();
+    if (currentTime - lastKeyTime > 50) rfidBuffer = ""; 
 
-    // 1. Reset buffer if typing is slow (human typing)
-    if (currentTime - lastKeyTime > 50) { 
-        rfidBuffer = ""; 
-    }
-
-    // 2. Scanner always fires an 'Enter' key at the very end
     if (e.key === 'Enter' && rfidBuffer.length > 5) {
-        e.preventDefault(); // Stop forms from submitting!
-
+        e.preventDefault(); 
         const activeEl = document.activeElement;
-        
-        // This targets BOTH the Staff and Member RFID input boxes beautifully
         const isRegistrationBox = activeEl && activeEl.classList.contains('rfid-register-input');
 
-        // 3. CLEANUP: If staff was typing in a normal text box (like Name or Search), 
-        // the scanner just dumped numbers into it. We need to silently erase those numbers.
         if (activeEl && activeEl.tagName === 'INPUT' && !isRegistrationBox) {
             let currentVal = activeEl.value;
-            if (currentVal.endsWith(rfidBuffer)) {
-                activeEl.value = currentVal.slice(0, -rfidBuffer.length);
-            }
+            if (currentVal.endsWith(rfidBuffer)) activeEl.value = currentVal.slice(0, -rfidBuffer.length);
         }
 
-        // 4. ROUTE THE SCAN
         if (isRegistrationBox) {
-            // They clicked an RFID box on purpose to register a new card (Staff OR Member)
             activeEl.value = rfidBuffer;
-            activeEl.style.backgroundColor = "#c8e6c9"; // Turn green
+            activeEl.style.backgroundColor = "#c8e6c9"; 
             activeEl.style.borderColor = "#2e7d32";
-            activeEl.blur(); // Remove cursor to prevent double-scanning
+            activeEl.blur(); 
         } else {
-            // Check if it's the currently logged-in Admin/Staff Member scanning out
             const loggedInRfid = localStorage.getItem("userRfid");
             if (loggedInRfid && rfidBuffer === loggedInRfid) {
                 alert("Shift Ended. Logging out...");
                 window.handleLogout();
             } else {
-                // They are doing something else, so this is a Member Checking In!
                 processRfidAttendance(rfidBuffer);
             }
         }
-
-        rfidBuffer = ""; // Clear buffer
+        rfidBuffer = ""; 
     } 
-    // 5. Build the buffer with characters
-    else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) { 
-        rfidBuffer += e.key;
-    }
+    else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) rfidBuffer += e.key;
     
     lastKeyTime = currentTime;
 });
 
 async function processRfidAttendance(scannedTag) {
-    // 1. Check if the card belongs to anyone in the database
     const q = query(usersCol, where("rfid", "==", scannedTag));
     const snapshot = await getDocs(q);
     
@@ -1736,7 +1264,8 @@ async function processRfidAttendance(scannedTag) {
         return;
     }
     
-    const user = snapshot.docs[0].data();
+    const userDoc = snapshot.docs[0];
+    const user = userDoc.data();
     
     if (user.status === 'Archived') {
         alert(`⚠️ Access Denied. ${user.name || user.givenName}'s account is archived.`);
@@ -1747,21 +1276,25 @@ async function processRfidAttendance(scannedTag) {
     const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const userName = user.name || `${user.givenName} ${user.familyName}`;
+    const isTrainer = (user.role || "").toLowerCase() === 'trainer';
 
-    // 2. CHECK: Are they already checked in today?
     const attQuery = query(attendanceCol, where("name", "==", userName), where("date", "==", dateStr), where("status", "==", "Checked In"));
     const attSnapshot = await getDocs(attQuery);
 
     if (!attSnapshot.empty) {
-        // THEY ARE TAPPING OUT
         const recordId = attSnapshot.docs[0].id;
         await updateDoc(doc(db, "attendance", recordId), {
             timeOut: timeStr,
             status: "Checked Out"
         });
-        alert(`👋 Goodbye, ${userName}! Checked out successfully.`);
+
+        if (isTrainer) {
+            await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "Off Floor" });
+            alert(`👋 Goodbye, Trainer ${userName}! You are now Off Floor.`);
+        } else {
+            alert(`👋 Goodbye, ${userName}! Checked out successfully.`);
+        }
     } else {
-        // THEY ARE TAPPING IN
         await addDoc(attendanceCol, {
             name: userName,
             type: user.plan || user.role || "Member",
@@ -1771,6 +1304,12 @@ async function processRfidAttendance(scannedTag) {
             status: "Checked In",
             timestamp: now.getTime()
         });
-        alert(`✅ Welcome, ${userName}! Checked in successfully.`);
+
+        if (isTrainer) {
+            await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "On Floor" });
+            alert(`✅ Welcome, Trainer ${userName}! You are now On Floor.`);
+        } else {
+            alert(`✅ Welcome, ${userName}! Checked in successfully.`);
+        }
     }
 }
