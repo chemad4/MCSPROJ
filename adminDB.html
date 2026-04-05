@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fit Track - Admin Dashboard</title>
-
-    <link rel="icon" type="image/png" href="images/icon-192.png">
     
+    <link rel="icon" type="image/png" href="images/icon-192.png">
+
     <script>
         if (!localStorage.getItem("loggedInUser") || localStorage.getItem("userRole") !== "Admin") {
-            window.location.replace("index.html"); 
+            window.location.replace("index.html");
         }
     </script>
 
@@ -21,102 +21,32 @@
     <link rel="stylesheet" href="css/styles.css">
     
     <style>
-        /* Specific layouts for Admin POS and Batch Tables */
-        .pos-container { 
-            display: grid; 
-            grid-template-columns: 2fr 1fr; 
-            gap: 20px; 
-            height: calc(100vh - 150px); 
-        }
-        .pos-products { 
-            background: var(--panel-bg); 
-            border-radius: 8px; 
-            border: 1px solid var(--border-color); 
-            display: flex; 
-            flex-direction: column; 
-        }
-        .pos-cart { 
-            background: var(--panel-bg); 
-            border-radius: 8px; 
-            border: 1px solid var(--border-color); 
-            display: flex; 
-            flex-direction: column; 
-        }
-        .pos-header { 
-            padding: 15px 20px; 
-            border-bottom: 1px solid var(--border-color); 
-            font-weight: bold; 
-            background: #FAFAFA; 
-        }
-        .pos-body { 
-            padding: 20px; 
-            overflow-y: auto; 
-            flex-grow: 1; 
-        }
-        .pos-totals { 
-            background: var(--dark-black); 
-            color: white; 
-            padding: 20px; 
-            border-radius: 0 0 8px 8px; 
-        }
-        .total-line { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-bottom: 10px; 
-            font-size: 14px; 
-        }
-        .total-line.grand { 
-            font-size: 20px; 
-            font-weight: bold; 
-            color: var(--primary-red); 
-            border-top: 1px solid #444; 
-            padding-top: 10px; 
-            margin-top: 10px; 
-        }
-        .inventory-split { 
-            display: grid; 
-            grid-template-columns: 1fr; 
-            gap: 30px; 
-        }
-        .stat-card, .grid-stat-box { 
-            cursor: pointer; 
-            transition: transform 0.2s, box-shadow 0.2s; 
-        }
-        .stat-card:hover, .grid-stat-box:hover { 
-            transform: translateY(-3px); 
-            box-shadow: 0 8px 15px rgba(0,0,0,0.1); 
-        }
-        .batch-table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-bottom: 15px; 
-        }
-        .batch-table th { 
-            text-align: left; 
-            padding: 8px; 
-            background: #f4f6f9; 
-            border-bottom: 2px solid #ddd; 
-            font-size: 13px; 
-            color: #555; 
-        }
-        .batch-table td { 
-            padding: 5px; 
-        }
-        .batch-table input, .batch-table select { 
-            width: 100%; 
-            padding: 8px; 
-            border: 1px solid #ccc; 
-            border-radius: 4px; 
-            font-size: 13px; 
-        }
+        /* Specific layouts for Staff POS and Batch Tables */
+        .pos-container { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: calc(100vh - 150px); }
+        .pos-products { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .pos-cart { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .pos-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: #FAFAFA; display: flex; justify-content: space-between; align-items: center; }
+        .pos-body { padding: 20px; overflow-y: auto; flex-grow: 1; }
+        .pos-totals { background: var(--dark-black); color: white; padding: 20px; border-radius: 0 0 8px 8px; }
+        .total-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .total-line.grand { font-size: 20px; font-weight: bold; color: var(--primary-red); border-top: 1px solid #444; padding-top: 10px; margin-top: 10px; }
+        
+        .stat-card, .grid-stat-box { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover, .grid-stat-box:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        
+        .batch-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .batch-table th { text-align: left; padding: 8px; background: #f4f6f9; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }
+        .batch-table td { padding: 5px; }
+        .batch-table input, .batch-table select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
+        
+        .rfid-register-input { background-color: #fffde7; border: 1px solid #f1c40f !important; }
+        .rfid-register-input:focus { border-color: var(--primary-red) !important; background-color: #fff; }
     </style>
 </head>
 <body>
 
     <aside class="sidebar">
-        <div class="logo-area">
-            FIT <span>TRACK</span>
-        </div>
+        <div class="logo-area">FIT <span>TRACK</span></div>
 
         <ul class="nav-menu" id="navMenu">
             <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)">
@@ -151,22 +81,23 @@
             <li class="nav-item nav-clickable" onclick="switchTab('payments', this)">
                 <i class="fa-solid fa-chart-line"></i> <span class="menu-text">Financial Reports</span>
             </li>
-            
+
             <li class="nav-item has-submenu">
-                <i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff Management</span>
+                <i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff Team</span>
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-arrow-right"></i> View All Staff</li>
+                <li class="sub-item" onclick="switchTab('staff', this)"><i class="fa-solid fa-clipboard-list"></i> Manage Staff</li>
                 <li class="sub-item" onclick="openChatTab('staff', this, 'Staff Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
 
             <li class="nav-item has-submenu">
-                <i class="fa-solid fa-users-gear"></i> <span class="menu-text">Trainer Management</span>
+                <i class="fa-solid fa-users-gear"></i> <span class="menu-text">Trainer Team</span>
                 <i class="fa-solid fa-chevron-down chevron-icon"></i>
             </li>
             <ul class="submenu">
-                <li class="sub-item" onclick="switchTab('trainers', this)"><i class="fa-solid fa-arrow-right"></i> View Trainers</li>
+                <li class="sub-item" onclick="switchTab('trainers', this)"><i class="fa-solid fa-clipboard-list"></i> Manage Trainers</li>
+                <li class="sub-item" onclick="switchTab('bookings', this)"><i class="fa-solid fa-calendar-check"></i> Booking Calendar</li>
                 <li class="sub-item" onclick="openChatTab('trainer', this, 'Trainer Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
         </ul>
@@ -181,7 +112,7 @@
                 <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
             </div>
             <div class="topbar-right">
-                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> Welcome Admin <i class="fa-solid fa-caret-down"></i></button>
+                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> <span id="topBarName">Welcome Admin</span> <i class="fa-solid fa-caret-down"></i></button>
                 <button id="logoutBtn" onclick="handleLogout()"><i class="fa-solid fa-power-off"></i> Logout</button>
             </div>
         </header>
@@ -223,31 +154,32 @@
                         </div>
                         <div class="grid-stat-box border-red" onclick="switchTab('trainers')">
                             <div class="num" id="gridTrainers">0</div>
-                            <div class="label">Total Trainers</div>
+                            <div class="label">Registered Trainers</div>
+                        </div>
+                        <div class="grid-stat-box border-black" onclick="switchTab('pos')">
+                            <div class="num" id="presentMembers">0</div>
+                            <div class="label">Currently On Floor</div>
                         </div>
                         <div class="grid-stat-box border-red" onclick="switchTab('equipment')">
                             <div class="num" id="gridEquip">0</div>
                             <div class="label">Operational Equipments</div>
-                        </div>
-                        <div class="grid-stat-box border-black" onclick="switchTab('attendance')">
-                            <div class="num" id="presentMembers">0</div>
-                            <div class="label">Total Check-ins Today</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="bottom-section" style="margin-top: 20px;">
+                <div class="panel" onclick="switchTab('trainers')" style="cursor: pointer;">
+                    <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Active Trainers on Floor</div>
+                    <div class="panel-body" id="dashActiveTrainersFeed">
+                        <p style="color: var(--text-muted); font-size: 14px;">Loading...</p>
+                    </div>
+                </div>
+
                 <div class="panel" onclick="switchTab('equipment')" style="cursor: pointer;">
                     <div class="panel-header"><i class="fa-solid fa-clipboard-list"></i> Inventory Alerts</div>
                     <div class="panel-body" id="dashInventoryAlerts">
                         <p style="color: var(--text-muted); font-size: 14px;">Loading alerts...</p>
-                    </div>
-                </div>
-                <div class="panel" onclick="switchTab('trainers')" style="cursor: pointer;">
-                    <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Active Trainers on Floor</div>
-                    <div class="panel-body" id="dashActiveTrainersFeed">
-                        <p style="color: var(--text-muted); font-size: 14px;">Loading trainers...</p>
                     </div>
                 </div>
             </div>
@@ -289,7 +221,7 @@
         <div id="pos" class="content-section">
             <div class="pos-container">
                 <div class="pos-products">
-                    <div class="pos-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="pos-header">
                         <span><i class="fa-solid fa-box-open"></i> Available Consumables</span>
                         <div class="search-box" style="width: 200px;">
                             <i class="fas fa-search"></i>
@@ -318,6 +250,93 @@
                     </div>
                     <div class="pos-totals">
                         </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="bookings" class="content-section">
+            <div class="table-controls">
+                <div class="search-box" style="display: flex; gap: 10px; width: 600px;">
+                    <div style="position: relative; flex-grow: 1;">
+                        <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999;"></i>
+                        <input type="text" id="bookingSearch" placeholder="Search member or trainer..." onkeyup="filterTable('bookingsTable', 'bookingSearch')" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px;">
+                    </div>
+                    <input type="date" id="bookingDateFilter" onchange="filterBookingsByDate()" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; background: white;">
+                </div>
+                <button class="action-btn" onclick="openBookingModal()"><i class="fas fa-calendar-plus"></i> Book Session</button>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-calendar-alt"></i> Scheduled PT Sessions</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="bookingsTable">
+                        <thead>
+                            <tr>
+                                <th>Member Name</th>
+                                <th>Assigned Trainer</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookingsBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="staff" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="staffSearch" placeholder="Search staff members..." onkeyup="filterTable('staffTable', 'staffSearch')">
+                </div>
+                <button class="action-btn" onclick="openStaffModal('Staff')"><i class="fas fa-user-plus"></i> Register Staff</button>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-user-tie"></i> Staff Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="staffTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Role</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="trainers" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="trainerSearch" placeholder="Search trainers..." onkeyup="filterTable('trainerTable', 'trainerSearch')">
+                </div>
+                <button class="action-btn" onclick="openStaffModal('Trainer')"><i class="fas fa-user-plus"></i> Register Trainer</button>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-users-gear"></i> Trainer Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="trainerTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Role</th>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -407,6 +426,8 @@
                                 <th>Membership Type</th>
                                 <th>Date Logged</th>
                                 <th>Time In</th>
+                                <th>Time Out</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -451,60 +472,6 @@
                                 <th>Gross Total</th>
                                 <th>VAT</th>
                                 <th>Net Total</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="staff" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="staffSearch" placeholder="Search staff..." onkeyup="filterTable('staffTable', 'staffSearch')">
-                </div>
-                <button class="action-btn" onclick="openStaffModal('Staff')"><i class="fas fa-users"></i> Batch Register Staff</button>
-            </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-id-badge"></i> Staff Directory</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="staffTable">
-                        <thead>
-                            <tr>
-                                <th>Full Name</th>
-                                <th>Role</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="trainers" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="trainerSearch" placeholder="Search trainers..." onkeyup="filterTable('trainerTable', 'trainerSearch')">
-                </div>
-                <button class="action-btn" onclick="openStaffModal('Trainer')"><i class="fas fa-users"></i> Batch Register Trainers</button>
-            </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-dumbbell"></i> Trainer Directory</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="trainerTable">
-                        <thead>
-                            <tr>
-                                <th>Full Name</th>
-                                <th>Role</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -591,13 +558,16 @@
     </div>
 
     <div id="staffModal" class="modal">
-        <div class="modal-content" style="width: 800px; max-width: 95vw;">
+        <div class="modal-content" style="width: 900px; max-width: 95vw;">
             <div class="modal-header">
                 <h3 id="staffModalTitle">Batch Register</h3>
                 <span class="close-btn" onclick="closeModal('staffModal')">&times;</span>
             </div>
             <form class="modal-form" id="batchStaffForm">
-                <input type="hidden" id="hiddenStaffRole" value="Staff">
+                <input type="hidden" id="hiddenStaffRole">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
+                    <i class="fas fa-info-circle"></i> To assign a card, click inside the "RFID Tag" box and tap the card on the scanner.
+                </p>
                 <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
                     <table class="batch-table">
                         <thead>
@@ -607,6 +577,7 @@
                                 <th>Family Name</th>
                                 <th>Email</th>
                                 <th>Status</th>
+                                <th>RFID Tag (Tap Card)</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -616,19 +587,22 @@
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <button type="button" onclick="addStaffBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
-                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
+                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div id="memberModal" class="modal">
-        <div class="modal-content" style="width: 800px; max-width: 95vw;">
+        <div class="modal-content" style="width: 900px; max-width: 95vw;">
             <div class="modal-header">
-                <h3 id="memberModalTitle">Register Members</h3>
+                <h3 id="memberModalTitle">Register Members & Assign RFID</h3>
                 <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
             </div>
             <form class="modal-form" id="batchMemberForm">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
+                    <i class="fas fa-info-circle"></i> To assign a card, click inside the "RFID Tag" box and tap the card on the scanner.
+                </p>
                 <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
                     <table class="batch-table">
                         <thead>
@@ -638,6 +612,7 @@
                                 <th>Family Name</th>
                                 <th>Email</th>
                                 <th>Plan</th>
+                                <th>RFID Tag (Tap Card)</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -647,7 +622,7 @@
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <button type="button" onclick="addBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
-                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register & Send Emails</button>
+                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register</button>
                 </div>
             </form>
         </div>
@@ -665,6 +640,59 @@
                 <input type="text" id="editMemberMI" placeholder="M.I. (Opt.)" maxlength="2" oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')">
                 <input type="text" id="editMemberFamily" placeholder="Family Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
                 <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="bookingModalTitle">Book Personal Training</h3>
+                <span class="close-btn" onclick="closeModal('bookingModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="bookingForm">
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Select Member:</p>
+                <select id="bookMember" required>
+                    </select>
+                
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px; margin-top: 10px;">Select Trainer:</p>
+                <select id="bookTrainer" required>
+                    </select>
+                
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <div style="flex: 1;">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Date:</p>
+                        <input type="date" id="bookDate" required style="width: 100%;">
+                    </div>
+                    <div style="flex: 1;">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Time:</p>
+                        <input type="time" id="bookTime" required style="width: 100%;">
+                    </div>
+                </div>
+                
+                <button type="submit" style="background-color: var(--primary-red); margin-top: 20px;">Confirm Booking</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="editBookingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Update Session Status</h3>
+                <span class="close-btn" onclick="closeModal('editBookingModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="editBookingForm">
+                <input type="hidden" id="editBookingId">
+                <p style="font-size: 14px; margin-bottom: 10px;">Session: <strong id="editBookingDetails"></strong></p>
+                
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Update Status:</p>
+                <select id="editBookingStatus" required>
+                    <option value="Confirmed">Confirmed</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="No Show">No Show</option>
+                </select>
+                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
             </form>
         </div>
     </div>

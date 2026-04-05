@@ -1108,6 +1108,7 @@ if (document.getElementById('batchMemberForm')) {
     });
 }
 
+// ----- UPDATED STAFF BATCH REGISTRATION (WITH RFID) -----
 let staffBatchRowCount = 1;
 
 window.addStaffBatchRow = function() {
@@ -1126,6 +1127,7 @@ window.addStaffBatchRow = function() {
                 <option value="On Leave">On Leave</option>
             </select>
         </td>
+        <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required></td>
         <td>
             <button type="button" onclick="this.parentElement.parentElement.remove(); staffBatchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;">
                 <i class="fas fa-trash"></i>
@@ -1156,6 +1158,7 @@ window.openStaffModal = (role) => {
                     <option value="On Leave">On Leave</option>
                 </select>
             </td>
+            <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required></td>
             <td></td>
         </tr>
     `;
@@ -1181,6 +1184,7 @@ if (document.getElementById('batchStaffForm')) {
             const family = row.querySelector('.bs-last').value.trim();
             const email = row.querySelector('.bs-email').value.trim();
             const status = row.querySelector('.bs-status').value;
+            const rfidTag = row.querySelector('.bs-rfid').value.trim();
             const randomPassword = generatePassword();
 
             try {
@@ -1199,6 +1203,7 @@ if (document.getElementById('batchStaffForm')) {
                     role: role, 
                     email: email, 
                     status: status,
+                    rfid: rfidTag,
                     password: randomPassword 
                 });
                 
@@ -1466,7 +1471,9 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault(); // Stop forms from submitting!
 
         const activeEl = document.activeElement;
-        const isRegistrationBox = activeEl && activeEl.classList.contains('bm-rfid');
+        
+        // This targets BOTH the Staff and Member RFID input boxes beautifully
+        const isRegistrationBox = activeEl && activeEl.classList.contains('rfid-register-input');
 
         // 3. CLEANUP: If staff was typing in a normal text box (like Name or Search), 
         // the scanner just dumped numbers into it. We need to silently erase those numbers.
@@ -1479,13 +1486,13 @@ document.addEventListener('keydown', (e) => {
 
         // 4. ROUTE THE SCAN
         if (isRegistrationBox) {
-            // They clicked the RFID box on purpose to register a new card
+            // They clicked an RFID box on purpose to register a new card (Staff OR Member)
             activeEl.value = rfidBuffer;
             activeEl.style.backgroundColor = "#c8e6c9"; // Turn green
             activeEl.style.borderColor = "#2e7d32";
             activeEl.blur(); // Remove cursor to prevent double-scanning
         } else {
-            // Check if it's the currently logged-in Staff Member scanning out
+            // Check if it's the currently logged-in Admin/Staff Member scanning out
             const loggedInRfid = localStorage.getItem("userRfid");
             if (loggedInRfid && rfidBuffer === loggedInRfid) {
                 alert("Shift Ended. Logging out...");
