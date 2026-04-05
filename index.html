@@ -149,7 +149,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const loginConfig = {
             apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
@@ -261,7 +261,9 @@
                     return;
                 } 
                 
-                const userData = querySnapshot.docs[0].data();
+                const userDoc = querySnapshot.docs[0];
+                const userData = userDoc.data();
+                const userId = userDoc.id;
                 
                 if (userData.status === 'Archived') {
                     errorMsg.innerText = "This account has been archived. Please contact admin.";
@@ -287,6 +289,17 @@
                     submitBtn.innerText = "Log In";
                     submitBtn.disabled = false;
                     return;
+                }
+
+                // LOG SHIFT START TIME FOR STAFF AND ADMINS
+                if (userData.role === "Admin" || userData.role === "Staff") {
+                    const now = Date.now();
+                    await updateDoc(doc(db, "users", userId), {
+                        shiftStatus: "On Shift",
+                        shiftStart: now
+                    });
+                    localStorage.setItem("shiftStart", now);
+                    localStorage.setItem("userId", userId);
                 }
 
                 localStorage.setItem("loggedInUser", userData.name || userData.givenName);

@@ -27,10 +27,23 @@ emailjs.init("ZqQKGRo5j5KpAhH98");
 // 3. GLOBAL EXPORTS (HTML ONCLICK BUTTONS)
 // ==========================================
 
-window.handleLogout = function() {
+window.handleLogout = async function() {
+    const userId = localStorage.getItem("userId");
+    
+    // Set shift status to 'Off Shift' before logging out
+    if (userId) {
+        try {
+            await updateDoc(doc(db, "users", userId), { shiftStatus: "Off Shift" });
+        } catch (error) {
+            console.error("Failed to update shift status:", error);
+        }
+    }
+
     localStorage.removeItem("loggedInUser");
     localStorage.removeItem("userRole");
-    localStorage.removeItem("userRfid"); // Clear the RFID on logout
+    localStorage.removeItem("userRfid"); 
+    localStorage.removeItem("userId"); 
+    localStorage.removeItem("shiftStart"); 
     window.location.replace("index.html"); 
 };
 
@@ -923,12 +936,19 @@ function renderStaff() {
         let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
         let fullName = `${u.givenName || u.name} ${u.mi ? u.mi + '. ' : ''}${u.familyName || ''}`.trim();
 
+        // 1. ADD THE NEW "ON SHIFT" BADGE HERE
+        let shiftBadge = '';
+        if (roleStr === 'staff' || roleStr === 'admin') {
+            const isWorking = u.shiftStatus === 'On Shift';
+            shiftBadge = `<br><span class="badge ${isWorking ? 'active' : 'inactive'}" style="margin-top: 5px; ${isWorking ? 'background: var(--dark-black);' : ''}">${isWorking ? 'On Shift' : 'Off Shift'}</span>`;
+        }
+
         const rowHtml = `
             <tr>
                 <td>${fullName}</td>
                 <td>${u.role}</td>
                 <td>${u.email}</td>
-                <td><span class="badge ${badgeClass}">${u.status || 'Active'}</span></td>
+                <td><span class="badge ${badgeClass}">${u.status || 'Active'}</span>${shiftBadge}</td>
                 <td>
                     <button class="btn-icon btn-delete" title="Delete Account" onclick="deleteUser('${u.id}')">
                         <i class="fas fa-trash"></i>
@@ -1257,7 +1277,7 @@ function renderPayments() {
 }
 
 // ==========================================
-// 11. UI INITIALIZATION
+// 11. UI INITIALIZATION & SHIFT TIMER
 // ==========================================
 function initUI() {
     // 1. START THE CLOCK FIRST (Never fails)
@@ -1286,7 +1306,37 @@ function initUI() {
         };
     });
 
-    // 3. LOAD THE CHARTS LAST (Wrapped in a safety net)
+    // 3. START THE SHIFT TIMER
+    function updateShiftTimer() {
+        const shiftStart = localStorage.getItem("shiftStart");
+        if (shiftStart) {
+            const now = Date.now();
+            const diff = now - parseInt(shiftStart);
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const secs = Math.floor((diff % (1000 * 60)) / 1000);
+            
+            const timeString = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            
+            const blackCards = document.querySelectorAll('.card-black');
+            blackCards.forEach(card => {
+                const valueDiv = card.querySelector('.value');
+                // Ensure we only inject the timer into the specific "Shift Started" box
+                if (valueDiv && valueDiv.innerText.includes('Shift')) {
+                    let timerSpan = card.querySelector('.shift-timer');
+                    if (!timerSpan) {
+                        card.innerHTML += `<span class="shift-timer" style="position: absolute; top: 10px; right: 15px; font-size: 16px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">${timeString}</span>`;
+                    } else {
+                        timerSpan.innerText = timeString;
+                    }
+                }
+            });
+        }
+    }
+    setInterval(updateShiftTimer, 1000);
+    updateShiftTimer();
+
+    // 4. LOAD THE CHARTS LAST (Wrapped in a safety net)
     try {
         initDashboardCharts();
     } catch (error) {
