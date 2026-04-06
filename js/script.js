@@ -606,7 +606,6 @@ function renderPayments() {
     });
 }
 
-// --- NEW: Dynamic Weekly PDF Generator ---
 window.generateWeeklyPDF = function() {
     if (typeof html2pdf === 'undefined') {
         return alert("PDF library is still loading, please wait a moment and try again.");
@@ -614,7 +613,6 @@ window.generateWeeklyPDF = function() {
 
     const docName = localStorage.getItem("loggedInUser") || "Staff Member";
     
-    // 1. Calculate this week's Monday and Sunday
     const today = new Date();
     const dayOfWeek = today.getDay(); 
     const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -633,19 +631,16 @@ window.generateWeeklyPDF = function() {
     document.getElementById('pdfAssociateName').innerText = docName;
     document.getElementById('pdfCompletionDate').innerText = formatShortDate(today);
 
-    // 2. Aggregate Data into Product Categories
     let productSales = {};
     
     paymentsData.forEach(payment => {
         if (!payment.date) return;
         const payDate = new Date(payment.date);
         
-        // Filter strictly to this week
         if (payDate >= monday && payDate <= sunday) {
             let dayIndex = payDate.getDay() === 0 ? 6 : payDate.getDay() - 1;
             
             if (payment.items) {
-                // Break apart string like "2x Protein Bar, 1x Walk-in Gym Access"
                 let itemsList = payment.items.split(', ');
                 itemsList.forEach(itemStr => {
                     let match = itemStr.match(/^(\d+)x\s+(.+)$/);
@@ -661,7 +656,6 @@ window.generateWeeklyPDF = function() {
         }
     });
 
-    // 3. Build HTML Rows
     const tbody = document.getElementById('pdfSalesBody');
     tbody.innerHTML = "";
     
@@ -684,7 +678,6 @@ window.generateWeeklyPDF = function() {
         rowCount++;
     }
 
-    // Fill empty rows to make it look like a printed template pad
     while (rowCount < 15) {
         tbody.innerHTML += `
             <tr>
@@ -702,7 +695,6 @@ window.generateWeeklyPDF = function() {
         rowCount++;
     }
 
-    // 4. Capture & Download via html2pdf
     const element = document.getElementById('weekly-sales-report');
     document.getElementById('pdf-report-container').style.display = 'block'; 
     
@@ -1401,7 +1393,7 @@ document.addEventListener('keydown', (e) => {
         } else {
             const loggedInRfid = localStorage.getItem("userRfid");
             if (loggedInRfid && rfidBuffer === loggedInRfid) {
-                alert("Shift Ended. Logging out...");
+                console.log("Shift Ended. Logging out...");
                 window.handleLogout();
             } else {
                 processRfidAttendance(rfidBuffer);
@@ -1414,12 +1406,13 @@ document.addEventListener('keydown', (e) => {
     lastKeyTime = currentTime;
 });
 
+// --- UPDATE: Replaced visual alerts with silent console logs ---
 async function processRfidAttendance(scannedTag) {
     const q = query(usersCol, where("rfid", "==", scannedTag));
     const snapshot = await getDocs(q);
     
     if (snapshot.empty) {
-        alert(`❌ Unrecognized Card Scanned (ID: ${scannedTag}). Please register this card to a user.`);
+        console.warn(`Unrecognized Card Scanned (ID: ${scannedTag}).`);
         return;
     }
     
@@ -1427,7 +1420,7 @@ async function processRfidAttendance(scannedTag) {
     const user = userDoc.data();
     
     if (user.status === 'Archived') {
-        alert(`⚠️ Access Denied. ${user.name || user.givenName}'s account is archived.`);
+        console.warn(`Access Denied. ${user.name || user.givenName}'s account is archived.`);
         return;
     }
 
@@ -1449,9 +1442,9 @@ async function processRfidAttendance(scannedTag) {
 
         if (isTrainer) {
             await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "Off Floor" });
-            alert(`👋 Goodbye, Trainer ${userName}! You are now Off Floor.`);
+            console.log(`Goodbye, Trainer ${userName}! You are now Off Floor.`);
         } else {
-            alert(`👋 Goodbye, ${userName}! Checked out successfully.`);
+            console.log(`Goodbye, ${userName}! Checked out successfully.`);
         }
     } else {
         await addDoc(attendanceCol, {
@@ -1466,9 +1459,9 @@ async function processRfidAttendance(scannedTag) {
 
         if (isTrainer) {
             await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "On Floor" });
-            alert(`✅ Welcome, Trainer ${userName}! You are now On Floor.`);
+            console.log(`Welcome, Trainer ${userName}! You are now On Floor.`);
         } else {
-            alert(`✅ Welcome, ${userName}! Checked in successfully.`);
+            console.log(`Welcome, ${userName}! Checked in successfully.`);
         }
     }
 }
