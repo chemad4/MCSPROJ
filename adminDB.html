@@ -265,7 +265,6 @@
                     </div>
                     <input type="date" id="bookingDateFilter" onchange="filterBookingsByDate()" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; background: white;">
                 </div>
-                <button class="action-btn" onclick="openBookingModal()"><i class="fas fa-calendar-plus"></i> Book Session</button>
             </div>
             
             <div class="panel">
@@ -731,37 +730,6 @@
                 </select>
 
                 <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="bookingModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="bookingModalTitle">Book Personal Training</h3>
-                <span class="close-btn" onclick="closeModal('bookingModal')">&times;</span>
-            </div>
-            <form class="modal-form" id="bookingForm">
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Select Member:</p>
-                <select id="bookMember" required>
-                    </select>
-                
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px; margin-top: 10px;">Select Trainer:</p>
-                <select id="bookTrainer" required>
-                    </select>
-                
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <div style="flex: 1;">
-                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Date:</p>
-                        <input type="date" id="bookDate" required style="width: 100%;">
-                    </div>
-                    <div style="flex: 1;">
-                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Time:</p>
-                        <input type="time" id="bookTime" required style="width: 100%;">
-                    </div>
-                </div>
-                
-                <button type="submit" style="background-color: var(--primary-red); margin-top: 20px;">Confirm Booking</button>
             </form>
         </div>
     </div>
