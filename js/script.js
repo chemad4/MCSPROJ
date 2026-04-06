@@ -123,7 +123,6 @@ window.switchTab = function(tabId, element) {
 }
 
 window.closeModal = function(modalId) { document.getElementById(modalId).style.display = 'none'; }
-window.exportReport = function() { window.print(); }
 window.exportInventoryReport = function() { window.print(); }
 
 window.filterTable = function(tableId, inputId) {
@@ -567,7 +566,7 @@ window.processPayment = async function(grandTotal) {
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
-    await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "POS Sale", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr, time: timeStr });
+    await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "POS Sale", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr, time: timeStr, timestamp: now.getTime() });
 
     for (let item of posCart) {
         if (item.id === 'WALKIN') {
@@ -584,7 +583,144 @@ window.processPayment = async function(grandTotal) {
 }
 
 // ==========================================
-// 9. MASTER DIRECTORY & ATTENDANCE LOGIC
+// 9. FINANCIALS & WEEKLY PDF GENERATOR
+// ==========================================
+onSnapshot(paymentsCol, (snapshot) => {
+    paymentsData = [];
+    snapshot.forEach(doc => paymentsData.push({ id: doc.id, ...doc.data() }));
+    renderPayments();
+});
+
+function renderPayments() {
+    const payTbody = document.querySelector('#paymentTable tbody');
+    if (!payTbody) return;
+    payTbody.innerHTML = "";
+    paymentsData.forEach(t => {
+        let vat = (t.amount * 0.12).toFixed(2);
+        payTbody.innerHTML += `
+            <tr>
+                <td>${t.name}</td><td>${t.items || t.type}</td><td>${t.date} <span style="color:#888; font-size:12px;">${t.time || ''}</span></td>
+                <td>₱${t.amount}</td><td>₱${vat}</td><td style="font-weight:bold; color:var(--primary-red);">₱${t.amount}</td>
+            </tr>
+        `;
+    });
+}
+
+// --- NEW: Dynamic Weekly PDF Generator ---
+window.generateWeeklyPDF = function() {
+    if (typeof html2pdf === 'undefined') {
+        return alert("PDF library is still loading, please wait a moment and try again.");
+    }
+
+    const docName = localStorage.getItem("loggedInUser") || "Staff Member";
+    
+    // 1. Calculate this week's Monday and Sunday
+    const today = new Date();
+    const dayOfWeek = today.getDay(); 
+    const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + distanceToMonday);
+    monday.setHours(0,0,0,0);
+    
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23,59,59,999);
+    
+    const formatShortDate = (d) => `${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear().toString().slice(-2)}`;
+    
+    document.getElementById('pdfWeekOf').innerText = `${formatShortDate(monday)} - ${formatShortDate(sunday)}`;
+    document.getElementById('pdfAssociateName').innerText = docName;
+    document.getElementById('pdfCompletionDate').innerText = formatShortDate(today);
+
+    // 2. Aggregate Data into Product Categories
+    let productSales = {};
+    
+    paymentsData.forEach(payment => {
+        if (!payment.date) return;
+        const payDate = new Date(payment.date);
+        
+        // Filter strictly to this week
+        if (payDate >= monday && payDate <= sunday) {
+            let dayIndex = payDate.getDay() === 0 ? 6 : payDate.getDay() - 1;
+            
+            if (payment.items) {
+                // Break apart string like "2x Protein Bar, 1x Walk-in Gym Access"
+                let itemsList = payment.items.split(', ');
+                itemsList.forEach(itemStr => {
+                    let match = itemStr.match(/^(\d+)x\s+(.+)$/);
+                    if (match) {
+                        let qty = parseInt(match[1]);
+                        let name = match[2];
+                        
+                        if(!productSales[name]) productSales[name] = [0,0,0,0,0,0,0];
+                        productSales[name][dayIndex] += qty;
+                    }
+                });
+            }
+        }
+    });
+
+    // 3. Build HTML Rows
+    const tbody = document.getElementById('pdfSalesBody');
+    tbody.innerHTML = "";
+    
+    let rowCount = 0;
+    for (let [prodName, days] of Object.entries(productSales)) {
+        let total = days.reduce((a, b) => a + b, 0);
+        tbody.innerHTML += `
+            <tr>
+                <td style="border: 1px solid #000; padding: 10px; text-align: left; height: 35px;">${prodName}</td>
+                <td style="border: 1px solid #000; padding: 10px;">${days[0] || ''}</td>
+                <td style="border: 1px solid #000; padding: 10px;">${days[1] || ''}</td>
+                <td style="border: 1px solid #000; padding: 10px;">${days[2] || ''}</td>
+                <td style="border: 1px solid #000; padding: 10px;">${days[3] || ''}</td>
+                <td style="border: 1px solid #000; padding: 10px;">${days[4] || ''}</td>
+                <td style="border: 1px solid #000; padding: 10px;">${days[5] || ''}</td>
+                <td style="border: 1px solid #000; padding: 10px;">${days[6] || ''}</td>
+                <td style="border: 1px solid #000; padding: 10px; font-weight: bold;">${total}</td>
+            </tr>
+        `;
+        rowCount++;
+    }
+
+    // Fill empty rows to make it look like a printed template pad
+    while (rowCount < 15) {
+        tbody.innerHTML += `
+            <tr>
+                <td style="border: 1px solid #000; padding: 10px; height: 35px;"></td>
+                <td style="border: 1px solid #000; padding: 10px;"></td>
+                <td style="border: 1px solid #000; padding: 10px;"></td>
+                <td style="border: 1px solid #000; padding: 10px;"></td>
+                <td style="border: 1px solid #000; padding: 10px;"></td>
+                <td style="border: 1px solid #000; padding: 10px;"></td>
+                <td style="border: 1px solid #000; padding: 10px;"></td>
+                <td style="border: 1px solid #000; padding: 10px;"></td>
+                <td style="border: 1px solid #000; padding: 10px;"></td>
+            </tr>
+        `;
+        rowCount++;
+    }
+
+    // 4. Capture & Download via html2pdf
+    const element = document.getElementById('weekly-sales-report');
+    document.getElementById('pdf-report-container').style.display = 'block'; 
+    
+    let opt = {
+        margin:       0.5,
+        filename:     `Weekly_Sales_${formatShortDate(monday).replace(/\//g, '-')}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+        document.getElementById('pdf-report-container').style.display = 'none'; 
+    });
+}
+
+// ==========================================
+// 10. MASTER DIRECTORY & ATTENDANCE LOGIC
 // ==========================================
 onSnapshot(attendanceCol, (snapshot) => {
     attendanceData = [];
@@ -849,7 +985,6 @@ function renderMemberTrainers() {
     });
 }
 
-// --- UPDATE: Edit Staff Modal populates the Status dropdown ---
 window.openEditStaffModal = function(id) {
     const user = allUsersData.find(u => u.id === id);
     if (!user) return;
@@ -872,7 +1007,6 @@ window.openEditStaffModal = function(id) {
         }
     }
 
-    // Pre-fill the Status
     if (document.getElementById('editStaffStatus')) {
         document.getElementById('editStaffStatus').value = user.status || 'Active';
     }
@@ -906,7 +1040,6 @@ if (document.getElementById('editStaffForm')) {
             updatedData.specialty = specialtyEl.value.trim();
         }
         
-        // Save the updated status
         const statusEl = document.getElementById('editStaffStatus');
         if (statusEl) {
             updatedData.status = statusEl.value;
@@ -932,7 +1065,7 @@ window.deleteUser = async (id) => {
 }
 
 // ==========================================
-// 10. BATCH REGISTRATION
+// 11. BATCH REGISTRATION
 // ==========================================
 let batchRowCount = 1;
 
@@ -1010,7 +1143,6 @@ if (document.getElementById('batchMemberForm')) {
 
 let staffBatchRowCount = 1;
 
-// --- UPDATE: Removed Status Dropdown from Batch Row HTML ---
 window.addStaffBatchRow = function() {
     if (staffBatchRowCount >= 20) return alert("Maximum 20 accounts can be registered at once.");
     const tbody = document.getElementById('batchStaffBody');
@@ -1037,7 +1169,6 @@ window.openStaffModal = (role) => {
         document.getElementById('batchSpecialtyHeader').innerText = role === 'Trainer' ? 'Specialty (Required)' : 'Specialty (N/A)';
     }
 
-    // --- UPDATE: Removed Status Dropdown from initial Modal HTML ---
     document.getElementById('batchStaffBody').innerHTML = `
         <tr>
             <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
@@ -1081,7 +1212,6 @@ if (document.getElementById('batchStaffForm')) {
             try {
                 await emailjs.send("service_x90mti6", "template_nda1wjc", { to_name: given, to_email: email, generated_password: randomPassword, plan: `${role} Account` });
                 
-                // --- UPDATE: Hardcoded Status to "Active" since it's a new registration ---
                 let newUser = { 
                     name: `${given} ${family}`, givenName: given, mi: mi, familyName: family, 
                     role: role, email: email, status: "Active", rfid: rfidTag, password: randomPassword
@@ -1099,30 +1229,6 @@ if (document.getElementById('batchStaffForm')) {
         if (duplicateCount > 0) alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
         if (emailFailCount > 0) alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
         alert(alertMsg);
-    });
-}
-
-// ==========================================
-// 11. FINANCIALS
-// ==========================================
-onSnapshot(paymentsCol, (snapshot) => {
-    paymentsData = [];
-    snapshot.forEach(doc => paymentsData.push({ id: doc.id, ...doc.data() }));
-    renderPayments();
-});
-
-function renderPayments() {
-    const payTbody = document.querySelector('#paymentTable tbody');
-    if (!payTbody) return;
-    payTbody.innerHTML = "";
-    paymentsData.forEach(t => {
-        let vat = (t.amount * 0.12).toFixed(2);
-        payTbody.innerHTML += `
-            <tr>
-                <td>${t.name}</td><td>${t.items || t.type}</td><td>${t.date} <span style="color:#888; font-size:12px;">${t.time || ''}</span></td>
-                <td>₱${t.amount}</td><td>₱${vat}</td><td style="font-weight:bold; color:var(--primary-red);">₱${t.amount}</td>
-            </tr>
-        `;
     });
 }
 

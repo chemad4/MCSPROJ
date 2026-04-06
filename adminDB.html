@@ -15,8 +15,10 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
     <link rel="stylesheet" href="css/styles.css">
     
@@ -513,7 +515,7 @@
                     <i class="fas fa-search"></i>
                     <input type="text" id="paymentSearch" placeholder="Search receipt..." onkeyup="filterTable('paymentTable', 'paymentSearch')">
                 </div>
-                <button class="action-btn" onclick="exportReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Sales Report</button>
+                <button class="action-btn" onclick="generateWeeklyPDF()" style="background: var(--dark-black);"><i class="fas fa-file-pdf"></i> Download Weekly PDF</button>
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-money-check-alt"></i> Transaction History (Receipts)</div>
@@ -753,6 +755,45 @@
                 </select>
                 <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
             </form>
+        </div>
+    </div>
+
+    <div id="pdf-report-container" style="display: none;">
+        <div id="weekly-sales-report" style="width: 100%; font-family: sans-serif; padding: 40px; color: #333; background: white;">
+            <h1 style="color: #555; font-size: 24px; text-transform: uppercase; margin-bottom: 20px; font-weight: bold; letter-spacing: 1px;">Printable Weekly<br>Sales Report Template</h1>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: center; border: 2px solid #000;">
+                <tr style="background-color: #bcc6d5; font-size: 11px; font-weight: bold; color: black;">
+                    <th style="border: 1px solid #000; padding: 12px;">WEEK OF</th>
+                    <th style="border: 1px solid #000; padding: 12px;">ASSOCIATE NAME</th>
+                    <th style="border: 1px solid #000; padding: 12px;">SIGNATURE</th>
+                    <th style="border: 1px solid #000; padding: 12px;">REPORT COMPLETION DATE</th>
+                </tr>
+                <tr style="font-size: 13px; font-weight: bold; color: black;">
+                    <td style="border: 1px solid #000; padding: 15px;" id="pdfWeekOf"></td>
+                    <td style="border: 1px solid #000; padding: 15px;" id="pdfAssociateName"></td>
+                    <td style="border: 1px solid #000; padding: 15px;"></td>
+                    <td style="border: 1px solid #000; padding: 15px;" id="pdfCompletionDate"></td>
+                </tr>
+            </table>
+
+            <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; text-align: center; font-size: 11px; color: black;">
+                <thead style="background-color: #bcc6d5; font-weight: bold;">
+                    <tr>
+                        <th style="border: 1px solid #000; padding: 12px; text-align: left;">PRODUCT DESCRIPTION</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">MON</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">TUE</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">WED</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">THU</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">FRI</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">SAT</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">SUN</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 80px;">TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfSalesBody">
+                    </tbody>
+            </table>
         </div>
     </div>
 
