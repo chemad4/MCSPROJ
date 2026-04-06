@@ -632,7 +632,7 @@
                                 <th>M.I.</th>
                                 <th>Family Name</th>
                                 <th>Email</th>
-                                <th>Specialty (Opt.)</th>
+                                <th id="batchSpecialtyHeader">Specialty (Opt.)</th>
                                 <th>Status</th>
                                 <th>RFID Tag (Tap Card)</th>
                                 <th></th>
@@ -653,7 +653,7 @@
     <div id="editStaffModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Edit Staff/Trainer Details</h3>
+                <h3 id="editStaffModalTitle">Edit Details</h3>
                 <span class="close-btn" onclick="closeModal('editStaffModal')">&times;</span>
             </div>
             <form class="modal-form" id="editStaffForm">
@@ -662,8 +662,10 @@
                 <input type="text" id="editStaffMI" placeholder="M.I. (Opt.)" maxlength="2" oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')">
                 <input type="text" id="editStaffFamily" placeholder="Family Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
                 
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Specialty (For Trainers Only):</p>
-                <input type="text" id="editStaffSpecialty" placeholder="e.g. Powerlifting, Yoga, HIIT">
+                <div id="editSpecialtyContainer" style="display: none;">
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px; margin-top: 10px;">Trainer Specialty:</p>
+                    <input type="text" id="editStaffSpecialty" placeholder="e.g. Powerlifting, Yoga, HIIT">
+                </div>
                 
                 <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
             </form>
