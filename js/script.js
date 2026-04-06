@@ -695,7 +695,6 @@ function renderMembers() {
     if (document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = totalNonArchived; 
 }
 
-// --- UPDATE: Open Member Edit Modal now fetches the Plan ---
 window.openEditMemberModal = function(id) {
     const member = membersData.find(m => m.id === id);
     if (!member) return;
@@ -711,7 +710,6 @@ window.openEditMemberModal = function(id) {
     document.getElementById('editMemberModal').style.display = 'flex';
 }
 
-// --- UPDATE: Edit Member Form saves the updated Plan ---
 if (document.getElementById('editMemberForm')) {
     document.getElementById('editMemberForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -851,7 +849,7 @@ function renderMemberTrainers() {
     });
 }
 
-// --- UPDATE: Edit Staff Modal dynamically hides Specialty based on Role ---
+// --- UPDATE: Edit Staff Modal populates the Status dropdown ---
 window.openEditStaffModal = function(id) {
     const user = allUsersData.find(u => u.id === id);
     if (!user) return;
@@ -861,7 +859,6 @@ window.openEditStaffModal = function(id) {
     document.getElementById('editStaffMI').value = user.mi || '';
     document.getElementById('editStaffFamily').value = user.familyName || '';
     
-    // Only show specialty input if they are a Trainer
     const specialtyContainer = document.getElementById('editSpecialtyContainer');
     const specialtyInput = document.getElementById('editStaffSpecialty');
     
@@ -875,7 +872,11 @@ window.openEditStaffModal = function(id) {
         }
     }
 
-    // Dynamic Title
+    // Pre-fill the Status
+    if (document.getElementById('editStaffStatus')) {
+        document.getElementById('editStaffStatus').value = user.status || 'Active';
+    }
+
     if (document.getElementById('editStaffModalTitle')) {
         document.getElementById('editStaffModalTitle').innerText = `Edit ${(user.role || "Staff")} Details`;
     }
@@ -898,7 +899,6 @@ if (document.getElementById('editStaffForm')) {
             name: `${given} ${family}`.trim()
         };
 
-        // Only save specialty if the container is currently visible (meaning they are a trainer)
         const specialtyContainer = document.getElementById('editSpecialtyContainer');
         const specialtyEl = document.getElementById('editStaffSpecialty');
         
@@ -906,6 +906,12 @@ if (document.getElementById('editStaffForm')) {
             updatedData.specialty = specialtyEl.value.trim();
         }
         
+        // Save the updated status
+        const statusEl = document.getElementById('editStaffStatus');
+        if (statusEl) {
+            updatedData.status = statusEl.value;
+        }
+
         await updateDoc(doc(db, "users", id), updatedData);
         window.closeModal('editStaffModal');
         alert(`Details updated successfully!`);
@@ -1004,6 +1010,7 @@ if (document.getElementById('batchMemberForm')) {
 
 let staffBatchRowCount = 1;
 
+// --- UPDATE: Removed Status Dropdown from Batch Row HTML ---
 window.addStaffBatchRow = function() {
     if (staffBatchRowCount >= 20) return alert("Maximum 20 accounts can be registered at once.");
     const tbody = document.getElementById('batchStaffBody');
@@ -1014,7 +1021,6 @@ window.addStaffBatchRow = function() {
         <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
         <td><input type="email" class="bs-email" required></td>
         <td><input type="text" class="bs-specialty" placeholder="Opt. (e.g. Yoga)"></td>
-        <td><select class="bs-status"><option value="Active">Active</option><option value="On Leave">On Leave</option></select></td>
         <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required></td>
         <td><button type="button" onclick="this.parentElement.parentElement.remove(); staffBatchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
     `;
@@ -1027,11 +1033,11 @@ window.openStaffModal = (role) => {
     document.getElementById('hiddenStaffRole').value = role;
     document.getElementById('staffModalTitle').innerText = `Batch Register ${role}s`;
     
-    // Dynamic Header for Batch Table
     if (document.getElementById('batchSpecialtyHeader')) {
         document.getElementById('batchSpecialtyHeader').innerText = role === 'Trainer' ? 'Specialty (Required)' : 'Specialty (N/A)';
     }
 
+    // --- UPDATE: Removed Status Dropdown from initial Modal HTML ---
     document.getElementById('batchStaffBody').innerHTML = `
         <tr>
             <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
@@ -1039,7 +1045,6 @@ window.openStaffModal = (role) => {
             <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
             <td><input type="email" class="bs-email" required></td>
             <td><input type="text" class="bs-specialty" placeholder="${role === 'Trainer' ? 'e.g. Yoga' : 'N/A'}" ${role === 'Staff' ? 'disabled' : ''}></td>
-            <td><select class="bs-status"><option value="Active">Active</option><option value="On Leave">On Leave</option></select></td>
             <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required></td>
             <td></td>
         </tr>
@@ -1057,7 +1062,7 @@ if (document.getElementById('batchStaffForm')) {
 
         for (let row of rows) {
             const given = row.querySelector('.bs-first').value.trim(), mi = row.querySelector('.bs-mi').value.trim(), family = row.querySelector('.bs-last').value.trim();
-            const email = row.querySelector('.bs-email').value.trim(), status = row.querySelector('.bs-status').value, rfidTag = row.querySelector('.bs-rfid').value.trim();
+            const email = row.querySelector('.bs-email').value.trim(), rfidTag = row.querySelector('.bs-rfid').value.trim();
             const specialty = row.querySelector('.bs-specialty').value.trim(); 
             const randomPassword = generatePassword();
 
@@ -1076,12 +1081,12 @@ if (document.getElementById('batchStaffForm')) {
             try {
                 await emailjs.send("service_x90mti6", "template_nda1wjc", { to_name: given, to_email: email, generated_password: randomPassword, plan: `${role} Account` });
                 
+                // --- UPDATE: Hardcoded Status to "Active" since it's a new registration ---
                 let newUser = { 
                     name: `${given} ${family}`, givenName: given, mi: mi, familyName: family, 
-                    role: role, email: email, status: status, rfid: rfidTag, password: randomPassword
+                    role: role, email: email, status: "Active", rfid: rfidTag, password: randomPassword
                 };
                 
-                // Only save specialty for Trainers
                 if (role === 'Trainer') newUser.specialty = specialty || 'General Fitness';
 
                 await addDoc(usersCol, newUser);
