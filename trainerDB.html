@@ -51,7 +51,7 @@
             min-width: 250px;
         }
 
-        /* NEW: Notification Banner Style */
+        /* Notification Banner Style */
         .notification-banner {
             background-color: #d4edda;
             color: #155724;
@@ -109,7 +109,7 @@
                 border-radius: 0;
                 flex: 1; 
                 text-align: center;
-                position: relative; /* Needed for red dot notifications */
+                position: relative;
             }
 
             .nav-item i {
@@ -132,7 +132,9 @@
 
             .topbar { left: 0 !important; width: 100% !important; padding: 10px 15px; }
             .live-clock { display: none !important; }
-            #topBarName { display: none; }
+            
+            /* Hide the name entirely on mobile to save space */
+            #topBarNameContainer { display: none !important; }
 
             .table-controls { flex-direction: column; align-items: stretch; }
             .search-box, .search-box input { width: 100% !important; }
@@ -177,8 +179,10 @@
             <div class="topbar-left" style="margin-left: auto; margin-right: 20px;">
                 <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
             </div>
-            <div class="topbar-right">
-                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> <span id="topBarName">Welcome Trainer</span> <i class="fa-solid fa-caret-down"></i></button>
+            <div class="topbar-right" style="display: flex; align-items: center; gap: 15px;">
+                <div id="topBarNameContainer" style="color: var(--dark-black); font-weight: 500; font-size: 14px;">
+                    <i class="fa-solid fa-user-circle" style="font-size: 18px; vertical-align: middle;"></i> <span id="topBarName">Loading...</span>
+                </div>
                 <button id="logoutBtn" onclick="handleLogout()"><i class="fa-solid fa-power-off"></i> Logout</button>
             </div>
         </header>
@@ -301,9 +305,9 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            if (document.getElementById('welcomeName')) {
-                document.getElementById('welcomeName').innerText = localStorage.getItem("loggedInUser") || "Trainer";
-            }
+            const userName = localStorage.getItem("loggedInUser") || "Trainer";
+            if (document.getElementById('welcomeName')) document.getElementById('welcomeName').innerText = userName;
+            if (document.getElementById('topBarName')) document.getElementById('topBarName').innerText = userName;
         });
 
         document.addEventListener('click', function(e) {
