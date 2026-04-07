@@ -59,7 +59,7 @@ if (currentUserId && currentSessionId) {
                 }
             }
 
-            // NEW: Automatically start/stop Trainer Shift Timer based on "On Floor" status
+            // Automatically start/stop Trainer Shift Timer based on "On Floor" status
             if (currentUserRole === "Trainer") {
                 const currentStatus = userData.shiftStatus || "Off Floor";
                 localStorage.setItem("trainerShiftStatus", currentStatus);
@@ -1316,7 +1316,7 @@ function initUI() {
                     timerSpan = card.querySelector('.shift-timer');
                 }
 
-                // NEW: Smart logic for Trainers vs Staff
+                // Smart logic for Trainers vs Staff
                 if (role === "Trainer" && trainerStatus !== "On Floor") {
                     timerSpan.innerText = "Off Floor";
                     timerSpan.style.background = "#eee";
@@ -1401,13 +1401,11 @@ function renderBookings() {
         displayData = displayData.filter(b => b.trainerId === loggedInUserId);
         if (tbody) tbody.innerHTML = "";
 
-        // --- NEW: Trainer Notification Banner Logic ---
         const notifArea = document.getElementById('trainerNotificationArea');
         if (notifArea) {
             let pendingRequests = displayData.filter(b => b.status === "Pending");
             
             if (pendingRequests.length > 0) {
-                // Creates a yellow warning banner for pending requests
                 notifArea.innerHTML = `
                     <div class="notification-banner" style="background-color: #fff3cd; color: #856404; border-left-color: #ffc107;">
                         <div><i class="fas fa-bell" style="font-size: 20px; margin-right: 10px;"></i> <strong>New Request!</strong> You have <strong>${pendingRequests.length}</strong> pending session request(s) to review in your Schedule tab.</div>
@@ -1415,7 +1413,6 @@ function renderBookings() {
                     </div>
                 `;
                 
-                // Add a red notification dot to the nav menu icon
                 const navIcon = document.getElementById('navBookingsIcon');
                 if (navIcon && !navIcon.querySelector('.badge-dot')) {
                     navIcon.innerHTML += `<span class="badge-dot" style="position:absolute; top:5px; right:30%; background:var(--primary-red); width:10px; height:10px; border-radius:50%;"></span>`;
