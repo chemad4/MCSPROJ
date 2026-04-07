@@ -28,6 +28,7 @@ emailjs.init("ZqQKGRo5j5KpAhH98");
 // ==========================================
 const currentUserId = localStorage.getItem("userId");
 const currentSessionId = localStorage.getItem("sessionId");
+const currentUserRole = localStorage.getItem("userRole");
 
 if (currentUserId && currentSessionId) {
     onSnapshot(doc(db, "users", currentUserId), (docSnap) => {
@@ -43,8 +44,24 @@ if (currentUserId && currentSessionId) {
                 localStorage.removeItem("sessionId");
                 window.location.replace("index.html");
             }
+            
+            // NEW: Automatically update the Member's Dashboard Plan Display
+            if (currentUserRole === "Member") {
+                if (document.getElementById('myPlanName')) document.getElementById('myPlanName').innerText = userData.plan || "Standard Plan";
+                if (document.getElementById('myPlanDays') && userData.dateRegistered) {
+                    const now = new Date().getTime();
+                    const expiryDate = userData.dateRegistered + (30 * 24 * 60 * 60 * 1000); 
+                    const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                    document.getElementById('myPlanDays').innerHTML = `<i class="fa-regular fa-clock"></i> ${diffDays > 0 ? diffDays + ' Days Left' : 'Expired'}`;
+                }
+            }
         }
     });
+}
+
+// Set Welcome Name on Member Dashboard
+if (document.getElementById('welcomeName')) {
+    document.getElementById('welcomeName').innerText = localStorage.getItem("loggedInUser") || "Member";
 }
 
 // ==========================================
@@ -111,9 +128,9 @@ window.switchTab = function(tabId, element) {
         'attendance': 'Attendance Log',
         'staff': 'Staff Directory',
         'archivedStaff': 'Archived Staff',
-        'trainers': 'Trainer Management',
+        'trainers': 'Gym Trainers',
         'archivedTrainers': 'Archived Trainers',
-        'bookings': 'Trainer Booking Calendar',
+        'bookings': 'Booking Calendar',
         'chats': 'Internal Messages'
     };
     
@@ -138,8 +155,8 @@ window.filterTable = function(tableId, inputId) {
             let tdType = tr[i].getElementsByTagName("td")[1]; 
             let text = (td ? td.textContent : "") + " " + (tdType ? tdType.textContent : "");
             tr[i].style.display = text.toUpperCase().indexOf(filter) > -1 ? "" : "none";
-        } else if (tableId === 'bookingsTable') {
-            let tdTrainer = tr[i].getElementsByTagName("td")[1]; 
+        } else if (tableId === 'bookingsTable' || tableId === 'myBookingsTable') {
+            let tdTrainer = tr[i].getElementsByTagName("td")[1] || tr[i].getElementsByTagName("td")[0]; 
             let text = (td ? td.textContent : "") + " " + (tdTrainer ? tdTrainer.textContent : "");
             tr[i].style.display = text.toUpperCase().indexOf(filter) > -1 ? "" : "none";
         } else {
@@ -720,30 +737,58 @@ onSnapshot(attendanceCol, (snapshot) => {
     renderAttendance();
 });
 
+// --- UPDATE: Render personal attendance for Members ---
 function renderAttendance() {
     const attTbody = document.querySelector('#attendanceTable tbody');
-    if (!attTbody) return;
-    attTbody.innerHTML = "";
+    const myAttTbody = document.querySelector('#myAttendanceBody'); 
+    const loggedInName = localStorage.getItem("loggedInUser");
+
+    if (attTbody) attTbody.innerHTML = "";
+    if (myAttTbody) myAttTbody.innerHTML = "";
 
     let today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     let gold = 0, silver = 0, walkin = 0, presentCount = 0; 
-    let todayAtt = attendanceData.filter(a => a.date === today).sort((a,b) => b.timestamp - a.timestamp);
+
+    let sortedAtt = [...attendanceData].sort((a,b) => b.timestamp - a.timestamp);
+    let todayAtt = sortedAtt.filter(a => a.date === today);
 
     todayAtt.forEach(a => {
         let statusBadge = a.status === 'Checked In' ? '<span class="badge active">On Floor</span>' : '<span class="badge inactive">Checked Out</span>';
         let timeOutDisplay = a.timeOut ? `<span class="badge inactive"><i class="fa-regular fa-clock"></i> ${a.timeOut}</span>` : '-';
         let timeInDisplay = a.timeIn || a.time || '-'; 
 
-        attTbody.innerHTML += `
-            <tr>
-                <td>${a.name}</td><td><strong>${a.type}</strong></td><td>${a.date}</td>
-                <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${timeInDisplay}</span></td>
-                <td>${timeOutDisplay}</td><td>${statusBadge}</td>
-            </tr>
-        `;
+        if (attTbody) {
+            attTbody.innerHTML += `
+                <tr>
+                    <td>${a.name}</td><td><strong>${a.type}</strong></td><td>${a.date}</td>
+                    <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${timeInDisplay}</span></td>
+                    <td>${timeOutDisplay}</td><td>${statusBadge}</td>
+                </tr>
+            `;
+        }
         if (a.type.includes('Gold')) gold++; else if (a.type.includes('Silver')) silver++; else if (a.type.includes('Walk-in')) walkin++;
         if (a.status === 'Checked In') presentCount++;
     });
+
+    if (myAttTbody) {
+        let myLogs = sortedAtt.filter(a => a.name === loggedInName).slice(0, 10); 
+        if (myLogs.length === 0) {
+            myAttTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888;">No attendance logs found.</td></tr>`;
+        } else {
+            myLogs.forEach(a => {
+                let statusBadge = a.status === 'Checked In' ? '<span class="badge active">On Floor</span>' : '<span class="badge inactive">Checked Out</span>';
+                let timeOutDisplay = a.timeOut ? `<span class="badge inactive"><i class="fa-regular fa-clock"></i> ${a.timeOut}</span>` : '-';
+                let timeInDisplay = a.timeIn || a.time || '-'; 
+                myAttTbody.innerHTML += `
+                    <tr>
+                        <td>${a.date}</td>
+                        <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${timeInDisplay}</span></td>
+                        <td>${timeOutDisplay}</td><td>${statusBadge}</td>
+                    </tr>
+                `;
+            });
+        }
+    }
 
     if (servicesChartInstance) { servicesChartInstance.data.datasets[0].data = [gold, silver, walkin]; servicesChartInstance.update(); }
     if (document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = presentCount; 
@@ -1289,37 +1334,124 @@ onSnapshot(bookingsCol, (snapshot) => {
     renderBookings();
 });
 
+// --- UPDATE: Renders bookings dynamically based on the user's role ---
 function renderBookings() {
-    const tbody = document.getElementById('bookingsBody');
-    if (!tbody) return;
-    tbody.innerHTML = "";
+    const tbody = document.getElementById('bookingsBody'); // Admin/Staff/Trainer
+    const myTbody = document.getElementById('myBookingsBody'); // Member
+    const loggedInRole = localStorage.getItem("userRole");
+    const loggedInUserId = localStorage.getItem("userId");
+
+    let displayData = bookingsData.sort((a,b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+
+    if (loggedInRole === "Member") {
+        displayData = displayData.filter(b => b.memberId === loggedInUserId);
+        if (myTbody) myTbody.innerHTML = "";
+    } else if (loggedInRole === "Trainer") {
+        displayData = displayData.filter(b => b.trainerId === loggedInUserId);
+        if (tbody) tbody.innerHTML = "";
+    } else {
+        if (tbody) tbody.innerHTML = "";
+    }
 
     const dateFilter = document.getElementById('bookingDateFilter')?.value;
-    let displayData = bookingsData.sort((a,b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
     if (dateFilter) displayData = displayData.filter(b => b.date === dateFilter);
 
     displayData.forEach(b => {
         let badgeClass = "active";
+        if (b.status === "Pending") badgeClass = "pending"; 
         if (b.status === "Completed") badgeClass = "maintenance"; 
         if (b.status === "Cancelled" || b.status === "No Show") badgeClass = "broken"; 
+        
         const dateObj = new Date(`${b.date}T${b.time}`);
-        const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-        tbody.innerHTML += `
-            <tr>
-                <td>${b.memberName}</td><td>${b.trainerName}</td><td>${dateStr}</td>
-                <td><span class="badge active" style="background: var(--dark-black);"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
-                <td><span class="badge ${badgeClass}">${b.status}</span></td>
-                <td>
+        if (loggedInRole === "Member" && myTbody) {
+            myTbody.innerHTML += `
+                <tr>
+                    <td>${b.trainerName}</td>
+                    <td>${dateStr}</td>
+                    <td><span class="badge active" style="background: var(--dark-black);"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
+                    <td><span class="badge ${badgeClass}">${b.status}</span></td>
+                </tr>
+            `;
+        } else if (tbody) {
+            let actions = "";
+            if (loggedInRole === "Trainer") {
+                if (b.status === "Pending") {
+                     actions = `
+                        <button class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed')"><i class="fas fa-check"></i></button>
+                        <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Cancelled')"><i class="fas fa-times"></i></button>
+                     `;
+                } else {
+                     actions = `<button class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
+                }
+            } else {
+                 actions = `
                     <button class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>
                     <button class="btn-icon btn-delete" title="Delete Booking" onclick="deleteBooking('${b.id}')"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>
-        `;
+                `;
+            }
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${b.memberName}</td>
+                    <td>${b.trainerName}</td>
+                    <td>${dateStr}</td>
+                    <td><span class="badge active" style="background: var(--dark-black);"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
+                    <td><span class="badge ${badgeClass}">${b.status}</span></td>
+                    <td>${actions}</td>
+                </tr>
+            `;
+        }
     });
 }
 
 window.filterBookingsByDate = () => { renderBookings(); }
+
+// --- NEW: Trainer quick status update ---
+window.updateBookingStatus = async (id, newStatus) => {
+    if (confirm(`Are you sure you want to mark this session as ${newStatus}?`)) {
+        await updateDoc(doc(db, "bookings", id), { status: newStatus });
+    }
+}
+
+// --- NEW: Member Booking Request logic ---
+window.openMemberBookingModal = () => {
+    const trainerSelect = document.getElementById('memberBookTrainer');
+    const trainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer' && u.status !== 'Archived');
+    
+    trainerSelect.innerHTML = '<option value="" disabled selected>Select a Trainer...</option>' + 
+        trainers.map(t => `<option value="${t.id}">${t.name || t.givenName + ' ' + t.familyName}</option>`).join('');
+
+    document.getElementById('memberBookingForm').reset(); 
+    document.getElementById('memberBookingModal').style.display = 'flex';
+}
+
+if (document.getElementById('memberBookingForm')) {
+    document.getElementById('memberBookingForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const trainerSelect = document.getElementById('memberBookTrainer');
+        const trainerId = trainerSelect.value;
+        const bookDate = document.getElementById('memberBookDate').value;
+        const bookTime = document.getElementById('memberBookTime').value;
+        
+        const trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
+        const memberId = localStorage.getItem("userId");
+        const memberName = localStorage.getItem("loggedInUser"); 
+
+        await addDoc(bookingsCol, { 
+            memberId, memberName, 
+            trainerId, trainerName, 
+            date: bookDate, time: bookTime, 
+            status: "Pending", 
+            timestamp: new Date().getTime() 
+        });
+        
+        window.closeModal('memberBookingModal'); 
+        alert("Request sent! Waiting for trainer approval.");
+    });
+}
 
 window.openBookingModal = () => {
     const memberSelect = document.getElementById('bookMember'), trainerSelect = document.getElementById('bookTrainer');
@@ -1406,7 +1538,6 @@ document.addEventListener('keydown', (e) => {
     lastKeyTime = currentTime;
 });
 
-// --- UPDATE: Replaced visual alerts with silent console logs ---
 async function processRfidAttendance(scannedTag) {
     const q = query(usersCol, where("rfid", "==", scannedTag));
     const snapshot = await getDocs(q);

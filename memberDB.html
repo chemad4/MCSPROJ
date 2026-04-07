@@ -160,6 +160,7 @@
                     <i class="fas fa-search"></i>
                     <input type="text" id="myBookingSearch" placeholder="Search sessions..." onkeyup="filterTable('myBookingsTable', 'myBookingSearch')">
                 </div>
+                <button class="action-btn" onclick="openMemberBookingModal()"><i class="fas fa-calendar-plus"></i> Book a Session</button>
             </div>
             
             <div class="panel">
@@ -215,6 +216,36 @@
         </div>
 
     </main>
+
+    <div id="memberBookingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Request a Training Session</h3>
+                <span class="close-btn" onclick="closeModal('memberBookingModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="memberBookingForm">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
+                    <i class="fas fa-info-circle"></i> Your request will be sent to the trainer. Check your bookings tab to see if they approve it!
+                </p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Select Trainer:</p>
+                <select id="memberBookTrainer" required>
+                    </select>
+                
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <div style="flex: 1;">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Preferred Date:</p>
+                        <input type="date" id="memberBookDate" required style="width: 100%;">
+                    </div>
+                    <div style="flex: 1;">
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Preferred Time:</p>
+                        <input type="time" id="memberBookTime" required style="width: 100%;">
+                    </div>
+                </div>
+                
+                <button type="submit" style="background-color: var(--primary-red); margin-top: 20px;"><i class="fas fa-paper-plane"></i> Send Request</button>
+            </form>
+        </div>
+    </div>
 
     <script type="module" src="js/script.js"></script>
 
