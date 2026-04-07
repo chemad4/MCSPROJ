@@ -110,6 +110,11 @@
             font-weight: bold; 
             transition: 0.3s; 
         }
+        
+        /* NEW: Mobile specific override */
+        @media (max-width: 800px) {
+            .desktop-only { display: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -124,7 +129,7 @@
             <button type="submit" class="login-btn" id="loginSubmitBtn">Log In</button>
         </form>
 
-        <p style="color: #888; font-size: 13px; margin-top: 20px;">
+        <p class="desktop-only" style="color: #888; font-size: 13px; margin-top: 20px;">
             <i class="fas fa-id-badge"></i> Or simply tap your ID Card to log in.
         </p>
 
