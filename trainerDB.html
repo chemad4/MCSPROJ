@@ -51,6 +51,9 @@
             min-width: 250px;
         }
 
+        /* Mobile Button Default Hidden */
+        .mobile-only-btn { display: none; }
+
         /* MASTER MOBILE OVERRIDES: APP-STYLE BOTTOM NAV */
         @media (max-width: 768px) {
             /* Transform Sidebar into a Bottom Nav Bar */
@@ -119,6 +122,16 @@
             .table-controls { flex-direction: column; align-items: stretch; }
             .search-box, .search-box input { width: 100% !important; }
             .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+            /* NEW: Mobile Chat Fixes */
+            .chat-container { flex-direction: column !important; height: calc(100vh - 160px) !important; }
+            .chat-sidebar { width: 100% !important; border-right: none !important; }
+            .chat-main { display: none; width: 100% !important; }
+            
+            /* Classes triggered via JS when chat is active */
+            .chat-container.mobile-chat-open .chat-sidebar { display: none !important; }
+            .chat-container.mobile-chat-open .chat-main { display: flex !important; flex-direction: column; flex-grow: 1; }
+            .mobile-only-btn { display: block !important; }
         }
     </style>
 </head>
@@ -224,9 +237,11 @@
                         </div>
                 </div>
                 <div class="chat-main">
-                    <div id="chatHeader" style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); font-weight: bold;">
-                        Select a user to start chatting
+                    <div style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px;">
+                        <button class="mobile-only-btn" onclick="closeMobileChat()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--dark-black);"><i class="fas fa-arrow-left"></i></button>
+                        <div id="chatHeader" style="font-weight: bold; font-size: 16px;">Select a user to start chatting</div>
                     </div>
+
                     <div id="chatHistory" class="chat-history">
                         <div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;">
                             <i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i>
@@ -274,6 +289,26 @@
                 document.getElementById('welcomeName').innerText = localStorage.getItem("loggedInUser") || "Trainer";
             }
         });
+
+        // NEW: Intercept clicks on the chat list to slide the chat window open on mobile
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.chat-user-item')) {
+                if (window.innerWidth <= 768) {
+                    const chatContainer = document.querySelector('.chat-container');
+                    if(chatContainer) chatContainer.classList.add('mobile-chat-open');
+                }
+            }
+            // Auto close mobile tabs if they click a bottom nav link
+            if (e.target.closest('.nav-clickable')) {
+                closeMobileChat();
+            }
+        });
+
+        // NEW: Function attached to the "Back" arrow
+        window.closeMobileChat = function() {
+            const chatContainer = document.querySelector('.chat-container');
+            if(chatContainer) chatContainer.classList.remove('mobile-chat-open');
+        }
     </script>
 </body>
 </html>

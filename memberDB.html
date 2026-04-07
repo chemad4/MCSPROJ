@@ -115,6 +115,9 @@
             margin-top: 20px;
         }
 
+        /* Mobile Button Default Hidden */
+        .mobile-only-btn { display: none; }
+
         /* MASTER MOBILE OVERRIDES: APP-STYLE BOTTOM NAV */
         @media (max-width: 768px) {
             /* Transform Sidebar into a Bottom Nav Bar */
@@ -123,18 +126,16 @@
                 bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 70px; /* Fixed height for bottom tabs */
-                transform: none; /* Overrides any previous slide animations */
+                height: 70px;
+                transform: none; 
                 z-index: 9999;
                 display: flex;
                 padding: 0;
                 box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
             }
 
-            /* Hide the big logo on mobile */
             .logo-area { display: none; }
 
-            /* Reformat the UL to sit horizontally */
             .nav-menu {
                 display: flex;
                 flex-direction: row;
@@ -145,14 +146,13 @@
                 background: var(--dark-black);
             }
 
-            /* Reformat the LIs to stack icon above text */
             .nav-item {
                 margin: 0;
                 padding: 10px 0;
                 flex-direction: column;
                 justify-content: center;
                 border-radius: 0;
-                flex: 1; /* Distributes space equally */
+                flex: 1; 
                 text-align: center;
             }
 
@@ -170,23 +170,31 @@
             /* Main Content Adjustments */
             .main-content { 
                 margin-left: 0 !important; 
-                margin-bottom: 70px; /* Pushes content up so bottom nav doesn't cover it */
+                margin-bottom: 70px; 
                 width: 100%; 
                 padding: 15px; 
             }
 
-            /* Topbar adjustments */
             .topbar { left: 0 !important; width: 100% !important; padding: 10px 15px; }
             .live-clock { display: none !important; }
             #topBarName { display: none; }
 
-            /* Internal Container adjustments */
             .dashboard-grid { grid-template-columns: 1fr; }
             .table-controls { flex-direction: column; align-items: stretch; }
             .search-box, .search-box input { width: 100% !important; }
             .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
             .welcome-panel-body { flex-direction: column; text-align: center; }
             .welcome-panel-body > div { text-align: center !important; }
+
+            /* NEW: Mobile Chat Fixes */
+            .chat-container { flex-direction: column !important; height: calc(100vh - 160px) !important; }
+            .chat-sidebar { width: 100% !important; border-right: none !important; }
+            .chat-main { display: none; width: 100% !important; }
+            
+            /* Classes triggered via JS when chat is active */
+            .chat-container.mobile-chat-open .chat-sidebar { display: none !important; }
+            .chat-container.mobile-chat-open .chat-main { display: flex !important; flex-direction: column; flex-grow: 1; }
+            .mobile-only-btn { display: block !important; }
         }
     </style>
 </head>
@@ -335,9 +343,11 @@
                         </div>
                 </div>
                 <div class="chat-main">
-                    <div id="chatHeader" style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); font-weight: bold;">
-                        Select a user to start chatting
+                    <div style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px;">
+                        <button class="mobile-only-btn" onclick="closeMobileChat()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--dark-black);"><i class="fas fa-arrow-left"></i></button>
+                        <div id="chatHeader" style="font-weight: bold; font-size: 16px;">Select a user to start chatting</div>
                     </div>
+
                     <div id="chatHistory" class="chat-history">
                         <div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;">
                             <i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i>
@@ -387,7 +397,6 @@
     <script type="module" src="js/script.js"></script>
 
     <script>
-        // JS specific to the Member UI interactions
         function filterMemberTrainers() {
             const filter = document.getElementById('memberTrainerSearch').value.toLowerCase();
             const cards = document.querySelectorAll('.member-trainer-card');
@@ -400,6 +409,26 @@
                     card.style.display = "none";
                 }
             });
+        }
+
+        // NEW: Intercept clicks on the chat list to slide the chat window open on mobile
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.chat-user-item')) {
+                if (window.innerWidth <= 768) {
+                    const chatContainer = document.querySelector('.chat-container');
+                    if(chatContainer) chatContainer.classList.add('mobile-chat-open');
+                }
+            }
+            // Auto close mobile tabs if they click a bottom nav link
+            if (e.target.closest('.nav-clickable')) {
+                closeMobileChat();
+            }
+        });
+
+        // NEW: Function attached to the "Back" arrow
+        window.closeMobileChat = function() {
+            const chatContainer = document.querySelector('.chat-container');
+            if(chatContainer) chatContainer.classList.remove('mobile-chat-open');
         }
     </script>
 </body>
