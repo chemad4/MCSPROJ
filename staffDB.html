@@ -8,6 +8,7 @@
     <link rel="icon" type="image/png" href="images/icon-192.png">
 
     <script>
+        // Security check for Staff
         if (!localStorage.getItem("loggedInUser") || localStorage.getItem("userRole") !== "Staff") {
             window.location.replace("index.html");
         }
@@ -19,265 +20,153 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
+    
     <link rel="stylesheet" href="css/styles.css">
-
+    
     <style>
-        .pos-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-        .cart-panel { background: var(--panel-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; height: 100%; }
-        .cart-items { flex-grow: 1; overflow-y: auto; margin-bottom: 20px; min-height: 200px; }
-        .pos-totals { border-top: 2px dashed var(--border-color); padding-top: 15px; }
+        .pos-container { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: calc(100vh - 150px); }
+        .pos-products { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .pos-cart { background: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); display: flex; flex-direction: column; }
+        .pos-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: #FAFAFA; display: flex; justify-content: space-between; align-items: center; }
+        .pos-body { padding: 20px; overflow-y: auto; flex-grow: 1; }
+        .pos-totals { background: var(--dark-black); color: white; padding: 20px; border-radius: 0 0 8px 8px; }
         .total-line { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
-        .total-line.grand { font-size: 20px; font-weight: bold; color: var(--primary-red); }
-
-        .grid-stat-box { background: #f8f9fa; border-radius: 8px; padding: 20px; text-align: center; border: 1px solid var(--border-color); cursor: pointer; transition: 0.2s; }
-        .grid-stat-box:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.08); border-color: var(--primary-red); }
-        .grid-stat-box h3 { margin: 0; font-size: 28px; color: var(--dark-black); }
-        .grid-stat-box p { margin: 5px 0 0 0; color: var(--text-muted); font-size: 13px; }
-
-        /* Report Styles */
-        #pdf-report-container { display: none; padding: 40px; background: white; color: black; font-family: Arial, sans-serif; }
-        .report-header { text-align: center; border-bottom: 2px solid black; padding-bottom: 20px; margin-bottom: 30px; }
-        .report-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-        .report-table th, .report-table td { border: 1px solid #000; padding: 10px; text-align: center; }
-        .report-table th { background-color: #f2f2f2; font-weight: bold; }
-
-        /* Master Mobile Overrides */
-        .mobile-only-btn { display: none; }
-        .mobile-toggle { display: none; font-size: 20px; cursor: pointer; margin-right: 15px; color: var(--dark-black); }
-
-        @media (max-width: 768px) {
-            .mobile-toggle { display: inline-block; }
-            
-            /* Slide-out Hamburger Menu for Staff */
-            .sidebar {
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-                z-index: 9999;
-                position: fixed;
-                top: 0;
-                left: 0;
-                height: 100vh;
-                box-shadow: 2px 0 10px rgba(0,0,0,0.5);
-                width: 250px;
-            }
-            .sidebar.open { transform: translateX(0); }
-
-            .main-content { margin-left: 0 !important; width: 100%; padding: 15px; }
-            .topbar { left: 0 !important; width: 100% !important; padding: 10px 15px; }
-
-            .live-clock { display: none !important; }
-            #topBarNameContainer { display: none !important; }
-
-            .pos-grid, .dashboard-grid, .stat-cards { grid-template-columns: 1fr !important; display: flex; flex-direction: column; }
-            .table-controls { flex-direction: column; align-items: stretch; }
-            .search-box, .search-box input { width: 100% !important; }
-            .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-            /* Mobile Chat Fixes */
-            .chat-container { flex-direction: column !important; height: calc(100vh - 160px) !important; }
-            .chat-sidebar { width: 100% !important; border-right: none !important; }
-            .chat-main { display: none; width: 100% !important; }
-            .chat-container.mobile-chat-open .chat-sidebar { display: none !important; }
-            .chat-container.mobile-chat-open .chat-main { display: flex !important; flex-direction: column; flex-grow: 1; }
-            .mobile-only-btn { display: block !important; }
-        }
+        .total-line.grand { font-size: 20px; font-weight: bold; color: var(--primary-red); border-top: 1px solid #444; padding-top: 10px; margin-top: 10px; }
+        
+        .stat-card, .grid-stat-box { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .stat-card:hover, .grid-stat-box:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        
+        .batch-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        .batch-table th { text-align: left; padding: 8px; background: #f4f6f9; border-bottom: 2px solid #ddd; font-size: 13px; color: #555; }
+        .batch-table td { padding: 5px; }
+        .batch-table input, .batch-table select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
+        
+        .rfid-register-input { background-color: #fffde7; border: 1px solid #f1c40f !important; }
+        .rfid-register-input:focus { border-color: var(--primary-red) !important; background-color: #fff; }
     </style>
 </head>
 <body>
 
-    <aside class="sidebar" id="mobileSidebar">
+    <aside class="sidebar">
         <div class="logo-area">FIT <span>TRACK</span></div>
 
         <ul class="nav-menu" id="navMenu">
-            <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)"><i class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span></li>
+            <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)">
+                <i class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span>
+            </li>
             
-            <li class="nav-item has-submenu"><i class="fa-solid fa-boxes-stacked"></i> <span class="menu-text">Inventory</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <li class="nav-item has-submenu">
+                <i class="fa-solid fa-address-card"></i> <span class="menu-text">Manage Members</span>
+                <i class="fa-solid fa-chevron-down chevron-icon"></i>
+            </li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('equipment', this)"><span class="menu-text">Gym Equipment</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('products', this)"><span class="menu-text">Products & Goods</span></li>
+                <li class="sub-item" onclick="switchTab('members', this)"><i class="fa-solid fa-users"></i> Member Directory</li>
+                <li class="sub-item" onclick="switchTab('archivedMembers', this)"><i class="fa-solid fa-box-archive"></i> Archived Members</li>
+                <li class="sub-item" onclick="switchTab('attendance', this)"><i class="fa-solid fa-clipboard-user"></i> Attendance Log</li>
+                <li class="sub-item" onclick="openChatTab('member', this, 'Member Chats')"><i class="fa-solid fa-comments"></i> Internal Chats</li>
             </ul>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('pos', this)"><i class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale</span></li>
-            <li class="nav-item nav-clickable" onclick="switchTab('payments', this)"><i class="fa-solid fa-file-invoice-dollar"></i> <span class="menu-text">Financial Reports</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('pos', this)">
+                <i class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale (POS)</span>
+            </li>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('members', this)"><i class="fa-solid fa-users"></i> <span class="menu-text">Member Directory</span></li>
+            <li class="nav-item has-submenu">
+                <i class="fa-solid fa-boxes-stacked"></i> <span class="menu-text">Gym Inventory</span>
+                <span class="badge-nav" style="background-color: #555; margin-left: 10px; padding: 2px 8px; border-radius: 10px;" id="navInventoryCount"> 0 </span>
+                <i class="fa-solid fa-chevron-down chevron-icon"></i>
+            </li>
+            <ul class="submenu">
+                <li class="sub-item" onclick="switchTab('equipment', this)"><i class="fa-solid fa-dumbbell"></i> View Equipment</li>
+                <li class="sub-item" onclick="switchTab('products', this)"><i class="fa-solid fa-wine-bottle"></i> View Products</li>
+            </ul>
+            
+            <li class="nav-item nav-clickable" onclick="switchTab('payments', this)">
+                <i class="fa-solid fa-chart-line"></i> <span class="menu-text">Financial Reports</span>
+            </li>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('attendance', this)"><i class="fa-solid fa-clipboard-user"></i> <span class="menu-text">Attendance Log</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)">
+                <i class="fa-solid fa-calendar-check"></i> <span class="menu-text">Trainer Bookings</span>
+            </li>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)"><i class="fa-solid fa-calendar-check"></i> <span class="menu-text">Bookings</span></li>
-
-            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Internal Messages')"><i class="fa-solid fa-comments"></i> <span class="menu-text">Messages</span></li>
+            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Internal Messages')">
+                <i class="fa-solid fa-comments"></i> <span class="menu-text">Internal Messages</span>
+            </li>
         </ul>
     </aside>
 
     <main class="main-content">
         <header class="topbar">
-            <div class="topbar-left" style="display: flex; align-items: center;">
-                <i class="fas fa-bars mobile-toggle" id="mobileMenuBtn"></i>
-                <span id="pageTitle" style="font-weight: 500; color: var(--dark-black); font-size: 16px;">Dashboard</span>
+            <div class="topbar-left">
+                <span id="pageTitle" style="font-weight: 500; color: var(--dark-black); font-size: 16px;">Staff Dashboard</span>
             </div>
             <div class="topbar-left" style="margin-left: auto; margin-right: 20px;">
                 <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
             </div>
-            <div class="topbar-right" style="display: flex; align-items: center; gap: 15px;">
-                <div id="topBarNameContainer" style="color: var(--dark-black); font-weight: 500; font-size: 14px;">
-                    <i class="fa-solid fa-user-circle" style="font-size: 18px; vertical-align: middle;"></i> <span id="topBarName">Loading...</span>
-                </div>
+            <div class="topbar-right">
+                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> <span id="topBarName">Welcome Staff</span> <i class="fa-solid fa-caret-down"></i></button>
                 <button id="logoutBtn" onclick="handleLogout()"><i class="fa-solid fa-power-off"></i> Logout</button>
             </div>
         </header>
 
         <div id="dashboard" class="content-section active-section">
-            <div class="panel" style="background: linear-gradient(135deg, var(--dark-black), #333); color: white; border: none; margin-bottom: 20px;">
-                <div class="panel-body" style="padding: 30px;">
-                    <h2 style="margin-bottom: 10px; font-size: 24px;">Welcome back, <span id="welcomeName">Staff</span>!</h2>
-                    <p style="color: #ccc; font-size: 14px;">Manage front desk operations, process payments, and assist members.</p>
+            <div class="stat-cards" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="stat-card card-red" onclick="switchTab('members')">
+                    <span class="stat-badge" id="dashActiveMembers">0</span>
+                    <i class="fa-solid fa-user-check"></i>
+                    <div class="value">Active Members</div>
+                </div>
+                <div class="stat-card card-black" style="cursor: default;">
+                    <i class="fa-solid fa-clock"></i>
+                    <div class="value">Shift Started</div>
+                    </div>
+                <div class="stat-card card-red" onclick="switchTab('equipment')">
+                    <span class="stat-badge" id="dashInventoryTotal">0</span>
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <div class="value">Total Inventory</div>
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;">
-                <div class="grid-stat-box" onclick="switchTab('members')">
-                    <h3 id="dashActiveMembers">0</h3>
-                    <p>Active Members</p>
-                </div>
-                <div class="grid-stat-box" style="cursor: default;">
-                    <h3 class="shift-timer">--:--:--</h3>
-                    <p class="value">Shift Started</p>
-                </div>
-            </div>
-
-            <div class="dashboard-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
-                <div class="panel" style="flex-grow: 1;">
-                    <div class="panel-header"><i class="fa-solid fa-users"></i> Live Attendance</div>
-                    <div class="panel-body" style="text-align: center; padding: 40px 20px;">
-                        <h1 style="font-size: 48px; color: var(--dark-black); margin: 0;" id="presentMembers">0</h1>
-                        <p style="color: var(--text-muted); margin-top: 10px;">Members Currently on Floor</p>
-                        <button class="action-btn" onclick="switchTab('attendance')" style="margin-top: 20px;"><i class="fa-solid fa-list"></i> View Logs</button>
+            <div class="middle-section">
+                <div class="panel" style="margin-bottom: 0;" onclick="switchTab('attendance')">
+                    <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Live Daily Attendance</div>
+                    <div class="panel-body">
+                        <div class="chart-container">
+                            <canvas id="servicesChart"></canvas>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="panel" style="margin-bottom: 0;">
-                    <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Trainers on Floor</div>
-                    <div class="panel-body" id="dashActiveTrainersFeed" style="max-height: 300px; overflow-y: auto;">
+
+                <div class="panel" style="background: none; border: none; box-shadow: none; margin-bottom: 0; padding: 0;">
+                    <div class="grid-stats" style="grid-template-columns: 1fr 1fr;">
+                        <div class="grid-stat-box border-black" onclick="switchTab('members')">
+                            <div class="num" id="gridMembers">0</div>
+                            <div class="label">Registered Members</div>
+                        </div>
+                        <div class="grid-stat-box border-red" onclick="switchTab('pos')">
+                            <div class="num" id="presentMembers">0</div>
+                            <div class="label">Currently On Floor</div>
+                        </div>
+                        <div class="grid-stat-box border-black" onclick="switchTab('equipment')">
+                            <div class="num" id="gridEquip">0</div>
+                            <div class="label">Operational Equipments</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bottom-section" style="margin-top: 20px;">
+                <div class="panel">
+                    <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Active Trainers on Floor</div>
+                    <div class="panel-body" id="dashActiveTrainersFeed">
                         <p style="color: var(--text-muted); font-size: 14px;">Loading...</p>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <div id="equipment" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="machineSearch" placeholder="Search equipment..." onkeyup="filterGrid('machinesGrid', 'machineSearch')">
-                </div>
-                <button class="action-btn" onclick="openEquipmentModal()"><i class="fas fa-plus"></i> Add Machine</button>
-            </div>
-            <div class="panel"><div class="panel-body"><div class="inventory-grid" id="machinesGrid"></div></div></div>
-        </div>
-
-        <div id="products" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="productSearch" placeholder="Search products..." onkeyup="filterGrid('productsGrid', 'productSearch')">
-                </div>
-                <button class="action-btn" onclick="openProductModal()"><i class="fas fa-plus"></i> Add Product</button>
-            </div>
-            <div class="panel"><div class="panel-body"><div class="inventory-grid" id="productsGrid"></div></div></div>
-        </div>
-
-        <div id="pos" class="content-section">
-            <div class="pos-grid">
-                <div class="panel">
-                    <div class="panel-header"><i class="fa-solid fa-box"></i> Available Products</div>
-                    <div class="table-container" style="box-shadow: none; max-height: 600px;">
-                        <table id="posProductsTable">
-                            <thead><tr><th>Item</th><th>Stock</th><th>Price</th><th>Action</th></tr></thead>
-                            <tbody id="posProductList"></tbody>
-                        </table>
+                <div class="panel" onclick="switchTab('equipment')" style="cursor: pointer;">
+                    <div class="panel-header"><i class="fa-solid fa-clipboard-list"></i> Inventory Alerts</div>
+                    <div class="panel-body" id="dashInventoryAlerts">
+                        <p style="color: var(--text-muted); font-size: 14px;">Loading alerts...</p>
                     </div>
-                </div>
-                <div class="cart-panel">
-                    <h3 style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;"><i class="fa-solid fa-cart-shopping"></i> Current Order</h3>
-                    <div class="cart-items" id="posCartBody"></div>
-                    <div class="pos-totals"></div>
-                </div>
-            </div>
-        </div>
-
-        <div id="payments" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="paymentSearch" placeholder="Search transactions..." onkeyup="filterTable('paymentTable', 'paymentSearch')">
-                </div>
-                <button class="action-btn" style="background-color: var(--dark-black);" onclick="generateWeeklyPDF()"><i class="fas fa-file-pdf"></i> Generate Weekly Report</button>
-            </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fa-solid fa-receipt"></i> Transaction History</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="paymentTable">
-                        <thead><tr><th>Customer Name</th><th>Purchased Items</th><th>Date & Time</th><th>Subtotal</th><th>VAT (12%)</th><th>Grand Total</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="members" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="memberSearch" placeholder="Search active members..." onkeyup="filterTable('membersTable', 'memberSearch')">
-                </div>
-                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-user-plus"></i> Batch Register</button>
-            </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-users"></i> Active Members</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="membersTable">
-                        <thead><tr><th>First Name</th><th>M.I.</th><th>Last Name</th><th>Email</th><th>Plan</th><th>Time Left</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="attendance" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="attendanceSearch" placeholder="Search by name or plan..." onkeyup="filterTable('attendanceTable', 'attendanceSearch')">
-                </div>
-            </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-clipboard-list"></i> Daily Attendance Log</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="attendanceTable">
-                        <thead><tr><th>Name</th><th>Plan / Type</th><th>Date</th><th>Time In</th><th>Time Out</th><th>Status</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="bookings" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="bookingSearch" placeholder="Search sessions..." onkeyup="filterTable('bookingsTable', 'bookingSearch')">
-                </div>
-                <button class="action-btn" onclick="openBookingModal()"><i class="fas fa-calendar-plus"></i> Manual Booking</button>
-            </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-calendar-alt"></i> Master Booking Calendar</div>
-                <div class="table-container" style="box-shadow: none;">
-                    <table id="bookingsTable">
-                        <thead><tr><th>Member Name</th><th>Trainer</th><th>Date</th><th>Time</th><th>Status</th><th>Actions</th></tr></thead>
-                        <tbody id="bookingsBody"></tbody>
-                    </table>
                 </div>
             </div>
         </div>
@@ -294,15 +183,18 @@
                             <input type="text" id="chatSearch" placeholder="Search users..." onkeyup="filterChatUsers()" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px; outline: none;">
                         </div>
                     </div>
-                    <div id="chatUserList" style="overflow-y: auto; flex-grow: 1;"></div>
+                    <div id="chatUserList" style="overflow-y: auto; flex-grow: 1;">
+                        </div>
                 </div>
                 <div class="chat-main">
-                    <div style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px;">
-                        <button class="mobile-only-btn" onclick="closeMobileChat()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--dark-black);"><i class="fas fa-arrow-left"></i></button>
-                        <div id="chatHeader" style="font-weight: bold; font-size: 16px;">Select a user to start chatting</div>
+                    <div id="chatHeader" style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); font-weight: bold;">
+                        Select a user to start chatting
                     </div>
                     <div id="chatHistory" class="chat-history">
-                        <div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;"><i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i><p>No chat selected</p></div>
+                        <div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;">
+                            <i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i>
+                            <p>No chat selected</p>
+                        </div>
                     </div>
                     <div style="padding: 20px; background: var(--white); border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
                         <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()" style="flex-grow: 1; padding: 12px 20px; border: 1px solid var(--border-color); border-radius: 25px; outline: none;" disabled>
@@ -312,43 +204,257 @@
             </div>
         </div>
 
+        <div id="pos" class="content-section">
+            <div class="pos-container">
+                <div class="pos-products">
+                    <div class="pos-header">
+                        <span><i class="fa-solid fa-box-open"></i> Available Consumables</span>
+                        <div class="search-box" style="width: 200px;">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="posSearch" placeholder="Search product..." onkeyup="filterTable('posTable', 'posSearch')">
+                        </div>
+                    </div>
+                    <div class="pos-body" style="padding: 0;">
+                        <table id="posTable" style="box-shadow: none; border-radius: 0;">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Stock</th>
+                                    <th>Price (₱)</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="posProductList"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="pos-cart">
+                    <div class="pos-header"><i class="fa-solid fa-cart-shopping"></i> Current Cart</div>
+                    <div class="pos-body" id="posCartBody">
+                        <p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>
+                    </div>
+                    <div class="pos-totals">
+                        </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="bookings" class="content-section">
+            <div class="table-controls">
+                <div class="search-box" style="display: flex; gap: 10px; width: 600px;">
+                    <div style="position: relative; flex-grow: 1;">
+                        <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999;"></i>
+                        <input type="text" id="bookingSearch" placeholder="Search member or trainer..." onkeyup="filterTable('bookingsTable', 'bookingSearch')" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px;">
+                    </div>
+                    <input type="date" id="bookingDateFilter" onchange="filterBookingsByDate()" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; background: white;">
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-calendar-alt"></i> Scheduled PT Sessions</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="bookingsTable">
+                        <thead>
+                            <tr>
+                                <th>Member Name</th>
+                                <th>Assigned Trainer</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookingsBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="members" class="content-section">
+            <div class="table-controls">
+                <div class="search-box" style="display: flex; gap: 10px; width: 500px;">
+                    <div style="position: relative; flex-grow: 1;">
+                        <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999;"></i>
+                        <input type="text" id="memberSearch" placeholder="Search members..." onkeyup="filterTable('membersTable', 'memberSearch')" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px;">
+                    </div>
+                    <select id="planFilter" onchange="filterByPlan(this.value)" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; background: white;">
+                        <option value="All">All Plans</option>
+                        <option value="Gold">Gold</option>
+                        <option value="Silver">Silver</option>
+                    </select>
+                </div>
+                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-users"></i> Register Members</button>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-address-card"></i> Registered Member Directory</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="membersTable">
+                        <thead>
+                            <tr>
+                                <th>Given Name</th>
+                                <th>M.I.</th>
+                                <th>Family Name</th>
+                                <th>Email</th>
+                                <th>Membership Plan</th>
+                                <th>Days Left</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="archivedMembers" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="archivedSearch" placeholder="Search archived members..." onkeyup="filterTable('archivedMembersTable', 'archivedSearch')">
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-box-archive"></i> Archived Members</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="archivedMembersTable">
+                        <thead>
+                            <tr>
+                                <th>Given Name</th>
+                                <th>M.I.</th>
+                                <th>Family Name</th>
+                                <th>Email</th>
+                                <th>Membership Plan</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="attendance" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="attendanceSearch" placeholder="Search name or membership..." onkeyup="filterTable('attendanceTable', 'attendanceSearch')">
+                </div>
+                <button class="action-btn" onclick="exportReport()" style="background: var(--dark-black);"><i class="fas fa-print"></i> Print Report</button>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-clipboard-user"></i> Live Daily Attendance Log</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="attendanceTable">
+                        <thead>
+                            <tr>
+                                <th>Guest / Member Name</th>
+                                <th>Membership Type</th>
+                                <th>Date Logged</th>
+                                <th>Time In</th>
+                                <th>Time Out</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="equipment" class="content-section">
+            <div class="inventory-header-large">Gym Equipment</div>
+            <input type="text" class="inventory-search-bar" id="equipSearchGrid" placeholder="Search equipment by name, category, or status..." onkeyup="filterGrid('machinesGrid', 'equipSearchGrid')">
+            <div class="inventory-grid" id="machinesGrid">
+                </div>
+            <button class="fab-btn" onclick="openEquipmentModal()"><i class="fas fa-plus"></i></button>
+        </div>
+
+        <div id="products" class="content-section">
+            <div class="inventory-header-large">Products & Consumables</div>
+            <input type="text" class="inventory-search-bar" id="prodSearchGrid" placeholder="Search products by name, category, or status..." onkeyup="filterGrid('productsGrid', 'prodSearchGrid')">
+            <div class="inventory-grid" id="productsGrid">
+                </div>
+            <button class="fab-btn" onclick="openProductModal()"><i class="fas fa-plus"></i></button>
+        </div>
+
+        <div id="payments" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="paymentSearch" placeholder="Search receipt..." onkeyup="filterTable('paymentTable', 'paymentSearch')">
+                </div>
+                <button class="action-btn" onclick="generateWeeklyPDF()" style="background: var(--dark-black);"><i class="fas fa-file-pdf"></i> Download Weekly PDF</button>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-money-check-alt"></i> Transaction History (Receipts)</div>
+                <div class="table-container" style="box-shadow: none;">
+                    <table id="paymentTable">
+                        <thead>
+                            <tr>
+                                <th>Customer Name</th>
+                                <th>Items Purchased</th>
+                                <th>Date & Time</th>
+                                <th>Gross Total</th>
+                                <th>VAT</th>
+                                <th>Net Total</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <div id="equipmentModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h3>Register New Equipment</h3><span class="close-btn" onclick="closeModal('equipmentModal')">&times;</span></div>
+            <div class="modal-header">
+                <h3 id="equipModalTitle">Register Equipment</h3>
+                <span class="close-btn" onclick="closeModal('equipmentModal')">&times;</span>
+            </div>
             <form class="modal-form" id="equipmentForm">
-                <input type="text" id="equipName" placeholder="Machine Name" required>
-                <select id="equipCategory" required>
-                    <option value="Cardio Machine">Cardio Machine</option>
-                    <option value="Strength Machine">Strength Machine</option>
-                    <option value="Free Weights">Free Weights</option>
-                    <option value="Accessories / Mats">Accessories / Mats</option>
+                <input type="text" id="equipName" placeholder="Specific Name of Equipment" required>
+                <select id="equipCategory">
+                    <option value="Cardio (Treadmill, Bike, etc.)">Cardio (Treadmills, Bikes, etc.)</option>
+                    <option value="Strength (Weights, Machines)">Strength (Weights, Machines)</option>
+                    <option value="Accessories (Mats, Balls, Bands)">Accessories (Mats, Balls, Bands)</option>
                 </select>
-                <input type="text" id="equipSize" placeholder="Weight/Size (e.g. 50 lbs) - Optional">
-                <input type="number" id="equipQty" placeholder="Quantity" min="1" required>
-                <button type="submit" style="background-color: var(--primary-red);">Register Equipment</button>
+                <input type="text" id="equipSize" placeholder="Weight or Dimensions" required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Quantity to Add (Automated Addition logic built-in):</p>
+                <input type="number" id="equipQty" placeholder="Total pieces to add" required min="1">
+                <button type="submit" id="equipSubmitBtn">Register Equipment</button>
             </form>
         </div>
     </div>
 
     <div id="editEquipModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h3>Edit Equipment</h3><span class="close-btn" onclick="closeModal('editEquipModal')">&times;</span></div>
+            <div class="modal-header">
+                <h3>Edit Equipment</h3>
+                <span class="close-btn" onclick="closeModal('editEquipModal')">&times;</span>
+            </div>
             <form class="modal-form" id="editEquipForm">
                 <input type="hidden" id="editEquipId">
-                <input type="text" id="editEquipName" required>
-                <select id="editEquipCategory" required>
-                    <option value="Cardio Machine">Cardio Machine</option>
-                    <option value="Strength Machine">Strength Machine</option>
-                    <option value="Free Weights">Free Weights</option>
-                    <option value="Accessories / Mats">Accessories / Mats</option>
+                <input type="text" id="editEquipName" placeholder="Specific Name of Equipment" required>
+                <select id="editEquipCategory">
+                    <option value="Cardio (Treadmill, Bike, etc.)">Cardio (Treadmills, Bikes, etc.)</option>
+                    <option value="Strength (Weights, Machines)">Strength (Weights, Machines)</option>
+                    <option value="Accessories (Mats, Balls, Bands)">Accessories (Mats, Balls, Bands)</option>
                 </select>
-                <input type="text" id="editEquipSize">
-                <input type="number" id="editEquipQty" min="0" required>
-                <select id="editEquipStatus" required>
+                <input type="text" id="editEquipSize" placeholder="Weight or Dimensions" required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Total Quantity:</p>
+                <input type="number" id="editEquipQty" placeholder="Total pieces" required min="0">
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Status:</p>
+                <select id="editEquipStatus">
                     <option value="Operational">Operational</option>
-                    <option value="Maintenance">Maintenance</option>
+                    <option value="Maintenance">Flag for Maintenance</option>
                     <option value="Out of Order">Out of Order</option>
                 </select>
                 <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
@@ -358,37 +464,60 @@
 
     <div id="productModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h3>Register New Product</h3><span class="close-btn" onclick="closeModal('productModal')">&times;</span></div>
+            <div class="modal-header">
+                <h3 id="prodModalTitle">Stock Consumable Product</h3>
+                <span class="close-btn" onclick="closeModal('productModal')">&times;</span>
+            </div>
             <form class="modal-form" id="productForm">
                 <input type="text" id="prodName" placeholder="Product Name" required>
-                <select id="prodCategory" required>
-                    <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
-                    <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
-                    <option value="Apparel / Merchandise">Apparel / Merchandise</option>
+                <select id="prodCategory">
+                    <option value="Supplements">Supplements (Powder/Capsules)</option>
+                    <option value="Beverages">Beverages (Bottled Drinks)</option>
+                    <option value="Merch">Apparel / Merchandise</option>
                 </select>
-                <input type="number" id="prodPrice" placeholder="Selling Price (₱)" min="1" step="0.01" required>
-                <input type="text" id="prodVol" placeholder="Volume/Size (e.g. 500ml) - Optional">
-                <input type="date" id="prodExpiry">
-                <input type="number" id="prodQty" placeholder="Quantity" min="1" required>
-                <button type="submit" style="background-color: var(--primary-red);">Register Product</button>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="prodVol" placeholder="Selling Unit" required style="width: 50%;">
+                    <input type="number" id="prodPrice" placeholder="Selling Price (₱)" required style="width: 50%;">
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Expiration Date:</p>
+                <input type="date" id="prodExpiry" required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Total Pieces/Servings to Add:</p>
+                <input type="number" id="prodQty" placeholder="Amount to add" required min="1">
+                <button type="submit" style="background-color: var(--dark-black);">Add to Stock</button>
             </form>
         </div>
     </div>
 
     <div id="memberModal" class="modal">
-        <div class="modal-content" style="max-width: 900px;">
-            <div class="modal-header"><h3>Batch Register Members</h3><span class="close-btn" onclick="closeModal('memberModal')">&times;</span></div>
+        <div class="modal-content" style="width: 900px; max-width: 95vw;">
+            <div class="modal-header">
+                <h3 id="memberModalTitle">Register Members & Assign RFID</h3>
+                <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
+            </div>
             <form class="modal-form" id="batchMemberForm">
-                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;"><i class="fas fa-info-circle"></i> Members will be automatically emailed their login passwords.</p>
-                <div class="table-container" style="box-shadow: none; margin-bottom: 15px; overflow-y: visible;">
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead><tr><th>First Name</th><th>M.I.</th><th>Last Name</th><th>Email</th><th>Plan</th><th>RFID Tag</th><th></th></tr></thead>
-                        <tbody id="batchMemberBody"></tbody>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
+                    <i class="fas fa-info-circle"></i> To assign a card, click inside the "RFID Tag" box and tap the card on the scanner.
+                </p>
+                <div style="max-height: 400px; overflow-y: auto; margin-bottom: 15px;">
+                    <table class="batch-table">
+                        <thead>
+                            <tr>
+                                <th>Given Name</th>
+                                <th>M.I.</th>
+                                <th>Family Name</th>
+                                <th>Email</th>
+                                <th>Plan</th>
+                                <th>RFID Tag (Tap Card)</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="batchMemberBody">
+                            </tbody>
                     </table>
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <button type="button" onclick="addBatchRow()" style="background-color: #f1f2f6; color: var(--dark-black); flex: 1;"><i class="fas fa-plus"></i> Add Row</button>
-                    <button type="submit" style="background-color: var(--primary-red); flex: 2;"><i class="fas fa-paper-plane"></i> Save & Send Emails</button>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" onclick="addBatchRow()" style="background: #f1c40f; color: black; padding: 10px 15px; width: auto;">+ Add Another Row</button>
+                    <button type="submit" style="width: auto; padding: 10px 30px;"><i class="fas fa-paper-plane"></i> Register</button>
                 </div>
             </form>
         </div>
@@ -396,44 +525,38 @@
 
     <div id="editMemberModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h3>Edit Member Details</h3><span class="close-btn" onclick="closeModal('editMemberModal')">&times;</span></div>
+            <div class="modal-header">
+                <h3>Edit Member Details</h3>
+                <span class="close-btn" onclick="closeModal('editMemberModal')">&times;</span>
+            </div>
             <form class="modal-form" id="editMemberForm">
                 <input type="hidden" id="editMemberId">
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;">
-                    <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2">
-                </div>
-                <input type="text" id="editMemberFamily" placeholder="Last Name" required>
+                <input type="text" id="editMemberGiven" placeholder="Given Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
+                <input type="text" id="editMemberMI" placeholder="M.I. (Opt.)" maxlength="2" oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')">
+                <input type="text" id="editMemberFamily" placeholder="Family Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\s\-]/g, '')" required>
+                
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px; margin-top: 10px;">Update Membership Plan:</p>
                 <select id="editMemberPlan" required>
                     <option value="Gold Plan">Gold Plan</option>
                     <option value="Silver Plan">Silver Plan</option>
                 </select>
-                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
-            </form>
-        </div>
-    </div>
 
-    <div id="bookingModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header"><h3>Book Personal Training</h3><span class="close-btn" onclick="closeModal('bookingModal')">&times;</span></div>
-            <form class="modal-form" id="bookingForm">
-                <select id="bookMember" required></select>
-                <select id="bookTrainer" required></select>
-                <div style="display: flex; gap: 10px;">
-                    <input type="date" id="bookDate" required style="flex: 1;">
-                    <input type="time" id="bookTime" required style="flex: 1;">
-                </div>
-                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Confirm Booking</button>
+                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
             </form>
         </div>
     </div>
 
     <div id="editBookingModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header"><h3>Update Session Status</h3><span class="close-btn" onclick="closeModal('editBookingModal')">&times;</span></div>
+            <div class="modal-header">
+                <h3>Update Session Status</h3>
+                <span class="close-btn" onclick="closeModal('editBookingModal')">&times;</span>
+            </div>
             <form class="modal-form" id="editBookingForm">
                 <input type="hidden" id="editBookingId">
                 <p style="font-size: 14px; margin-bottom: 10px;">Session: <strong id="editBookingDetails"></strong></p>
+                
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Update Status:</p>
                 <select id="editBookingStatus" required>
                     <option value="Confirmed">Confirmed</option>
                     <option value="Completed">Completed</option>
@@ -445,65 +568,46 @@
         </div>
     </div>
 
-    <div id="pdf-report-container">
-        <div id="weekly-sales-report">
-            <div class="report-header">
-                <h2>FIT TRACK GYM</h2>
-                <h3>Weekly Product Consumption Report</h3>
-                <p>For the Week Of: <strong id="pdfWeekOf">--/--/-- to --/--/--</strong></p>
-            </div>
-            <table class="report-table">
-                <thead>
-                    <tr><th>Item Name</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th><th>TOTAL</th></tr>
-                </thead>
-                <tbody id="pdfSalesBody"></tbody>
+    <div id="pdf-report-container" style="display: none;">
+        <div id="weekly-sales-report" style="width: 100%; font-family: sans-serif; padding: 40px; color: #333; background: white;">
+            <h1 style="color: #555; font-size: 24px; text-transform: uppercase; margin-bottom: 20px; font-weight: bold; letter-spacing: 1px;">Printable Weekly<br>Sales Report Template</h1>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: center; border: 2px solid #000;">
+                <tr style="background-color: #bcc6d5; font-size: 11px; font-weight: bold; color: black;">
+                    <th style="border: 1px solid #000; padding: 12px;">WEEK OF</th>
+                    <th style="border: 1px solid #000; padding: 12px;">ASSOCIATE NAME</th>
+                    <th style="border: 1px solid #000; padding: 12px;">SIGNATURE</th>
+                    <th style="border: 1px solid #000; padding: 12px;">REPORT COMPLETION DATE</th>
+                </tr>
+                <tr style="font-size: 13px; font-weight: bold; color: black;">
+                    <td style="border: 1px solid #000; padding: 15px;" id="pdfWeekOf"></td>
+                    <td style="border: 1px solid #000; padding: 15px;" id="pdfAssociateName"></td>
+                    <td style="border: 1px solid #000; padding: 15px;"></td>
+                    <td style="border: 1px solid #000; padding: 15px;" id="pdfCompletionDate"></td>
+                </tr>
             </table>
-            <div style="margin-top: 40px; display: flex; justify-content: space-between;">
-                <div><p>Prepared By:</p><p style="margin-top: 30px; border-top: 1px solid black; padding-top: 5px;"><strong id="pdfAssociateName">Staff Member</strong></p></div>
-                <div><p>Date Generated:</p><p style="margin-top: 30px; border-top: 1px solid black; padding-top: 5px;"><strong id="pdfCompletionDate">--/--/--</strong></p></div>
-            </div>
+
+            <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; text-align: center; font-size: 11px; color: black;">
+                <thead style="background-color: #bcc6d5; font-weight: bold;">
+                    <tr>
+                        <th style="border: 1px solid #000; padding: 12px; text-align: left;">PRODUCT DESCRIPTION</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">MON</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">TUE</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">WED</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">THU</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">FRI</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">SAT</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 60px;">SUN</th>
+                        <th style="border: 1px solid #000; padding: 12px; width: 80px;">TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfSalesBody">
+                    </tbody>
+            </table>
         </div>
     </div>
 
     <script type="module" src="js/script.js"></script>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const userName = localStorage.getItem("loggedInUser") || "Staff";
-            if (document.getElementById('welcomeName')) document.getElementById('welcomeName').innerText = userName;
-            if (document.getElementById('topBarName')) document.getElementById('topBarName').innerText = userName;
-        });
-
-        // Hamburger Menu Logic
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const mobileSidebar = document.getElementById('mobileSidebar');
-
-        if(mobileMenuBtn && mobileSidebar) {
-            mobileMenuBtn.addEventListener('click', function() {
-                mobileSidebar.classList.toggle('open');
-            });
-        }
-
-        // Mobile Chat Interactions
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('.chat-user-item')) {
-                if (window.innerWidth <= 768) {
-                    const chatContainer = document.querySelector('.chat-container');
-                    if(chatContainer) chatContainer.classList.add('mobile-chat-open');
-                }
-            }
-            if (e.target.closest('.nav-clickable')) {
-                if (window.innerWidth <= 768 && mobileSidebar) {
-                    mobileSidebar.classList.remove('open');
-                }
-                closeMobileChat();
-            }
-        });
-
-        window.closeMobileChat = function() {
-            const chatContainer = document.querySelector('.chat-container');
-            if(chatContainer) chatContainer.classList.remove('mobile-chat-open');
-        }
-    </script>
 </body>
 </html>
