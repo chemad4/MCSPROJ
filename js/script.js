@@ -1306,7 +1306,6 @@ function initUI() {
         
         document.querySelectorAll('.card-black').forEach(card => {
             const valueDiv = card.querySelector('.value');
-            // Look for the shift timer card
             if (valueDiv && (valueDiv.innerText.includes('Shift') || valueDiv.innerText.includes('Checking Status'))) {
                 valueDiv.innerText = "Shift Status";
                 
@@ -1316,7 +1315,6 @@ function initUI() {
                     timerSpan = card.querySelector('.shift-timer');
                 }
 
-                // Smart logic for Trainers vs Staff
                 if (role === "Trainer" && trainerStatus !== "On Floor") {
                     timerSpan.innerText = "Off Floor";
                     timerSpan.style.background = "#eee";
@@ -1372,6 +1370,7 @@ function renderBookings() {
 
     let displayData = bookingsData.sort((a,b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
 
+    // --- NEW: Stacking Notification Banners for Members ---
     if (loggedInRole === "Member") {
         displayData = displayData.filter(b => b.memberId === loggedInUserId);
         if (myTbody) myTbody.innerHTML = "";
@@ -1379,23 +1378,46 @@ function renderBookings() {
         const notifArea = document.getElementById('memberNotificationArea');
         if (notifArea) {
             const now = new Date();
-            let upcomingConfirmed = displayData.filter(b => b.status === "Confirmed" && new Date(`${b.date}T${b.time}`) > now);
+            let upcomingBookings = displayData.filter(b => new Date(`${b.date}T${b.time}`) > now);
             
-            if (upcomingConfirmed.length > 0) {
-                let nextSession = upcomingConfirmed[0]; 
+            let confirmed = upcomingBookings.filter(b => b.status === "Confirmed");
+            let pending = upcomingBookings.filter(b => b.status === "Pending");
+            let cancelled = upcomingBookings.filter(b => b.status === "Cancelled" || b.status === "Declined"); 
+
+            let html = "";
+
+            if (confirmed.length > 0) {
+                let nextSession = confirmed[0]; 
                 const dateObj = new Date(`${nextSession.date}T${nextSession.time}`);
-                const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                
-                notifArea.innerHTML = `
+                html += `
                     <div class="notification-banner">
-                        <div><i class="fas fa-check-circle" style="font-size: 20px; margin-right: 10px;"></i> <strong>Booking Confirmed!</strong> Your session with ${nextSession.trainerName} is scheduled for ${dateStr} at ${timeStr}.</div>
+                        <div><i class="fas fa-check-circle" style="font-size: 20px; margin-right: 10px;"></i> <strong>Booking Confirmed!</strong> Your session with ${nextSession.trainerName} is scheduled for ${dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.</div>
                         <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
                     </div>
                 `;
-            } else {
-                notifArea.innerHTML = "";
             }
+
+            if (pending.length > 0) {
+                html += `
+                    <div class="notification-banner" style="background-color: #e2e3e5; color: #383d41; border-left-color: #6c757d;">
+                        <div><i class="fas fa-hourglass-half" style="font-size: 20px; margin-right: 10px;"></i> <strong>Pending Approval:</strong> You have ${pending.length} request(s) waiting for a trainer to accept.</div>
+                        <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
+            }
+
+            if (cancelled.length > 0) {
+                let nextDeclined = cancelled[0];
+                const dateObj = new Date(`${nextDeclined.date}T${nextDeclined.time}`);
+                html += `
+                    <div class="notification-banner" style="background-color: #f8d7da; color: #721c24; border-left-color: #f5c6cb;">
+                        <div><i class="fas fa-exclamation-circle" style="font-size: 20px; margin-right: 10px;"></i> <strong>Update:</strong> Your request with ${nextDeclined.trainerName} on ${dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} was declined or cancelled. Please book another time.</div>
+                        <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
+            }
+
+            notifArea.innerHTML = html;
         }
     } else if (loggedInRole === "Trainer") {
         displayData = displayData.filter(b => b.trainerId === loggedInUserId);
