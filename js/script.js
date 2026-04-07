@@ -45,7 +45,7 @@ if (currentUserId && currentSessionId) {
                 window.location.replace("index.html");
             }
             
-            // NEW: Automatically update the Member's Dashboard Plan Display
+            // Automatically update the Member's Dashboard Plan Display
             if (currentUserRole === "Member") {
                 if (document.getElementById('myPlanName')) document.getElementById('myPlanName').innerText = userData.plan || "Standard Plan";
                 if (document.getElementById('myPlanDays') && userData.dateRegistered) {
@@ -59,7 +59,7 @@ if (currentUserId && currentSessionId) {
     });
 }
 
-// Set Welcome Name on Member Dashboard
+// Set Welcome Name on Dashboard
 if (document.getElementById('welcomeName')) {
     document.getElementById('welcomeName').innerText = localStorage.getItem("loggedInUser") || "Member";
 }
@@ -75,8 +75,8 @@ window.handleLogout = async function() {
     if (userId) {
         try {
             let updateData = { currentSession: null };
-            if (userRole === "Admin" || userRole === "Staff") {
-                updateData.shiftStatus = "Off Shift";
+            if (userRole === "Admin" || userRole === "Staff" || userRole === "Trainer") {
+                updateData.shiftStatus = "Off Shift"; // Default back to off
             }
             await updateDoc(doc(db, "users", userId), updateData);
         } catch (error) {
@@ -737,7 +737,6 @@ onSnapshot(attendanceCol, (snapshot) => {
     renderAttendance();
 });
 
-// --- UPDATE: Render personal attendance for Members ---
 function renderAttendance() {
     const attTbody = document.querySelector('#attendanceTable tbody');
     const myAttTbody = document.querySelector('#myAttendanceBody'); 
@@ -1334,10 +1333,9 @@ onSnapshot(bookingsCol, (snapshot) => {
     renderBookings();
 });
 
-// --- UPDATE: Renders bookings dynamically based on the user's role ---
 function renderBookings() {
-    const tbody = document.getElementById('bookingsBody'); // Admin/Staff/Trainer
-    const myTbody = document.getElementById('myBookingsBody'); // Member
+    const tbody = document.getElementById('bookingsBody'); 
+    const myTbody = document.getElementById('myBookingsBody'); 
     const loggedInRole = localStorage.getItem("userRole");
     const loggedInUserId = localStorage.getItem("userId");
 
@@ -1346,6 +1344,30 @@ function renderBookings() {
     if (loggedInRole === "Member") {
         displayData = displayData.filter(b => b.memberId === loggedInUserId);
         if (myTbody) myTbody.innerHTML = "";
+
+        // --- NEW: Member Notification Banner Logic ---
+        const notifArea = document.getElementById('memberNotificationArea');
+        if (notifArea) {
+            const now = new Date();
+            // Look for any Confirmed session that hasn't happened yet
+            let upcomingConfirmed = displayData.filter(b => b.status === "Confirmed" && new Date(`${b.date}T${b.time}`) > now);
+            
+            if (upcomingConfirmed.length > 0) {
+                let nextSession = upcomingConfirmed[0]; 
+                const dateObj = new Date(`${nextSession.date}T${nextSession.time}`);
+                const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                
+                notifArea.innerHTML = `
+                    <div class="notification-banner">
+                        <div><i class="fas fa-check-circle" style="font-size: 20px; margin-right: 10px;"></i> <strong>Booking Confirmed!</strong> Your session with ${nextSession.trainerName} is scheduled for ${dateStr} at ${timeStr}.</div>
+                        <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
+            } else {
+                notifArea.innerHTML = "";
+            }
+        }
     } else if (loggedInRole === "Trainer") {
         displayData = displayData.filter(b => b.trainerId === loggedInUserId);
         if (tbody) tbody.innerHTML = "";
@@ -1409,14 +1431,12 @@ function renderBookings() {
 
 window.filterBookingsByDate = () => { renderBookings(); }
 
-// --- NEW: Trainer quick status update ---
 window.updateBookingStatus = async (id, newStatus) => {
     if (confirm(`Are you sure you want to mark this session as ${newStatus}?`)) {
         await updateDoc(doc(db, "bookings", id), { status: newStatus });
     }
 }
 
-// --- NEW: Member Booking Request logic ---
 window.openMemberBookingModal = () => {
     const trainerSelect = document.getElementById('memberBookTrainer');
     const trainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer' && u.status !== 'Archived');
