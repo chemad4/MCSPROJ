@@ -34,6 +34,8 @@ if (currentUserId && currentSessionId) {
     onSnapshot(doc(db, "users", currentUserId), (docSnap) => {
         if (docSnap.exists()) {
             const userData = docSnap.data();
+            
+            // Kick out duplicate logins
             if (userData.currentSession && userData.currentSession !== currentSessionId) {
                 alert("Session Override: Your account was just logged in from another device. Logging out here to protect your data.");
                 localStorage.removeItem("loggedInUser");
@@ -42,10 +44,11 @@ if (currentUserId && currentSessionId) {
                 localStorage.removeItem("userId"); 
                 localStorage.removeItem("shiftStart"); 
                 localStorage.removeItem("sessionId");
+                localStorage.removeItem("trainerShiftStatus");
                 window.location.replace("index.html");
             }
             
-            // Automatically update the Member's Dashboard Plan Display
+            // Update Member UI dynamically
             if (currentUserRole === "Member") {
                 if (document.getElementById('myPlanName')) document.getElementById('myPlanName').innerText = userData.plan || "Standard Plan";
                 if (document.getElementById('myPlanDays') && userData.dateRegistered) {
@@ -53,6 +56,18 @@ if (currentUserId && currentSessionId) {
                     const expiryDate = userData.dateRegistered + (30 * 24 * 60 * 60 * 1000); 
                     const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
                     document.getElementById('myPlanDays').innerHTML = `<i class="fa-regular fa-clock"></i> ${diffDays > 0 ? diffDays + ' Days Left' : 'Expired'}`;
+                }
+            }
+
+            // NEW: Automatically start/stop Trainer Shift Timer based on "On Floor" status
+            if (currentUserRole === "Trainer") {
+                const currentStatus = userData.shiftStatus || "Off Floor";
+                localStorage.setItem("trainerShiftStatus", currentStatus);
+                
+                if (currentStatus === "On Floor" && !localStorage.getItem("shiftStart")) {
+                    localStorage.setItem("shiftStart", Date.now()); // Starts timer
+                } else if (currentStatus !== "On Floor") {
+                    localStorage.removeItem("shiftStart"); // Stops timer
                 }
             }
         }
@@ -76,7 +91,7 @@ window.handleLogout = async function() {
         try {
             let updateData = { currentSession: null };
             if (userRole === "Admin" || userRole === "Staff" || userRole === "Trainer") {
-                updateData.shiftStatus = "Off Shift"; // Default back to off
+                updateData.shiftStatus = "Off Shift"; 
             }
             await updateDoc(doc(db, "users", userId), updateData);
         } catch (error) {
@@ -84,12 +99,7 @@ window.handleLogout = async function() {
         }
     }
 
-    localStorage.removeItem("loggedInUser");
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("userRfid"); 
-    localStorage.removeItem("userId"); 
-    localStorage.removeItem("shiftStart"); 
-    localStorage.removeItem("sessionId"); 
+    localStorage.clear(); // Clears all local storage variables securely
     window.location.replace("index.html"); 
 };
 
@@ -1291,21 +1301,42 @@ function initUI() {
     });
 
     function updateShiftTimer() {
-        const shiftStart = localStorage.getItem("shiftStart");
-        if (shiftStart) {
-            const diff = Date.now() - parseInt(shiftStart);
-            const hours = Math.floor(diff / (1000 * 60 * 60)), mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)), secs = Math.floor((diff % (1000 * 60)) / 1000);
-            const timeString = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            
-            document.querySelectorAll('.card-black').forEach(card => {
-                const valueDiv = card.querySelector('.value');
-                if (valueDiv && valueDiv.innerText.includes('Shift')) {
-                    let timerSpan = card.querySelector('.shift-timer');
-                    if (!timerSpan) card.innerHTML += `<span class="shift-timer" style="position: absolute; top: 10px; right: 15px; font-size: 16px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">${timeString}</span>`;
-                    else timerSpan.innerText = timeString;
+        const role = localStorage.getItem("userRole");
+        const trainerStatus = localStorage.getItem("trainerShiftStatus");
+        
+        document.querySelectorAll('.card-black').forEach(card => {
+            const valueDiv = card.querySelector('.value');
+            // Look for the shift timer card
+            if (valueDiv && (valueDiv.innerText.includes('Shift') || valueDiv.innerText.includes('Checking Status'))) {
+                valueDiv.innerText = "Shift Status";
+                
+                let timerSpan = card.querySelector('.shift-timer');
+                if (!timerSpan) {
+                    card.innerHTML += `<span class="shift-timer" style="position: absolute; top: 10px; right: 15px; font-size: 14px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">--:--:--</span>`;
+                    timerSpan = card.querySelector('.shift-timer');
                 }
-            });
-        }
+
+                // NEW: Smart logic for Trainers vs Staff
+                if (role === "Trainer" && trainerStatus !== "On Floor") {
+                    timerSpan.innerText = "Off Floor";
+                    timerSpan.style.background = "#eee";
+                    timerSpan.style.color = "#888";
+                } else {
+                    const shiftStart = localStorage.getItem("shiftStart");
+                    if (shiftStart) {
+                        const diff = Date.now() - parseInt(shiftStart);
+                        const hours = Math.floor(diff / (1000 * 60 * 60)), mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)), secs = Math.floor((diff % (1000 * 60)) / 1000);
+                        timerSpan.innerText = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                        timerSpan.style.background = "white";
+                        timerSpan.style.color = "black";
+                    } else {
+                        timerSpan.innerText = "Not Started";
+                        timerSpan.style.background = "#eee";
+                        timerSpan.style.color = "#888";
+                    }
+                }
+            }
+        });
     }
     setInterval(updateShiftTimer, 1000); updateShiftTimer();
 
@@ -1345,11 +1376,9 @@ function renderBookings() {
         displayData = displayData.filter(b => b.memberId === loggedInUserId);
         if (myTbody) myTbody.innerHTML = "";
 
-        // --- NEW: Member Notification Banner Logic ---
         const notifArea = document.getElementById('memberNotificationArea');
         if (notifArea) {
             const now = new Date();
-            // Look for any Confirmed session that hasn't happened yet
             let upcomingConfirmed = displayData.filter(b => b.status === "Confirmed" && new Date(`${b.date}T${b.time}`) > now);
             
             if (upcomingConfirmed.length > 0) {
@@ -1371,6 +1400,35 @@ function renderBookings() {
     } else if (loggedInRole === "Trainer") {
         displayData = displayData.filter(b => b.trainerId === loggedInUserId);
         if (tbody) tbody.innerHTML = "";
+
+        // --- NEW: Trainer Notification Banner Logic ---
+        const notifArea = document.getElementById('trainerNotificationArea');
+        if (notifArea) {
+            let pendingRequests = displayData.filter(b => b.status === "Pending");
+            
+            if (pendingRequests.length > 0) {
+                // Creates a yellow warning banner for pending requests
+                notifArea.innerHTML = `
+                    <div class="notification-banner" style="background-color: #fff3cd; color: #856404; border-left-color: #ffc107;">
+                        <div><i class="fas fa-bell" style="font-size: 20px; margin-right: 10px;"></i> <strong>New Request!</strong> You have <strong>${pendingRequests.length}</strong> pending session request(s) to review in your Schedule tab.</div>
+                        <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
+                    </div>
+                `;
+                
+                // Add a red notification dot to the nav menu icon
+                const navIcon = document.getElementById('navBookingsIcon');
+                if (navIcon && !navIcon.querySelector('.badge-dot')) {
+                    navIcon.innerHTML += `<span class="badge-dot" style="position:absolute; top:5px; right:30%; background:var(--primary-red); width:10px; height:10px; border-radius:50%;"></span>`;
+                }
+            } else {
+                notifArea.innerHTML = "";
+                const navIcon = document.getElementById('navBookingsIcon');
+                if (navIcon) {
+                    const dot = navIcon.querySelector('.badge-dot');
+                    if (dot) dot.remove();
+                }
+            }
+        }
     } else {
         if (tbody) tbody.innerHTML = "";
     }

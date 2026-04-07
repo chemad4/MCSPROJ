@@ -51,6 +51,25 @@
             min-width: 250px;
         }
 
+        /* NEW: Notification Banner Style */
+        .notification-banner {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 5px solid #28a745;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            animation: slideDown 0.5s ease-out;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* Mobile Button Default Hidden */
         .mobile-only-btn { display: none; }
 
@@ -62,18 +81,16 @@
                 bottom: 0;
                 left: 0;
                 width: 100%;
-                height: 70px; /* Fixed height for bottom tabs */
-                transform: none; /* Overrides any previous slide animations */
+                height: 70px;
+                transform: none; 
                 z-index: 9999;
                 display: flex;
                 padding: 0;
                 box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
             }
 
-            /* Hide the big logo on mobile */
             .logo-area { display: none; }
 
-            /* Reformat the UL to sit horizontally */
             .nav-menu {
                 display: flex;
                 flex-direction: row;
@@ -84,15 +101,15 @@
                 background: var(--dark-black);
             }
 
-            /* Reformat the LIs to stack icon above text */
             .nav-item {
                 margin: 0;
                 padding: 10px 0;
                 flex-direction: column;
                 justify-content: center;
                 border-radius: 0;
-                flex: 1; /* Distributes space equally */
+                flex: 1; 
                 text-align: center;
+                position: relative; /* Needed for red dot notifications */
             }
 
             .nav-item i {
@@ -106,15 +123,13 @@
                 display: block;
             }
 
-            /* Main Content Adjustments */
             .main-content { 
                 margin-left: 0 !important; 
-                margin-bottom: 70px; /* Pushes content up so bottom nav doesn't cover it */
+                margin-bottom: 70px; 
                 width: 100%; 
                 padding: 15px; 
             }
 
-            /* Topbar adjustments */
             .topbar { left: 0 !important; width: 100% !important; padding: 10px 15px; }
             .live-clock { display: none !important; }
             #topBarName { display: none; }
@@ -123,12 +138,11 @@
             .search-box, .search-box input { width: 100% !important; }
             .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-            /* NEW: Mobile Chat Fixes */
+            /* Mobile Chat Fixes */
             .chat-container { flex-direction: column !important; height: calc(100vh - 160px) !important; }
             .chat-sidebar { width: 100% !important; border-right: none !important; }
             .chat-main { display: none; width: 100% !important; }
             
-            /* Classes triggered via JS when chat is active */
             .chat-container.mobile-chat-open .chat-sidebar { display: none !important; }
             .chat-container.mobile-chat-open .chat-main { display: flex !important; flex-direction: column; flex-grow: 1; }
             .mobile-only-btn { display: block !important; }
@@ -145,7 +159,7 @@
                 <i class="fa-solid fa-gauge"></i> <span class="menu-text">Home</span>
             </li>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)">
+            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)" id="navBookingsIcon">
                 <i class="fa-solid fa-calendar-check"></i> <span class="menu-text">Schedule</span>
             </li>
 
@@ -170,6 +184,9 @@
         </header>
 
         <div id="dashboard" class="content-section active-section">
+            
+            <div id="trainerNotificationArea"></div>
+
             <div class="panel" style="background: linear-gradient(135deg, var(--dark-black), #333); color: white; border: none; margin-bottom: 20px;">
                 <div class="panel-body" style="padding: 30px;">
                     <h2 style="margin-bottom: 10px; font-size: 24px;">Welcome back, <span id="welcomeName">Trainer</span>!</h2>
@@ -180,7 +197,7 @@
             <div class="stat-cards">
                 <div class="stat-card card-black" style="cursor: default;">
                     <i class="fa-solid fa-clock"></i>
-                    <div class="value">Shift Started</div>
+                    <div class="value">Checking Status...</div>
                     </div>
                 <div class="stat-card card-red" onclick="switchTab('bookings')">
                     <i class="fa-solid fa-calendar-day"></i>
@@ -283,14 +300,12 @@
     <script type="module" src="js/script.js"></script>
 
     <script>
-        // Specific UI update for trainer dashboard
         document.addEventListener('DOMContentLoaded', () => {
             if (document.getElementById('welcomeName')) {
                 document.getElementById('welcomeName').innerText = localStorage.getItem("loggedInUser") || "Trainer";
             }
         });
 
-        // NEW: Intercept clicks on the chat list to slide the chat window open on mobile
         document.addEventListener('click', function(e) {
             if (e.target.closest('.chat-user-item')) {
                 if (window.innerWidth <= 768) {
@@ -298,13 +313,11 @@
                     if(chatContainer) chatContainer.classList.add('mobile-chat-open');
                 }
             }
-            // Auto close mobile tabs if they click a bottom nav link
             if (e.target.closest('.nav-clickable')) {
                 closeMobileChat();
             }
         });
 
-        // NEW: Function attached to the "Back" arrow
         window.closeMobileChat = function() {
             const chatContainer = document.querySelector('.chat-container');
             if(chatContainer) chatContainer.classList.remove('mobile-chat-open');
