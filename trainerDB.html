@@ -19,13 +19,106 @@
     <link rel="stylesheet" href="css/styles.css">
     
     <style>
+        /* Interactive Card Animations */
         .stat-card { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
         .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        
+        /* Responsive Flexbox for Mobile Layouts */
+        .stat-cards {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            flex: 1;
+            min-width: 250px; 
+        }
+        .table-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .search-box {
+            flex-grow: 1;
+            min-width: 250px;
+        }
+
+        /* Mobile Hamburger Icon */
+        .mobile-toggle {
+            display: none;
+            font-size: 20px;
+            cursor: pointer;
+            margin-right: 15px;
+            color: var(--dark-black);
+        }
+
+        /* MASTER MOBILE OVERRIDES */
+        @media (max-width: 768px) {
+            /* Show the hamburger menu */
+            .mobile-toggle {
+                display: inline-block;
+            }
+            
+            /* Hide sidebar off-screen by default */
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 9999;
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            }
+            /* Class to slide it back in */
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            /* Make main content full width */
+            .main-content {
+                margin-left: 0 !important;
+                width: 100%;
+                padding: 15px;
+            }
+
+            /* Fix topbar width and layout */
+            .topbar {
+                left: 0 !important;
+                width: 100% !important;
+                padding: 10px 15px;
+            }
+
+            /* Hide non-essentials to save space */
+            .live-clock {
+                display: none !important;
+            }
+            #topBarName {
+                display: none; /* Hides "Welcome Trainer", keeps the dropdown icon */
+            }
+
+            .table-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .search-box, .search-box input {
+                width: 100% !important;
+            }
+            /* Prevents tables from breaking the mobile screen width */
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <aside class="sidebar">
+    <aside class="sidebar" id="mobileSidebar">
         <div class="logo-area">FIT <span>TRACK</span></div>
 
         <ul class="nav-menu" id="navMenu">
@@ -45,7 +138,8 @@
 
     <main class="main-content">
         <header class="topbar">
-            <div class="topbar-left">
+            <div class="topbar-left" style="display: flex; align-items: center;">
+                <i class="fas fa-bars mobile-toggle" id="mobileMenuBtn"></i>
                 <span id="pageTitle" style="font-weight: 500; color: var(--dark-black); font-size: 16px;">Trainer Dashboard</span>
             </div>
             <div class="topbar-left" style="margin-left: auto; margin-right: 20px;">
@@ -65,7 +159,7 @@
                 </div>
             </div>
 
-            <div class="stat-cards" style="grid-template-columns: repeat(2, 1fr); max-width: 600px;">
+            <div class="stat-cards">
                 <div class="stat-card card-black" style="cursor: default;">
                     <i class="fa-solid fa-clock"></i>
                     <div class="value">Shift Started</div>
@@ -79,7 +173,7 @@
 
         <div id="bookings" class="content-section">
             <div class="table-controls">
-                <div class="search-box" style="display: flex; gap: 10px; width: 600px;">
+                <div class="search-box" style="display: flex; gap: 10px; flex-grow: 1;">
                     <div style="position: relative; flex-grow: 1;">
                         <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999;"></i>
                         <input type="text" id="bookingSearch" placeholder="Search by member name..." onkeyup="filterTable('bookingsTable', 'bookingSearch')" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px;">
@@ -174,6 +268,25 @@
             if (document.getElementById('welcomeName')) {
                 document.getElementById('welcomeName').innerText = localStorage.getItem("loggedInUser") || "Trainer";
             }
+        });
+
+        // Handle Mobile Sidebar Toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileSidebar = document.getElementById('mobileSidebar');
+
+        if(mobileMenuBtn && mobileSidebar) {
+            mobileMenuBtn.addEventListener('click', function() {
+                mobileSidebar.classList.toggle('open');
+            });
+        }
+
+        // Auto-close sidebar when a nav item is clicked on mobile
+        document.querySelectorAll('.nav-clickable').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768 && mobileSidebar) {
+                    mobileSidebar.classList.remove('open');
+                }
+            });
         });
     </script>
 </body>

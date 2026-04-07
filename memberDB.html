@@ -83,7 +83,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* RESTORED: Responsive Flexbox Layouts */
+        /* Responsive Flexbox Layouts */
         .table-controls {
             display: flex;
             flex-wrap: wrap;
@@ -111,8 +111,64 @@
             margin-top: 20px;
         }
 
-        /* Mobile specific overrides */
+        /* Mobile Hamburger Icon */
+        .mobile-toggle {
+            display: none;
+            font-size: 20px;
+            cursor: pointer;
+            margin-right: 15px;
+            color: var(--dark-black);
+        }
+
+        /* MASTER MOBILE OVERRIDES */
         @media (max-width: 768px) {
+            /* Show the hamburger menu */
+            .mobile-toggle {
+                display: inline-block;
+            }
+            
+            /* Hide sidebar off-screen by default */
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 9999;
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            }
+            /* Class to slide it back in */
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            /* Make main content full width */
+            .main-content {
+                margin-left: 0 !important;
+                width: 100%;
+                padding: 15px;
+            }
+
+            /* Fix topbar width and layout */
+            .topbar {
+                left: 0 !important;
+                width: 100% !important;
+                padding: 10px 15px;
+            }
+
+            /* Hide non-essentials to save space */
+            .live-clock {
+                display: none !important;
+            }
+            #topBarName {
+                display: none; /* Hides "Welcome Member", keeps the dropdown icon */
+            }
+
+            /* Stack internal grids */
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
             .table-controls {
                 flex-direction: column;
                 align-items: stretch;
@@ -131,15 +187,12 @@
             .welcome-panel-body > div {
                 text-align: center !important;
             }
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
 <body>
 
-    <aside class="sidebar">
+    <aside class="sidebar" id="mobileSidebar">
         <div class="logo-area">FIT <span>TRACK</span></div>
 
         <ul class="nav-menu" id="navMenu">
@@ -163,7 +216,8 @@
 
     <main class="main-content">
         <header class="topbar">
-            <div class="topbar-left">
+            <div class="topbar-left" style="display: flex; align-items: center;">
+                <i class="fas fa-bars mobile-toggle" id="mobileMenuBtn"></i>
                 <span id="pageTitle" style="font-weight: 500; color: var(--dark-black); font-size: 16px;">My Dashboard</span>
             </div>
             <div class="topbar-left" style="margin-left: auto; margin-right: 20px;">
@@ -334,6 +388,7 @@
     <script type="module" src="js/script.js"></script>
 
     <script>
+        // JS specific to the Member UI interactions
         function filterMemberTrainers() {
             const filter = document.getElementById('memberTrainerSearch').value.toLowerCase();
             const cards = document.querySelectorAll('.member-trainer-card');
@@ -347,6 +402,25 @@
                 }
             });
         }
+
+        // Handle Mobile Sidebar Toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileSidebar = document.getElementById('mobileSidebar');
+
+        if(mobileMenuBtn && mobileSidebar) {
+            mobileMenuBtn.addEventListener('click', function() {
+                mobileSidebar.classList.toggle('open');
+            });
+        }
+
+        // Auto-close sidebar when a nav item is clicked on mobile
+        document.querySelectorAll('.nav-clickable').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 768 && mobileSidebar) {
+                    mobileSidebar.classList.remove('open');
+                }
+            });
+        });
     </script>
 </body>
 </html>
