@@ -51,87 +51,89 @@
             min-width: 250px;
         }
 
-        /* Mobile Hamburger Icon */
-        .mobile-toggle {
-            display: none;
-            font-size: 20px;
-            cursor: pointer;
-            margin-right: 15px;
-            color: var(--dark-black);
-        }
-
-        /* MASTER MOBILE OVERRIDES */
+        /* MASTER MOBILE OVERRIDES: APP-STYLE BOTTOM NAV */
         @media (max-width: 768px) {
-            /* Show the hamburger menu */
-            .mobile-toggle {
-                display: inline-block;
-            }
-            
-            /* Hide sidebar off-screen by default */
+            /* Transform Sidebar into a Bottom Nav Bar */
             .sidebar {
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-                z-index: 9999;
                 position: fixed;
-                top: 0;
+                bottom: 0;
                 left: 0;
-                height: 100vh;
-                box-shadow: 2px 0 10px rgba(0,0,0,0.5);
-            }
-            /* Class to slide it back in */
-            .sidebar.open {
-                transform: translateX(0);
-            }
-
-            /* Make main content full width */
-            .main-content {
-                margin-left: 0 !important;
                 width: 100%;
-                padding: 15px;
+                height: 70px; /* Fixed height for bottom tabs */
+                transform: none; /* Overrides any previous slide animations */
+                z-index: 9999;
+                display: flex;
+                padding: 0;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
             }
 
-            /* Fix topbar width and layout */
-            .topbar {
-                left: 0 !important;
-                width: 100% !important;
-                padding: 10px 15px;
+            /* Hide the big logo on mobile */
+            .logo-area { display: none; }
+
+            /* Reformat the UL to sit horizontally */
+            .nav-menu {
+                display: flex;
+                flex-direction: row;
+                width: 100%;
+                justify-content: space-around;
+                margin: 0;
+                padding: 0;
+                background: var(--dark-black);
             }
 
-            /* Hide non-essentials to save space */
-            .live-clock {
-                display: none !important;
-            }
-            #topBarName {
-                display: none; /* Hides "Welcome Trainer", keeps the dropdown icon */
-            }
-
-            .table-controls {
+            /* Reformat the LIs to stack icon above text */
+            .nav-item {
+                margin: 0;
+                padding: 10px 0;
                 flex-direction: column;
-                align-items: stretch;
+                justify-content: center;
+                border-radius: 0;
+                flex: 1; /* Distributes space equally */
+                text-align: center;
             }
-            .search-box, .search-box input {
-                width: 100% !important;
+
+            .nav-item i {
+                margin-right: 0 !important;
+                margin-bottom: 4px;
+                font-size: 20px;
             }
-            /* Prevents tables from breaking the mobile screen width */
-            .table-container {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
+
+            .menu-text {
+                font-size: 11px;
+                display: block;
             }
+
+            /* Main Content Adjustments */
+            .main-content { 
+                margin-left: 0 !important; 
+                margin-bottom: 70px; /* Pushes content up so bottom nav doesn't cover it */
+                width: 100%; 
+                padding: 15px; 
+            }
+
+            /* Topbar adjustments */
+            .topbar { left: 0 !important; width: 100% !important; padding: 10px 15px; }
+            .live-clock { display: none !important; }
+            #topBarName { display: none; }
+
+            .table-controls { flex-direction: column; align-items: stretch; }
+            .search-box, .search-box input { width: 100% !important; }
+            .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         }
     </style>
 </head>
 <body>
 
-    <aside class="sidebar" id="mobileSidebar">
+    <aside class="sidebar">
         <div class="logo-area">FIT <span>TRACK</span></div>
 
         <ul class="nav-menu" id="navMenu">
             <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)">
-                <i class="fa-solid fa-gauge"></i> <span class="menu-text">My Dashboard</span>
+                <i class="fa-solid fa-gauge"></i> <span class="menu-text">Home</span>
             </li>
 
             <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)">
-                <i class="fa-solid fa-calendar-check"></i> <span class="menu-text">My Schedule</span>
+                <i class="fa-solid fa-calendar-check"></i> <span class="menu-text">Schedule</span>
             </li>
 
             <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Internal Messages')">
@@ -143,7 +145,6 @@
     <main class="main-content">
         <header class="topbar">
             <div class="topbar-left" style="display: flex; align-items: center;">
-                <i class="fas fa-bars mobile-toggle" id="mobileMenuBtn"></i>
                 <span id="pageTitle" style="font-weight: 500; color: var(--dark-black); font-size: 16px;">Trainer Dashboard</span>
             </div>
             <div class="topbar-left" style="margin-left: auto; margin-right: 20px;">
@@ -272,25 +273,6 @@
             if (document.getElementById('welcomeName')) {
                 document.getElementById('welcomeName').innerText = localStorage.getItem("loggedInUser") || "Trainer";
             }
-        });
-
-        // Handle Mobile Sidebar Toggle
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const mobileSidebar = document.getElementById('mobileSidebar');
-
-        if(mobileMenuBtn && mobileSidebar) {
-            mobileMenuBtn.addEventListener('click', function() {
-                mobileSidebar.classList.toggle('open');
-            });
-        }
-
-        // Auto-close sidebar when a nav item is clicked on mobile
-        document.querySelectorAll('.nav-clickable').forEach(item => {
-            item.addEventListener('click', () => {
-                if (window.innerWidth <= 768 && mobileSidebar) {
-                    mobileSidebar.classList.remove('open');
-                }
-            });
         });
     </script>
 </body>
