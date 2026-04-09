@@ -469,7 +469,8 @@ tr:hover {
     background-color: #fff; 
     padding: 30px; 
     border-radius: 8px; 
-    width: 400px; 
+    width: 95%; /* Adjusts to screen size naturally */
+    max-width: 400px; /* Default max width for small modals */
     box-shadow: 0 4px 20px rgba(0,0,0,0.2); 
     animation: slideDown 0.3s ease; 
 }
@@ -788,7 +789,7 @@ tr:hover {
 #batchMemberBody input, #batchMemberBody select, 
 #batchStaffBody input, #batchStaffBody select {
     width: 100%;
-    min-width: 130px; /* Forces inputs to stay a readable size */
+    min-width: 130px; 
     padding: 10px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -798,4 +799,10 @@ tr:hover {
 /* Keeps the Middle Initial box appropriately small */
 #batchMemberBody .bm-mi, #batchStaffBody .bs-mi {
     min-width: 60px !important;
+}
+
+/* Expand the modal window itself so it doesn't need to scroll */
+#memberModal .modal-content, 
+#staffModal .modal-content {
+    max-width: 1100px !important; 
 }
