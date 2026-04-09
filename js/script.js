@@ -637,7 +637,7 @@ function renderPayments() {
     });
 }
 
-// NEW: Void Transaction & Restock Inventory
+// Void Transaction & Restock Inventory
 window.voidTransaction = async function(id) {
     const tx = paymentsData.find(p => p.id === id);
     if (!tx) return;
@@ -924,7 +924,6 @@ window.openEditMemberModal = function(id) {
     document.getElementById('editMemberMI').value = member.mi || '';
     document.getElementById('editMemberFamily').value = member.familyName || '';
     
-    // NEW: Pull the RFID tag so it can be updated
     if (document.getElementById('editMemberRfid')) {
         document.getElementById('editMemberRfid').value = member.rfid || '';
     }
@@ -955,7 +954,6 @@ if (document.getElementById('editMemberForm')) {
             updatedData.plan = document.getElementById('editMemberPlan').value;
         }
 
-        // NEW: Save the updated RFID tag
         if (document.getElementById('editMemberRfid')) {
             updatedData.rfid = document.getElementById('editMemberRfid').value.trim();
         }
@@ -1089,7 +1087,6 @@ window.openEditStaffModal = function(id) {
     document.getElementById('editStaffMI').value = user.mi || '';
     document.getElementById('editStaffFamily').value = user.familyName || '';
 
-    // NEW: Pull the RFID tag so it can be updated
     if (document.getElementById('editStaffRfid')) {
         document.getElementById('editStaffRfid').value = user.rfid || '';
     }
@@ -1145,7 +1142,6 @@ if (document.getElementById('editStaffForm')) {
             updatedData.status = statusEl.value;
         }
 
-        // NEW: Save the updated RFID tag
         if (document.getElementById('editStaffRfid')) {
             updatedData.rfid = document.getElementById('editStaffRfid').value.trim();
         }
@@ -1363,33 +1359,41 @@ function initUI() {
         const role = localStorage.getItem("userRole");
         const trainerStatus = localStorage.getItem("trainerShiftStatus");
         
-        document.querySelectorAll('.card-black').forEach(card => {
+        document.querySelectorAll('.card-black, .grid-stat-box').forEach(card => {
             const valueDiv = card.querySelector('.value');
             if (valueDiv && (valueDiv.innerText.includes('Shift') || valueDiv.innerText.includes('Checking Status'))) {
                 valueDiv.innerText = "Shift Status";
                 
                 let timerSpan = card.querySelector('.shift-timer');
-                if (!timerSpan) {
+                if (!timerSpan && card.classList.contains('card-black')) {
                     card.innerHTML += `<span class="shift-timer" style="position: absolute; top: 10px; right: 15px; font-size: 14px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">--:--:--</span>`;
                     timerSpan = card.querySelector('.shift-timer');
                 }
 
-                if (role === "Trainer" && trainerStatus !== "On Floor") {
-                    timerSpan.innerText = "Off Floor";
-                    timerSpan.style.background = "#eee";
-                    timerSpan.style.color = "#888";
-                } else {
-                    const shiftStart = localStorage.getItem("shiftStart");
-                    if (shiftStart) {
-                        const diff = Date.now() - parseInt(shiftStart);
-                        const hours = Math.floor(diff / (1000 * 60 * 60)), mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)), secs = Math.floor((diff % (1000 * 60)) / 1000);
-                        timerSpan.innerText = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-                        timerSpan.style.background = "white";
-                        timerSpan.style.color = "black";
+                if (timerSpan) {
+                    if (role === "Trainer" && trainerStatus !== "On Floor") {
+                        timerSpan.innerText = "Off Floor";
+                        if(card.classList.contains('card-black')) {
+                            timerSpan.style.background = "#eee";
+                            timerSpan.style.color = "#888";
+                        }
                     } else {
-                        timerSpan.innerText = "Not Started";
-                        timerSpan.style.background = "#eee";
-                        timerSpan.style.color = "#888";
+                        const shiftStart = localStorage.getItem("shiftStart");
+                        if (shiftStart) {
+                            const diff = Date.now() - parseInt(shiftStart);
+                            const hours = Math.floor(diff / (1000 * 60 * 60)), mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)), secs = Math.floor((diff % (1000 * 60)) / 1000);
+                            timerSpan.innerText = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                            if(card.classList.contains('card-black')) {
+                                timerSpan.style.background = "white";
+                                timerSpan.style.color = "black";
+                            }
+                        } else {
+                            timerSpan.innerText = "Not Started";
+                            if(card.classList.contains('card-black')) {
+                                timerSpan.style.background = "#eee";
+                                timerSpan.style.color = "#888";
+                            }
+                        }
                     }
                 }
             }
