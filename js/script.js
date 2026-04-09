@@ -1170,17 +1170,18 @@ window.deleteUser = async (id) => {
 // ==========================================
 let batchRowCount = 1;
 
+// NEW: Inline styles added to bypass stubborn table constraints
 window.addBatchRow = function() {
     if (batchRowCount >= 20) return alert("Maximum 20 members can be registered at once.");
     const tbody = document.getElementById('batchMemberBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td><input type="text" class="bm-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
-        <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
-        <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
-        <td><input type="email" class="bm-email" required></td>
-        <td><select class="bm-plan"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
-        <td><input type="text" class="bm-rfid rfid-register-input" placeholder="Tap Card..." required></td>
+        <td><input type="text" class="bm-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="text" class="bm-mi" maxlength="2" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')" style="min-width: 60px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="email" class="bm-email" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><select class="bm-plan" style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
+        <td><input type="text" class="bm-rfid rfid-register-input" placeholder="Tap Card..." required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
         <td><button type="button" onclick="this.parentElement.parentElement.remove(); batchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
     `;
     tbody.appendChild(tr); batchRowCount++;
@@ -1189,12 +1190,12 @@ window.addBatchRow = function() {
 window.openMemberModal = () => { 
     document.getElementById('batchMemberBody').innerHTML = `
         <tr>
-            <td><input type="text" class="bm-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
-            <td><input type="text" class="bm-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
-            <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
-            <td><input type="email" class="bm-email" required></td>
-            <td><select class="bm-plan"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
-            <td><input type="text" class="bm-rfid rfid-register-input" placeholder="Tap Card..." required></td>
+            <td><input type="text" class="bm-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+            <td><input type="text" class="bm-mi" maxlength="2" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')" style="min-width: 60px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+            <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+            <td><input type="email" class="bm-email" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+            <td><select class="bm-plan" style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
+            <td><input type="text" class="bm-rfid rfid-register-input" placeholder="Tap Card..." required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
             <td></td>
         </tr>
     `;
@@ -1244,17 +1245,18 @@ if (document.getElementById('batchMemberForm')) {
 
 let staffBatchRowCount = 1;
 
+// NEW: Inline styles added to bypass stubborn table constraints
 window.addStaffBatchRow = function() {
     if (staffBatchRowCount >= 20) return alert("Maximum 20 accounts can be registered at once.");
     const tbody = document.getElementById('batchStaffBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
-        <td><input type="text" class="bs-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
-        <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
-        <td><input type="email" class="bs-email" required></td>
-        <td><input type="text" class="bs-specialty" placeholder="Opt. (e.g. Yoga)"></td>
-        <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required></td>
+        <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="text" class="bs-mi" maxlength="2" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')" style="min-width: 60px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="email" class="bs-email" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="text" class="bs-specialty" placeholder="Opt. (e.g. Yoga)" style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
         <td><button type="button" onclick="this.parentElement.parentElement.remove(); staffBatchRowCount--;" style="color:red; background:none; border:none; font-size:16px; cursor:pointer;"><i class="fas fa-trash"></i></button></td>
     `;
     tbody.appendChild(tr); staffBatchRowCount++;
@@ -1272,12 +1274,12 @@ window.openStaffModal = (role) => {
 
     document.getElementById('batchStaffBody').innerHTML = `
         <tr>
-            <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
-            <td><input type="text" class="bs-mi" maxlength="2" style="width:50px;" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')"></td>
-            <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required></td>
-            <td><input type="email" class="bs-email" required></td>
-            <td><input type="text" class="bs-specialty" placeholder="${role === 'Trainer' ? 'e.g. Yoga' : 'N/A'}" ${role === 'Staff' ? 'disabled' : ''}></td>
-            <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required></td>
+            <td><input type="text" class="bs-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+            <td><input type="text" class="bs-mi" maxlength="2" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')" style="min-width: 60px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+            <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+            <td><input type="email" class="bs-email" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+            <td><input type="text" class="bs-specialty" placeholder="${role === 'Trainer' ? 'e.g. Yoga' : 'N/A'}" ${role === 'Staff' ? 'disabled' : ''} style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+            <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
             <td></td>
         </tr>
     `;
