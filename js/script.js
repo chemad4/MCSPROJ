@@ -624,13 +624,51 @@ function renderPayments() {
     payTbody.innerHTML = "";
     paymentsData.forEach(t => {
         let vat = (t.amount * 0.12).toFixed(2);
+        let badge = t.status === 'Voided' ? '<span style="color:var(--primary-red);font-weight:bold;">VOIDED</span>' : 'Paid';
+        let actionBtn = t.status !== 'Voided' ? `<button class="btn-icon btn-delete" onclick="voidTransaction('${t.id}')" title="Void Transaction"><i class="fas fa-ban"></i></button>` : '-';
+        
         payTbody.innerHTML += `
-            <tr>
+            <tr style="${t.status === 'Voided' ? 'opacity: 0.6; text-decoration: line-through;' : ''}">
                 <td>${t.name}</td><td>${t.items || t.type}</td><td>${t.date} <span style="color:#888; font-size:12px;">${t.time || ''}</span></td>
-                <td>₱${t.amount}</td><td>₱${vat}</td><td style="font-weight:bold; color:var(--primary-red);">₱${t.amount}</td>
+                <td>₱${t.amount}</td><td>₱${vat}</td><td style="font-weight:bold; color:var(--dark-black);">₱${t.amount} <br><small style="text-decoration:none;">${badge}</small></td>
+                <td>${actionBtn}</td>
             </tr>
         `;
     });
+}
+
+// NEW: Void Transaction & Restock Inventory
+window.voidTransaction = async function(id) {
+    const tx = paymentsData.find(p => p.id === id);
+    if (!tx) return;
+    if (tx.status === "Voided") return alert("This transaction is already voided.");
+    if (!confirm("Are you sure you want to VOID this transaction? This will automatically return the purchased items back into your inventory.")) return;
+
+    try {
+        if (tx.items && tx.type === "POS Sale") {
+            const itemList = tx.items.split(', ');
+            for (let itemStr of itemList) {
+                const match = itemStr.match(/^(\d+)x\s+(.+)$/);
+                if (match) {
+                    const qtyRefunded = parseInt(match[1]);
+                    const itemName = match[2];
+                    if (itemName.includes("Walk-in Gym Access")) continue; 
+
+                    const invItem = inventoryData.find(i => i.name.toLowerCase() === itemName.toLowerCase());
+                    if (invItem) {
+                        await updateDoc(doc(db, "inventory", invItem.id), {
+                            qty: invItem.qty + qtyRefunded
+                        });
+                    }
+                }
+            }
+        }
+        await updateDoc(doc(db, "payments", id), { status: "Voided" });
+        alert("Transaction successfully voided and inventory restocked!");
+    } catch(e) {
+        console.error(e);
+        alert("Error voiding transaction.");
+    }
 }
 
 window.generateWeeklyPDF = function() {
@@ -660,7 +698,8 @@ window.generateWeeklyPDF = function() {
 
     let productSales = {};
     
-    paymentsData.forEach(payment => {
+    // Ignore voided transactions in the report
+    paymentsData.filter(p => p.status !== 'Voided').forEach(payment => {
         if (!payment.date) return;
         const payDate = new Date(payment.date);
         
@@ -885,6 +924,11 @@ window.openEditMemberModal = function(id) {
     document.getElementById('editMemberMI').value = member.mi || '';
     document.getElementById('editMemberFamily').value = member.familyName || '';
     
+    // NEW: Pull the RFID tag so it can be updated
+    if (document.getElementById('editMemberRfid')) {
+        document.getElementById('editMemberRfid').value = member.rfid || '';
+    }
+
     if (document.getElementById('editMemberPlan')) {
         document.getElementById('editMemberPlan').value = member.plan || 'Gold Plan';
     }
@@ -909,6 +953,11 @@ if (document.getElementById('editMemberForm')) {
         
         if (document.getElementById('editMemberPlan')) {
             updatedData.plan = document.getElementById('editMemberPlan').value;
+        }
+
+        // NEW: Save the updated RFID tag
+        if (document.getElementById('editMemberRfid')) {
+            updatedData.rfid = document.getElementById('editMemberRfid').value.trim();
         }
         
         await updateDoc(doc(db, "users", id), updatedData);
@@ -1039,6 +1088,11 @@ window.openEditStaffModal = function(id) {
     document.getElementById('editStaffGiven').value = user.givenName || '';
     document.getElementById('editStaffMI').value = user.mi || '';
     document.getElementById('editStaffFamily').value = user.familyName || '';
+
+    // NEW: Pull the RFID tag so it can be updated
+    if (document.getElementById('editStaffRfid')) {
+        document.getElementById('editStaffRfid').value = user.rfid || '';
+    }
     
     const specialtyContainer = document.getElementById('editSpecialtyContainer');
     const specialtyInput = document.getElementById('editStaffSpecialty');
@@ -1089,6 +1143,11 @@ if (document.getElementById('editStaffForm')) {
         const statusEl = document.getElementById('editStaffStatus');
         if (statusEl) {
             updatedData.status = statusEl.value;
+        }
+
+        // NEW: Save the updated RFID tag
+        if (document.getElementById('editStaffRfid')) {
+            updatedData.rfid = document.getElementById('editStaffRfid').value.trim();
         }
 
         await updateDoc(doc(db, "users", id), updatedData);
@@ -1370,7 +1429,6 @@ function renderBookings() {
 
     let displayData = bookingsData.sort((a,b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
 
-    // --- NEW: Stacking Notification Banners for Members ---
     if (loggedInRole === "Member") {
         displayData = displayData.filter(b => b.memberId === loggedInUserId);
         if (myTbody) myTbody.innerHTML = "";
