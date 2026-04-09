@@ -783,3 +783,19 @@ tr:hover {
 .inventory-card:hover .card-actions { 
     opacity: 1; 
 }
+
+/* Fix for squished Batch Register modal inputs */
+#batchMemberBody input, #batchMemberBody select, 
+#batchStaffBody input, #batchStaffBody select {
+    width: 100%;
+    min-width: 130px; /* Forces inputs to stay a readable size */
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+/* Keeps the Middle Initial box appropriately small */
+#batchMemberBody .bm-mi, #batchStaffBody .bs-mi {
+    min-width: 60px !important;
+}
