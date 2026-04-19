@@ -3,6 +3,8 @@
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { initAttendance } from "./attendance.js";
+import { initRfid } from "./rfid.js";
 
 // ==========================================
 // 2. FIREBASE & EMAILJS CONFIGURATION
@@ -222,6 +224,8 @@ const usersCol = collection(db, "users");
 const attendanceCol = collection(db, "attendance");
 const messagesCol = collection(db, "messages");
 const bookingsCol = collection(db, "bookings");
+const guestCardsCol = collection(db, "guestCards");
+const walkinPassesCol = collection(db, "walkinPasses");
 
 let servicesChartInstance = null;
 
@@ -517,6 +521,130 @@ if (document.getElementById('productForm')) document.getElementById('productForm
 // ==========================================
 // 8. POINT OF SALE (POS) LOGIC
 // ==========================================
+function getWalkinIssueEls() {
+    const modal = document.getElementById("walkinIssueModal");
+    const input = document.getElementById("walkinIssueRfidInput");
+    const counter = document.getElementById("walkinIssueCounter");
+    return { modal, input, counter };
+}
+
+function openWalkinIssueModal({ current, total } = {}) {
+    const { modal, input, counter } = getWalkinIssueEls();
+    if (!modal || !input) {
+        throw new Error("Walk-in issue modal is missing. Ensure #walkinIssueModal exists on this page.");
+    }
+
+    if (counter) {
+        if (Number.isFinite(current) && Number.isFinite(total) && total > 1) counter.innerText = `Tap Card ${current} of ${total}`;
+        else counter.innerText = "Tap Card";
+    }
+
+    input.value = "";
+    modal.style.display = "flex";
+    // Focus the input so rfid.js recognizes it as the active `.rfid-register-input`.
+    setTimeout(() => input.focus(), 0);
+}
+
+function closeWalkinIssueModal() {
+    const { modal, input } = getWalkinIssueEls();
+    if (input) input.value = "";
+    if (modal) modal.style.display = "none";
+}
+
+async function waitForWalkinRfidTap({ timeoutMs = 60000 } = {}) {
+    const { modal, input } = getWalkinIssueEls();
+    if (!modal || !input) return null;
+
+    const started = Date.now();
+    return await new Promise((resolve) => {
+        let lastVal = "";
+
+        window.__walkinIssueRetry = () => {
+            if (!input) return;
+            input.value = "";
+            setTimeout(() => input.focus(), 0);
+        };
+
+        const timer = setInterval(() => {
+            // User cancelled (modal closed)
+            if (modal.style.display === "none") {
+                clearInterval(timer);
+                resolve(null);
+                return;
+            }
+
+            if (Date.now() - started > timeoutMs) {
+                clearInterval(timer);
+                resolve(null);
+                return;
+            }
+
+            const val = (input.value || "").trim();
+            if (val && val !== lastVal && val.length > 5) {
+                clearInterval(timer);
+                resolve(val);
+                return;
+            }
+            lastVal = val;
+        }, 50);
+    });
+}
+
+async function isGuestCardIssuedToday(rfidTag, dateStr) {
+    const q = query(guestCardsCol, where("rfid", "==", rfidTag));
+    const snap = await getDocs(q);
+    if (snap.empty) return false;
+    const d = snap.docs[0].data() || {};
+    return d.status === "Issued" && d.issuedForDate === dateStr;
+}
+
+async function upsertGuestCardIssued({ rfidTag, dateStr, paymentId, issuedBy } = {}) {
+    const q = query(guestCardsCol, where("rfid", "==", rfidTag));
+    const snap = await getDocs(q);
+    const data = {
+        rfid: rfidTag,
+        status: "Issued",
+        issuedForDate: dateStr,
+        issuedAt: Date.now(),
+        paymentId: paymentId || "",
+        issuedByUserId: issuedBy?.userId || "",
+        issuedByName: issuedBy?.name || "",
+        issuedByRole: issuedBy?.role || "",
+    };
+
+    if (snap.empty) {
+        await addDoc(guestCardsCol, data);
+        return;
+    }
+    await updateDoc(doc(db, "guestCards", snap.docs[0].id), data);
+}
+
+async function issueWalkinPassAndCheckIn({ rfidTag, paymentId, dateStr, timeStr, amount, issuedBy } = {}) {
+    await addDoc(walkinPassesCol, {
+        rfid: rfidTag,
+        paymentId: paymentId || "",
+        amount: typeof amount === "number" ? amount : 0,
+        date: dateStr,
+        status: "Active",
+        createdAt: Date.now(),
+        issuedByUserId: issuedBy?.userId || "",
+        issuedByName: issuedBy?.name || "",
+        issuedByRole: issuedBy?.role || "",
+    });
+
+    await addDoc(attendanceCol, {
+        name: "Walk-in Guest",
+        type: "Walk-in",
+        date: dateStr,
+        timeIn: timeStr,
+        timeOut: "",
+        status: "Checked In",
+        timestamp: Date.now(),
+        guestRfid: rfidTag,
+        paymentId: paymentId || "",
+    });
+}
+
 function renderPOSProducts() {
     const posBody = document.getElementById('posProductList');
     if (!posBody) return;
@@ -593,19 +721,80 @@ window.processPayment = async function(grandTotal) {
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
-    await addDoc(paymentsCol, { name: "Walk-in POS Customer", type: "POS Sale", items: itemsStr, amount: grandTotal, status: "Paid", date: dateStr, time: timeStr, timestamp: now.getTime() });
+    const paymentRef = await addDoc(paymentsCol, {
+        name: "Walk-in POS Customer",
+        type: "POS Sale",
+        items: itemsStr,
+        amount: grandTotal,
+        status: "Paid",
+        date: dateStr,
+        time: timeStr,
+        timestamp: now.getTime(),
+    });
+    const paymentId = paymentRef.id;
+
+    const issuedBy = {
+        userId: localStorage.getItem("userId") || "",
+        name: localStorage.getItem("loggedInUser") || "",
+        role: localStorage.getItem("userRole") || "",
+    };
+
+    const walkinItem = posCart.find((x) => x.id === "WALKIN");
+    const walkinQty = walkinItem ? Number(walkinItem.qty || 0) : 0;
+    let issuedCount = 0;
+    let issuanceCancelled = false;
 
     for (let item of posCart) {
         if (item.id === 'WALKIN') {
             for (let w = 0; w < item.qty; w++) {
-                await addDoc(attendanceCol, { name: "Walk-in Guest", type: "Walk-in", date: dateStr, timeIn: timeStr, timeOut: "", status: "Checked In", timestamp: now.getTime() });
+                openWalkinIssueModal({ current: w + 1, total: item.qty });
+
+                // Wait for a tap (rfid.js will populate the focused `.rfid-register-input`).
+                let tag = await waitForWalkinRfidTap({ timeoutMs: 60000 });
+                if (!tag) {
+                    issuanceCancelled = true;
+                    closeWalkinIssueModal();
+                    break;
+                }
+                tag = tag.trim();
+
+                // Guard: prevent issuing the same guest card multiple times today.
+                while (await isGuestCardIssuedToday(tag, dateStr)) {
+                    alert("That guest card is already issued for today. Please tap a different guest RFID card.");
+                    openWalkinIssueModal({ current: w + 1, total: item.qty });
+                    const retryTag = await waitForWalkinRfidTap({ timeoutMs: 60000 });
+                    if (!retryTag) {
+                        issuanceCancelled = true;
+                        break;
+                    }
+                    tag = retryTag.trim();
+                }
+                if (issuanceCancelled) {
+                    closeWalkinIssueModal();
+                    break;
+                }
+
+                await upsertGuestCardIssued({ rfidTag: tag, dateStr, paymentId, issuedBy });
+                await issueWalkinPassAndCheckIn({ rfidTag: tag, paymentId, dateStr, timeStr, amount: Number(item.price || 0), issuedBy });
+                issuedCount++;
+                closeWalkinIssueModal();
             }
             continue; 
         }
         let currentStock = inventoryData.find(i => i.id === item.id).qty;
         await updateDoc(doc(db, "inventory", item.id), { qty: currentStock - item.qty });
     }
-    alert("Payment Processed Successfully! Walk-ins logged to Attendance.");
+
+    if (walkinQty > 0 && (issuanceCancelled || issuedCount < walkinQty)) {
+        await updateDoc(doc(db, "payments", paymentId), {
+            walkinIssuanceIncomplete: true,
+            walkinExpectedQty: walkinQty,
+            walkinIssuedQty: issuedCount,
+        });
+        alert(`Payment processed, but walk-in issuance was not completed.\n\nIssued: ${issuedCount} of ${walkinQty}\n\nYou can re-process issuance by completing the missing guest card taps.`);
+    } else {
+        alert("Payment Processed Successfully! Walk-ins issued and checked in.");
+    }
     posCart = []; renderCart();
 }
 
@@ -780,67 +969,7 @@ window.generateWeeklyPDF = function() {
 // ==========================================
 // 10. MASTER DIRECTORY & ATTENDANCE LOGIC
 // ==========================================
-onSnapshot(attendanceCol, (snapshot) => {
-    attendanceData = [];
-    snapshot.forEach(doc => attendanceData.push({ id: doc.id, ...doc.data() }));
-    renderAttendance();
-});
-
-function renderAttendance() {
-    const attTbody = document.querySelector('#attendanceTable tbody');
-    const myAttTbody = document.querySelector('#myAttendanceBody'); 
-    const loggedInName = localStorage.getItem("loggedInUser");
-
-    if (attTbody) attTbody.innerHTML = "";
-    if (myAttTbody) myAttTbody.innerHTML = "";
-
-    let today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    let gold = 0, silver = 0, walkin = 0, presentCount = 0; 
-
-    let sortedAtt = [...attendanceData].sort((a,b) => b.timestamp - a.timestamp);
-    let todayAtt = sortedAtt.filter(a => a.date === today);
-
-    todayAtt.forEach(a => {
-        let statusBadge = a.status === 'Checked In' ? '<span class="badge active">On Floor</span>' : '<span class="badge inactive">Checked Out</span>';
-        let timeOutDisplay = a.timeOut ? `<span class="badge inactive"><i class="fa-regular fa-clock"></i> ${a.timeOut}</span>` : '-';
-        let timeInDisplay = a.timeIn || a.time || '-'; 
-
-        if (attTbody) {
-            attTbody.innerHTML += `
-                <tr>
-                    <td>${a.name}</td><td><strong>${a.type}</strong></td><td>${a.date}</td>
-                    <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${timeInDisplay}</span></td>
-                    <td>${timeOutDisplay}</td><td>${statusBadge}</td>
-                </tr>
-            `;
-        }
-        if (a.type.includes('Gold')) gold++; else if (a.type.includes('Silver')) silver++; else if (a.type.includes('Walk-in')) walkin++;
-        if (a.status === 'Checked In') presentCount++;
-    });
-
-    if (myAttTbody) {
-        let myLogs = sortedAtt.filter(a => a.name === loggedInName).slice(0, 10); 
-        if (myLogs.length === 0) {
-            myAttTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888;">No attendance logs found.</td></tr>`;
-        } else {
-            myLogs.forEach(a => {
-                let statusBadge = a.status === 'Checked In' ? '<span class="badge active">On Floor</span>' : '<span class="badge inactive">Checked Out</span>';
-                let timeOutDisplay = a.timeOut ? `<span class="badge inactive"><i class="fa-regular fa-clock"></i> ${a.timeOut}</span>` : '-';
-                let timeInDisplay = a.timeIn || a.time || '-'; 
-                myAttTbody.innerHTML += `
-                    <tr>
-                        <td>${a.date}</td>
-                        <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${timeInDisplay}</span></td>
-                        <td>${timeOutDisplay}</td><td>${statusBadge}</td>
-                    </tr>
-                `;
-            });
-        }
-    }
-
-    if (servicesChartInstance) { servicesChartInstance.data.datasets[0].data = [gold, silver, walkin]; servicesChartInstance.update(); }
-    if (document.getElementById('presentMembers')) document.getElementById('presentMembers').innerText = presentCount; 
-}
+initAttendance({ db, attendanceCol, servicesChartInstanceGetter: () => servicesChartInstance });
 
 onSnapshot(usersCol, (snapshot) => {
     allUsersData = []; membersData = []; chatUsers = [];
@@ -1421,6 +1550,79 @@ function initDashboardCharts() {
 // ==========================================
 // 13. BOOKING CALENDAR LOGIC
 // ==========================================
+function bookingLocalDateString(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Local wall-clock instant for booking fields (avoids ISO string UTC/local bugs in Safari/Chrome). */
+function parseBookingSlotLocal(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return null;
+    const dp = dateStr.split("-").map((n) => parseInt(n, 10));
+    if (dp.length !== 3 || dp.some((n) => Number.isNaN(n))) return null;
+    const [y, mo, d] = dp;
+    const tp = timeStr.trim().split(":");
+    const hh = parseInt(tp[0], 10);
+    const mm = parseInt(tp[1] !== undefined ? tp[1] : "0", 10);
+    const ss = tp[2] !== undefined ? parseInt(String(tp[2]).split(".")[0], 10) : 0;
+    if (Number.isNaN(hh) || Number.isNaN(mm) || Number.isNaN(ss)) return null;
+    const dt = new Date(y, mo - 1, d, hh, mm, ss);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return dt.getTime();
+}
+
+function isBookingSessionInPast(dateStr, timeStr) {
+    const t = parseBookingSlotLocal(dateStr, timeStr);
+    if (t === null) return true;
+    return t < Date.now();
+}
+
+function setBookingDateMin(dateInput) {
+    if (!dateInput) return;
+    const min = bookingLocalDateString();
+    dateInput.setAttribute("min", min);
+    dateInput.min = min;
+}
+
+function updateBookingTimeMinForToday(dateInput, timeInput) {
+    if (!dateInput || !timeInput) return;
+    const today = bookingLocalDateString();
+    if (dateInput.value !== today) {
+        timeInput.removeAttribute("min");
+        return;
+    }
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    timeInput.setAttribute("min", `${pad(now.getHours())}:${pad(now.getMinutes())}`);
+}
+
+function wireBookingDateTimeGuards() {
+    const memberDate = document.getElementById("memberBookDate");
+    const memberTime = document.getElementById("memberBookTime");
+    if (memberDate && memberTime && !memberDate.dataset.bookingGuard) {
+        memberDate.dataset.bookingGuard = "1";
+        const sync = () => updateBookingTimeMinForToday(memberDate, memberTime);
+        memberDate.addEventListener("change", sync);
+        memberDate.addEventListener("input", sync);
+        memberDate.addEventListener("focus", sync);
+        memberTime.addEventListener("focus", sync);
+    }
+    const bookD = document.getElementById("bookDate");
+    const bookT = document.getElementById("bookTime");
+    if (bookD && bookT && !bookD.dataset.bookingGuard) {
+        bookD.dataset.bookingGuard = "1";
+        const sync = () => updateBookingTimeMinForToday(bookD, bookT);
+        bookD.addEventListener("change", sync);
+        bookD.addEventListener("input", sync);
+        bookD.addEventListener("focus", sync);
+        bookT.addEventListener("focus", sync);
+    }
+}
+
+wireBookingDateTimeGuards();
+// Ensure date pickers disable past dates even before opening modals.
+setBookingDateMin(document.getElementById("memberBookDate"));
+setBookingDateMin(document.getElementById("bookDate"));
+
 onSnapshot(bookingsCol, (snapshot) => {
     bookingsData = [];
     snapshot.forEach(doc => bookingsData.push({ id: doc.id, ...doc.data() }));
@@ -1585,7 +1787,11 @@ window.openMemberBookingModal = () => {
     trainerSelect.innerHTML = '<option value="" disabled selected>Select a Trainer...</option>' + 
         trainers.map(t => `<option value="${t.id}">${t.name || t.givenName + ' ' + t.familyName}</option>`).join('');
 
-    document.getElementById('memberBookingForm').reset(); 
+    document.getElementById('memberBookingForm').reset();
+    const md = document.getElementById('memberBookDate');
+    const mt = document.getElementById('memberBookTime');
+    setBookingDateMin(md);
+    updateBookingTimeMinForToday(md, mt);
     document.getElementById('memberBookingModal').style.display = 'flex';
 }
 
@@ -1594,12 +1800,23 @@ if (document.getElementById('memberBookingForm')) {
         e.preventDefault();
         const trainerSelect = document.getElementById('memberBookTrainer');
         const trainerId = trainerSelect.value;
-        const bookDate = document.getElementById('memberBookDate').value;
-        const bookTime = document.getElementById('memberBookTime').value;
+        const dateEl = document.getElementById('memberBookDate');
+        const timeEl = document.getElementById('memberBookTime');
+        setBookingDateMin(dateEl);
+        updateBookingTimeMinForToday(dateEl, timeEl);
+        if (!dateEl.checkValidity()) { dateEl.reportValidity(); return; }
+        if (!timeEl.checkValidity()) { timeEl.reportValidity(); return; }
+        const bookDate = dateEl.value;
+        const bookTime = timeEl.value;
         
         const trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
         const memberId = localStorage.getItem("userId");
-        const memberName = localStorage.getItem("loggedInUser"); 
+        const memberName = localStorage.getItem("loggedInUser");
+
+        if (isBookingSessionInPast(bookDate, bookTime)) {
+            alert("Choose a date and time in the future. Past sessions cannot be booked.");
+            return;
+        }
 
         await addDoc(bookingsCol, { 
             memberId, memberName, 
@@ -1620,15 +1837,31 @@ window.openBookingModal = () => {
     const trainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer');
     trainerSelect.innerHTML = '<option value="" disabled selected>Select an Assigned Trainer...</option>' + trainers.map(t => `<option value="${t.id}">${t.name || t.givenName + ' ' + t.familyName}</option>`).join('');
 
-    document.getElementById('bookingForm').reset(); document.getElementById('bookingModal').style.display = 'flex';
+    document.getElementById('bookingForm').reset();
+    const bd = document.getElementById('bookDate');
+    const bt = document.getElementById('bookTime');
+    setBookingDateMin(bd);
+    updateBookingTimeMinForToday(bd, bt);
+    document.getElementById('bookingModal').style.display = 'flex';
 }
 
 if (document.getElementById('bookingForm')) {
     document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const memberSelect = document.getElementById('bookMember'), trainerSelect = document.getElementById('bookTrainer');
-        const memberId = memberSelect.value, trainerId = trainerSelect.value, bookDate = document.getElementById('bookDate').value, bookTime = document.getElementById('bookTime').value;
+        const dateEl = document.getElementById('bookDate');
+        const timeEl = document.getElementById('bookTime');
+        setBookingDateMin(dateEl);
+        updateBookingTimeMinForToday(dateEl, timeEl);
+        if (!dateEl.checkValidity()) { dateEl.reportValidity(); return; }
+        if (!timeEl.checkValidity()) { timeEl.reportValidity(); return; }
+        const memberId = memberSelect.value, trainerId = trainerSelect.value, bookDate = dateEl.value, bookTime = timeEl.value;
         const memberName = memberSelect.options[memberSelect.selectedIndex].text, trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
+
+        if (isBookingSessionInPast(bookDate, bookTime)) {
+            alert("Choose a date and time in the future. Past sessions cannot be booked.");
+            return;
+        }
 
         await addDoc(bookingsCol, { memberId, memberName, trainerId, trainerName, date: bookDate, time: bookTime, status: "Confirmed", timestamp: new Date().getTime() });
         window.closeModal('bookingModal'); alert("Personal Training Session booked successfully!");
@@ -1661,99 +1894,4 @@ window.deleteBooking = async (id) => { if (confirm("Are you sure you want to del
 // ==========================================
 // 14. SMART USB RFID GHOST LISTENER
 // ==========================================
-let rfidBuffer = "";
-let lastKeyTime = Date.now();
-
-document.addEventListener('keydown', (e) => {
-    const currentTime = Date.now();
-    if (currentTime - lastKeyTime > 50) rfidBuffer = ""; 
-
-    if (e.key === 'Enter' && rfidBuffer.length > 5) {
-        e.preventDefault(); 
-        const activeEl = document.activeElement;
-        const isRegistrationBox = activeEl && activeEl.classList.contains('rfid-register-input');
-
-        if (activeEl && activeEl.tagName === 'INPUT' && !isRegistrationBox) {
-            let currentVal = activeEl.value;
-            if (currentVal.endsWith(rfidBuffer)) activeEl.value = currentVal.slice(0, -rfidBuffer.length);
-        }
-
-        if (isRegistrationBox) {
-            activeEl.value = rfidBuffer;
-            activeEl.style.backgroundColor = "#c8e6c9"; 
-            activeEl.style.borderColor = "#2e7d32";
-            activeEl.blur(); 
-        } else {
-            const loggedInRfid = localStorage.getItem("userRfid");
-            if (loggedInRfid && rfidBuffer === loggedInRfid) {
-                console.log("Shift Ended. Logging out...");
-                window.handleLogout();
-            } else {
-                processRfidAttendance(rfidBuffer);
-            }
-        }
-        rfidBuffer = ""; 
-    } 
-    else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) rfidBuffer += e.key;
-    
-    lastKeyTime = currentTime;
-});
-
-async function processRfidAttendance(scannedTag) {
-    const q = query(usersCol, where("rfid", "==", scannedTag));
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) {
-        console.warn(`Unrecognized Card Scanned (ID: ${scannedTag}).`);
-        return;
-    }
-    
-    const userDoc = snapshot.docs[0];
-    const user = userDoc.data();
-    
-    if (user.status === 'Archived') {
-        console.warn(`Access Denied. ${user.name || user.givenName}'s account is archived.`);
-        return;
-    }
-
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    const userName = user.name || `${user.givenName} ${user.familyName}`;
-    const isTrainer = (user.role || "").toLowerCase() === 'trainer';
-
-    const attQuery = query(attendanceCol, where("name", "==", userName), where("date", "==", dateStr), where("status", "==", "Checked In"));
-    const attSnapshot = await getDocs(attQuery);
-
-    if (!attSnapshot.empty) {
-        const recordId = attSnapshot.docs[0].id;
-        await updateDoc(doc(db, "attendance", recordId), {
-            timeOut: timeStr,
-            status: "Checked Out"
-        });
-
-        if (isTrainer) {
-            await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "Off Floor" });
-            console.log(`Goodbye, Trainer ${userName}! You are now Off Floor.`);
-        } else {
-            console.log(`Goodbye, ${userName}! Checked out successfully.`);
-        }
-    } else {
-        await addDoc(attendanceCol, {
-            name: userName,
-            type: user.plan || user.role || "Member",
-            date: dateStr,
-            timeIn: timeStr,
-            timeOut: "",
-            status: "Checked In",
-            timestamp: now.getTime()
-        });
-
-        if (isTrainer) {
-            await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "On Floor" });
-            console.log(`Welcome, Trainer ${userName}! You are now On Floor.`);
-        } else {
-            console.log(`Welcome, ${userName}! Checked in successfully.`);
-        }
-    }
-}
+initRfid({ db, usersCol, attendanceCol, onShiftLogout: window.handleLogout });
