@@ -6,11 +6,11 @@ const urlsToCache = [
   '/staffDB.html',
   '/trainerDB.html',
   '/memberDB.html',
-  '/MCSPROJ/css/styles.css',
-  '/MCSPROJ/js/script.js',
-  '/MCSPROJ/js/attendance.js',
-  '/MCSPROJ/js/rfid.js',
-  '/MCSPROJ/images/icon-192.png'
+  '/css/styles.css',
+  '/js/script.js',
+  '/js/attendance.js',
+  '/js/rfid.js',
+  '/images/icon-192.png'
 ];
 
 // Install the service worker and cache the core files
