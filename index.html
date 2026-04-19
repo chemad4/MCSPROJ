@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fit Track - Login</title>
+
+    <link rel="icon" type="image/png" href="MCSPROJ/images/icon-192.png">
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#111111">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link rel="stylesheet" href="MCSPROJ/css/styles.css">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => console.log('ServiceWorker registered!'))
+                    .catch(err => console.log('ServiceWorker failed: ', err));
+            });
+        }
+    </script>
+
+    <style>
+        body { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            background-color: var(--dark-black); 
+            height: 100vh; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .login-container { 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 40px 30px; 
+            border-radius: 12px; 
+            box-shadow: 0 15px 50px rgba(0,0,0,0.1); 
+            width: 100%; 
+            max-width: 450px; 
+            text-align: center; 
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+        }
+        .login-logo { 
+            font-size: 2.8rem; 
+            font-weight: 700; 
+            margin-bottom: 40px; 
+            letter-spacing: 1px; 
+            color: var(--text-primary); 
+        }
+        .login-logo span { 
+            color: var(--primary-red); 
+        }
+        .login-form input { 
+            width: 100%; 
+            padding: 18px; 
+            margin-bottom: 20px; 
+            border: 1px solid var(--border-color); 
+            border-radius: 8px; 
+            outline: none; 
+            font-size: 16px; 
+            box-sizing: border-box; 
+            background: rgba(255, 255, 255, 0.5);
+            color: var(--text-primary);
+        }
+        .login-form input:focus { 
+            border-color: var(--primary-red); 
+        }
+        .login-btn { 
+            width: 100%; 
+            padding: 18px; 
+            background-color: var(--primary-red); 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: 0.3s; 
+        }
+        .login-btn:hover { 
+            background-color: #900f14; 
+        }
+        .login-btn:disabled { 
+            background-color: #e0abae; 
+            cursor: not-allowed; 
+        }
+        #errorMsg { 
+            color: var(--primary-red); 
+            margin-bottom: 15px; 
+            font-size: 14px; 
+            display: none; 
+            font-weight: 500; 
+            line-height: 1.4; 
+        }
+        #installAppBtn { 
+            display: none; 
+            width: 100%; 
+            padding: 18px; 
+            margin-top: 20px; 
+            background-color: #333; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            transition: 0.3s; 
+        }
+        
+        /* NEW: Mobile specific override */
+        @media (max-width: 800px) {
+            .desktop-only { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-container">
+        <div class="login-logo">FIT<span>TRACK</span></div>
+        <div id="errorMsg">Invalid email or password.</div>
+        
+        <form class="login-form" id="loginForm">
+            <input type="email" id="loginEmail" placeholder="Email Address" required>
+            <input type="password" id="loginPassword" placeholder="Password" required>
+            <button type="submit" class="login-btn" id="loginSubmitBtn">Log In</button>
+        </form>
+
+        <p class="desktop-only" style="color: #AAAAAA; font-size: 13px; margin-top: 20px;">
+            <i class="fas fa-id-badge"></i> Or simply tap your ID Card to log in.
+        </p>
+
+        <button id="installAppBtn">
+            <i class="fa-solid fa-download"></i> Install Fit Track App
+        </button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const loginConfig = {
+            apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
+            authDomain: "fit-track-ca8d1.firebaseapp.com",
+            projectId: "fit-track-ca8d1",
+            storageBucket: "fit-track-ca8d1.firebasestorage.app",
+            messagingSenderId: "157593985795",
+            appId: "1:157593985795:web:07156961dda8e2254fbf36",
+            measurementId: "G-NYGGEMMJMC"
+        };
+
+        const app = initializeApp(loginConfig);
+        const db = getFirestore(app);
+
+        const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
+
+        // ==========================================
+        // SMART USB RFID GHOST LISTENER
+        // ==========================================
+        let rfidBuffer = "";
+        let lastKeyTime = Date.now();
+
+        document.addEventListener('keydown', async (e) => {
+            const currentTime = Date.now();
+            if (currentTime - lastKeyTime > 50) rfidBuffer = ""; 
+
+            if (e.key === 'Enter' && rfidBuffer.length > 5) {
+                e.preventDefault();
+                const activeEl = document.activeElement;
+                if (activeEl && activeEl.tagName === 'INPUT') {
+                    let currentVal = activeEl.value;
+                    if (currentVal.endsWith(rfidBuffer)) activeEl.value = currentVal.slice(0, -rfidBuffer.length);
+                    activeEl.blur(); 
+                }
+                const scannedRfid = rfidBuffer;
+                rfidBuffer = "";
+                await authenticateUser(query(collection(db, "users"), where("rfid", "==", scannedRfid)));
+            } else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) { 
+                rfidBuffer += e.key;
+            }
+            lastKeyTime = currentTime;
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            await authenticateUser(query(collection(db, "users"), where("email", "==", email), where("password", "==", password)));
+        });
+
+        async function authenticateUser(dbQuery) {
+            const errorMsg = document.getElementById('errorMsg');
+            const submitBtn = document.getElementById('loginSubmitBtn');
+            submitBtn.innerText = "Authenticating...";
+            submitBtn.disabled = true;
+            errorMsg.style.display = "none";
+
+            try {
+                const querySnapshot = await getDocs(dbQuery);
+                if (querySnapshot.empty) {
+                    errorMsg.innerText = "Invalid credentials or unrecognized ID Card.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                    return;
+                } 
+                
+                const userDoc = querySnapshot.docs[0];
+                const userData = userDoc.data();
+                const userId = userDoc.id;
+                const userRole = userData.role;
+                const userOnMobile = isMobileDevice();
+
+                // 1. ARCHIVE CHECK
+                if (userData.status === 'Archived') {
+                    errorMsg.innerText = "This account has been archived. Please contact management.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                // 2. DEVICE RESTRICTION CHECK
+                if ((userRole === "Admin" || userRole === "Staff") && userOnMobile) {
+                    errorMsg.innerText = "Access Denied: Admins/Staff must use Desktop.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                if ((userRole === "Member" || userRole === "Trainer") && !userOnMobile) {
+                    errorMsg.innerText = "Access Denied: Use the Mobile App.";
+                    errorMsg.style.display = "block";
+                    submitBtn.innerText = "Log In";
+                    submitBtn.disabled = false;
+                    return;
+                }
+
+                // 3. GENERATE UNIQUE SESSION ID TO OVERRIDE ANY PREVIOUS LOGINS
+                const newSessionId = Math.random().toString(36).substring(2, 15);
+                let updateData = { currentSession: newSessionId };
+
+                if (userRole === "Admin" || userRole === "Staff") {
+                    const now = Date.now();
+                    updateData.shiftStatus = "On Shift";
+                    updateData.shiftStart = now;
+                    localStorage.setItem("shiftStart", now);
+                }
+
+                // Save to Firebase
+                await updateDoc(doc(db, "users", userId), updateData);
+                
+                // Save universally needed items to Local Storage
+                localStorage.setItem("userId", userId);
+                localStorage.setItem("loggedInUser", userData.name || userData.givenName);
+                localStorage.setItem("userRole", userRole);
+                localStorage.setItem("sessionId", newSessionId); // Save Session ID locally!
+                if(userData.rfid) localStorage.setItem("userRfid", userData.rfid);
+
+                // Redirect
+                if (userRole === "Admin") window.location.replace("adminDB.html");
+                else if (userRole === "Staff") window.location.replace("staffDB.html");
+                else if (userRole === "Trainer") window.location.replace("trainerDB.html");
+                else window.location.replace("memberDB.html");
+                
+            } catch (error) {
+                console.error("Login Error:", error);
+                errorMsg.innerText = "Connection error. Please try again.";
+                errorMsg.style.display = "block";
+                submitBtn.innerText = "Log In";
+                submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -497,6 +497,12 @@ if (document.getElementById('editEquipForm')) {
 
 async function handleInventorySubmit(e, isProduct) {
     e.preventDefault();
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    }
     const nameStr = document.getElementById(isProduct ? 'prodName' : 'equipName').value.trim();
     const addQty = Number(document.getElementById(isProduct ? 'prodQty' : 'equipQty').value);
     const existingItem = inventoryData.find(i => i.name.toLowerCase() === nameStr.toLowerCase());
@@ -511,6 +517,10 @@ async function handleInventorySubmit(e, isProduct) {
         };
         await addDoc(inventoryCol, newItem);
         alert(`New ${isProduct ? 'product' : 'equipment'} registered successfully!`);
+    }
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
     }
     window.closeModal(isProduct ? 'productModal' : 'equipmentModal');
 }
@@ -1336,6 +1346,14 @@ const generatePassword = () => Math.random().toString(36).slice(-8);
 if (document.getElementById('batchMemberForm')) {
     document.getElementById('batchMemberForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        }
+
         const rows = document.querySelectorAll('#batchMemberBody tr');
         let addedCount = 0, emailSuccessCount = 0, emailFailCount = 0, duplicateCount = 0;
         const currentTimestamp = new Date().getTime(); 
@@ -1364,8 +1382,12 @@ if (document.getElementById('batchMemberForm')) {
             } catch(err) { console.error("EmailJS failed:", err); emailFailCount++; }
         }
         
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
         window.closeModal('memberModal');
-        let alertMsg = `Batch Registration Summary:\n\n✅ ${emailSuccessCount} user(s) received emails and were saved to the database.\n`;
+        let alertMsg = `Registration Summary:\n\n✅ ${emailSuccessCount} user(s) received emails and were saved to the database.\n`;
         if (duplicateCount > 0) alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
         if (emailFailCount > 0) alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
         alert(alertMsg);
@@ -1395,7 +1417,7 @@ window.openStaffModal = (role) => {
     if (localStorage.getItem("userRole") !== "Admin") return alert("Action Denied: Only Admins can register Staff and Trainers.");
     
     document.getElementById('hiddenStaffRole').value = role;
-    document.getElementById('staffModalTitle').innerText = `Batch Register ${role}s`;
+    document.getElementById('staffModalTitle').innerText = `Register ${role}`;
     
     if (document.getElementById('batchSpecialtyHeader')) {
         document.getElementById('batchSpecialtyHeader').innerText = role === 'Trainer' ? 'Specialty (Required)' : 'Specialty (N/A)';
@@ -1419,6 +1441,14 @@ if (document.getElementById('batchStaffForm')) {
     document.getElementById('batchStaffForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (localStorage.getItem("userRole") !== "Admin") return;
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        }
+
         const rows = document.querySelectorAll('#batchStaffBody tr');
         const role = document.getElementById('hiddenStaffRole').value;
         let addedCount = 0, emailSuccessCount = 0, emailFailCount = 0, duplicateCount = 0;
@@ -1456,8 +1486,12 @@ if (document.getElementById('batchStaffForm')) {
             } catch(err) { console.error("EmailJS failed:", err); emailFailCount++; }
         }
         
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
         window.closeModal('staffModal');
-        let alertMsg = `Batch Registration Summary:\n\n✅ ${emailSuccessCount} ${role}(s) received emails and were saved to the database.\n`;
+        let alertMsg = `Registration Summary:\n\n✅ ${emailSuccessCount} ${role}(s) received emails and were saved to the database.\n`;
         if (duplicateCount > 0) alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
         if (emailFailCount > 0) alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
         alert(alertMsg);
@@ -1798,6 +1832,12 @@ window.openMemberBookingModal = () => {
 if (document.getElementById('memberBookingForm')) {
     document.getElementById('memberBookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        }
         const trainerSelect = document.getElementById('memberBookTrainer');
         const trainerId = trainerSelect.value;
         const dateEl = document.getElementById('memberBookDate');
@@ -1826,6 +1866,10 @@ if (document.getElementById('memberBookingForm')) {
             timestamp: new Date().getTime() 
         });
         
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
         window.closeModal('memberBookingModal'); 
         alert("Request sent! Waiting for trainer approval.");
     });
@@ -1848,6 +1892,12 @@ window.openBookingModal = () => {
 if (document.getElementById('bookingForm')) {
     document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        }
         const memberSelect = document.getElementById('bookMember'), trainerSelect = document.getElementById('bookTrainer');
         const dateEl = document.getElementById('bookDate');
         const timeEl = document.getElementById('bookTime');
@@ -1864,6 +1914,10 @@ if (document.getElementById('bookingForm')) {
         }
 
         await addDoc(bookingsCol, { memberId, memberName, trainerId, trainerName, date: bookDate, time: bookTime, status: "Confirmed", timestamp: new Date().getTime() });
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
         window.closeModal('bookingModal'); alert("Personal Training Session booked successfully!");
     });
 }

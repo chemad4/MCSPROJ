@@ -2,39 +2,44 @@
 :root {
     --primary-red: #C01718;
     --dark-black: #111111;
-    --sidebar-bg: rgba(26, 26, 26, 0.95);
-    --submenu-bg: rgba(17, 17, 17, 0.98);
+    --sidebar-bg: rgba(255, 255, 255, 0.85);
+    --submenu-bg: rgba(245, 245, 245, 0.95);
     --white: #FFFFFF;
-    --panel-bg: rgba(255, 255, 255, 0.95);
-    --border-color: #E0E0E0;
-    --text-muted: #6C757D;
-    --card-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    --panel-bg: rgba(255, 255, 255, 0.85);
+    --border-color: #E5E7EB;
+    --text-muted: #6B7280;
+    --text-primary: #1F2937;
+    --card-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
 }
 
 * { 
     margin: 0; 
     padding: 0; 
     box-sizing: border-box; 
-    font-family: 'Roboto', sans-serif; 
+    font-family: 'Inter', sans-serif; 
 }
 
 body {
-    background-color: #F4F6F9; 
+    background-color: #F9FAFB; 
     display: flex;
     height: 100vh;
     overflow: hidden;
+    color: var(--text-primary);
 }
 
 /* --- SIDEBAR --- */
 .sidebar {
     width: 250px; 
     background-color: var(--sidebar-bg); 
-    color: var(--white);
+    color: var(--text-primary);
     display: flex; 
     flex-direction: column; 
     height: 100%; 
     flex-shrink: 0;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    box-shadow: 2px 0 15px rgba(0,0,0,0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-right: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .logo-area {
@@ -62,16 +67,16 @@ body {
     display: flex; 
     align-items: center; 
     cursor: pointer;
-    transition: background 0.3s; 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
     border-left: 4px solid transparent;
     position: relative; 
     font-size: 15px; 
-    color: #ccc;
+    color: #6B7280;
 }
 
 .nav-item:hover, .nav-item.active { 
-    background-color: rgba(255,255,255,0.05); 
-    color: var(--white); 
+    background-color: rgba(0,0,0,0.03); 
+    color: var(--primary-red); 
     border-left-color: var(--primary-red); 
 }
 
@@ -106,13 +111,13 @@ body {
     padding: 12px 20px 12px 55px; 
     cursor: pointer; 
     font-size: 14px; 
-    color: #999; 
+    color: #6B7280; 
     transition: all 0.2s; 
 }
 
 .sub-item:hover, .sub-item.active { 
-    color: var(--white); 
-    background-color: rgba(255,255,255,0.05); 
+    color: var(--primary-red); 
+    background-color: rgba(0,0,0,0.02); 
 }
 
 /* --- MAIN CONTENT --- */
@@ -126,12 +131,15 @@ body {
 /* TOPBAR */
 .topbar {
     height: 60px; 
-    background-color: var(--white); 
+    background-color: rgba(255, 255, 255, 0.85); 
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     display: flex;
     align-items: center; 
     justify-content: space-between; 
     padding: 0 20px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+    box-shadow: 0 2px 10px rgba(0,0,0,0.03); 
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     z-index: 10;
 }
 
@@ -177,14 +185,22 @@ body {
 }
 
 .stat-card {
-    background: var(--white); 
+    background: var(--panel-bg); 
     padding: 20px; 
-    border-radius: 8px;
+    border-radius: 12px;
     box-shadow: var(--card-shadow); 
     display: flex; 
     align-items: center; 
     position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.8);
     border-top: 4px solid var(--dark-black);
+    backdrop-filter: blur(8px);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
 }
 
 .stat-card.card-red { 
@@ -200,12 +216,13 @@ body {
 
 .stat-card.card-red i { 
     color: var(--primary-red); 
+    text-shadow: 0 0 15px rgba(192, 23, 24, 0.3);
 }
 
 .stat-card .value { 
     font-size: 1.5rem; 
     font-weight: 700; 
-    color: var(--dark-black); 
+    color: var(--text-primary); 
 }
 
 .stat-badge {
@@ -217,6 +234,7 @@ body {
     border-radius: 12px; 
     font-size: 12px; 
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 /* --- PANELS & TABLES --- */
@@ -229,19 +247,20 @@ body {
 
 .panel { 
     background: var(--panel-bg); 
-    border-radius: 8px; 
+    border-radius: 12px; 
     box-shadow: var(--card-shadow); 
-    border: 1px solid var(--border-color); 
+    border: 1px solid rgba(255, 255, 255, 0.8); 
     overflow: hidden; 
     margin-bottom: 20px;
+    backdrop-filter: blur(10px);
 }
 
 .panel-header { 
     padding: 15px 20px; 
-    border-bottom: 1px solid var(--border-color); 
-    font-weight: 500; 
-    color: var(--dark-black); 
-    background-color: var(--white); 
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05); 
+    font-weight: 600; 
+    color: var(--text-primary); 
+    background-color: rgba(255, 255, 255, 0.5); 
 }
 
 .panel-body { 
@@ -264,19 +283,21 @@ th, td {
 }
 
 th { 
-    background-color: #FAFAFA; 
-    font-weight: 500; 
+    background-color: rgba(0, 0, 0, 0.02); 
+    font-weight: 600; 
     color: var(--text-muted); 
     font-size: 14px; 
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 td { 
     font-size: 14px; 
-    color: #333; 
+    color: var(--text-primary); 
 }
 
 tr:hover { 
-    background-color: #F8F9FA; 
+    background-color: rgba(0, 0, 0, 0.02); 
 }
 
 /* BADGES & BUTTONS */
@@ -288,18 +309,21 @@ tr:hover {
 }
 
 .badge.active, .badge.operational { 
-    background-color: #E8F5E9; 
-    color: #2E7D32; 
+    background-color: rgba(46, 125, 50, 0.2); 
+    color: #81C784; 
+    border: 1px solid #2E7D32;
 }
 
 .badge.inactive, .badge.broken { 
-    background-color: #FFEBEE; 
-    color: #C62828; 
+    background-color: rgba(198, 40, 40, 0.2); 
+    color: #E57373; 
+    border: 1px solid #C62828;
 }
 
 .badge.maintenance, .badge.pending { 
-    background-color: #FFF8E1; 
-    color: #F57F17; 
+    background-color: rgba(245, 127, 23, 0.2); 
+    color: #FFF176; 
+    border: 1px solid #F57F17;
 }
 
 .badge.stock-low { 
@@ -360,14 +384,18 @@ tr:hover {
 
 .search-box input { 
     width: 100%; 
-    padding: 8px 10px 8px 30px; 
+    padding: 10px 15px 10px 35px; 
     border: 1px solid var(--border-color); 
-    border-radius: 4px; 
+    border-radius: 8px; 
     outline: none; 
+    background-color: rgba(255, 255, 255, 0.5);
+    color: var(--text-primary);
+    transition: all 0.3s;
 }
 
 .search-box input:focus { 
     border-color: var(--primary-red); 
+    box-shadow: 0 0 0 3px rgba(192, 23, 24, 0.2);
 }
 
 /* LIST ITEMS */
@@ -400,7 +428,8 @@ tr:hover {
 .list-content h4 { 
     font-size: 14px; 
     margin-bottom: 3px; 
-    color: #333; 
+    color: var(--text-primary); 
+    font-weight: 600;
 }
 
 .list-content p { 
@@ -417,14 +446,22 @@ tr:hover {
 }
 
 .grid-stat-box { 
-    background: var(--white); 
-    border-radius: 8px; 
+    background: var(--panel-bg); 
+    border-radius: 12px; 
     padding: 20px; 
     display: flex; 
     flex-direction: column; 
     justify-content: center; 
+    border: 1px solid rgba(255, 255, 255, 0.8); 
     border-left: 4px solid transparent; 
     box-shadow: var(--card-shadow); 
+    backdrop-filter: blur(8px);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s;
+}
+
+.grid-stat-box:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
 }
 
 .grid-stat-box.border-red { border-left-color: var(--primary-red); }
@@ -432,7 +469,7 @@ tr:hover {
 .grid-stat-box .num { 
     font-size: 2rem; 
     font-weight: 700; 
-    color: var(--dark-black); 
+    color: var(--text-primary); 
     margin-bottom: 5px; 
 }
 
@@ -466,18 +503,19 @@ tr:hover {
 }
 
 .modal-content { 
-    background-color: #fff; 
+    background-color: var(--white); 
     padding: 30px; 
-    border-radius: 8px; 
-    width: 95%; /* Adjusts to screen size naturally */
-    max-width: 400px; /* Default max width for small modals */
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2); 
-    animation: slideDown 0.3s ease; 
+    border-radius: 12px; 
+    width: 95%; 
+    max-width: 400px; 
+    box-shadow: 0 15px 50px rgba(0,0,0,0.15); 
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    animation: slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
 }
 
 @keyframes slideDown { 
-    from { transform: translateY(-50px); opacity: 0; } 
-    to { transform: translateY(0); opacity: 1; } 
+    from { transform: translateY(-50px) scale(0.95); opacity: 0; } 
+    to { transform: translateY(0) scale(1); opacity: 1; } 
 }
 
 .modal-header { 
@@ -488,8 +526,8 @@ tr:hover {
 }
 
 .modal-header h3 { 
-    color: var(--dark-black); 
-    font-weight: 500;
+    color: var(--text-primary); 
+    font-weight: 600;
 }
 
 .close-btn { 
@@ -504,15 +542,19 @@ tr:hover {
 
 .modal-form input, .modal-form select { 
     width: 100%; 
-    padding: 12px; 
+    padding: 12px 15px; 
     margin-bottom: 15px; 
-    border: 1px solid #ddd; 
-    border-radius: 4px; 
+    border: 1px solid var(--border-color); 
+    border-radius: 8px; 
     outline: none; 
+    background-color: rgba(255, 255, 255, 0.5);
+    color: var(--text-primary);
+    transition: all 0.3s;
 }
 
 .modal-form input:focus, .modal-form select:focus { 
     border-color: var(--primary-red); 
+    box-shadow: 0 0 0 3px rgba(192, 23, 24, 0.2);
 }
 
 .modal-form button { 
@@ -545,7 +587,7 @@ tr:hover {
 .chat-sidebar { 
     width: 300px; 
     border-right: 1px solid var(--border-color); 
-    background: #fafafa; 
+    background: rgba(255, 255, 255, 0.5); 
     display: flex; 
     flex-direction: column; 
     flex-shrink: 0; 
@@ -556,7 +598,7 @@ tr:hover {
     font-size: 12px; 
     font-weight: bold; 
     color: var(--text-muted); 
-    background: #eee; 
+    background: rgba(0, 0, 0, 0.03); 
     text-transform: uppercase; 
     border-bottom: 1px solid var(--border-color); 
     border-top: 1px solid var(--border-color); 
@@ -577,7 +619,7 @@ tr:hover {
 }
 
 .chat-user:hover, .chat-user.active { 
-    background: #fff; 
+    background: rgba(0, 0, 0, 0.02); 
     border-left: 4px solid var(--primary-red); 
 }
 
@@ -598,7 +640,7 @@ tr:hover {
     flex-grow: 1; 
     display: flex; 
     flex-direction: column; 
-    background: #f4f6f9; 
+    background: rgba(255, 255, 255, 0.3); 
 }
 
 .chat-history { 
@@ -629,10 +671,10 @@ tr:hover {
 
 .msg-received { 
     background: white; 
-    color: var(--dark-black); 
+    color: var(--text-primary); 
     align-self: flex-start; 
     border-bottom-left-radius: 4px; 
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1); 
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
     border: 1px solid var(--border-color); 
 }
 
@@ -647,7 +689,7 @@ tr:hover {
 .inventory-header-large { 
     font-size: 26px; 
     font-weight: bold; 
-    color: var(--dark-black); 
+    color: var(--text-primary); 
     margin-bottom: 15px; 
     letter-spacing: -0.5px; 
 }
@@ -678,27 +720,27 @@ tr:hover {
 
 .inventory-card { 
     display: flex; 
-    background: var(--white); 
-    border: 1px solid var(--border-color); 
-    border-radius: 10px; 
+    background: rgba(255, 255, 255, 0.7); 
+    border: 1px solid rgba(255, 255, 255, 0.8); 
+    border-radius: 12px; 
     padding: 20px; 
-    transition: 0.2s; 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.02); 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
     position: relative; 
     overflow: hidden; 
+    backdrop-filter: blur(8px);
 }
 
 .inventory-card:hover { 
-    box-shadow: 0 8px 20px rgba(0,0,0,0.08); 
-    transform: translateY(-3px); 
-    border-color: #ccc; 
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08); 
+    transform: translateY(-5px); 
+    border-color: rgba(255, 255, 255, 1); 
 }
 
 .inventory-icon-box { 
     width: 90px; 
     height: 90px; 
-    background: #f8f9fa; 
-    border-radius: 8px; 
+    background: rgba(0, 0, 0, 0.03); 
+    border-radius: 10px; 
     display: flex; 
     align-items: center; 
     justify-content: center; 
@@ -706,7 +748,7 @@ tr:hover {
     color: var(--dark-black); 
     margin-right: 20px; 
     flex-shrink: 0; 
-    border: 1px solid #f0f0f0; 
+    border: 1px solid rgba(0, 0, 0, 0.05); 
 }
 
 .inventory-details { 
@@ -717,9 +759,9 @@ tr:hover {
 }
 
 .inventory-title { 
-    font-weight: bold; 
+    font-weight: 600; 
     font-size: 17px; 
-    color: var(--dark-black); 
+    color: var(--text-primary); 
     margin-bottom: 4px; 
 }
 
@@ -734,7 +776,7 @@ tr:hover {
 
 .inventory-desc { 
     font-size: 13px; 
-    color: #555; 
+    color: #6B7280; 
     margin-bottom: 12px; 
 }
 
