@@ -76,7 +76,7 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
 
     // Only allow guest card tap-out for cards issued today.
     if (guest.status !== "Issued" || guest.issuedForDate !== dateStr) {
-      alert("Guest card is not issued for today. Please ask staff to issue a day pass first.");
+      showToast("Guest card is not issued for today. Please ask staff to issue a day pass first.", "error");
       return;
     }
 
@@ -84,7 +84,7 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
     const attSnapshot = await getDocs(attQuery);
 
     if (attSnapshot.empty) {
-      alert("No active walk-in session found for this guest card.");
+      showToast("No active walk-in session found for this guest card.", "error");
       return;
     }
 
@@ -126,12 +126,10 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
   }
 
   // Auto-deny expired memberships on tap-in.
-  // Uses existing schema: membership expires 30 days after dateRegistered (ms timestamp).
   if ((user.role || "").toLowerCase() === "member" && typeof user.dateRegistered === "number") {
-    const expiryAt = user.dateRegistered + 30 * 24 * 60 * 60 * 1000;
+    const planDays = (typeof window.getPlanDays === 'function') ? window.getPlanDays(user.plan) : 30;
+    const expiryAt = user.dateRegistered + planDays * 24 * 60 * 60 * 1000;
     if (Date.now() > expiryAt) {
-      // Still allow tap-out if they have an open "Checked In" record; this check applies only when creating a new "IN".
-      // We can only know that after we query today's Checked In record below, so we just keep a flag here.
       user.__isExpired = true;
     }
   }
@@ -150,7 +148,6 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
     const recordId = attDoc.id;
     const record = attDoc.data() || {};
 
-    // Deny tap-out within 30 minutes of a successful tap-in (unless Staff/Admin overrides).
     const THIRTY_MIN_MS = 30 * 60 * 1000;
     const checkInAt = typeof record.timestamp === "number" ? record.timestamp : null;
     const msSinceIn = checkInAt !== null ? now.getTime() - checkInAt : null;
@@ -160,44 +157,47 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
 
     if (msSinceIn !== null && msSinceIn >= 0 && msSinceIn < THIRTY_MIN_MS) {
       if (!canOverride) {
-        alert("Tap-out denied: you can only tap out 30 minutes after tapping in. Please ask staff for an override.");
+        showToast("Tap-out denied: you can only tap out 30 minutes after tapping in. Please ask staff for an override.", "error");
         return;
       }
 
       const minsLeft = Math.ceil((THIRTY_MIN_MS - msSinceIn) / 60000);
-      const proceed = confirm(
-        `Tap-out is blocked for 30 minutes after tap-in.\n\nOverride and allow tap-out anyway? (${minsLeft} minute(s) remaining)`
+      showConfirm(
+        `Tap-out is blocked for 30 minutes after tap-in.\n\nOverride and allow tap-out anyway? (${minsLeft} minute(s) remaining)`,
+        async () => {
+          const reason = (prompt("Override reason (required):", "Early tap-out") || "").trim();
+          if (!reason) {
+            showToast("Override cancelled: reason is required.", "error");
+            return;
+          }
+
+          await updateDoc(doc(db, "attendance", recordId), {
+            timeOut: timeStr,
+            status: "Checked Out",
+            overrideTapOut: true,
+            overrideByRole: localStorage.getItem("userRole") || "",
+            overrideBy: localStorage.getItem("loggedInUser") || "",
+            overrideReason: reason,
+            overrideTimestamp: now.getTime(),
+          });
+          if (isTrainer) {
+            await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "Off Floor" });
+          }
+        }
       );
-      if (!proceed) return;
-
-      const reason = (prompt("Override reason (required):", "Early tap-out") || "").trim();
-      if (!reason) {
-        alert("Override cancelled: reason is required.");
-        return;
-      }
-
-      await updateDoc(doc(db, "attendance", recordId), {
-        timeOut: timeStr,
-        status: "Checked Out",
-        overrideTapOut: true,
-        overrideByRole: localStorage.getItem("userRole") || "",
-        overrideBy: localStorage.getItem("loggedInUser") || "",
-        overrideReason: reason,
-        overrideTimestamp: now.getTime(),
-      });
+      return;
     } else {
       await updateDoc(doc(db, "attendance", recordId), {
         timeOut: timeStr,
         status: "Checked Out",
       });
-    }
-
-    if (isTrainer) {
-      await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "Off Floor" });
+      if (isTrainer) {
+        await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "Off Floor" });
+      }
     }
   } else {
     if (user.__isExpired) {
-      alert("Access denied: membership is expired.");
+      showToast("Access denied: membership is expired.", "error");
       return;
     }
     await addDoc(attendanceCol, {

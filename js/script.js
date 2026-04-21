@@ -39,7 +39,7 @@ if (currentUserId && currentSessionId) {
             
             // Kick out duplicate logins
             if (userData.currentSession && userData.currentSession !== currentSessionId) {
-                alert("Session Override: Your account was just logged in from another device. Logging out here to protect your data.");
+                showToast("Session Override: Your account was just logged in from another device. Logging out here to protect your data.", "error");
                 localStorage.removeItem("loggedInUser");
                 localStorage.removeItem("userRole");
                 localStorage.removeItem("userRfid"); 
@@ -89,6 +89,8 @@ window.handleLogout = async function() {
     const userId = localStorage.getItem("userId");
     const userRole = localStorage.getItem("userRole");
     
+    if (window.logActivity) await window.logActivity("Logout", `User logged out.`);
+
     if (userId) {
         try {
             let updateData = { currentSession: null };
@@ -101,7 +103,7 @@ window.handleLogout = async function() {
         }
     }
 
-    localStorage.clear(); // Clears all local storage variables securely
+    localStorage.clear();
     window.location.replace("index.html"); 
 };
 
@@ -143,13 +145,40 @@ window.switchTab = function(tabId, element) {
         'trainers': 'Gym Trainers',
         'archivedTrainers': 'Archived Trainers',
         'bookings': 'Booking Calendar',
-        'chats': 'Internal Messages'
+        'chats': 'Internal Messages',
+        'activityLog': 'System Activity Log'
     };
     
     if (document.getElementById('pageTitle')) {
         document.getElementById('pageTitle').innerText = titles[tabId] || 'Dashboard';
     }
 }
+
+const activityLogsCol = collection(db, "activityLogs");
+
+window.logActivity = async function(action, details = "") {
+    try {
+        const userId = localStorage.getItem("userId") || "System";
+        const userName = localStorage.getItem("loggedInUser") || "Unknown User";
+        const role = localStorage.getItem("userRole") || "";
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+        await addDoc(activityLogsCol, {
+            userId,
+            userName,
+            role,
+            action,
+            details,
+            date: dateStr,
+            time: timeStr,
+            timestamp: now.getTime()
+        });
+    } catch (e) {
+        console.error("Failed to log activity:", e);
+    }
+};
 
 window.closeModal = function(modalId) { document.getElementById(modalId).style.display = 'none'; }
 window.exportInventoryReport = function() { window.print(); }
@@ -212,6 +241,7 @@ let chatUsers = [];
 let paymentsData = [];
 let attendanceData = [];
 let messagesData = [];
+let activityData = [];
 let bookingsData = [];
 let posCart = []; 
 
@@ -401,8 +431,11 @@ function renderInventory() {
 
     equipGrid.innerHTML = "";
     prodGrid.innerHTML = "";
-    let alertsHtml = "";
     let ops = 0, maint = 0, low = 0, totalMachines = 0;
+    
+    let alertsHtmlArr = [];
+    let equipHtmlArr = [];
+    let prodHtmlArr = [];
 
     inventoryData.forEach((item) => {
         let isConsumable = ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
@@ -424,7 +457,8 @@ function renderInventory() {
         let actionButtons = !isConsumable ? `
                 <button class="btn-icon btn-edit" title="Edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
                 <button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
-            ` : `<button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>`;
+            ` : `<button class="btn-icon btn-edit" title="Edit" onclick="openEditProductModal('${item.id}')"><i class="fas fa-edit"></i></button>
+                 <button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>`;
 
         let cardHTML = `
             <div class="inventory-card inventory-item-filter" data-search="${item.name.toLowerCase()} ${item.cat.toLowerCase()} ${currentStatus.toLowerCase()}">
@@ -443,18 +477,22 @@ function renderInventory() {
             </div>
         `;
 
-        if (isConsumable) prodGrid.innerHTML += cardHTML;
-        else equipGrid.innerHTML += cardHTML;
+        if (isConsumable) prodHtmlArr.push(cardHTML);
+        else equipHtmlArr.push(cardHTML);
 
         if (isProblematic) {
-            alertsHtml += `
+            alertsHtmlArr.push(`
                 <div class="list-item">
                     <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
                     <div class="list-content"><h4>Status: ${currentStatus}</h4><p><strong>${item.name}</strong> requires attention.</p></div>
                 </div>
-            `;
+            `);
         }
     });
+
+    equipGrid.innerHTML = equipHtmlArr.join('');
+    prodGrid.innerHTML = prodHtmlArr.join('');
+    let alertsHtml = alertsHtmlArr.join('');
 
     if (document.getElementById('dashInventoryTotal')) document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
     if (document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
@@ -464,7 +502,14 @@ function renderInventory() {
 
 window.openEquipmentModal = () => { document.getElementById('equipmentForm').reset(); document.getElementById('equipmentModal').style.display = 'flex'; }
 window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
-window.deleteInventoryItem = async (id) => { if (confirm("Delete this inventory item?")) await deleteDoc(doc(db, "inventory", id)); }
+window.deleteInventoryItem = async (id) => {
+    const item = inventoryData.find(i => i.id === id);
+    showConfirm("Delete this inventory item?", async () => {
+        await deleteDoc(doc(db, "inventory", id));
+        showToast("Item deleted.", "info");
+        if (window.logActivity) window.logActivity("Item Deleted", `Deleted inventory item: ${item ? item.name : id}`);
+    });
+}
 
 window.openEditEquipModal = function(id) {
     const item = inventoryData.find(i => i.id === id);
@@ -491,7 +536,38 @@ if (document.getElementById('editEquipForm')) {
         };
         await updateDoc(doc(db, "inventory", id), updatedData);
         window.closeModal('editEquipModal');
-        alert("Equipment updated successfully!");
+        showToast("Equipment updated successfully!", "success");
+        if (window.logActivity) window.logActivity("Equipment Updated", `Updated: ${updatedData.name}`);
+    });
+}
+
+window.openEditProductModal = function(id) {
+    const item = inventoryData.find(i => i.id === id);
+    if (!item) return;
+    document.getElementById('editProdId').value = item.id;
+    document.getElementById('editProdName').value = item.name;
+    document.getElementById('editProdCategory').value = item.cat;
+    document.getElementById('editProdPrice').value = item.price;
+    document.getElementById('editProdQty').value = item.qty;
+    document.getElementById('editProdVol').value = item.size || '';
+    document.getElementById('editProductModal').style.display = 'flex';
+}
+
+if (document.getElementById('editProductForm')) {
+    document.getElementById('editProductForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editProdId').value;
+        const updatedData = {
+            name: document.getElementById('editProdName').value.trim(),
+            cat: document.getElementById('editProdCategory').value,
+            price: Number(document.getElementById('editProdPrice').value),
+            qty: Number(document.getElementById('editProdQty').value),
+            size: document.getElementById('editProdVol').value
+        };
+        await updateDoc(doc(db, "inventory", id), updatedData);
+        window.closeModal('editProductModal');
+        showToast("Product updated successfully!", "success");
+        if (window.logActivity) window.logActivity("Product Updated", `Updated: ${updatedData.name}`);
     });
 }
 
@@ -509,14 +585,15 @@ async function handleInventorySubmit(e, isProduct) {
 
     if (existingItem) {
         await updateDoc(doc(db, "inventory", existingItem.id), { qty: existingItem.qty + addQty });
-        alert(`Automated Update: Added ${addQty} units to existing stock. New Total: ${existingItem.qty + addQty} units.`);
+        showToast(`Automated Update: Added ${addQty} units to existing stock. New Total: ${existingItem.qty + addQty} units.`, "info");
     } else {
         const newItem = { 
             name: nameStr, cat: document.getElementById(isProduct ? 'prodCategory' : 'equipCategory').value, size: document.getElementById(isProduct ? 'prodVol' : 'equipSize').value, 
             qty: addQty, status: isProduct ? 'In Stock' : 'Operational', price: isProduct ? Number(document.getElementById('prodPrice').value) : 0, expiry: isProduct ? document.getElementById('prodExpiry').value : null
         };
         await addDoc(inventoryCol, newItem);
-        alert(`New ${isProduct ? 'product' : 'equipment'} registered successfully!`);
+        showToast(`New ${isProduct ? 'product' : 'equipment'} registered successfully!`, "success");
+        if (window.logActivity) window.logActivity("Item Registered", `Registered new ${isProduct ? 'product' : 'equipment'}: ${nameStr} (Qty: ${addQty})`);
     }
     if (submitBtn) {
         submitBtn.disabled = false;
@@ -682,7 +759,7 @@ function renderPOSProducts() {
 
 window.addToCart = function(id, name, price, maxQty) {
     let existing = posCart.find(i => i.id === id);
-    if (existing) { if (existing.qty < maxQty) existing.qty++; else alert("Not enough stock available!"); } 
+    if (existing) { if (existing.qty < maxQty) existing.qty++; else showToast("Not enough stock available!", "error"); } 
     else { posCart.push({id, name, price, qty: 1, maxQty}); }
     renderCart();
 }
@@ -720,27 +797,43 @@ function updatePOSTotals(sub, vat, disc, grand) {
             <span style="color: #ff4c4c;">- ₱${disc.toFixed(2)}</span>
         </div>
         <div class="total-line grand"><span>TOTAL:</span> <span>₱${grand.toFixed(2)}</span></div>
-        <button class="action-btn" onclick="processPayment(${grand})" style="width: 100%; justify-content: center; margin-top: 15px; font-size: 16px;"><i class="fa-solid fa-check"></i> PROCESS PAYMENT</button>
+        <button class="action-btn" onclick="processPayment()" style="width: 100%; justify-content: center; margin-top: 15px; font-size: 16px;"><i class="fa-solid fa-check"></i> PROCESS PAYMENT</button>
     `;
 }
 
-window.processPayment = async function(grandTotal) {
-    if (posCart.length === 0) return alert("Cart is empty!");
+window.processPayment = async function() {
+    if (posCart.length === 0) return showToast("Cart is empty!", "error");
+    
+    let subtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    let vat = subtotal * 0.12;
+    let isSenior = document.getElementById('seniorDiscount')?.checked || false;
+    let discount = isSenior ? (subtotal * 0.20) : 0;
+    let grandTotal = subtotal + vat - discount;
+
+    const customerNameInput = document.getElementById('posCustomerName');
+    const customerName = (customerNameInput && customerNameInput.value.trim() !== '') ? customerNameInput.value.trim() : "Walk-in POS Customer";
+
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
     const paymentRef = await addDoc(paymentsCol, {
-        name: "Walk-in POS Customer",
+        name: customerName,
         type: "POS Sale",
         items: itemsStr,
+        subtotal: subtotal,
+        vat: vat,
+        discount: discount,
         amount: grandTotal,
         status: "Paid",
         date: dateStr,
         time: timeStr,
         timestamp: now.getTime(),
     });
+    
+    if(window.logActivity) window.logActivity("POS Sale", `Processed payment for ${customerName} totaling ₱${grandTotal.toFixed(2)}`);
+
     const paymentId = paymentRef.id;
 
     const issuedBy = {
@@ -770,7 +863,7 @@ window.processPayment = async function(grandTotal) {
 
                 // Guard: prevent issuing the same guest card multiple times today.
                 while (await isGuestCardIssuedToday(tag, dateStr)) {
-                    alert("That guest card is already issued for today. Please tap a different guest RFID card.");
+                    showToast("That guest card is already issued for today. Please tap a different guest RFID card.", "error");
                     openWalkinIssueModal({ current: w + 1, total: item.qty });
                     const retryTag = await waitForWalkinRfidTap({ timeoutMs: 60000 });
                     if (!retryTag) {
@@ -801,9 +894,9 @@ window.processPayment = async function(grandTotal) {
             walkinExpectedQty: walkinQty,
             walkinIssuedQty: issuedCount,
         });
-        alert(`Payment processed, but walk-in issuance was not completed.\n\nIssued: ${issuedCount} of ${walkinQty}\n\nYou can re-process issuance by completing the missing guest card taps.`);
+        showToast(`Payment processed, but walk-in issuance was not completed.\nIssued: ${issuedCount} of ${walkinQty}`, "error");
     } else {
-        alert("Payment Processed Successfully! Walk-ins issued and checked in.");
+        showToast("Payment Processed Successfully! Walk-ins issued and checked in.", "success");
     }
     posCart = []; renderCart();
 }
@@ -840,39 +933,41 @@ function renderPayments() {
 window.voidTransaction = async function(id) {
     const tx = paymentsData.find(p => p.id === id);
     if (!tx) return;
-    if (tx.status === "Voided") return alert("This transaction is already voided.");
-    if (!confirm("Are you sure you want to VOID this transaction? This will automatically return the purchased items back into your inventory.")) return;
+    if (tx.status === "Voided") return showToast("This transaction is already voided.", "error");
+    
+    showConfirm("Are you sure you want to VOID this transaction? This will automatically return the purchased items back into your inventory.", async () => {
+        try {
+            if (tx.items && tx.type === "POS Sale") {
+                const itemList = tx.items.split(', ');
+                for (let itemStr of itemList) {
+                    const match = itemStr.match(/^(\d+)x\s+(.+)$/);
+                    if (match) {
+                        const qtyRefunded = parseInt(match[1]);
+                        const itemName = match[2];
+                        if (itemName.includes("Walk-in Gym Access")) continue; 
 
-    try {
-        if (tx.items && tx.type === "POS Sale") {
-            const itemList = tx.items.split(', ');
-            for (let itemStr of itemList) {
-                const match = itemStr.match(/^(\d+)x\s+(.+)$/);
-                if (match) {
-                    const qtyRefunded = parseInt(match[1]);
-                    const itemName = match[2];
-                    if (itemName.includes("Walk-in Gym Access")) continue; 
-
-                    const invItem = inventoryData.find(i => i.name.toLowerCase() === itemName.toLowerCase());
-                    if (invItem) {
-                        await updateDoc(doc(db, "inventory", invItem.id), {
-                            qty: invItem.qty + qtyRefunded
-                        });
+                        const invItem = inventoryData.find(i => i.name.toLowerCase() === itemName.toLowerCase());
+                        if (invItem) {
+                            await updateDoc(doc(db, "inventory", invItem.id), {
+                                qty: invItem.qty + qtyRefunded
+                            });
+                        }
                     }
                 }
             }
+            await updateDoc(doc(db, "payments", id), { status: "Voided" });
+            showToast("Transaction successfully voided and inventory restocked!", "success");
+            if (window.logActivity) window.logActivity("Transaction Voided", `Voided transaction ${id} for ${tx.name || 'Unknown'} (₱${tx.amount})`);
+        } catch(e) {
+            console.error(e);
+            showToast("Error voiding transaction.", "error");
         }
-        await updateDoc(doc(db, "payments", id), { status: "Voided" });
-        alert("Transaction successfully voided and inventory restocked!");
-    } catch(e) {
-        console.error(e);
-        alert("Error voiding transaction.");
-    }
+    });
 }
 
 window.generateWeeklyPDF = function() {
     if (typeof html2pdf === 'undefined') {
-        return alert("PDF library is still loading, please wait a moment and try again.");
+        return showToast("PDF library is still loading, please wait a moment and try again.", "info");
     }
 
     const docName = localStorage.getItem("loggedInUser") || "Staff Member";
@@ -994,7 +1089,52 @@ onSnapshot(usersCol, (snapshot) => {
     renderMembers(); 
     renderMemberTrainers(); 
     if (document.getElementById('chatUserList')) renderChatUserList();
+
+    // Change Password Logic
+    const cpForm = document.getElementById('changePasswordForm');
+    if (cpForm) {
+        cpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newPass = document.getElementById('newPasswordInput').value.trim();
+            if (newPass.length < 6) return showToast("Password must be at least 6 characters.", "error");
+            
+            const userId = localStorage.getItem('userId');
+            if (!userId) return;
+
+            try {
+                await updateDoc(doc(db, "users", userId), { password: newPass });
+                document.getElementById('changePasswordModal').style.display = 'none';
+                showToast("Password updated successfully!", "success");
+                if (window.logActivity) window.logActivity("Password Changed", `User changed their own password.`);
+            } catch (err) {
+                console.error(err);
+                showToast("Error updating password.", "error");
+            }
+        });
+    }
 });
+
+window.openChangePasswordModal = function() {
+    document.getElementById('newPasswordInput').value = "";
+    document.getElementById('changePasswordModal').style.display = "flex";
+};
+
+window.getPlanDays = function(plan) {
+    if (!plan) return 30;
+    const p = plan.toLowerCase();
+    if (p.includes("year")) return 365;
+    if (p.includes("quarter") || p.includes("3 month")) return 90;
+    if (p.includes("6 month")) return 180;
+    return 30;
+};
+
+window.renewMember = async (id) => {
+    showConfirm("Are you sure you want to renew this membership starting today?", async () => {
+        await updateDoc(doc(db, "users", id), { dateRegistered: new Date().getTime(), status: "Active" });
+        showToast("Membership renewed successfully!", "success");
+        if (window.logActivity) window.logActivity("Membership Renewed", `Renewed membership for user ID: ${id}`);
+    });
+};
 
 function renderMembers() {
     const memTbody = document.querySelector('#membersTable tbody');
@@ -1004,22 +1144,32 @@ function renderMembers() {
     
     let activeMembers = 0, totalNonArchived = 0;
     const now = new Date().getTime();
+    
+    let memHtml = [];
+    let arcHtml = [];
 
     membersData.forEach(m => {
         const statusStr = (m.status || "Active").trim().toLowerCase();
         let plan = m.plan || 'Standard Member'; 
         let daysLeftText = "N/A", timerBadgeClass = "active";
         
+        const planDays = window.getPlanDays(plan);
+
         if (m.dateRegistered) {
-            const expiryDate = m.dateRegistered + (30 * 24 * 60 * 60 * 1000); 
+            const expiryDate = m.dateRegistered + (planDays * 24 * 60 * 60 * 1000); 
             const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
             if (diffDays > 0) { daysLeftText = `${diffDays} Days`; if (diffDays <= 7) timerBadgeClass = "pending"; } 
             else { daysLeftText = "Expired"; timerBadgeClass = "broken"; }
-        } else { daysLeftText = "30 Days"; }
+        } else { daysLeftText = `${planDays} Days`; }
         
+        let renewBtnHtml = "";
+        if (daysLeftText === "Expired" || (m.dateRegistered && Math.ceil((m.dateRegistered + (planDays * 24 * 60 * 60 * 1000) - now) / (1000 * 60 * 60 * 24)) <= 7)) {
+            renewBtnHtml = `<button class="btn-icon btn-edit" style="color: #1abc9c;" title="Renew Membership" onclick="renewMember('${m.id}')"><i class="fas fa-sync-alt"></i></button>`;
+        }
+
         if (statusStr === 'archived') {
             if (arcTbody) {
-                arcTbody.innerHTML += `
+                arcHtml.push(`
                     <tr>
                         <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
                         <td>${m.email}</td><td><strong>${plan}</strong></td><td><span class="badge maintenance">Archived</span></td>
@@ -1028,28 +1178,32 @@ function renderMembers() {
                             <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>
-                `;
+                `);
             }
         } else {
             totalNonArchived++;
             let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
             if (memTbody) {
-                memTbody.innerHTML += `
+                memHtml.push(`
                     <tr>
                         <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
                         <td>${m.email}</td><td><strong>${plan}</strong></td>
                         <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
                         <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
                         <td>
+                            ${renewBtnHtml}
                             <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Member" onclick="openEditMemberModal('${m.id}')"><i class="fa-solid fa-edit"></i></button>
                             <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Archive Account" onclick="archiveUser('${m.id}', '${m.status || 'Active'}')"><i class="fas fa-box-archive"></i></button>
                         </td>
                     </tr>
-                `;
+                `);
             }
             if (statusStr === 'active') activeMembers++;
         }
     });
+
+    if (memTbody) memTbody.innerHTML = memHtml.join('');
+    if (arcTbody) arcTbody.innerHTML = arcHtml.join('');
 
     if (document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
     if (document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = totalNonArchived; 
@@ -1099,7 +1253,8 @@ if (document.getElementById('editMemberForm')) {
         
         await updateDoc(doc(db, "users", id), updatedData);
         window.closeModal('editMemberModal');
-        alert("Member details updated successfully!");
+        showToast("Member details updated successfully!", "success");
+        if (window.logActivity) window.logActivity("Member Edited", `Edited member: ${updatedData.givenName} ${updatedData.familyName}`);
     });
 }
 
@@ -1287,21 +1442,28 @@ if (document.getElementById('editStaffForm')) {
 
         await updateDoc(doc(db, "users", id), updatedData);
         window.closeModal('editStaffModal');
-        alert(`Details updated successfully!`);
+        showToast(`Details updated successfully!`, "success");
+        if (window.logActivity) window.logActivity("Staff Edited", `Edited: ${updatedData.givenName} ${updatedData.familyName}`);
     });
 }
 
 window.archiveUser = async (id, currentStatus) => { 
     const actionText = currentStatus === 'Archived' ? 'Restore' : 'Archive';
     const newStatus = currentStatus === 'Archived' ? 'Active' : 'Archived';
-    if (confirm(`Are you sure you want to ${actionText.toLowerCase()} this account?`)) { 
-        await updateDoc(doc(db, "users", id), { status: newStatus }); alert(`Account successfully ${newStatus.toLowerCase()}.`);
-    } 
+    showConfirm(`Are you sure you want to ${actionText.toLowerCase()} this account?`, async () => { 
+        await updateDoc(doc(db, "users", id), { status: newStatus }); 
+        showToast(`Account successfully ${newStatus.toLowerCase()}.`, "success");
+        if (window.logActivity) window.logActivity(newStatus === 'Archived' ? 'Account Archived' : 'Account Restored', `User ID: ${id} was ${newStatus.toLowerCase()}.`);
+    }); 
 }
 
 window.deleteUser = async (id) => { 
-    if (localStorage.getItem("userRole") !== "Admin") { alert("Action Denied: You do not have permission to delete accounts."); return; }
-    if (confirm("Remove this account completely? This action cannot be undone.")) await deleteDoc(doc(db, "users", id)); 
+    if (localStorage.getItem("userRole") !== "Admin") { showToast("Action Denied: You do not have permission to delete accounts.", "error"); return; }
+    showConfirm("Remove this account completely? This action cannot be undone.", async () => {
+        await deleteDoc(doc(db, "users", id)); 
+        showToast("Account deleted.", "info");
+        if (window.logActivity) window.logActivity("Account Deleted", `Permanently deleted user ID: ${id}`);
+    }); 
 }
 
 // ==========================================
@@ -1311,7 +1473,7 @@ let batchRowCount = 1;
 
 // NEW: Inline styles added to bypass stubborn table constraints
 window.addBatchRow = function() {
-    if (batchRowCount >= 20) return alert("Maximum 20 members can be registered at once.");
+    if (batchRowCount >= 20) return showToast("Maximum 20 members can be registered at once.", "error");
     const tbody = document.getElementById('batchMemberBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1390,7 +1552,9 @@ if (document.getElementById('batchMemberForm')) {
         let alertMsg = `Registration Summary:\n\n✅ ${emailSuccessCount} user(s) received emails and were saved to the database.\n`;
         if (duplicateCount > 0) alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
         if (emailFailCount > 0) alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
-        alert(alertMsg);
+        let isSuccess = emailFailCount === 0 && duplicateCount === 0;
+        showToast(alertMsg, isSuccess ? "success" : "info");
+        if (window.logActivity && emailSuccessCount > 0) window.logActivity("Member Registered", `Registered ${emailSuccessCount} new member(s).`);
     });
 }
 
@@ -1398,7 +1562,7 @@ let staffBatchRowCount = 1;
 
 // NEW: Inline styles added to bypass stubborn table constraints
 window.addStaffBatchRow = function() {
-    if (staffBatchRowCount >= 20) return alert("Maximum 20 accounts can be registered at once.");
+    if (staffBatchRowCount >= 20) return showToast("Maximum 20 accounts can be registered at once.", "error");
     const tbody = document.getElementById('batchStaffBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1414,7 +1578,7 @@ window.addStaffBatchRow = function() {
 }
 
 window.openStaffModal = (role) => { 
-    if (localStorage.getItem("userRole") !== "Admin") return alert("Action Denied: Only Admins can register Staff and Trainers.");
+    if (localStorage.getItem("userRole") !== "Admin") return showToast("Action Denied: Only Admins can register Staff and Trainers.", "error");
     
     document.getElementById('hiddenStaffRole').value = role;
     document.getElementById('staffModalTitle').innerText = `Register ${role}`;
@@ -1494,7 +1658,9 @@ if (document.getElementById('batchStaffForm')) {
         let alertMsg = `Registration Summary:\n\n✅ ${emailSuccessCount} ${role}(s) received emails and were saved to the database.\n`;
         if (duplicateCount > 0) alertMsg += `⚠️ ${duplicateCount} account(s) were SKIPPED because the Email or RFID already exists in the system.\n`;
         if (emailFailCount > 0) alertMsg += `❌ ${emailFailCount} email(s) failed to send. These users were NOT saved.`;
-        alert(alertMsg);
+        let isSuccess = emailFailCount === 0 && duplicateCount === 0;
+        showToast(alertMsg, isSuccess ? "success" : "info");
+        if (window.logActivity && emailSuccessCount > 0) window.logActivity(`${role} Registered`, `Registered ${emailSuccessCount} new ${role.toLowerCase()}(s).`);
     });
 }
 
@@ -1510,7 +1676,7 @@ function initUI() {
             clockElement.innerHTML = `<i class="fa-regular fa-clock"></i> ${now.toLocaleDateString('en-US', options)}`;
         }
     }
-    setInterval(updateClock, 1000); updateClock();
+    let clockTimerId = setInterval(updateClock, 1000); updateClock();
 
     const submenuToggles = document.querySelectorAll('.has-submenu');
     submenuToggles.forEach(toggle => {
@@ -1564,7 +1730,19 @@ function initUI() {
             }
         });
     }
-    setInterval(updateShiftTimer, 1000); updateShiftTimer();
+    let shiftTimerId = setInterval(updateShiftTimer, 1000); updateShiftTimer();
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            clearInterval(clockTimerId);
+            clearInterval(shiftTimerId);
+        } else {
+            clockTimerId = setInterval(updateClock, 1000);
+            shiftTimerId = setInterval(updateShiftTimer, 1000);
+            updateClock();
+            updateShiftTimer();
+        }
+    });
 
     try { initDashboardCharts(); } catch (error) { console.warn("Chart tool delayed.", error); }
 }
@@ -1809,9 +1987,11 @@ function renderBookings() {
 window.filterBookingsByDate = () => { renderBookings(); }
 
 window.updateBookingStatus = async (id, newStatus) => {
-    if (confirm(`Are you sure you want to mark this session as ${newStatus}?`)) {
+    showConfirm(`Are you sure you want to mark this session as ${newStatus}?`, async () => {
         await updateDoc(doc(db, "bookings", id), { status: newStatus });
-    }
+        showToast(`Session marked as ${newStatus}.`, "success");
+        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}.`);
+    });
 }
 
 window.openMemberBookingModal = () => {
@@ -1854,7 +2034,7 @@ if (document.getElementById('memberBookingForm')) {
         const memberName = localStorage.getItem("loggedInUser");
 
         if (isBookingSessionInPast(bookDate, bookTime)) {
-            alert("Choose a date and time in the future. Past sessions cannot be booked.");
+            showToast("Choose a date and time in the future. Past sessions cannot be booked.", "error");
             return;
         }
 
@@ -1871,7 +2051,8 @@ if (document.getElementById('memberBookingForm')) {
             submitBtn.innerHTML = originalBtnText;
         }
         window.closeModal('memberBookingModal'); 
-        alert("Request sent! Waiting for trainer approval.");
+        showToast("Request sent! Waiting for trainer approval.", "success");
+        if (window.logActivity) window.logActivity("Booking Created", `Member requested a training session.`);
     });
 }
 
@@ -1903,13 +2084,38 @@ if (document.getElementById('bookingForm')) {
         const timeEl = document.getElementById('bookTime');
         setBookingDateMin(dateEl);
         updateBookingTimeMinForToday(dateEl, timeEl);
-        if (!dateEl.checkValidity()) { dateEl.reportValidity(); return; }
-        if (!timeEl.checkValidity()) { timeEl.reportValidity(); return; }
+        if (!dateEl.checkValidity()) { dateEl.reportValidity(); if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; } return; }
+        if (!timeEl.checkValidity()) { timeEl.reportValidity(); if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; } return; }
         const memberId = memberSelect.value, trainerId = trainerSelect.value, bookDate = dateEl.value, bookTime = timeEl.value;
         const memberName = memberSelect.options[memberSelect.selectedIndex].text, trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
 
         if (isBookingSessionInPast(bookDate, bookTime)) {
-            alert("Choose a date and time in the future. Past sessions cannot be booked.");
+            showToast("Choose a date and time in the future. Past sessions cannot be booked.", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
+
+        // Conflict Detection
+        const q = query(bookingsCol, where("trainerId", "==", trainerId), where("date", "==", bookDate), where("status", "==", "Confirmed"));
+        const snap = await getDocs(q);
+        let conflict = false;
+        const [bH, bM] = bookTime.split(':').map(Number);
+        const bookMins = bH * 60 + bM;
+
+        snap.forEach(doc => {
+            const timeStr = doc.data().time;
+            if (timeStr) {
+                const [eH, eM] = timeStr.split(':').map(Number);
+                const existingMins = eH * 60 + eM;
+                if (Math.abs(bookMins - existingMins) < 60) {
+                    conflict = true;
+                }
+            }
+        });
+
+        if (conflict) {
+            showToast("This trainer already has a session booked within 1 hour of this time.", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
             return;
         }
 
@@ -1918,7 +2124,8 @@ if (document.getElementById('bookingForm')) {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalBtnText;
         }
-        window.closeModal('bookingModal'); alert("Personal Training Session booked successfully!");
+        window.closeModal('bookingModal'); showToast("Personal Training Session booked successfully!", "success");
+        if (window.logActivity) window.logActivity("Booking Created", `Admin/Staff booked a training session.`);
     });
 }
 
@@ -1940,10 +2147,144 @@ if (document.getElementById('editBookingForm')) {
         const id = document.getElementById('editBookingId').value, status = document.getElementById('editBookingStatus').value;
         await updateDoc(doc(db, "bookings", id), { status: status });
         window.closeModal('editBookingModal');
+        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} status changed to ${status}.`);
     });
 }
 
-window.deleteBooking = async (id) => { if (confirm("Are you sure you want to delete this booking record?")) await deleteDoc(doc(db, "bookings", id)); }
+window.deleteBooking = async (id) => { 
+    showConfirm("Are you sure you want to delete this booking record?", async () => {
+        await deleteDoc(doc(db, "bookings", id)); 
+        showToast("Booking deleted.", "info");
+        if (window.logActivity) window.logActivity("Booking Deleted", `Deleted booking ID: ${id}.`);
+    }); 
+}
+
+// ==========================================
+// 15. SYSTEM ACTIVITY LOGS
+// ==========================================
+onSnapshot(activityLogsCol, (snapshot) => {
+    activityData = [];
+    snapshot.forEach(doc => activityData.push({ id: doc.id, ...doc.data() }));
+    activityData.sort((a, b) => b.timestamp - a.timestamp);
+    renderActivityLogs();
+});
+
+function renderActivityLogs() {
+    const actTbody = document.querySelector('#activityTable tbody');
+    if (!actTbody) return;
+    actTbody.innerHTML = "";
+
+    const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+    // Filters
+    const roleFilter = document.getElementById('activityRoleFilter');
+    const dateFilter = document.getElementById('activityDateFilter');
+    const selectedRole = roleFilter ? roleFilter.value : 'all';
+
+    let selectedDateStr = '';
+    if (dateFilter && dateFilter.value) {
+        const [y, m, d] = dateFilter.value.split('-');
+        const dateObj = new Date(y, m - 1, d);
+        selectedDateStr = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+
+    let filtered = activityData;
+    if (selectedRole !== 'all') {
+        filtered = filtered.filter(l => l.role === selectedRole);
+    }
+    if (selectedDateStr) {
+        filtered = filtered.filter(l => l.date === selectedDateStr);
+    }
+
+    // Stat cards
+    const todayLogs = activityData.filter(l => l.date === today);
+    const uniqueUsers = new Set(activityData.map(l => l.userName));
+    const actionCounts = {};
+    activityData.forEach(l => { actionCounts[l.action] = (actionCounts[l.action] || 0) + 1; });
+    let topAction = '-';
+    let topCount = 0;
+    for (const [action, count] of Object.entries(actionCounts)) {
+        if (count > topCount) { topCount = count; topAction = action; }
+    }
+
+    if (document.getElementById('actTotalLogs')) document.getElementById('actTotalLogs').innerText = activityData.length;
+    if (document.getElementById('actTodayLogs')) document.getElementById('actTodayLogs').innerText = todayLogs.length;
+    if (document.getElementById('actUniqueUsers')) document.getElementById('actUniqueUsers').innerText = uniqueUsers.size;
+    if (document.getElementById('actTopAction')) {
+        const el = document.getElementById('actTopAction');
+        el.innerText = topAction;
+        el.style.fontSize = topAction.length > 12 ? '16px' : '28px';
+    }
+
+    const countEl = document.getElementById('activityRecordCount');
+    if (countEl) countEl.innerText = `Showing ${Math.min(filtered.length, 200)} of ${filtered.length} records`;
+
+    if (filtered.length === 0) {
+        const emptyRow = document.getElementById('activityEmptyState');
+        if (emptyRow) {
+            actTbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 60px 20px;">
+                        <i class="fa-solid fa-clock-rotate-left" style="font-size: 3rem; opacity: 0.15; margin-bottom: 15px; display: block;"></i>
+                        <p style="color: var(--text-muted); font-size: 14px; margin: 0;">No activity logs found for the selected filters.</p>
+                    </td>
+                </tr>
+            `;
+        }
+        return;
+    }
+
+    // Action → icon mapping
+    const actionIcons = {
+        'POS Sale': 'fa-cash-register',
+        'Login': 'fa-right-to-bracket',
+        'Logout': 'fa-right-from-bracket',
+        'Member Registered': 'fa-user-plus',
+        'Staff Registered': 'fa-user-tie',
+        'Trainer Registered': 'fa-dumbbell',
+        'Member Edited': 'fa-user-pen',
+        'Staff Edited': 'fa-user-pen',
+        'Equipment Updated': 'fa-wrench',
+        'Product Updated': 'fa-box',
+        'Account Archived': 'fa-box-archive',
+        'Account Restored': 'fa-box-open',
+        'Account Deleted': 'fa-trash',
+        'Item Deleted': 'fa-trash-can',
+        'Item Registered': 'fa-plus-circle',
+        'Transaction Voided': 'fa-ban',
+        'Booking Created': 'fa-calendar-plus',
+        'Booking Status Updated': 'fa-calendar-check',
+        'Booking Deleted': 'fa-calendar-xmark',
+        'Password Changed': 'fa-key',
+        'Membership Renewed': 'fa-sync-alt',
+    };
+
+    const displayData = filtered.slice(0, 200);
+
+    let html = '';
+    displayData.forEach(log => {
+        const icon = actionIcons[log.action] || 'fa-circle-info';
+        const roleBadge = log.role === 'Admin'
+            ? '<span class="badge active" style="background: var(--primary-red);">Admin</span>'
+            : log.role === 'Staff'
+            ? '<span class="badge active" style="background: #2980b9;">Staff</span>'
+            : log.role === 'Trainer'
+            ? '<span class="badge active" style="background: #27ae60;">Trainer</span>'
+            : `<span class="badge active" style="background: var(--dark-black);">${log.role || 'System'}</span>`;
+
+        html += `
+            <tr>
+                <td style="white-space: nowrap;"><strong>${log.date}</strong><br><small style="color: var(--text-muted);">${log.time}</small></td>
+                <td>${log.userName || 'System'}</td>
+                <td>${roleBadge}</td>
+                <td><span style="display: inline-flex; align-items: center; gap: 6px;"><i class="fa-solid ${icon}" style="font-size: 12px; color: var(--text-muted);"></i> <strong>${log.action}</strong></span></td>
+                <td style="font-size: 13px; color: var(--text-muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${log.details || '-'}</td>
+            </tr>
+        `;
+    });
+    actTbody.innerHTML = html;
+}
+window.renderActivityLogs = renderActivityLogs;
 
 // ==========================================
 // 14. SMART USB RFID GHOST LISTENER

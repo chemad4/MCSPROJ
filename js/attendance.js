@@ -10,21 +10,35 @@ export function initAttendance({ db, attendanceCol, servicesChartInstanceGetter,
   const ch = Number.isFinite(closingHour) ? closingHour : DEFAULT_CLOSING_HOUR;
   const cm = Number.isFinite(closingMinute) ? closingMinute : DEFAULT_CLOSING_MINUTE;
 
-  // Reduce reads: listen only to today's attendance documents.
-  const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  const todaysQuery = query(attendanceCol, where("date", "==", today));
+  let currentUnsubscribe = null;
 
-  onSnapshot(todaysQuery, (snapshot) => {
-    attendanceData = [];
-    snapshot.forEach((d) => attendanceData.push({ id: d.id, ...d.data() }));
-    renderAttendance(attendanceData, servicesChartInstanceGetter);
-  });
+  window.filterAttendanceByDate = (dateVal) => {
+    if (currentUnsubscribe) currentUnsubscribe();
+    
+    let targetDateStr;
+    if (!dateVal) {
+        targetDateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } else {
+        const [y, m, d] = dateVal.split('-');
+        const dateObj = new Date(y, m - 1, d);
+        targetDateStr = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+    
+    const q = query(attendanceCol, where("date", "==", targetDateStr));
+    currentUnsubscribe = onSnapshot(q, (snapshot) => {
+        attendanceData = [];
+        snapshot.forEach((d) => attendanceData.push({ id: d.id, ...d.data() }));
+        renderAttendance(attendanceData, servicesChartInstanceGetter, targetDateStr);
+    });
+  };
+
+  window.filterAttendanceByDate(); // Load today initially
 
   // Auto force-out at closing (runs once per day per device).
   runAutoForceOutIfClosingPassed({ db, attendanceCol, closingHour: ch, closingMinute: cm }).catch(() => {});
 }
 
-function renderAttendance(attendanceData, servicesChartInstanceGetter) {
+function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDate) {
   const attTbody = document.querySelector("#attendanceTable tbody");
   const myAttTbody = document.querySelector("#myAttendanceBody");
   const loggedInName = localStorage.getItem("loggedInUser");
@@ -35,61 +49,138 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter) {
   if (attTbody) attTbody.innerHTML = "";
   if (myAttTbody) myAttTbody.innerHTML = "";
 
-  const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const dateFilter = targetDate || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   let gold = 0,
     silver = 0,
     walkin = 0,
     presentCount = 0;
 
   const sortedAtt = [...attendanceData].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-  const todayAtt = sortedAtt.filter((a) => a.date === today);
+  const todayAtt = sortedAtt.filter((a) => a.date === dateFilter);
 
-  // Daily IN/OUT counters per member to flag suspicious activity.
-  const dailyCounts = new Map(); // name -> { inCount, outCount, deniedCount, overrideCount }
+  // --- Group records by person name ---
+  const grouped = new Map();
   todayAtt.forEach((a) => {
-    const nameKey = a.name || "";
-    if (!nameKey) return;
-    let entry = dailyCounts.get(nameKey);
-    if (!entry) {
-      entry = { inCount: 0, outCount: 0, deniedCount: 0, overrideCount: 0 };
-      dailyCounts.set(nameKey, entry);
+    const nameKey = a.name || "Unknown";
+    if (!grouped.has(nameKey)) {
+      grouped.set(nameKey, { records: [], type: a.type, latestStatus: a.status, latestRecord: a, inCount: 0, outCount: 0, date: a.date });
     }
-    entry.inCount += 1;
-    const hasOut = !!a.timeOut || a.status === "Checked Out";
-    if (hasOut) entry.outCount += 1;
-    if (a.overrideTapOut) entry.overrideCount += 1;
-    if (a.denied === true) entry.deniedCount += 1;
+    const g = grouped.get(nameKey);
+    g.records.push(a);
+    g.inCount += 1;
+    if (a.timeOut || a.status === "Checked Out") g.outCount += 1;
+    if ((a.timestamp || 0) > ((g.latestRecord || {}).timestamp || 0)) {
+      g.latestStatus = a.status;
+      g.latestRecord = a;
+      g.type = a.type;
+      g.date = a.date;
+    }
   });
 
-  todayAtt.forEach((a) => {
-    const statusBadge =
-      a.status === "Checked In" ? '<span class="badge active">On Floor</span>' : '<span class="badge inactive">Checked Out</span>';
-    const timeOutDisplay = a.timeOut ? `<span class="badge inactive"><i class="fa-regular fa-clock"></i> ${a.timeOut}</span>` : "-";
-    const timeInDisplay = a.timeIn || a.time || "-";
+  // Build chart counts using the grouped data
+  grouped.forEach((g) => {
+    if ((g.type || "").includes("Gold")) gold++;
+    else if ((g.type || "").includes("Silver")) silver++;
+    else if ((g.type || "").includes("Walk-in")) walkin++;
+    if (g.latestStatus === "Checked In") presentCount++;
+  });
 
-    const counts = dailyCounts.get(a.name || "") || { inCount: 0, outCount: 0, deniedCount: 0, overrideCount: 0 };
-    const isFlagged = counts.inCount >= 3;
-    const flagDisplay = isFlagged
-      ? `<span class="badge broken">FLAG</span>`
-      : `<span class="badge active" style="background: var(--dark-black);">OK</span>`;
+  if (attTbody) {
+    let rowIndex = 0;
+    grouped.forEach((g, name) => {
+      const latestRec = g.latestRecord || g.records[0];
+      const hasMultiple = g.records.length > 1;
+      const isFlagged = g.inCount >= 3;
 
-    if (attTbody) {
+      const latestStatusBadge =
+        g.latestStatus === "Checked In"
+          ? '<span class="badge active">On Floor</span>'
+          : '<span class="badge inactive">Checked Out</span>';
+
+      const latestTimeIn = latestRec ? (latestRec.timeIn || latestRec.time || "-") : "-";
+      const latestTimeOut =
+        latestRec && latestRec.timeOut
+          ? `<span class="badge inactive"><i class="fa-regular fa-clock"></i> ${latestRec.timeOut}</span>`
+          : "-";
+
+      const flagDisplay = isFlagged
+        ? `<span class="badge broken">FLAG</span>`
+        : `<span class="badge active" style="background: var(--dark-black);">OK</span>`;
+
+      const toggleId = `att-detail-${rowIndex}`;
+      const chevronId = `att-chevron-${rowIndex}`;
+
+      // Summary Row
       attTbody.innerHTML += `
-        <tr>
-          <td>${a.name}</td><td><strong>${a.type}</strong></td><td>${a.date}</td>
-          <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${timeInDisplay}</span></td>
-          <td>${timeOutDisplay}</td><td>${statusBadge}</td>
-          ${showCounts ? `<td>${counts.inCount}</td><td>${counts.outCount}</td><td>${flagDisplay}</td>` : ``}
+        <tr class="att-summary-row" style="cursor: ${hasMultiple ? "pointer" : "default"};"
+            onclick="${hasMultiple ? `toggleAttDetail('${toggleId}', '${chevronId}')` : ""}">
+          <td>
+            <span style="display:inline-flex; align-items:center; gap: 8px;">
+              ${
+                hasMultiple
+                  ? `<i id="${chevronId}" class="fa-solid fa-chevron-right" style="font-size:11px; color: var(--text-muted); transition: transform 0.2s;"></i>`
+                  : `<span style="display:inline-block; width:15px;"></span>`
+              }
+              ${name}
+              ${hasMultiple ? `<span style="font-size:11px; background: var(--primary-red); color: white; padding: 1px 6px; border-radius: 10px; font-weight:600;">${g.records.length}</span>` : ""}
+            </span>
+          </td>
+          <td><strong>${g.type}</strong></td>
+          <td>${g.date || today}</td>
+          <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${latestTimeIn}</span></td>
+          <td>${latestTimeOut}</td>
+          <td>${latestStatusBadge}</td>
+          ${showCounts ? `<td>${g.inCount}</td><td>${g.outCount}</td><td>${flagDisplay}</td>` : ""}
         </tr>
       `;
+
+      // Detail Rows (hidden by default, sorted oldest-first)
+      if (hasMultiple) {
+        let detailRows = "";
+        const sorted = [...g.records].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        sorted.forEach((rec, i) => {
+          const recTimeIn = rec.timeIn || rec.time || "-";
+          const recTimeOut = rec.timeOut
+            ? `<span class="badge inactive"><i class="fa-regular fa-clock"></i> ${rec.timeOut}</span>`
+            : "-";
+          const recStatus =
+            rec.status === "Checked In"
+              ? '<span class="badge active">On Floor</span>'
+              : '<span class="badge inactive">Checked Out</span>';
+          detailRows += `
+            <tr style="background: rgba(0,0,0,0.02);">
+              <td colspan="2" style="padding-left: 45px; font-size: 13px; color: var(--text-muted);">
+                <i class="fa-solid fa-right-to-bracket" style="font-size:11px; margin-right:5px;"></i> Session ${i + 1}
+              </td>
+              <td style="font-size:13px; color: var(--text-muted);">${rec.date}</td>
+              <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${recTimeIn}</span></td>
+              <td>${recTimeOut}</td>
+              <td>${recStatus}</td>
+              ${showCounts ? `<td></td><td></td><td></td>` : ""}
+            </tr>
+          `;
+        });
+
+        attTbody.innerHTML += `
+          <tr id="${toggleId}" class="att-detail-group" style="display: none;">
+            <td colspan="100%" style="padding: 0; border-bottom: 2px solid var(--primary-red);">
+              <table style="width:100%; border-collapse:collapse;">
+                <tbody>${detailRows}</tbody>
+              </table>
+            </td>
+          </tr>
+        `;
+      }
+
+      rowIndex++;
+    });
+
+    if (grouped.size === 0) {
+      const colCount = showCounts ? 9 : 6;
+      attTbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center; padding: 30px; color: var(--text-muted);">No attendance records for today.</td></tr>`;
     }
+  }
 
-    if ((a.type || "").includes("Gold")) gold++;
-    else if ((a.type || "").includes("Silver")) silver++;
-    else if ((a.type || "").includes("Walk-in")) walkin++;
-
-    if (a.status === "Checked In") presentCount++;
-  });
 
   if (myAttTbody) {
     const myLogs = sortedAtt.filter((a) => a.name === loggedInName).slice(0, 10);
@@ -120,6 +211,18 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter) {
   const presentEl = document.getElementById("presentMembers");
   if (presentEl) presentEl.innerText = presentCount;
 }
+
+// Toggle the detail rows for a grouped attendance entry
+window.toggleAttDetail = function (toggleId, chevronId) {
+  const detailRow = document.getElementById(toggleId);
+  const chevron = document.getElementById(chevronId);
+  if (!detailRow) return;
+  const isOpen = detailRow.style.display !== "none";
+  detailRow.style.display = isOpen ? "none" : "table-row";
+  if (chevron) {
+    chevron.style.transform = isOpen ? "rotate(0deg)" : "rotate(90deg)";
+  }
+};
 
 async function runAutoForceOutIfClosingPassed({ db, attendanceCol, closingHour, closingMinute }) {
   const now = new Date();

@@ -16,8 +16,10 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <link rel="stylesheet" href="css/styles.css">
-
+    <script src="js/ui.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script>
+        emailjs.init("ZqQKGRo5j5KpAhH98");
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js')
@@ -133,6 +135,10 @@
             <button type="submit" class="login-btn" id="loginSubmitBtn">Log In</button>
         </form>
 
+        <p style="text-align: center; margin-top: 15px;">
+            <a href="#" id="forgotPasswordBtn" style="color: var(--text-muted); text-decoration: none; font-size: 14px;">Forgot Password?</a>
+        </p>
+
         <p class="desktop-only" style="color: #AAAAAA; font-size: 13px; margin-top: 20px;">
             <i class="fas fa-id-badge"></i> Or simply tap your ID Card to log in.
         </p>
@@ -144,7 +150,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const loginConfig = {
             apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
@@ -194,6 +200,37 @@
             const password = document.getElementById('loginPassword').value.trim();
             await authenticateUser(query(collection(db, "users"), where("email", "==", email), where("password", "==", password)));
         });
+
+        document.getElementById('forgotPasswordBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            const email = prompt("Enter your email address to reset your password:");
+            if (!email) return;
+            resetPasswordFlow(email.trim());
+        });
+
+        async function resetPasswordFlow(email) {
+            const q = query(collection(db, "users"), where("email", "==", email));
+            const snap = await getDocs(q);
+            if (snap.empty) {
+                showToast("No account found with this email.", "error");
+                return;
+            }
+            const userDoc = snap.docs[0];
+            const newPass = Math.random().toString(36).slice(-8);
+
+            try {
+                await updateDoc(doc(db, "users", userDoc.id), { password: newPass });
+                await emailjs.send("service_x90mti6", "template_nda1wjc", {
+                    to_name: userDoc.data().name || userDoc.data().givenName,
+                    to_email: email,
+                    generated_password: newPass,
+                    plan: "Password Reset"
+                });
+                showToast("A new password has been sent to your email.", "success");
+            } catch (e) {
+                showToast("Error resetting password.", "error");
+            }
+        }
 
         async function authenticateUser(dbQuery) {
             const errorMsg = document.getElementById('errorMsg');
@@ -264,6 +301,21 @@
                 localStorage.setItem("userRole", userRole);
                 localStorage.setItem("sessionId", newSessionId); // Save Session ID locally!
                 if(userData.rfid) localStorage.setItem("userRfid", userData.rfid);
+
+                // Log the login activity
+                try {
+                    const now = new Date();
+                    await addDoc(collection(db, "activityLogs"), {
+                        userId: userId,
+                        userName: userData.name || userData.givenName,
+                        role: userRole,
+                        action: "Login",
+                        details: `${userRole} logged in.`,
+                        date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                        time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                        timestamp: now.getTime()
+                    });
+                } catch(e) { console.error("Login log failed:", e); }
 
                 // Redirect
                 if (userRole === "Admin") window.location.replace("adminDB.html");

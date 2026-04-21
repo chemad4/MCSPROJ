@@ -21,6 +21,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <link rel="stylesheet" href="css/styles.css">
+    <script src="js/ui.js"></script>
 
     <style>
         .pos-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
@@ -121,6 +122,8 @@
                 <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
             </div>
             <div class="topbar-right" style="display: flex; align-items: center; gap: 15px;">
+                <button onclick="toggleDarkMode()" title="Toggle Dark Mode" style="font-size: 16px;"><i id="darkModeIcon" class="fas fa-moon"></i></button>
+                <button onclick="openChangePasswordModal()" title="Change Password" style="font-size: 16px;"><i class="fas fa-key"></i></button>
                 <div id="topBarNameContainer" style="color: var(--text-primary); font-weight: 500; font-size: 14px;">
                     <i class="fa-solid fa-user-circle" style="font-size: 18px; vertical-align: middle;"></i> <span id="topBarName">Loading...</span>
                 </div>
@@ -202,6 +205,9 @@
                 <div class="cart-panel">
                     <h3 style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;"><i class="fa-solid fa-cart-shopping"></i> Current Order</h3>
                     <div class="cart-items" id="posCartBody"></div>
+                    <div style="margin-bottom: 15px;">
+                        <input type="text" id="posCustomerName" placeholder="Customer Name (Optional)" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(255,255,255,0.5); color: var(--text-primary);">
+                    </div>
                     <div class="pos-totals"></div>
                 </div>
             </div>
@@ -253,7 +259,12 @@
                 </div>
             </div>
             <div class="panel">
-                <div class="panel-header"><i class="fas fa-clipboard-list"></i> Daily Attendance Log</div>
+                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div><i class="fas fa-clipboard-list"></i> Daily Attendance Log</div>
+                    <div>
+                        <input type="date" id="attendanceDateFilter" onchange="filterAttendanceByDate(this.value)" style="padding: 5px; border-radius: 4px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.5); color: var(--text-primary);">
+                    </div>
+                </div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="attendanceTable">
                         <thead><tr><th>Name</th><th>Plan / Type</th><th>Date</th><th>Time In</th><th>Time Out</th><th>Status</th></tr></thead>
@@ -387,7 +398,24 @@
             </form>
         </div>
     </div>
-
+    <div id="editProductModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Edit Product</h3><span class="close-btn" onclick="closeModal('editProductModal')">&times;</span></div>
+            <form class="modal-form" id="editProductForm">
+                <input type="hidden" id="editProdId">
+                <input type="text" id="editProdName" required>
+                <select id="editProdCategory" required>
+                    <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
+                    <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
+                    <option value="Apparel / Merchandise">Apparel / Merchandise</option>
+                </select>
+                <input type="number" id="editProdPrice" min="1" step="0.01" required>
+                <input type="number" id="editProdQty" min="0" required>
+                <input type="text" id="editProdVol">
+                <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
+            </form>
+        </div>
+    </div>
     <div id="productModal" class="modal">
         <div class="modal-content">
             <div class="modal-header"><h3>Register New Product</h3><span class="close-btn" onclick="closeModal('productModal')">&times;</span></div>
