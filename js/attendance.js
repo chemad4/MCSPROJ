@@ -210,6 +210,88 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDat
   }
   const presentEl = document.getElementById("presentMembers");
   if (presentEl) presentEl.innerText = presentCount;
+
+  // --- DASHBOARD ANALYTICS HOOK ---
+  if (document.getElementById('dashboard')) {
+    // Daily Checkins
+    const checkinEl = document.getElementById('dashDailyCheckins');
+    if (checkinEl) checkinEl.innerText = todayAtt.length;
+
+    // Peak Hour Calculation
+    const hourCounts = Array(24).fill(0);
+    todayAtt.forEach(a => {
+        if (a.timeIn || a.time) {
+            const timeStr = a.timeIn || a.time;
+            const hour = parseInt(timeStr.split(':')[0]);
+            const isPM = timeStr.toLowerCase().includes('pm');
+            let hour24 = hour;
+            if (isPM && hour !== 12) hour24 += 12;
+            if (!isPM && hour === 12) hour24 = 0;
+            if (!isNaN(hour24)) hourCounts[hour24]++;
+        }
+    });
+
+    let peakHour = -1;
+    let maxCheckins = 0;
+    hourCounts.forEach((count, hr) => {
+        if (count > maxCheckins) {
+            maxCheckins = count;
+            peakHour = hr;
+        }
+    });
+
+    const peakEl = document.getElementById('dashPeakHour');
+    if (peakEl) {
+        if (peakHour === -1) peakEl.innerText = "--:--";
+        else {
+            const displayHour = peakHour % 12 || 12;
+            const ampm = peakHour >= 12 ? 'PM' : 'AM';
+            peakEl.innerText = `${displayHour}:00 ${ampm}`;
+        }
+    }
+
+    // Sparkline for Check-ins
+    if (window.renderSparkline) {
+        const checkinTrend = hourCounts.filter((_, i) => i >= 6 && i <= 21); // 6 AM to 9 PM
+        window.renderSparkline('checkinSparkline', checkinTrend, 'var(--primary-red)');
+    }
+
+    if (window.refreshDashboardAnalytics) window.refreshDashboardAnalytics();
+    if (window.renderRecentCheckins) window.renderRecentCheckins(attendanceData);
+  }
+}
+
+window.renderRecentCheckins = function(attendanceData) {
+    const list = document.getElementById('recentCheckinsList');
+    if (!list) return;
+
+    const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const recent = attendanceData
+        .filter(a => a.status === 'Checked In' && a.date === today)
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+        .slice(0, 5);
+
+    if (recent.length === 0) {
+        list.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0;">No check-ins yet today.</p>`;
+        return;
+    }
+
+    list.innerHTML = recent.map(a => {
+        const initials = a.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const time = a.timeIn || a.time || '00:00';
+        return `
+            <div class="checkin-item">
+                <div class="initial-avatar">${initials}</div>
+                <div class="checkin-details">
+                    <div class="checkin-name">${a.name}</div>
+                    <div class="checkin-meta">
+                        <span>Plan: ${a.type || 'Standard'}</span>
+                        <span>Checked in at: ${time}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // Toggle the detail rows for a grouped attendance entry

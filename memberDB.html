@@ -226,14 +226,34 @@
             <div class="topbar-left">
                 <span id="pageTitle" style="font-weight: 500; color: var(--text-primary); font-size: 16px;">My Dashboard</span>
             </div>
-            <div class="topbar-left" style="margin-left: auto; margin-right: 20px;">
+            <div class="topbar-center" style="margin-left: auto; margin-right: 20px;">
                 <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
             </div>
-            <div class="topbar-right" style="display: flex; align-items: center; gap: 15px;">
-                <button onclick="toggleDarkMode()" title="Toggle Dark Mode" style="font-size: 16px;"><i id="darkModeIcon" class="fas fa-moon"></i></button>
-                <button onclick="openChangePasswordModal()" title="Change Password" style="font-size: 16px;"><i class="fas fa-key"></i></button>
-                <button id="adminBtn"><i class="fa-solid fa-user-circle"></i> <span id="topBarName">Loading...</span> <i class="fa-solid fa-caret-down"></i></button>
-                <button id="logoutBtn" onclick="handleLogout()"><i class="fa-solid fa-power-off"></i> Logout</button>
+            <div class="topbar-right">
+                <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn-circle"><i id="darkModeIcon" class="fas fa-moon"></i></button>
+                
+                <div class="user-menu-container">
+                    <div class="user-profile-trigger" id="userMenuTrigger">
+                        <div id="topBarNameContainer" style="display: flex; align-items: center; gap: 8px; pointer-events: none;">
+                            <i class="fa-solid fa-circle-user" style="font-size: 24px; color: var(--text-muted);"></i>
+                            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                <span id="topBarName" style="font-weight: 600; font-size: 14px; line-height: 1;">Loading...</span>
+                                <span style="font-size: 11px; color: var(--text-muted);">Gym Member</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-down" style="font-size: 10px; color: var(--text-muted); margin-left: 4px;"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="dropdown-menu" id="userDropdown">
+                        <button class="dropdown-item-btn" onclick="openProfileSettingsModal()">
+                            <i class="fas fa-user-gear"></i> Profile Settings
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: var(--primary-red);">
+                            <i class="fa-solid fa-power-off"></i> Logout
+                        </button>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -241,16 +261,16 @@
             
             <div id="memberNotificationArea"></div>
 
-            <div class="panel" style="background: linear-gradient(135deg, var(--dark-black), #333); color: white; border: none;">
-                <div class="welcome-panel-body">
+            <div class="panel" style="border: none; background: transparent; box-shadow: none; margin-bottom: 25px; padding: 0;">
+                <div class="panel-body" style="padding: 10px 5px; display: flex; justify-content: space-between; align-items: center;">
                     <div>
-                        <h2 style="margin-bottom: 10px; font-size: 24px;">Welcome back, <span id="welcomeName">Member</span>!</h2>
-                        <p style="color: #ccc; font-size: 14px;">Ready to crush your goals today?</p>
+                        <h2 id="greetingText" style="margin-bottom: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--text-primary);">Overview</h2>
+                        <p style="color: var(--text-muted); font-size: 15px;">Ready to crush your goals today?</p>
                     </div>
                     <div style="text-align: right;">
-                        <div style="font-size: 14px; color: #aaa; margin-bottom: 5px;">Current Plan</div>
-                        <div id="myPlanName" style="font-size: 20px; font-weight: bold; color: var(--primary-red);">Loading...</div>
-                        <div id="myPlanDays" style="font-size: 14px; margin-top: 5px;"><i class="fa-regular fa-clock"></i> Checking status...</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Current Plan</div>
+                        <div id="myPlanName" style="font-size: 20px; font-weight: 700; color: var(--primary-red); line-height: 1;">Loading...</div>
+                        <div id="myPlanDays" style="font-size: 13px; margin-top: 6px; color: var(--text-muted);"><i class="fa-regular fa-clock"></i> Checking...</div>
                     </div>
                 </div>
             </div>

@@ -21,6 +21,14 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            corePlugins: {
+                preflight: false,
+            }
+        }
+    </script>
     <link rel="stylesheet" href="css/styles.css">
     <script src="js/ui.js"></script>
 
@@ -29,6 +37,7 @@
             display: grid;
             grid-template-columns: 2fr 1fr;
             gap: 20px;
+            align-items: start;
         }
 
         .cart-panel {
@@ -39,6 +48,18 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            min-height: 700px;
+        }
+
+        .cart-header {
+            display: flex;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 10px;
         }
 
         .cart-items {
@@ -46,11 +67,15 @@
             overflow-y: auto;
             margin-bottom: 20px;
             min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .pos-totals {
             border-top: 2px dashed var(--border-color);
             padding-top: 15px;
+            margin-bottom: 20px;
         }
 
         .total-line {
@@ -61,9 +86,297 @@
         }
 
         .total-line.grand {
-            font-size: 20px;
-            font-weight: bold;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--dark-black);
+            margin-top: 10px;
+        }
+
+        .pos-category-tabs {
+            display: flex;
+            gap: 10px;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        .pos-tab {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+            border-bottom: 2px solid transparent;
+            transition: 0.2s;
+        }
+
+        .pos-tab:hover {
+            color: var(--dark-black);
+        }
+
+        .pos-tab.active {
             color: var(--primary-red);
+            border-bottom-color: var(--primary-red);
+        }
+
+        .pos-product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .pos-product-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: 0.2s;
+        }
+
+        .pos-product-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transform: translateY(-2px);
+            border-color: var(--primary-red);
+        }
+
+        .pos-card-image {
+            height: 120px;
+            background: #f8f9fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ccc;
+            font-size: 32px;
+            overflow: hidden;
+        }
+
+        .pos-card-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .pos-card-info {
+            padding: 12px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .pos-card-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--dark-black);
+            margin-bottom: 4px;
+            line-height: 1.3;
+        }
+
+        .pos-card-stock {
+            font-size: 12px;
+            color: #27ae60;
+        }
+
+        .pos-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            border-top: 1px solid #f1f1f1;
+            background: #fafafa;
+        }
+
+        .pos-card-price {
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--dark-black);
+        }
+
+        .pos-add-btn {
+            background: var(--primary-red);
+            color: white;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+
+        .pos-add-btn:hover {
+            background: #c0392b;
+        }
+
+        .pos-cart-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            gap: 10px;
+        }
+
+        .pos-cart-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            background: #f1f1f1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .pos-cart-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .pos-cart-detail {
+            flex: 2;
+            min-width: 0;
+        }
+
+        .pos-cart-item-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--dark-black);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .pos-cart-qty {
+            width: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .qty-btn {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f1f1f1;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--dark-black);
+        }
+
+        .qty-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .pos-cart-line-total {
+            width: 80px;
+            text-align: right;
+            font-weight: 600;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .pos-cart-remove {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 5px;
+        }
+
+        .pos-payment-methods {
+            margin-bottom: 20px;
+        }
+
+        .pos-payment-methods h4 {
+            margin: 0 0 10px 0;
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .payment-method-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .payment-method-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 15px 10px;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: 0.2s;
+        }
+
+        .payment-method-btn i {
+            font-size: 20px;
+        }
+
+        .payment-method-btn span {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .payment-method-btn:hover {
+            border-color: var(--dark-black);
+            color: var(--dark-black);
+        }
+
+        .payment-method-btn.active {
+            border-color: var(--dark-black);
+            background: #fafafa;
+            color: var(--dark-black);
+            box-shadow: 0 0 0 1px var(--dark-black);
+        }
+
+        .process-payment-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .process-payment-btn:hover {
+            box-shadow: 0 4px 12px rgba(153, 27, 27, 0.3);
+            transform: translateY(-1px);
         }
 
         .grid-stat-box {
@@ -247,132 +560,295 @@
         <div class="logo-area">FIT <span>TRACK</span></div>
 
         <ul class="nav-menu" id="navMenu">
-            <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)"><i
-                    class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span></li>
+            <!-- ─── MAIN ─── -->
+            <li class="nav-section-label">OVERVIEW</li>
+            <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)"><i class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span></li>
 
-            <li class="nav-item has-submenu"><i class="fa-solid fa-boxes-stacked"></i> <span
-                    class="menu-text">Inventory</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <!-- ─── BUSINESS ─── -->
+            <li class="nav-section-label">BUSINESS</li>
+
+            <li class="nav-item has-submenu"><i class="fa-solid fa-boxes-stacked"></i> <span class="menu-text">Inventory</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('equipment', this)"><span
-                        class="menu-text">Gym Equipment</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('products', this)"><span
-                        class="menu-text">Products & Goods</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('equipment', this)"><span class="menu-text">Gym Equipment</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('products', this)"><span class="menu-text">Products & Goods</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('ledger', this)"><span class="menu-text">Stock Movements</span></li>
             </ul>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('pos', this)"><i
-                    class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale</span></li>
-            <li class="nav-item nav-clickable" onclick="switchTab('payments', this)"><i
-                    class="fa-solid fa-file-invoice-dollar"></i> <span class="menu-text">Financial Reports</span></li>
-
-            <li class="nav-item has-submenu"><i class="fa-solid fa-users"></i> <span class="menu-text">Members</span> <i
-                    class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <li class="nav-item has-submenu"><i class="fa-solid fa-id-card-clip"></i> <span class="menu-text">Membership</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('members', this)"><span
-                        class="menu-text">Active Members</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedMembers', this)"><span
-                        class="menu-text">Archived Members</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('membershipPlans', this)"><span class="menu-text">Plans & Pricing</span></li>
             </ul>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('attendance', this)"><i
-                    class="fa-solid fa-clipboard-user"></i> <span class="menu-text">Attendance Log</span></li>
-            <li class="nav-item nav-clickable" onclick="switchTab('activityLog', this)"><i
-                    class="fa-solid fa-clock-rotate-left"></i> <span class="menu-text">Activity Log</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('pos', this)"><i class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('payments', this)"><i class="fa-solid fa-file-invoice-dollar"></i> <span class="menu-text">Financial Reports</span></li>
 
-            <li class="nav-item has-submenu"><i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff
-                    Team</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <!-- ─── PEOPLE ─── -->
+            <li class="nav-section-label">PEOPLE</li>
+
+            <li class="nav-item has-submenu"><i class="fa-solid fa-users"></i> <span class="menu-text">Members</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('staff', this)"><span
-                        class="menu-text">Active Staff</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedStaff', this)"><span
-                        class="menu-text">Archived Staff</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('members', this)"><span class="menu-text">Active Members</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedMembers', this)"><span class="menu-text">Archived Members</span></li>
             </ul>
 
-            <li class="nav-item has-submenu"><i class="fa-solid fa-dumbbell"></i> <span
-                    class="menu-text">Trainers</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <li class="nav-item has-submenu"><i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff Team</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('trainers', this)"><span
-                        class="menu-text">Active Trainers</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedTrainers', this)"><span
-                        class="menu-text">Archived Trainers</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('staff', this)"><span class="menu-text">Active Staff</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedStaff', this)"><span class="menu-text">Archived Staff</span></li>
             </ul>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)"><i
-                    class="fa-solid fa-calendar-check"></i> <span class="menu-text">Bookings</span></li>
-            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Internal Messages')"><i
-                    class="fa-solid fa-comments"></i> <span class="menu-text">Messages</span></li>
+            <li class="nav-item has-submenu"><i class="fa-solid fa-dumbbell"></i> <span class="menu-text">Trainers</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <ul class="submenu">
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('trainers', this)"><span class="menu-text">Active Trainers</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedTrainers', this)"><span class="menu-text">Archived Trainers</span></li>
+            </ul>
+
+            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)"><i class="fa-solid fa-calendar-check"></i> <span class="menu-text">Bookings</span></li>
+
+            <!-- ─── SYSTEM ─── -->
+            <li class="nav-section-label">SYSTEM</li>
+            <li class="nav-item nav-clickable" onclick="switchTab('attendance', this)"><i class="fa-solid fa-clipboard-user"></i> <span class="menu-text">Attendance Log</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('activityLog', this)"><i class="fa-solid fa-clock-rotate-left"></i> <span class="menu-text">Activity Log</span></li>
+            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Internal Messages')"><i class="fa-solid fa-comments"></i> <span class="menu-text">Messages</span></li>
         </ul>
     </aside>
 
     <main class="main-content">
         <header class="topbar">
-            <div class="topbar-left" style="display: flex; align-items: center;">
+            <div class="topbar-left">
                 <i class="fas fa-bars mobile-toggle" id="mobileMenuBtn"></i>
-                <span id="pageTitle"
-                    style="font-weight: 500; color: var(--text-primary); font-size: 16px;">Dashboard</span>
+                <span id="pageTitle" class="page-title">Dashboard</span>
             </div>
-            <div class="topbar-left" style="margin-left: auto; margin-right: 20px;">
+            <div class="topbar-center" style="margin-left: auto; margin-right: 20px;">
                 <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
             </div>
-            <div class="topbar-right" style="display: flex; align-items: center; gap: 15px;">
-                <button onclick="toggleDarkMode()" title="Toggle Dark Mode" style="font-size: 16px;"><i
-                        id="darkModeIcon" class="fas fa-moon"></i></button>
-                <button onclick="openChangePasswordModal()" title="Change Password" style="font-size: 16px;"><i
-                        class="fas fa-key"></i></button>
-                <div id="topBarNameContainer" style="color: var(--text-primary); font-weight: 500; font-size: 14px;">
-                    <i class="fa-solid fa-user-circle" style="font-size: 18px; vertical-align: middle;"></i> <span
-                        id="topBarName">Loading...</span>
+            <div class="topbar-right">
+                <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn-circle"><i id="darkModeIcon"
+                        class="fas fa-moon"></i></button>
+                <button onclick="toggleNotifSidebar()" title="Toggle Notifications" class="icon-btn-circle" id="notifToggleBtn">
+                    <i class="fas fa-bell"></i>
+                </button>
+
+                <div class="user-menu-container">
+                    <div class="user-profile-trigger" id="userMenuTrigger">
+                        <div id="topBarNameContainer"
+                            style="display: flex; align-items: center; gap: 8px; pointer-events: none;">
+                            <i class="fa-solid fa-circle-user" style="font-size: 24px; color: var(--text-muted);"></i>
+                            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                <span id="topBarName"
+                                    style="font-weight: 600; font-size: 14px; line-height: 1;">Loading...</span>
+                                <span style="font-size: 11px; color: var(--text-muted);">Administrator</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-down"
+                                style="font-size: 10px; color: var(--text-muted); margin-left: 4px;"></i>
+                        </div>
+                    </div>
+
+                    <div class="dropdown-menu" id="userDropdown">
+                        <button class="dropdown-item-btn" onclick="openProfileSettingsModal()">
+                            <i class="fas fa-user-gear"></i> Profile Settings
+                        </button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: var(--primary-red);">
+                            <i class="fa-solid fa-power-off"></i> Logout
+                        </button>
+                    </div>
                 </div>
-                <button id="logoutBtn" onclick="handleLogout()"><i class="fa-solid fa-power-off"></i> Logout</button>
             </div>
         </header>
 
         <div id="dashboard" class="content-section active-section">
-            <div class="panel"
-                style="background: linear-gradient(135deg, var(--dark-black), #333); color: white; border: none; margin-bottom: 20px;">
-                <div class="panel-body" style="padding: 30px;">
-                    <h2 style="margin-bottom: 10px; font-size: 24px;">Welcome to the Admin Control Panel</h2>
-                    <p style="color: #ccc; font-size: 14px;">Manage gym inventory, users, and oversee your daily gym
-                        operations.</p>
+            <!-- Header Section -->
+            <div class="panel panel-transparent">
+                <div class="panel-body panel-body-compact">
+                    <h2 id="greetingText"
+                        style="margin-bottom: 4px; font-size: 26px; font-weight: 700; color: var(--text-primary);">
+                        Dashboard</h2>
+                    <p class="text-muted-sm">Real-time operational summary.</p>
                 </div>
             </div>
 
-            <div
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;">
-                <div class="grid-stat-box" onclick="switchTab('members')">
-                    <h3 id="dashActiveMembers">0</h3>
-                    <p>Active Members</p>
-                </div>
-                <div class="grid-stat-box" onclick="switchTab('trainers')">
-                    <h3 id="gridTrainers">0</h3>
-                    <p>Registered Trainers</p>
-                </div>
-                <div class="grid-stat-box" onclick="switchTab('staff')">
-                    <h3 id="dashStaffTotal">0</h3>
-                    <p>Total Staff</p>
-                </div>
-                <div class="grid-stat-box" onclick="switchTab('equipment')">
-                    <h3 id="gridEquip">0</h3>
-                    <p>Operational Machines</p>
-                </div>
-            </div>
+            <div class="dashboard-layout" id="dashboardLayout">
+                <!-- Left Column (2fr) -->
+                <div class="dashboard-main-col">
+                    <!-- Unified KPI Block -->
+                    <div class="panel kpi-unified-panel">
+                        <!-- Revenue KPI -->
+                        <div class="kpi-unified-item" onclick="toggleKpiDetail('revenueDetail', this)">
+                            <div class="kpi-header-row">
+                                <div class="kpi-label">Daily Revenue</div>
+                                <div class="kpi-dropdown-container">
+                                    <button class="kpi-ellipsis-btn">
+                                        <i class="fa-solid fa-ellipsis-h"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="kpi-value" id="dashDailyRevenue">₱0.00</div>
+                            <div class="kpi-trend" id="revenueTrend">
+                                <span style="color: #27ae60;"><i class="fas fa-caret-up"></i> +0% since last week</span>
+                            </div>
+                        </div>
 
-            <div class="dashboard-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
-                <div class="panel">
-                    <div class="panel-header"><i class="fa-solid fa-chart-simple"></i> Daily Check-in Volume</div>
-                    <div class="panel-body" style="height: 300px;">
-                        <canvas id="servicesChart"></canvas>
+                        <!-- Maintenance KPI -->
+                        <div class="kpi-unified-item" onclick="toggleKpiDetail('maintenanceDetail', this)">
+                            <div class="kpi-header-row">
+                                <div class="kpi-label">Maintenance Needed</div>
+                                <div class="kpi-dropdown-container">
+                                    <button class="kpi-ellipsis-btn">
+                                        <i class="fa-solid fa-ellipsis-h"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="kpi-value" id="dashMaintCount">0</div>
+                            <div class="kpi-trend">
+                                <span id="maintStatusText" style="color: #27ae60;">System Healthy</span>
+                            </div>
+                        </div>
+
+                        <!-- Capacity KPI -->
+                        <div class="kpi-unified-item" onclick="toggleKpiDetail('capacityDetail', this)">
+                            <div class="kpi-header-row">
+                                <div class="kpi-label">Floor Capacity</div>
+                                <div class="kpi-dropdown-container">
+                                    <button class="kpi-ellipsis-btn">
+                                        <i class="fa-solid fa-ellipsis-h"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="kpi-value"><span id="presentMembers">0</span>/50</div>
+                            <div class="kpi-trend">
+                                <!-- Progress bar removed as per quiet luxury refinements -->
+                            </div>
+                        </div>
+
+                        <!-- Extended Detail Panel -->
+                        <div class="kpi-extended-panel" id="kpiExtendedPanel">
+                            <!-- Revenue Breakdown -->
+                            <div class="kpi-detail-content" id="revenueDetail">
+                                <div class="detail-header">Daily Revenue Breakdown</div>
+                                <div class="detail-grid">
+                                    <div class="detail-chart-wrapper">
+                                        <canvas id="revenueBreakdownChart"></canvas>
+                                    </div>
+                                    <div class="detail-stats-grid">
+                                        <div class="stat-detail-row">
+                                            <span class="label"><i class="fa-solid fa-circle"
+                                                    style="color: var(--primary-red); font-size: 8px;"></i> Membership
+                                                Fees</span>
+                                            <span class="value" id="detailMembershipRev">₱0.00</span>
+                                        </div>
+                                        <div class="stat-detail-row">
+                                            <span class="label"><i class="fa-solid fa-circle"
+                                                    style="color: #3B82F6; font-size: 8px;"></i> Walk-in
+                                                Fees</span>
+                                            <span class="value" id="detailWalkinRev">₱0.00</span>
+                                        </div>
+                                        <div class="stat-detail-row">
+                                            <span class="label"><i class="fa-solid fa-circle"
+                                                    style="color: #475569; font-size: 8px;"></i> POS Sales</span>
+                                            <span class="value" id="detailPosRev">₱0.00</span>
+                                        </div>
+                                        <div class="stat-detail-row grand-total">
+                                            <span class="label">Total Collected Today</span>
+                                            <span class="value" id="detailTotalRev">₱0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Maintenance Breakdown -->
+                            <div class="kpi-detail-content" id="maintenanceDetail">
+                                <div class="detail-header">Equipment Status Breakdown</div>
+                                <div class="detail-grid">
+                                    <div class="detail-stats-grid">
+                                        <div class="stat-detail-row">
+                                            <span class="label"><i class="fa-solid fa-circle"
+                                                    style="color: #10B981; font-size: 8px;"></i> Operational</span>
+                                            <span class="value" id="detailOpsCount">0 Units</span>
+                                        </div>
+                                        <div class="stat-detail-row">
+                                            <span class="label"><i class="fa-solid fa-circle"
+                                                    style="color: #F59E0B; font-size: 8px;"></i> Maintenance</span>
+                                            <span class="value" id="detailMaintCount">0 Units</span>
+                                        </div>
+                                        <div class="stat-detail-row">
+                                            <span class="label"><i class="fa-solid fa-circle"
+                                                    style="color: #EF4444; font-size: 8px;"></i> Out of Order</span>
+                                            <span class="value" id="detailBrokenCount">0 Units</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Capacity Breakdown -->
+                            <div class="kpi-detail-content" id="capacityDetail">
+                                <div class="detail-header">Floor Capacity Breakdown</div>
+                                <div class="detail-grid">
+                                    <div class="detail-stats-grid">
+                                        <div class="stat-detail-row">
+                                            <span class="label"><i class="fa-solid fa-circle"
+                                                    style="color: var(--primary-red); font-size: 8px;"></i> Present
+                                                Members</span>
+                                            <span class="value" id="detailPresentCount">0</span>
+                                        </div>
+                                        <div class="stat-detail-row">
+                                            <span class="label"><i class="fa-solid fa-circle"
+                                                    style="color: #E2E8F0; font-size: 8px;"></i> Available Slots</span>
+                                            <span class="value" id="detailAvailableCount">50</span>
+                                        </div>
+                                        <div class="stat-detail-row grand-total">
+                                            <span class="label">Occupancy Rate</span>
+                                            <span class="value" id="detailOccupancyRate">0%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Widgets Grid -->
+                    <div class="widgets-grid">
+                        <div class="panel">
+                            <div class="panel-header"
+                                style="background: white; border-bottom: none; padding-bottom: 0;"><i
+                                    class="fa-solid fa-calendar-day"></i> Today's Bookings</div>
+                            <div class="panel-body" id="todayBookingsList">
+                                <p style="color: var(--text-muted); font-size: 14px;">Loading bookings...</p>
+                            </div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-header"
+                                style="background: white; border-bottom: none; padding-bottom: 0;"><i
+                                    class="fa-solid fa-user-check"></i> Recent Check-ins</div>
+                            <div class="panel-body" id="recentCheckinsList">
+                                <p style="color: var(--text-muted); font-size: 14px;">Loading check-ins...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div style="display: flex; flex-direction: column; gap: 20px;">
-                    <div class="panel" style="flex-grow: 1;">
-                        <div class="panel-header"><i class="fa-solid fa-users"></i> Live Attendance</div>
-                        <div class="panel-body" style="text-align: center; padding: 40px 20px;">
-                            <h1 style="font-size: 48px; color: var(--text-primary); margin: 0;" id="presentMembers">0
-                            </h1>
-                            <p style="color: var(--text-muted); margin-top: 10px;">Members Currently on Floor</p>
-                            <button class="action-btn" onclick="switchTab('attendance')" style="margin-top: 20px;"><i
-                                    class="fa-solid fa-list"></i> View Logs</button>
+
+                <!-- Right Column (1fr) -->
+                <div class="notif-column">
+                    <div class="notif-card">
+                        <div class="notif-header">
+                            Expiring Memberships
+                            <span class="notif-badge" id="dashExpiringBadge">0</span>
                         </div>
+                        <div class="notif-list" id="dashExpiringList">
+                            <p style="color: var(--text-muted); font-size: 12px;">Checking for expirations...</p>
+                        </div>
+                        <a href="#" class="view-all-notif" onclick="switchTab('members', this)">View all</a>
+                    </div>
+
+                    <div class="notif-card">
+                        <div class="notif-header">
+                            Low Stock Alerts
+                            <span class="notif-badge" id="dashLowStockBadge">0</span>
+                        </div>
+                        <div class="notif-list" id="dashLowStockList">
+                            <p style="color: var(--text-muted); font-size: 12px;">Checking stock levels...</p>
+                        </div>
+                        <a href="#" class="view-all-notif" onclick="switchTab('products', this)">View all</a>
                     </div>
                 </div>
             </div>
@@ -385,12 +861,51 @@
                     <input type="text" id="machineSearch" placeholder="Search equipment..."
                         onkeyup="filterGrid('machinesGrid', 'machineSearch')">
                 </div>
-                <button class="action-btn" onclick="openEquipmentModal()"><i class="fas fa-plus"></i> Add
-                    Machine</button>
+                <div class="control-cluster">
+                    <div class="view-toggle-group">
+                        <button class="view-toggle-btn active" onclick="toggleInventoryView('grid', this)"
+                            title="Grid View"><i class="fas fa-th-large"></i></button>
+                        <button class="view-toggle-btn" onclick="toggleInventoryView('list', this)" title="List View"><i
+                                class="fas fa-list"></i></button>
+                    </div>
+                    <button class="action-btn" onclick="openEquipmentModal()"><i class="fas fa-plus"></i> Add
+                        Machine</button>
+                </div>
             </div>
+
+            <div class="batch-actions-bar" id="equipBatchBar">
+                <span class="batch-count" id="equipBatchCount">0 selected</span>
+                <select id="equipBatchStatus">
+                    <option value="">Change Status To...</option>
+                    <option value="Operational">Operational</option>
+                    <option value="Maintenance">Maintenance</option>
+                    <option value="Out of Order">Out of Order</option>
+                </select>
+                <button class="batch-apply-btn" onclick="applyBatchStatus('equipment')">Apply</button>
+                <button class="batch-cancel-btn" onclick="clearBatchSelection('equipment')">Cancel</button>
+            </div>
+
             <div class="panel">
                 <div class="panel-body">
                     <div class="inventory-grid" id="machinesGrid"></div>
+                    <div class="table-container" id="machinesListContainer" style="display: none; box-shadow: none;">
+                        <table class="inventory-list-table" id="machinesListTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;"><input type="checkbox" id="equipSelectAll"
+                                            onchange="toggleSelectAll('equipment', this)"></th>
+                                    <th>Equipment Name</th>
+                                    <th>Category</th>
+                                    <th>Asset Tag</th>
+                                    <th>Size/Weight</th>
+                                    <th>Qty</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="machinesListBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -411,33 +926,94 @@
             </div>
         </div>
 
+        <div id="ledger" class="content-section">
+            <div class="table-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="ledgerSearch" placeholder="Search by item name or reason..."
+                        onkeyup="filterTable('ledgerTable', 'ledgerSearch')">
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header"><i class="fa-solid fa-clock-rotate-left"></i> Stock Movements Ledger</div>
+                <div class="table-container no-shadow">
+                    <table id="ledgerTable">
+                        <thead>
+                            <tr>
+                                <th>Date & Time</th>
+                                <th>Item Name</th>
+                                <th>Adjustment</th>
+                                <th>Reason</th>
+                                <th>Logged By</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div id="pos" class="content-section">
             <div class="pos-grid">
                 <div class="panel">
-                    <div class="panel-header"><i class="fa-solid fa-box"></i> Available Products</div>
-                    <div class="table-container" style="box-shadow: none; max-height: 600px;">
-                        <table id="posProductsTable">
-                            <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th>Stock</th>
-                                    <th>Price</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="posProductList"></tbody>
-                        </table>
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div><i class="fa-solid fa-box"></i> Product Catalog</div>
+                        <div class="search-box" style="width: 250px; margin: 0; box-shadow: none;">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="posSearch" placeholder="Search..." onkeyup="filterPOSCatalog()">
+                        </div>
+                    </div>
+                    <div class="pos-category-tabs" id="posCategoryTabs">
+                        <button class="pos-tab active" data-cat="all" onclick="filterPOSCategory('all', this)">All</button>
+                        <button class="pos-tab" data-cat="gym passes" onclick="filterPOSCategory('gym passes', this)">Gym Passes</button>
+                        <button class="pos-tab" data-cat="drinks" onclick="filterPOSCategory('drinks', this)">Drinks</button>
+                        <button class="pos-tab" data-cat="supplements" onclick="filterPOSCategory('supplements', this)">Supplements</button>
+                        <button class="pos-tab" data-cat="services" onclick="filterPOSCategory('services', this)">Services</button>
+                        <button class="pos-tab" data-cat="other" onclick="filterPOSCategory('other', this)">Other</button>
+                    </div>
+                    <div class="pos-product-grid" id="posProductGrid">
+                        <!-- Rendered by JS -->
                     </div>
                 </div>
                 <div class="cart-panel">
                     <h3 style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;"><i
                             class="fa-solid fa-cart-shopping"></i> Current Order</h3>
-                    <div class="cart-items" id="posCartBody"></div>
+                    
                     <div style="margin-bottom: 15px;">
                         <input type="text" id="posCustomerName" placeholder="Customer Name (Optional)"
                             style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(255,255,255,0.5); color: var(--text-primary);">
                     </div>
+
+                    <div class="cart-header">
+                        <span style="flex:2;">ITEM</span>
+                        <span style="width: 80px; text-align: center;">QTY</span>
+                        <span style="width: 80px; text-align: right;">Line Total</span>
+                    </div>
+
+                    <div class="cart-items" id="posCartBody"></div>
+                    
                     <div class="pos-totals"></div>
+
+                    <div class="pos-payment-methods">
+                        <h4>Quick-Payment Method</h4>
+                        <div class="payment-method-grid">
+                            <button class="payment-method-btn active" data-method="Cash" onclick="selectPaymentMethod('Cash', this)">
+                                <i class="fa-solid fa-money-bill-wave"></i>
+                                <span>Cash</span>
+                            </button>
+                            <button class="payment-method-btn" data-method="RFID" onclick="selectPaymentMethod('RFID', this)">
+                                <i class="fa-solid fa-id-card"></i>
+                                <span>RFID Credit</span>
+                            </button>
+                            <button class="payment-method-btn" data-method="GCash" onclick="selectPaymentMethod('GCash', this)">
+                                <i class="fa-solid fa-mobile-screen-button"></i>
+                                <span>GCash</span>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="process-payment-btn" onclick="processPayment()">
+                        Process Payment <i class="fa-solid fa-sparkles" style="margin-left: 8px;"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -454,7 +1030,7 @@
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fa-solid fa-receipt"></i> Transaction History</div>
-                <div class="table-container" style="box-shadow: none;">
+                <div class="table-container no-shadow">
                     <table id="paymentTable">
                         <thead>
                             <tr>
@@ -467,7 +1043,12 @@
                                 <th>Action</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody>
+                            <!-- Skeleton loader (Audit Fix 1.5) - cleared by renderPayments() -->
+                            <tr class="skeleton-row"><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
+                            <tr class="skeleton-row"><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
+                            <tr class="skeleton-row"><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -485,7 +1066,7 @@
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-users"></i> Active Members</div>
-                <div class="table-container" style="box-shadow: none;">
+                <div class="table-container no-shadow">
                     <table id="membersTable">
                         <thead>
                             <tr>
@@ -495,11 +1076,17 @@
                                 <th>Email</th>
                                 <th>Plan</th>
                                 <th>Time Left</th>
+                                <th>Credit Bal.</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody>
+                            <!-- Skeleton loader (Audit Fix 1.5) - cleared by renderMembers() -->
+                            <tr class="skeleton-row"><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-20"></div></td><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
+                            <tr class="skeleton-row"><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-20"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
+                            <tr class="skeleton-row"><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-20"></div></td><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
@@ -515,7 +1102,7 @@
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fas fa-archive"></i> Archived Members</div>
-                <div class="table-container" style="box-shadow: none;">
+                <div class="table-container no-shadow">
                     <table id="archivedMembersTable">
                         <thead>
                             <tr>
@@ -835,7 +1422,162 @@
             </div>
         </div>
 
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- MEMBERSHIP PLANS MANAGEMENT SECTION        -->
+        <!-- ═══════════════════════════════════════════ -->
+        <div id="membershipPlans" class="content-section bg-slate-50" style="padding: 32px;">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i class="fa-solid fa-id-card-clip mr-2 text-slate-400"></i>Membership Plans & Pricing</h2>
+                    <p class="text-sm text-slate-500 mt-1">Configure access tiers, pricing models, and billing logic.</p>
+                </div>
+                <button class="bg-[#991b1b] hover:bg-red-800 text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-2" onclick="openPlanModal()">
+                    <i class="fas fa-plus"></i> Create New Plan
+                </button>
+            </div>
+
+            <!-- Top KPI Ribbon -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <!-- KPI 1 -->
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm flex flex-col">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Total Active Subscribers</div>
+                    <div class="flex items-end justify-between">
+                        <div class="text-2xl font-bold text-slate-900" id="mpActivePlans">0</div>
+                        <div class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 shadow-sm">
+                            <i class="fas fa-arrow-up text-[10px]"></i> +5.2%
+                        </div>
+                    </div>
+                </div>
+                <!-- KPI 2 -->
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm flex flex-col">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Monthly Recurring Revenue (MRR)</div>
+                    <div class="flex items-end justify-between">
+                        <div class="text-2xl font-bold text-slate-900" id="mpAvgPrice">₱0</div>
+                        <div class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 shadow-sm">
+                            <i class="fas fa-arrow-up text-[10px]"></i> +8.1%
+                        </div>
+                    </div>
+                </div>
+                <!-- KPI 3 -->
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm flex flex-col">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">New Sign-ups This Month</div>
+                    <div class="flex items-end justify-between">
+                        <div class="text-2xl font-bold text-slate-900" id="mpTotalPlans">0</div>
+                        <div class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 shadow-sm">
+                            <i class="fas fa-arrow-up text-[10px]"></i> +12.4%
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Layout Shift -->
+            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-solid border-gray-200 pb-2">Active Plan Configurations</h3>
+            
+            <div id="plansTableBody" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Dynamic Plans will be rendered here by renderMembershipPlans() -->
+            </div>
+        </div>
+
     </main>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- MEMBERSHIP PLAN CREATE / EDIT MODAL        -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="planModal" class="modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3 id="planModalTitle"><i class="fa-solid fa-tags"></i> Create Membership Plan</h3>
+                <span class="close-btn" onclick="closeModal('planModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="planForm">
+                <input type="hidden" id="planEditId">
+                <div class="form-group">
+                    <label class="form-label">Plan Name</label>
+                    <input type="text" id="planName" placeholder="e.g. Gold Plan" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Duration (Days)</label>
+                        <input type="number" id="planDuration" placeholder="30" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Price (₱)</label>
+                        <input type="number" id="planPrice" placeholder="1500" min="0" step="0.01" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description (Optional)</label>
+                    <textarea id="planDescription" placeholder="Short description for this plan..." rows="3" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:6px; font-family:inherit; font-size:14px; resize:vertical; background:rgba(255,255,255,0.5); color:var(--text-primary);"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="planStatus" required>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="btn-cancel" onclick="closeModal('planModal')">Cancel</button>
+                    <button type="submit" class="btn-submit" style="background-color: var(--primary-red);">Save Plan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- MEMBERSHIP RENEWAL MODAL                   -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="renewMemberModal" class="modal">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-rotate"></i> Renew Membership</h3>
+                <span class="close-btn" onclick="closeModal('renewMemberModal')">&times;</span>
+            </div>
+            <div class="modal-form">
+                <input type="hidden" id="renewMemberId">
+                <div style="text-align:center; margin-bottom:20px;">
+                    <div style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, var(--primary-red), #c0392b); color:white; display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 12px;">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <h3 id="renewMemberName" style="margin:0; font-size:18px; color:var(--text-primary);">Member Name</h3>
+                    <p id="renewMemberEmail" style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">email@example.com</p>
+                    <div id="renewCurrentPlanBadge" style="display:inline-block; margin-top:8px; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; background:#FEF2F2; color:#991B1B; border:1px solid #FECACA;">Expired</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Select Plan for Renewal</label>
+                    <select id="renewPlanSelect" required style="width:100%;">
+                        <option value="" disabled selected>Loading plans...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="background:#fff; padding:10px; border:1px solid var(--border-color); border-radius:6px; display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" id="renewAddLocker" style="width:18px; height:18px;">
+                    <label for="renewAddLocker" style="margin:0; font-size:14px; font-weight:600; cursor:pointer;">Include Locker Rental (+₱300)</label>
+                </div>
+
+                <div id="renewPlanSummary" style="background:#f8fafc; border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:15px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="color:var(--text-muted); font-size:13px;">Duration</span>
+                        <span id="renewDuration" style="font-weight:600; font-size:14px;">— days</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="color:var(--text-muted); font-size:13px;">New Expiry</span>
+                        <span id="renewExpiry" style="font-weight:600; font-size:14px;">—</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--border-color); padding-top:8px;">
+                        <span style="font-weight:700; font-size:14px;">Total Due</span>
+                        <span id="renewTotalDue" style="font-weight:700; font-size:18px; color:var(--primary-red);">₱0.00</span>
+                    </div>
+                </div>
+
+                <div class="btn-row">
+                    <button type="button" class="btn-cancel" onclick="closeModal('renewMemberModal')">Cancel</button>
+                    <button type="button" class="btn-submit" style="background-color: #10B981;" onclick="confirmRenewal()"><i class="fa-solid fa-check"></i> Confirm & Renew</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="walkinIssueModal" class="modal">
         <div class="modal-content" style="max-width: 520px;">
@@ -873,16 +1615,45 @@
                     onclick="closeModal('equipmentModal')">&times;</span>
             </div>
             <form class="modal-form" id="equipmentForm">
-                <input type="text" id="equipName" placeholder="Machine Name" required>
-                <select id="equipCategory" required>
-                    <option value="Cardio Machine">Cardio Machine</option>
-                    <option value="Strength Machine">Strength Machine</option>
-                    <option value="Free Weights">Free Weights</option>
-                    <option value="Accessories / Mats">Accessories / Mats</option>
-                </select>
-                <input type="text" id="equipSize" placeholder="Weight/Size (e.g. 50 lbs) - Optional">
-                <input type="number" id="equipQty" placeholder="Quantity" min="1" required>
-                <button type="submit" style="background-color: var(--primary-red);">Register Equipment</button>
+                <div class="form-group">
+                    <label class="form-label">Equipment Name</label>
+                    <input type="text" id="equipName" placeholder="e.g. Treadmill Pro 5000" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select id="equipCategory" required>
+                        <option value="Cardio Machine">Cardio Machine</option>
+                        <option value="Strength Machine">Strength Machine</option>
+                        <option value="Free Weights">Free Weights</option>
+                        <option value="Accessories / Mats">Accessories / Mats</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Weight / Size (Optional)</label>
+                    <input type="text" id="equipSize" placeholder="e.g. 50 lbs">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" id="equipQty" placeholder="1" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Asset Tag (Optional)</label>
+                        <input type="text" id="equipAssetTag" placeholder="e.g. TRD-001">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Equipment Image</label>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <input type="file" id="equipImageFile" accept="image/*" class="form-control">
+                        <input type="url" id="equipImage" placeholder="...or paste image URL" class="form-control">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="btn-cancel" onclick="closeModal('equipmentModal')">Cancel</button>
+                    <button type="submit" class="btn-submit" style="background-color: var(--primary-red);">Register
+                        Equipment</button>
+                </div>
             </form>
         </div>
     </div>
@@ -893,22 +1664,55 @@
                 <h3>Edit Equipment</h3><span class="close-btn" onclick="closeModal('editEquipModal')">&times;</span>
             </div>
             <form class="modal-form" id="editEquipForm">
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-equip.png" id="editEquipPreview" class="profile-upload-img">
+                    <label for="editEquipImageFile" class="profile-upload-btn">
+                        <i class="fas fa-pencil-alt"></i>
+                    </label>
+                </div>
+                <input type="file" id="editEquipImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editEquipPreview')">
+                <input type="url" id="editEquipImage" placeholder="...or paste image URL" class="form-control" style="margin-bottom: 15px;">
                 <input type="hidden" id="editEquipId">
-                <input type="text" id="editEquipName" required>
-                <select id="editEquipCategory" required>
-                    <option value="Cardio Machine">Cardio Machine</option>
-                    <option value="Strength Machine">Strength Machine</option>
-                    <option value="Free Weights">Free Weights</option>
-                    <option value="Accessories / Mats">Accessories / Mats</option>
-                </select>
-                <input type="text" id="editEquipSize">
-                <input type="number" id="editEquipQty" min="0" required>
-                <select id="editEquipStatus" required>
-                    <option value="Operational">Operational</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Out of Order">Out of Order</option>
-                </select>
-                <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
+                <div class="form-group">
+                    <label class="form-label">Equipment Name</label>
+                    <input type="text" id="editEquipName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select id="editEquipCategory" required>
+                        <option value="Cardio Machine">Cardio Machine</option>
+                        <option value="Strength Machine">Strength Machine</option>
+                        <option value="Free Weights">Free Weights</option>
+                        <option value="Accessories / Mats">Accessories / Mats</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Weight / Size</label>
+                    <input type="text" id="editEquipSize" placeholder="e.g. 50 lbs">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" id="editEquipQty" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select id="editEquipStatus" required>
+                            <option value="Operational">Operational</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Out of Order">Out of Order</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Asset Tag</label>
+                    <input type="text" id="editEquipAssetTag" placeholder="e.g. TRD-001">
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="btn-cancel" onclick="closeModal('editEquipModal')">Cancel</button>
+                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save
+                        Changes</button>
+                </div>
             </form>
         </div>
     </div>
@@ -920,15 +1724,40 @@
             </div>
             <form class="modal-form" id="editProductForm">
                 <input type="hidden" id="editProdId">
-                <input type="text" id="editProdName" required>
-                <select id="editProdCategory" required>
-                    <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
-                    <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
-                    <option value="Apparel / Merchandise">Apparel / Merchandise</option>
-                </select>
-                <input type="number" id="editProdPrice" min="1" step="0.01" required>
-                <input type="number" id="editProdQty" min="0" required>
-                <input type="text" id="editProdVol">
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-product.png" id="editProdPreview" class="profile-upload-img">
+                    <label for="editProdImageFile" class="profile-upload-btn">
+                        <i class="fas fa-pencil-alt"></i>
+                    </label>
+                </div>
+                <input type="file" id="editProdImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editProdPreview')">
+                <input type="url" id="editProdImage" placeholder="Product Image URL" class="mb-15">
+                <div class="form-group">
+                    <label class="form-label">Product Name</label>
+                    <input type="text" id="editProdName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select id="editProdCategory" required>
+                        <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
+                        <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
+                        <option value="Apparel / Merchandise">Apparel / Merchandise</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Price (₱)</label>
+                        <input type="number" id="editProdPrice" min="1" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" id="editProdQty" min="0" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Volume / Size</label>
+                    <input type="text" id="editProdVol" placeholder="e.g. 500ml">
+                </div>
                 <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
             </form>
         </div>
@@ -950,42 +1779,48 @@
                 <input type="text" id="prodVol" placeholder="Volume/Size (e.g. 500ml) - Optional">
                 <input type="date" id="prodExpiry">
                 <input type="number" id="prodQty" placeholder="Quantity" min="1" required>
+                <input type="file" id="prodImageFile" accept="image/*">
+                <input type="url" id="prodImage" placeholder="Product Image URL">
                 <button type="submit" style="background-color: var(--primary-red);">Register Product</button>
             </form>
         </div>
     </div>
 
     <div id="memberModal" class="modal">
-        <div class="modal-content" style="width: 95%; max-width: 1100px;">
+        <div class="modal-content">
             <div class="modal-header">
                 <h3>Register Member</h3><span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
             </div>
-            <form class="modal-form" id="batchMemberForm">
+            <form class="modal-form" id="memberRegistrationForm">
                 <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;"><i
-                        class="fas fa-info-circle"></i> Members will be automatically emailed their login passwords.</p>
-                <div class="table-container" style="box-shadow: none; margin-bottom: 15px; overflow-y: visible;">
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr>
-                                <th>First Name</th>
-                                <th>M.I.</th>
-                                <th>Last Name</th>
-                                <th>Email</th>
-                                <th>Plan</th>
-                                <th>RFID Tag</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="batchMemberBody"></tbody>
-                    </table>
+                        class="fas fa-info-circle"></i> Member will be automatically emailed their login password.</p>
+                
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-profile.png" id="regMemberPreview" class="profile-upload-img">
+                    <label for="regMemberImageFile" class="profile-upload-btn">
+                        <i class="fas fa-pencil-alt"></i>
+                    </label>
                 </div>
+                <input type="file" id="regMemberImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'regMemberPreview')">
+
                 <div style="display: flex; gap: 10px;">
-                    <button type="button" onclick="addBatchRow()"
-                        style="background-color: #f1f2f6; color: var(--dark-black); flex: 1;"><i
-                            class="fas fa-plus"></i> Add Row</button>
-                    <button type="submit" style="background-color: var(--primary-red); flex: 2;"><i
-                            class="fas fa-paper-plane"></i> Save & Send Emails</button>
+                    <input type="text" id="regMemberGiven" placeholder="First Name" required style="flex: 2;">
+                    <input type="text" id="regMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2">
                 </div>
+                <input type="text" id="regMemberFamily" placeholder="Last Name" required>
+                <input type="email" id="regMemberEmail" placeholder="Email Address" required>
+                
+                <select id="regMemberPlan" required>
+                    <option value="" disabled selected>Select Plan...</option>
+                    <option value="Gold Plan">Gold Plan</option>
+                    <option value="Silver Plan">Silver Plan</option>
+                </select>
+
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag (Tap Card or type):</p>
+                <input type="text" id="regMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card..." required>
+                
+                <button type="submit" style="background-color: var(--primary-red); margin-top: 15px;"><i
+                        class="fas fa-paper-plane"></i> Register & Send Email</button>
             </form>
         </div>
     </div>
@@ -998,6 +1833,15 @@
             </div>
             <form class="modal-form" id="editMemberForm">
                 <input type="hidden" id="editMemberId">
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-profile.png" id="editMemberPreview" class="profile-upload-img">
+                    <label for="editMemberImageFile" class="profile-upload-btn">
+                        <i class="fas fa-pencil-alt"></i>
+                    </label>
+                </div>
+                <input type="file" id="editMemberImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editMemberPreview')">
+                <input type="url" id="editMemberImage" placeholder="...or paste Photo URL" style="margin-bottom: 15px;">
+
                 <div style="display: flex; gap: 10px;">
                     <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;">
                     <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2">
@@ -1020,7 +1864,7 @@
     </div>
 
     <div id="staffModal" class="modal">
-        <div class="modal-content" style="width: 95%; max-width: 1100px;">
+        <div class="modal-content">
             <div class="modal-header">
                 <h3 id="staffModalTitle">Register Staff</h3><span class="close-btn"
                     onclick="closeModal('staffModal')">&times;</span>
@@ -1028,31 +1872,33 @@
             <form class="modal-form" id="batchStaffForm">
                 <input type="hidden" id="hiddenStaffRole">
                 <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;"><i
-                        class="fas fa-info-circle"></i> Accounts will be automatically emailed their login passwords.
+                        class="fas fa-info-circle"></i> Account will be automatically emailed their login password.
                 </p>
-                <div class="table-container" style="box-shadow: none; margin-bottom: 15px; overflow-y: visible;">
-                    <table style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr>
-                                <th>First Name</th>
-                                <th>M.I.</th>
-                                <th>Last Name</th>
-                                <th>Email</th>
-                                <th id="batchSpecialtyHeader">Specialty</th>
-                                <th>RFID Tag</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="batchStaffBody"></tbody>
-                    </table>
+
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-profile.png" id="regStaffPreview" class="profile-upload-img">
+                    <label for="regStaffImageFile" class="profile-upload-btn">
+                        <i class="fas fa-pencil-alt"></i>
+                    </label>
                 </div>
+                <input type="file" id="regStaffImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'regStaffPreview')">
+
                 <div style="display: flex; gap: 10px;">
-                    <button type="button" onclick="addStaffBatchRow()"
-                        style="background-color: #f1f2f6; color: var(--dark-black); flex: 1;"><i
-                            class="fas fa-plus"></i> Add Row</button>
-                    <button type="submit" style="background-color: var(--primary-red); flex: 2;"><i
-                            class="fas fa-paper-plane"></i> Save & Send Emails</button>
+                    <input type="text" id="regStaffGiven" placeholder="First Name" required style="flex: 2;">
+                    <input type="text" id="regStaffMI" placeholder="M.I." style="flex: 1;" maxlength="2">
                 </div>
+                <input type="text" id="regStaffFamily" placeholder="Last Name" required>
+                <input type="email" id="regStaffEmail" placeholder="Email Address" required>
+
+                <div id="regSpecialtyContainer" style="display: none;">
+                    <input type="text" id="regStaffSpecialty" placeholder="Specialty (e.g. Yoga, Boxing)">
+                </div>
+
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag (Tap Card or type):</p>
+                <input type="text" id="regStaffRfid" class="rfid-register-input" placeholder="Tap RFID Card..." required>
+
+                <button type="submit" style="background-color: var(--primary-red); margin-top: 15px;"><i
+                        class="fas fa-paper-plane"></i> Register & Send Email</button>
             </form>
         </div>
     </div>
@@ -1065,6 +1911,15 @@
             </div>
             <form class="modal-form" id="editStaffForm">
                 <input type="hidden" id="editStaffId">
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-profile.png" id="editStaffPreview" class="profile-upload-img">
+                    <label for="editStaffImageFile" class="profile-upload-btn">
+                        <i class="fas fa-pencil-alt"></i>
+                    </label>
+                </div>
+                <input type="file" id="editStaffImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editStaffPreview')">
+                <input type="url" id="editStaffImage" placeholder="...or paste Photo URL" style="margin-bottom: 15px;">
+
                 <div style="display: flex; gap: 10px;">
                     <input type="text" id="editStaffGiven" placeholder="First Name" required style="flex: 2;">
                     <input type="text" id="editStaffMI" placeholder="M.I." style="flex: 1;" maxlength="2">
@@ -1206,6 +2061,75 @@
             if (chatContainer) chatContainer.classList.remove('mobile-chat-open');
         }
     </script>
+    <div id="addCreditModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-wallet"></i> Top-Up Credit</h3>
+                <span class="close-btn" onclick="closeModal('addCreditModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="addCreditForm">
+                    <input type="hidden" id="addCreditMemberId">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 600; color: var(--dark-black);" id="addCreditMemberName">Loading...</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                            Current Balance: <strong id="addCreditCurrentBalance" style="color: var(--primary-red);">₱0.00</strong>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Amount to Add (₱)</label>
+                        <input type="number" id="addCreditAmount" required min="1" step="0.01" style="font-size: 20px; font-weight: bold; text-align: center;">
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
+                        <button type="button" class="action-btn" style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);" onclick="document.getElementById('addCreditAmount').value=100">₱100</button>
+                        <button type="button" class="action-btn" style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);" onclick="document.getElementById('addCreditAmount').value=200">₱200</button>
+                        <button type="button" class="action-btn" style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);" onclick="document.getElementById('addCreditAmount').value=500">₱500</button>
+                        <button type="button" class="action-btn" style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);" onclick="document.getElementById('addCreditAmount').value=1000">₱1000</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Payment Method</label>
+                        <select id="addCreditPaymentMethod" required>
+                            <option value="Cash">Cash</option>
+                            <option value="GCash">GCash</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Note (Optional)</label>
+                        <input type="text" id="addCreditNote" placeholder="e.g. Counter top-up">
+                    </div>
+
+                    <div class="modal-footer" style="padding: 0; margin-top: 20px;">
+                        <button type="button" class="btn-cancel" onclick="closeModal('addCreditModal')">Cancel</button>
+                        <button type="submit" class="btn-save" style="flex: 1;">Add Credit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div id="rfidPaymentModal" class="modal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-id-card"></i> RFID Payment</h3>
+                <span class="close-btn" onclick="closeModal('rfidPaymentModal')">&times;</span>
+            </div>
+            <div class="modal-body" style="padding: 30px 20px;">
+                <i class="fa-solid fa-wifi" style="font-size: 40px; color: var(--primary-red); margin-bottom: 15px; animation: pulse 1.5s infinite;"></i>
+                <h4 style="margin-bottom: 10px;">Please tap Member RFID Card</h4>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Or search member manually if RFID is unavailable.</p>
+                <div style="position: relative;">
+                    <input type="text" class="bm-rfid rfid-register-input" id="posRfidInput" placeholder="Tap Card or Search Name..." style="width: 100%; padding: 12px; text-align: center; border: 1px solid var(--primary-red); border-radius: 6px; box-shadow: 0 0 5px rgba(153,27,27,0.2);">
+                    <div id="posRfidSearchDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-color); border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 100; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                </div>
+                <div id="rfidPaymentStatus" style="margin-top: 15px; font-weight: 600;"></div>
+            </div>
+        </div>
+    </div>
+
 </body>
 
 </html>

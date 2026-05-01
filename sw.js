@@ -1,4 +1,6 @@
-const CACHE_NAME = 'fit-track-cache-v2';
+// Cache version — bump this on each deployment to invalidate stale assets.
+// Using date-based versioning for clarity (Audit Fix 3.6).
+const CACHE_NAME = 'fit-track-cache-20260428';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -10,6 +12,8 @@ const urlsToCache = [
   '/js/script.js',
   '/js/attendance.js',
   '/js/rfid.js',
+  '/js/utils.js',
+  '/js/ui.js',
   '/images/icon-192.png'
 ];
 

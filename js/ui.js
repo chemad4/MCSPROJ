@@ -27,26 +27,47 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.appendChild(confirmModal);
     }
 
-    // Inject Change Password Modal
-    if (!document.getElementById('changePasswordModal')) {
-        const cpModal = document.createElement('div');
-        cpModal.id = 'changePasswordModal';
-        cpModal.className = 'modal';
-        cpModal.innerHTML = `
-            <div class="modal-content" style="max-width: 400px;">
-                <span class="close-modal" onclick="document.getElementById('changePasswordModal').style.display='none'"><i class="fas fa-times"></i></span>
-                <h3>Change Password</h3>
-                <form id="changePasswordForm" style="display: flex; flex-direction: column; gap: 15px; margin-top: 20px;">
+    // Inject Profile Settings Modal
+    if (!document.getElementById('profileSettingsModal')) {
+        const pModal = document.createElement('div');
+        pModal.id = 'profileSettingsModal';
+        pModal.className = 'modal';
+        pModal.innerHTML = `
+            <div class="modal-content" style="max-width: 450px; position: relative;">
+                <span class="close-btn" onclick="document.getElementById('profileSettingsModal').style.display='none'" style="position: absolute; right: 20px; top: 15px; cursor: pointer; font-size: 24px;">&times;</span>
+                <h3 style="text-align: center; margin-bottom: 20px;">Edit Profile</h3>
+                
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-profile.png" id="userProfilePreview" class="profile-upload-img">
+                    <label for="userProfileFile" class="profile-upload-btn">
+                        <i class="fas fa-pencil-alt"></i>
+                    </label>
+                </div>
+                <input type="file" id="userProfileFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'userProfilePreview')">
+
+                <form id="profileSettingsForm" style="display: flex; flex-direction: column; gap: 12px;">
                     <div class="form-group">
-                        <label>New Password</label>
-                        <input type="password" id="newPasswordInput" required>
+                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Full Name</label>
+                        <input type="text" id="userProfileName" required style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
-                    <button type="submit" class="submit-btn" style="width: 100%;">Update Password</button>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Email</label>
+                        <input type="email" id="userProfileEmail" readonly style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: #f1f5f9; color: #64748b;">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600;">New Password (Leave blank to keep current)</label>
+                        <input type="password" id="userProfilePassword" placeholder="********" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 15px;">
+                        <button type="button" class="btn-cancel" style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: #f1f5f9; color: #334155; cursor: pointer;" onclick="document.getElementById('profileSettingsModal').style.display='none'">Cancel</button>
+                        <button type="submit" class="submit-btn" style="flex: 2; background-color: var(--primary-red); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; padding: 10px;">Save Changes</button>
+                    </div>
                 </form>
             </div>
         `;
-        document.body.appendChild(cpModal);
+        document.body.appendChild(pModal);
     }
+
 
     // Initialize Dark Mode
     const savedTheme = localStorage.getItem('theme');
