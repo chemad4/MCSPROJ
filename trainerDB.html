@@ -8,7 +8,8 @@
     <link rel="icon" type="image/png" href="images/icon-192.png">
 
     <script>
-        if (!localStorage.getItem("loggedInUser") || localStorage.getItem("userRole") !== "Trainer") {
+        const role = (localStorage.getItem("userRole") || "").toLowerCase();
+        if (!localStorage.getItem("loggedInUser") || role !== "trainer") {
             window.location.replace("index.html");
         }
     </script>
@@ -19,7 +20,10 @@
 
 
     <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/bookings-ui.js"></script>
     
     <style>
         /* Interactive Card Animations */

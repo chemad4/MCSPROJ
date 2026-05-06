@@ -12,6 +12,64 @@ import { escapeHtml, formatCurrency } from "./utils.js";
 window.escapeHtml = escapeHtml;
 window.formatCurrency = formatCurrency;
 
+/**
+ * Synchronizes a container with a data array using DOM diffing to prevent UI flickering.
+ */
+window.syncDOM = function(container, dataArray, renderFunc, idPrefix) {
+    if (!container) return;
+    
+    // Clear initial skeleton loaders if they exist (Audit Fix)
+    if (container.querySelector('.skeleton-row') || (container.innerHTML.includes('Loading...') && !container.innerHTML.includes(idPrefix))) {
+        container.innerHTML = "";
+    }
+
+    const currentIds = new Set(dataArray.map(item => `${idPrefix}-${item.id}`));
+    
+    // 1. Remove elements no longer in the data array
+    Array.from(container.children).forEach(child => {
+        if (child.id && child.id.startsWith(idPrefix) && !currentIds.has(child.id)) {
+            container.removeChild(child);
+        }
+    });
+
+    // 2. Update existing elements or Append new ones
+    dataArray.forEach((item, index) => {
+        const id = `${idPrefix}-${item.id}`;
+        const html = renderFunc(item);
+        let el = document.getElementById(id);
+        
+        if (el) {
+            // Update existing if content changed
+            if (el.innerHTML !== html) {
+                el.innerHTML = html;
+            }
+        } else {
+            // Create new element
+            const isTable = container.tagName === 'TBODY';
+            const temp = document.createElement(isTable ? 'table' : 'div');
+            temp.innerHTML = isTable ? `<tbody>${html}</tbody>` : html;
+            const newEl = isTable ? temp.querySelector('tr') : temp.firstElementChild;
+            if (newEl) {
+                newEl.id = id;
+                // Insert at specific index to maintain order
+                const nextEl = container.children[index];
+                if (nextEl) {
+                    container.insertBefore(newEl, nextEl);
+                } else {
+                    container.appendChild(newEl);
+                }
+            }
+        }
+        
+        // 3. Maintain correct order if it changed
+        const currentElAtIndex = container.children[index];
+        if (currentElAtIndex && currentElAtIndex.id !== id) {
+            const targetEl = document.getElementById(id);
+            if (targetEl) container.insertBefore(targetEl, currentElAtIndex);
+        }
+    });
+};
+
 // ==========================================
 // 2. FIREBASE & EMAILJS CONFIGURATION
 // ==========================================
@@ -82,19 +140,22 @@ if (currentUserId && currentSessionId) {
                 window.location.replace("index.html");
             }
 
+            const roleLower = (currentUserRole || "").toLowerCase();
             // Update Member UI dynamically
-            if (currentUserRole === "Member") {
+            if (roleLower === "member") {
                 if (document.getElementById('myPlanName')) document.getElementById('myPlanName').innerText = userData.plan || "Standard Plan";
                 if (document.getElementById('myPlanDays') && userData.dateRegistered) {
                     const now = new Date().getTime();
-                    const expiryDate = userData.dateRegistered + (30 * 24 * 60 * 60 * 1000);
+                    const planName = userData.plan || 'Standard Member';
+                    const planDays = window.getPlanDays ? window.getPlanDays(planName) : 30;
+                    const expiryDate = userData.dateRegistered + (planDays * 24 * 60 * 60 * 1000);
                     const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
                     document.getElementById('myPlanDays').innerHTML = `<i class="fa-regular fa-clock"></i> ${diffDays > 0 ? diffDays + ' Days Left' : 'Expired'}`;
                 }
             }
 
             // Automatically start/stop Trainer Shift Timer based on "On Floor" status
-            if (currentUserRole === "Trainer") {
+            if (roleLower === "trainer") {
                 const currentStatus = userData.shiftStatus || "Off Floor";
                 localStorage.setItem("trainerShiftStatus", currentStatus);
 
@@ -126,7 +187,8 @@ window.handleLogout = async function () {
     if (userId) {
         try {
             let updateData = { currentSession: null };
-            if (userRole === "Admin" || userRole === "Staff" || userRole === "Trainer") {
+            const roleLower = (userRole || "").toLowerCase();
+            if (roleLower === "admin" || roleLower === "staff" || roleLower === "trainer") {
                 updateData.shiftStatus = "Off Shift";
             }
             await updateDoc(doc(db, "users", userId), updateData);
@@ -180,7 +242,8 @@ window.switchTab = function (tabId, element) {
         'bookings': 'Booking Calendar',
         'chats': 'Internal Messages',
         'activityLog': 'System Activity Log',
-        'membershipPlans': 'Membership Plans'
+        'membershipPlans': 'Membership Plans',
+        'lockers': 'Locker Management'
     };
 
     if (document.getElementById('pageTitle')) {
@@ -426,6 +489,7 @@ let posCart = [];
 let currentPOSCategory = 'all';
 let selectedPaymentMethod = 'Cash';
 let stockMovementsData = [];
+let lockersData = [];
 
 let currentChatUser = null;
 let currentChatRoleFilter = 'all';
@@ -441,6 +505,10 @@ const walkinPassesCol = collection(db, "walkinPasses");
 const stockMovementsCol = collection(db, "stockMovements"); // Phase 3: Inventory Ledger
 const membershipPlansCol = collection(db, "membershipPlans"); // Membership Plans
 const creditTransactionsCol = collection(db, "creditTransactions"); // Credit System
+const lockersCol = collection(db, "lockers"); // Locker System
+
+// Expose Firebase helpers for non-module booking UI script
+window._fb = { bookingsCol, query, where, getDocs, addDoc, db, doc, updateDoc, deleteDoc };
 
 async function logStockMovement(productId, productName, changeAmount, reason) {
     try {
@@ -471,14 +539,15 @@ onSnapshot(stockMovementsCol, (snapshot) => {
 window.renderLedger = function () {
     const tbody = document.querySelector('#ledgerTable tbody');
     if (!tbody) return;
-    tbody.innerHTML = "";
+
     if (stockMovementsData.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No stock movements recorded yet.</td></tr>';
         return;
     }
-    stockMovementsData.forEach(m => {
+
+    const renderLedgerRow = (m) => {
         let changeStr = m.changeAmount > 0 ? `<span style="color: #27ae60; font-weight: bold;">+${m.changeAmount}</span>` : `<span style="color: #e74c3c; font-weight: bold;">${m.changeAmount}</span>`;
-        tbody.innerHTML += `
+        return `
             <tr>
                 <td>${m.date} <span style="color:#888; font-size:12px;">${m.time || ''}</span></td>
                 <td><strong>${m.productName}</strong></td>
@@ -487,7 +556,9 @@ window.renderLedger = function () {
                 <td>${m.userName}</td>
             </tr>
         `;
-    });
+    };
+
+    window.syncDOM(tbody, stockMovementsData, renderLedgerRow, 'ledger-row');
 }
 
 let servicesChartInstance = null;
@@ -687,100 +758,33 @@ function renderInventory() {
 
     if (!equipGrid || !prodGrid) return;
 
-    equipGrid.innerHTML = "";
-    prodGrid.innerHTML = "";
-    if (equipListBody) equipListBody.innerHTML = "";
-
     let ops = 0, maint = 0, low = 0, totalMachines = 0;
     let alertsHtmlArr = [];
-    let equipHtmlArr = [];
-    let prodHtmlArr = [];
-    let equipListHtmlArr = [];
+    
+    // Sort and filter data first
+    const consumables = [];
+    const equipment = [];
 
     inventoryData.forEach((item) => {
         let isConsumable = item.itemType === 'product' || ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
         let currentStatus = item.status || (isConsumable ? 'In Stock' : 'Operational');
-        let badge = 'operational';
-        let isProblematic = false;
         let threshold = item.lowStockThreshold !== undefined ? item.lowStockThreshold : 5;
+        let isProblematic = false;
 
-        if (item.qty === 0) { currentStatus = "Out of Stock"; badge = 'broken'; isProblematic = true; }
+        if (item.qty === 0) { currentStatus = "Out of Stock"; isProblematic = true; }
         else if (item.qty <= threshold) {
-            if (currentStatus !== 'Maintenance' && currentStatus !== 'Out of Order') { currentStatus = "Low Stock"; badge = 'stock-low'; isProblematic = true; low++; }
+            if (currentStatus !== 'Maintenance' && currentStatus !== 'Out of Order') { currentStatus = "Low Stock"; isProblematic = true; low++; }
         }
-        else if (currentStatus === 'Maintenance') { badge = 'maintenance'; maint++; isProblematic = true; }
-        else if (currentStatus === 'Out of Order') { badge = 'broken'; isProblematic = true; }
+        else if (currentStatus === 'Maintenance') { maint++; isProblematic = true; }
+        else if (currentStatus === 'Out of Order') { isProblematic = true; }
 
         if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
-        if (!isConsumable) totalMachines++;
-
-        // Expiry warning badge
-        let expiryHtml = '';
-        if (isConsumable && item.expiry) {
-            let expDate = new Date(item.expiry);
-            let daysLeft = (expDate - new Date()) / (1000 * 60 * 60 * 24);
-            if (daysLeft <= 30 && daysLeft >= 0) {
-                expiryHtml = ` <span class="badge pending" style="font-size: 10px;">Expiring Soon</span>`;
-            } else if (daysLeft < 0) {
-                expiryHtml = ` <span class="badge broken" style="font-size: 10px;">Expired</span>`;
-            }
+        if (!isConsumable) {
+            totalMachines++;
+            equipment.push({ ...item, currentStatus, isProblematic });
+        } else {
+            consumables.push({ ...item, currentStatus, isProblematic });
         }
-
-        const iconHtml = getCategoryIcon(item.cat);
-        const isSelected = !isConsumable && selectedEquipItems.has(item.id);
-
-        let actionButtons = !isConsumable ? `
-                <button class="btn-icon btn-edit" title="Edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
-                <button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
-            ` : `<button class="btn-icon" style="color: #27ae60;" title="Quick Restock" onclick="quickRestock('${item.id}', '${item.name.replace(/'/g, "\\'")}')"><i class="fas fa-plus-circle"></i></button>
-                 <button class="btn-icon btn-edit" title="Edit" onclick="openEditProductModal('${item.id}')"><i class="fas fa-edit"></i></button>
-                 <button class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>`;
-
-        // Grid Card HTML
-        const imageHtml = item.image ? `<img src="${item.image}" alt="${item.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">` : iconHtml;
-        
-        let cardHTML = `
-            <div class="inventory-card inventory-item-filter ${isSelected ? 'selected' : ''}" data-search="${item.name.toLowerCase()} ${item.cat.toLowerCase()} ${currentStatus.toLowerCase()}">
-                ${!isConsumable ? `<input type="checkbox" class="inventory-checkbox" onchange="toggleItemSelection('equipment', '${item.id}', this)" ${isSelected ? 'checked' : ''}>` : ''}
-                <div class="inventory-icon-box" style="${item.image ? 'padding:0;' : ''}">${imageHtml}</div>
-                <div class="inventory-details">
-                    <div class="inventory-title">${item.name}</div>
-                    <div class="inventory-category">${item.cat}</div>
-                    <div class="inventory-desc">
-                        ${(item.assetTag && item.assetTag !== 'undefined') ? `Tag: <strong>${item.assetTag}</strong><br>` : ''}
-                        ${(item.size && item.size !== 'undefined') ? `Size/Vol: <strong>${item.size}</strong><br>` : ''}
-                        ${isConsumable && item.expiry ? `Expiry: <strong>${item.expiry}</strong>${expiryHtml}<br>` : ''}
-                        Qty: <strong>${item.qty} units</strong>
-                    </div>
-                    <div class="inventory-meta"><span class="badge ${badge}">${currentStatus}</span></div>
-                </div>
-                <div class="card-actions">${actionButtons}</div>
-            </div>
-        `;
-
-        // List Row HTML
-        if (!isConsumable && equipListBody) {
-            equipListHtmlArr.push(`
-                <tr class="${isSelected ? 'selected' : ''}">
-                    <td><input type="checkbox" onchange="toggleItemSelection('equipment', '${item.id}', this)" ${isSelected ? 'checked' : ''}></td>
-                    <td><div style="font-weight:600;">${item.name}</div></td>
-                    <td><span class="inventory-category" style="margin:0;">${item.cat}</span></td>
-                    <td><code>${(item.assetTag && item.assetTag !== 'undefined') ? item.assetTag : '-'}</code></td>
-                    <td>${(item.size && item.size !== 'undefined') ? item.size : '-'}</td>
-                    <td><strong>${item.qty}</strong></td>
-                    <td><span class="badge ${badge}">${currentStatus}</span></td>
-                    <td>
-                        <div style="display:flex; gap:8px;">
-                            <button class="btn-icon" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
-                            <button class="btn-icon" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
-                        </div>
-                    </td>
-                </tr>
-            `);
-        }
-
-        if (isConsumable) prodHtmlArr.push(cardHTML);
-        else equipHtmlArr.push(cardHTML);
 
         if (isProblematic) {
             alertsHtmlArr.push(`
@@ -792,36 +796,114 @@ function renderInventory() {
         }
     });
 
-    // Toggle views
+    const renderCard = (item) => {
+        const isConsumable = item.itemType === 'product';
+        let badge = 'operational';
+        if (item.currentStatus === 'Out of Stock' || item.currentStatus === 'Out of Order') badge = 'broken';
+        else if (item.currentStatus === 'Low Stock') badge = 'stock-low';
+        else if (item.currentStatus === 'Maintenance') badge = 'maintenance';
+
+        let expiryHtml = '';
+        if (isConsumable && item.expiry) {
+            let expDate = new Date(item.expiry);
+            let daysLeft = (expDate - new Date()) / (1000 * 60 * 60 * 24);
+            if (daysLeft <= 30 && daysLeft >= 0) expiryHtml = ` <span class="badge pending" style="font-size: 10px;">Expiring Soon</span>`;
+            else if (daysLeft < 0) expiryHtml = ` <span class="badge broken" style="font-size: 10px;">Expired</span>`;
+        }
+
+        const iconHtml = getCategoryIcon(item.cat);
+        const isSelected = !isConsumable && selectedEquipItems.has(item.id);
+        const imageHtml = item.image ? `<img src="${item.image}" alt="${item.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">` : iconHtml;
+
+        let actionButtons = !isConsumable ? `
+            <button type="button" class="btn-icon btn-edit" title="Edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
+            <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
+        ` : `
+            <button type="button" class="btn-icon" style="color: #27ae60;" title="Quick Restock" onclick="quickRestock('${item.id}', '${item.name.replace(/'/g, "\\'")}')"><i class="fas fa-plus-circle"></i></button>
+            <button type="button" class="btn-icon btn-edit" title="Edit" onclick="openEditProductModal('${item.id}')"><i class="fas fa-edit"></i></button>
+            <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
+        `;
+
+        return `
+            <div class="inventory-card inventory-item-filter ${isSelected ? 'selected' : ''}" data-search="${item.name.toLowerCase()} ${item.cat.toLowerCase()} ${item.currentStatus.toLowerCase()}">
+                ${!isConsumable ? `<input type="checkbox" class="inventory-checkbox" onchange="toggleItemSelection('equipment', '${item.id}', this)" ${isSelected ? 'checked' : ''}>` : ''}
+                <div class="inventory-icon-box" style="${item.image ? 'padding:0;' : ''}">${imageHtml}</div>
+                <div class="inventory-details">
+                    <div class="inventory-title">${item.name}</div>
+                    <div class="inventory-category">${item.cat}</div>
+                    <div class="inventory-desc">
+                        ${(item.assetTag && item.assetTag !== 'undefined') ? `Tag: <strong>${item.assetTag}</strong><br>` : ''}
+                        ${(item.size && item.size !== 'undefined') ? `Size/Vol: <strong>${item.size}</strong><br>` : ''}
+                        ${isConsumable && item.expiry ? `Expiry: <strong>${item.expiry}</strong>${expiryHtml}<br>` : ''}
+                        Qty: <strong>${item.qty} units</strong>
+                    </div>
+                    <div class="inventory-meta"><span class="badge ${badge}">${item.currentStatus}</span></div>
+                </div>
+                <div class="card-actions">${actionButtons}</div>
+            </div>
+        `;
+    };
+
+    const renderRow = (item) => {
+        let badge = 'operational';
+        if (item.currentStatus === 'Out of Stock' || item.currentStatus === 'Out of Order') badge = 'broken';
+        else if (item.currentStatus === 'Low Stock') badge = 'stock-low';
+        else if (item.currentStatus === 'Maintenance') badge = 'maintenance';
+        
+        const isSelected = selectedEquipItems.has(item.id);
+        return `
+            <tr class="${isSelected ? 'selected' : ''}">
+                <td><input type="checkbox" onchange="toggleItemSelection('equipment', '${item.id}', this)" ${isSelected ? 'checked' : ''}></td>
+                <td><div style="font-weight:600;">${item.name}</div></td>
+                <td><span class="inventory-category" style="margin:0;">${item.cat}</span></td>
+                <td><code>${(item.assetTag && item.assetTag !== 'undefined') ? item.assetTag : '-'}</code></td>
+                <td>${(item.size && item.size !== 'undefined') ? item.size : '-'}</td>
+                <td><strong>${item.qty}</strong></td>
+                <td><span class="badge ${badge}">${item.currentStatus}</span></td>
+                <td>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn-icon" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
+                        <button type="button" class="btn-icon" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    };
+
+    // Render Grid Equipment
     if (currentInventoryView === 'grid') {
         equipGrid.style.display = 'grid';
         if (equipListContainer) equipListContainer.style.display = 'none';
-        equipGrid.innerHTML = equipHtmlArr.join('');
+        window.syncDOM(equipGrid, equipment, renderCard, 'equip-grid');
     } else {
         equipGrid.style.display = 'none';
         if (equipListContainer) {
             equipListContainer.style.display = 'block';
-            equipListBody.innerHTML = equipListHtmlArr.join('');
+            window.syncDOM(equipListBody, equipment, renderRow, 'equip-row');
         }
     }
 
-    prodGrid.innerHTML = prodHtmlArr.join('');
-    let alertsHtml = alertsHtmlArr.join('');
+    // Render Products
+    window.syncDOM(prodGrid, consumables, renderCard, 'prod-grid');
 
-    // Update batch bar
+    // Update Batch Bar
     if (equipBatchBar) {
         if (selectedEquipItems.size > 0) {
             equipBatchBar.classList.add('show');
-            document.getElementById('equipBatchCount').innerText = `${selectedEquipItems.size} selected`;
+            const countEl = document.getElementById('equipBatchCount');
+            if (countEl) countEl.innerText = `${selectedEquipItems.size} selected`;
         } else {
             equipBatchBar.classList.remove('show');
         }
     }
 
+    // Update Stats
     if (document.getElementById('dashInventoryTotal')) document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
     if (document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
     if (document.getElementById('navInventoryCount')) document.getElementById('navInventoryCount').innerText = ` ${inventoryData.length} `;
-    if (document.getElementById('dashInventoryAlerts')) document.getElementById('dashInventoryAlerts').innerHTML = alertsHtml || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
+    
+    const dashAlerts = document.getElementById('dashInventoryAlerts');
+    if (dashAlerts) dashAlerts.innerHTML = alertsHtmlArr.join('') || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
 }
 
 window.migrateInventoryDatabase = async function () {
@@ -1158,7 +1240,6 @@ function renderPOSProducts() {
     if (!grid) return;
     
     const searchTerm = (document.getElementById('posSearch')?.value || '').toLowerCase();
-    let html = '';
 
     // Walk-in Passes
     const walkinPlan = (window.__membershipPlansData || []).find(p => p.name.toLowerCase().includes('walk-in'));
@@ -1173,7 +1254,9 @@ function renderPOSProducts() {
         maxQty: 999,
         image: 'images/default-product.png',
         cat: 'Gym Passes',
-        isPlan: true
+        size: 'One-Day Pass',
+        isPlan: true,
+        featured: true
     });
 
     inventoryData.forEach(item => {
@@ -1186,36 +1269,42 @@ function renderPOSProducts() {
                 stock: item.qty,
                 maxQty: item.qty,
                 image: item.image || 'images/default-product.png',
-                cat: item.cat
+                cat: item.cat,
+                size: item.size || ''
             });
         }
     });
 
-    allItems.forEach(item => {
+    // Filter items based on category and search term
+    const filteredItems = allItems.filter(item => {
         const catLabel = getPOSCategoryLabel(item);
-        if (currentPOSCategory !== 'all' && catLabel !== currentPOSCategory) return;
-        if (searchTerm && !item.name.toLowerCase().includes(searchTerm)) return;
+        const matchesCat = currentPOSCategory === 'all' || catLabel === currentPOSCategory;
+        const matchesSearch = !searchTerm || item.name.toLowerCase().includes(searchTerm);
+        return matchesCat && matchesSearch;
+    });
 
-        html += `
-            <div class="pos-product-card" onclick="addToCart('${item.id}', '${item.name.replace(/'/g, "\\'")}', ${item.price}, ${item.maxQty}, '${item.image}')">
+    const renderItem = (item) => {
+        return `
+            <div class="pos-product-card ${item.featured ? 'featured' : ''}" onclick="addToCart('${item.id}', '${item.name.replace(/'/g, "\\'")}', ${item.price}, ${item.maxQty}, '${item.image}')">
                 <div class="pos-card-image">
                     <img src="${item.image}" onerror="this.src='images/default-product.png'">
                 </div>
                 <div class="pos-card-info">
                     <div class="pos-card-name">${item.name}</div>
                     <div class="pos-card-stock">${item.stock === 'Unlimited' ? 'Unlimited' : item.stock + ' in stock'}</div>
+                    <div class="pos-card-size">${item.size || ''}</div>
                 </div>
                 <div class="pos-card-footer">
                     <span class="pos-card-price">₱${item.price.toFixed(2)}</span>
-                    <button class="pos-add-btn">
+                    <button type="button" class="pos-add-btn">
                         <i class="fa-solid fa-plus"></i>
                     </button>
                 </div>
             </div>
         `;
-    });
+    };
 
-    grid.innerHTML = html;
+    window.syncDOM(grid, filteredItems, renderItem, 'pos-prod');
 }
 
 window.addToCart = function (id, name, price, maxQty, image) {
@@ -1245,9 +1334,13 @@ window.changeQty = function (id, delta) {
 function renderCart() {
     const cartBody = document.getElementById('posCartBody');
     if (!cartBody) return;
-    if (posCart.length === 0) { cartBody.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>`; updatePOSTotals(0, 0, 0, 0); return; }
+    if (posCart.length === 0) { 
+        cartBody.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>`; 
+        updatePOSTotals(0, 0, 0, 0); 
+        return; 
+    }
 
-    cartBody.innerHTML = posCart.map(item => `
+    const renderCartItem = (item) => `
         <div class="pos-cart-item">
             <div class="pos-cart-thumb">
                 <img src="${item.image || 'images/default-product.png'}" onerror="this.src='images/default-product.png'">
@@ -1257,18 +1350,21 @@ function renderCart() {
                 <div style="font-size: 11px; color: var(--text-muted);">₱${item.price.toFixed(2)} each</div>
             </div>
             <div class="pos-cart-qty">
-                <button class="qty-btn" onclick="changeQty('${item.id}', -1)">−</button>
+                <button type="button" class="qty-btn" onclick="changeQty('${item.id}', -1)">−</button>
                 <span style="font-weight:600; width:20px; text-align:center;">${item.qty}</span>
-                <button class="qty-btn" onclick="changeQty('${item.id}', 1)">+</button>
+                <button type="button" class="qty-btn" onclick="changeQty('${item.id}', 1)">+</button>
             </div>
             <div class="pos-cart-line-total">₱${(item.price * item.qty).toFixed(2)}</div>
-            <button class="pos-cart-remove" onclick="removeFromCart('${item.id}')">×</button>
+            <button type="button" class="pos-cart-remove" onclick="removeFromCart('${item.id}')">×</button>
         </div>
-    `).join('');
+    `;
+
+    window.syncDOM(cartBody, posCart, renderCartItem, 'cart-item');
 
     let subtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    let vat = subtotal * 0.12;
     let isSenior = document.getElementById('seniorDiscount')?.checked || false;
+    // Senior/PWD Rule: VAT Exempt + 20% Discount
+    let vat = isSenior ? 0 : (subtotal * 0.12);
     let discount = isSenior ? (subtotal * 0.20) : 0;
     updatePOSTotals(subtotal, vat, discount, subtotal + vat - discount);
 }
@@ -1297,8 +1393,8 @@ window.processPayment = async function () {
     if (posCart.length === 0) return showToast("Cart is empty!", "error");
 
     let subtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    let vat = subtotal * 0.12;
     let isSenior = document.getElementById('seniorDiscount')?.checked || false;
+    let vat = isSenior ? 0 : (subtotal * 0.12);
     let discount = isSenior ? (subtotal * 0.20) : 0;
     let grandTotal = subtotal + vat - discount;
 
@@ -1728,6 +1824,9 @@ function renderSparkline(canvasId, data, color) {
 // ==========================================
 // 9. FINANCIALS & WEEKLY PDF GENERATOR
 // ==========================================
+let currentPaymentSortField = 'timestamp';
+let currentPaymentSortOrder = 'desc';
+
 onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
     snapshot.forEach(doc => paymentsData.push({ id: doc.id, ...doc.data() }));
@@ -1738,21 +1837,241 @@ onSnapshot(paymentsCol, (snapshot) => {
 function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
     if (!payTbody) return;
-    payTbody.innerHTML = "";
-    paymentsData.forEach(t => {
-        let vat = (t.vat != null ? Number(t.vat) : (Number(t.amount || 0) / 1.12 * 0.12)).toFixed(2);
-        let badge = t.status === 'Voided' ? '<span style="color:var(--primary-red);font-weight:bold;">VOIDED</span>' : 'Paid';
-        let actionBtn = t.status !== 'Voided' ? `<button class="btn-icon btn-delete" onclick="voidTransaction('${t.id}')" title="Void Transaction"><i class="fas fa-ban"></i></button>` : '-';
 
-        payTbody.innerHTML += `
-            <tr style="${t.status === 'Voided' ? 'opacity: 0.6; text-decoration: line-through;' : ''}">
-                <td>${t.name}</td><td>${t.items || t.type}</td><td>${t.date} <span style="color:#888; font-size:12px;">${t.time || ''}</span></td>
-                <td>₱${t.amount}</td><td>₱${vat}</td><td style="font-weight:bold; color:var(--dark-black);">₱${t.amount} <br><small style="text-decoration:none;">${badge}</small></td>
-                <td>${actionBtn}</td>
+    // 1. Calculate KPI Metrics (Always based on full data)
+    let totalRevenue = 0;
+    let totalVAT = 0;
+    let totalVoided = 0;
+
+    paymentsData.forEach(t => {
+        const amount = Number(t.amount || 0);
+        const vat = (t.vat != null ? Number(t.vat) : (amount / 1.12 * 0.12));
+        if (t.status === 'Voided') {
+            totalVoided += amount;
+        } else {
+            totalRevenue += amount;
+            totalVAT += vat;
+        }
+    });
+
+    // Update KPI UI
+    if (document.getElementById('financialTotalRevenue')) document.getElementById('financialTotalRevenue').innerText = `₱${totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    if (document.getElementById('financialTotalVAT')) document.getElementById('financialTotalVAT').innerText = `₱${totalVAT.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    if (document.getElementById('financialTotalVoided')) document.getElementById('financialTotalVoided').innerText = `₱${totalVoided.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+
+    // 2. Filter and Sort for the Table
+    let filtered = [...paymentsData];
+
+    const searchTerm = document.getElementById('paymentSearch')?.value.toLowerCase();
+    const filterStatus = document.getElementById('paymentFilterStatus')?.value;
+    const filterMethod = document.getElementById('paymentFilterMethod')?.value;
+
+    if (searchTerm) {
+        filtered = filtered.filter(p => 
+            (p.name && p.name.toLowerCase().includes(searchTerm)) || 
+            (p.id && p.id.toLowerCase().includes(searchTerm)) ||
+            (p.items && p.items.toLowerCase().includes(searchTerm))
+        );
+    }
+
+    if (filterStatus && filterStatus !== 'all') {
+        filtered = filtered.filter(p => p.status === filterStatus);
+    }
+
+    if (filterMethod && filterMethod !== 'all') {
+        filtered = filtered.filter(p => p.paymentMethod === filterMethod);
+    }
+
+    // Sorting logic
+    filtered.sort((a, b) => {
+        let valA, valB;
+
+        if (currentPaymentSortField === 'customerName') {
+            valA = (a.name || "").toLowerCase();
+            valB = (b.name || "").toLowerCase();
+        } else if (currentPaymentSortField === 'grandTotal' || currentPaymentSortField === 'amount') {
+            valA = Number(a.amount || 0);
+            valB = Number(b.amount || 0);
+        } else if (currentPaymentSortField === 'subtotal') {
+            valA = Number(a.subtotal || a.amount || 0);
+            valB = Number(b.subtotal || b.amount || 0);
+        } else if (currentPaymentSortField === 'vat') {
+            valA = Number(a.vat || 0);
+            valB = Number(b.vat || 0);
+        } else if (currentPaymentSortField === 'timestamp') {
+            valA = Number(a.timestamp || 0);
+            valB = Number(b.timestamp || 0);
+        } else {
+            valA = String(a[currentPaymentSortField] || "").toLowerCase();
+            valB = String(b[currentPaymentSortField] || "").toLowerCase();
+        }
+
+        if (valA < valB) return currentPaymentSortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return currentPaymentSortOrder === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    // 3. Render Rows
+    const renderPaymentRow = (t) => {
+        const amount = Number(t.amount || 0);
+        const vat = (t.vat != null ? Number(t.vat) : (amount / 1.12 * 0.12)).toFixed(2);
+        const isVoided = t.status === 'Voided';
+        
+        // Status Badge
+        const statusBadge = isVoided 
+            ? '<span class="status-badge-solid voided">Voided</span>' 
+            : '<span class="status-badge-solid paid">Paid</span>';
+
+        // Purchased Items Truncation
+        const items = t.items || t.type || "";
+        const itemList = items.split(',').map(i => i.trim());
+        let itemsHtml = "";
+        if (itemList.length > 2) {
+            itemsHtml = `
+                <div class="items-cell">
+                    ${itemList[0]}, ${itemList[1]} <span class="item-badge">+${itemList.length - 2} more</span>
+                    <div class="items-tooltip">${items}</div>
+                </div>
+            `;
+        } else {
+            itemsHtml = items;
+        }
+
+        // Action Kebab Menu
+        const actionHtml = `
+            <div class="kebab-menu">
+                <button type="button" class="kebab-btn" onclick="toggleKebab(event, '${t.id}')">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <div class="kebab-dropdown" id="kebab-${t.id}">
+                    <div class="kebab-item" onclick="viewInvoice('${t.id}')"><i class="fas fa-file-invoice"></i> View Invoice</div>
+                    <div class="kebab-item" onclick="printReceipt('${t.id}')"><i class="fas fa-print"></i> Print Receipt</div>
+                    ${!isVoided ? `
+                        <div class="kebab-item" onclick="processRefund('${t.id}')"><i class="fas fa-undo"></i> Process Refund</div>
+                        <div class="kebab-item" style="color: #991b1b;" onclick="voidTransaction('${t.id}')"><i class="fas fa-ban"></i> Void Transaction</div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+
+        return `
+            <tr style="${isVoided ? 'color: #94a3b8;' : ''}">
+                <td style="font-weight: 500;">${t.name}</td>
+                <td>${itemsHtml}</td>
+                <td><span style="white-space: nowrap;">${t.date}</span> <br><small style="color:#94a3b8;">${t.time || ''}</small></td>
+                <td>₱${(t.subtotal || amount).toFixed(2)}</td>
+                <td>₱${vat}</td>
+                <td style="font-weight:700;">₱${amount.toFixed(2)}</td>
+                <td>${statusBadge}</td>
+                <td style="text-align: right;">${actionHtml}</td>
             </tr>
         `;
-    });
+    };
+
+    window.syncDOM(payTbody, filtered, renderPaymentRow, 'pay-row');
+    
+    // Update pagination counts
+    if (document.getElementById('paymentTotalCount')) document.getElementById('paymentTotalCount').innerText = filtered.length;
+    if (document.getElementById('paymentShowingCount')) document.getElementById('paymentShowingCount').innerText = filtered.length > 0 ? `1-${filtered.length}` : '0-0';
 }
+
+// Financial Report UI Helpers
+window.toggleKebab = function(event, id) {
+    event.stopPropagation();
+    document.querySelectorAll('.kebab-dropdown').forEach(d => {
+        if (d.id !== `kebab-${id}`) d.classList.remove('show');
+    });
+    const dropdown = document.getElementById(`kebab-${id}`);
+    if (dropdown) dropdown.classList.toggle('show');
+};
+
+// Close kebabs on click outside
+document.addEventListener('click', () => {
+    document.querySelectorAll('.kebab-dropdown').forEach(d => d.classList.remove('show'));
+});
+
+window.viewInvoice = function(id) { 
+    const tx = paymentsData.find(p => p.id === id);
+    if (!tx) return;
+
+    document.getElementById('invoiceId').innerText = `#${id.slice(0, 8).toUpperCase()}`;
+    document.getElementById('invoiceCustomerName').innerText = tx.name || "Walk-in Customer";
+    document.getElementById('invoiceDate').innerText = `${tx.date} • ${tx.time || ''}`;
+    document.getElementById('invoiceMethod').innerText = tx.paymentMethod || "Cash";
+    document.getElementById('invoiceStatus').innerText = tx.status || "Paid";
+    document.getElementById('invoiceStatus').className = `status-badge-solid ${tx.status?.toLowerCase() || 'paid'}`;
+    document.getElementById('invoiceStatus').style.background = tx.status === 'Voided' ? '#ef4444' : '#27ae60';
+
+    const subtotal = tx.subtotal || (Number(tx.amount || 0) / 1.12);
+    const vat = tx.vat || (Number(tx.amount || 0) - subtotal);
+    const total = Number(tx.amount || 0);
+
+    document.getElementById('invoiceSubtotal').innerText = `₱${subtotal.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    document.getElementById('invoiceVAT').innerText = `₱${vat.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    document.getElementById('invoiceTotal').innerText = `₱${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+
+    const itemsList = document.getElementById('invoiceItemsList');
+    itemsList.innerHTML = "";
+
+    if (tx.lineItems && tx.lineItems.length > 0) {
+        tx.lineItems.forEach(item => {
+            const row = `
+                <tr>
+                    <td style="padding: 10px 0;">${item.name}</td>
+                    <td style="padding: 10px 0; text-align: center;">${item.qty}</td>
+                    <td style="padding: 10px 0; text-align: right;">₱${(Number(item.price || 0) * Number(item.qty || 1)).toFixed(2)}</td>
+                </tr>
+            `;
+            itemsList.innerHTML += row;
+        });
+    } else {
+        const row = `
+            <tr>
+                <td style="padding: 10px 0;">${tx.items || tx.type || "Purchase"}</td>
+                <td style="padding: 10px 0; text-align: center;">1</td>
+                <td style="padding: 10px 0; text-align: right;">₱${total.toFixed(2)}</td>
+            </tr>
+        `;
+        itemsList.innerHTML += row;
+    }
+
+    document.getElementById('invoiceModal').style.display = 'flex';
+};
+
+window.printReceipt = function(id) { window.viewInvoice(id); setTimeout(() => window.print(), 500); };
+window.processRefund = function(id) { showToast("Refund processing initiated for " + id, "info"); };
+
+window.filterPayments = function() {
+    renderPayments();
+};
+
+window.sortPayments = function(field) {
+    if (currentPaymentSortField === field) {
+        currentPaymentSortOrder = currentPaymentSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentPaymentSortField = field;
+        currentPaymentSortOrder = 'asc';
+    }
+    
+    // Update sort icons in headers
+    document.querySelectorAll('#paymentTable th i').forEach(icon => {
+        icon.className = 'fas fa-sort';
+    });
+    
+    const th = document.querySelector(`#paymentTable th[onclick*="${field}"]`);
+    if (th) {
+        const icon = th.querySelector('i');
+        if (icon) {
+            icon.className = `fas fa-sort-${currentPaymentSortOrder === 'asc' ? 'up' : 'down'}`;
+        }
+    }
+
+    renderPayments();
+};
+
+window.changePaymentPagination = function() {
+    renderPayments();
+};
 
 // Void Transaction & Restock Inventory
 window.voidTransaction = async function (id) {
@@ -1930,30 +2249,29 @@ onSnapshot(usersCol, (snapshot) => {
     renderMembers();
     renderMemberTrainers();
     if (document.getElementById('chatUserList')) renderChatUserList();
-
-    // Change Password Logic
-    const cpForm = document.getElementById('changePasswordForm');
-    if (cpForm) {
-        cpForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const newPass = document.getElementById('newPasswordInput').value.trim();
-            if (newPass.length < 6) return showToast("Password must be at least 6 characters.", "error");
-
-            const userId = localStorage.getItem('userId');
-            if (!userId) return;
-
-            try {
-                await updateDoc(doc(db, "users", userId), { password: newPass });
-                document.getElementById('changePasswordModal').style.display = 'none';
-                showToast("Password updated successfully!", "success");
-                if (window.logActivity) window.logActivity("Password Changed", `User changed their own password.`);
-            } catch (err) {
-                console.error(err);
-                showToast("Error updating password.", "error");
-            }
-        });
-    }
 });
+
+// Change Password Logic - Moved outside onSnapshot (Bug Fix)
+if (document.getElementById('changePasswordForm')) {
+    document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newPass = document.getElementById('newPasswordInput').value.trim();
+        if (newPass.length < 6) return showToast("Password must be at least 6 characters.", "error");
+
+        const userId = localStorage.getItem('userId');
+        if (!userId) return;
+
+        try {
+            await updateDoc(doc(db, "users", userId), { password: newPass });
+            document.getElementById('changePasswordModal').style.display = 'none';
+            showToast("Password updated successfully!", "success");
+            if (window.logActivity) window.logActivity("Password Changed", `User changed their own password.`);
+        } catch (err) {
+            console.error(err);
+            showToast("Error updating password.", "error");
+        }
+    });
+}
 
 window.openProfileSettingsModal = async function () {
     const userId = localStorage.getItem("userId");
@@ -2299,7 +2617,7 @@ function renderMembershipPlans() {
                         <i class="fas fa-users text-slate-400"></i> ${subscriberCount} Subs
                     </div>
                     <div class="flex gap-2">
-                        <button class="text-sm font-semibold text-[#991b1b] hover:bg-red-50 px-4 py-2 rounded transition-colors border-solid border border-transparent hover:border-red-200 flex items-center gap-2 bg-white shadow-sm" onclick="openEditPlanModal('${p.id}')">
+                        <button type="button" class="text-sm font-semibold text-[#991b1b] hover:bg-red-50 px-4 py-2 rounded transition-colors border-solid border border-transparent hover:border-red-200 flex items-center gap-2 bg-white shadow-sm" onclick="openEditPlanModal('${p.id}')">
                             <i class="fas fa-edit"></i> Edit
                         </button>
                     </div>
@@ -2424,94 +2742,376 @@ if (document.getElementById('planForm')) {
     });
 }
 
+// ==========================================
+// 10.5 LOCKER SYSTEM MODULE
+// ==========================================
+onSnapshot(lockersCol, (snapshot) => {
+    lockersData = [];
+    snapshot.forEach(d => lockersData.push({ id: d.id, ...d.data() }));
+    renderLockers();
+});
+
+function renderLockers() {
+    const grid = document.getElementById('lockerGrid');
+    if (!grid) return;
+
+    // Stats
+    const total = lockersData.length;
+    const occupied = lockersData.filter(l => l.status === 'Occupied').length;
+    const maintenance = lockersData.filter(l => l.status === 'Maintenance').length;
+    const available = total - occupied - maintenance;
+
+    if (document.getElementById('totalLockersCount')) document.getElementById('totalLockersCount').innerText = total;
+    if (document.getElementById('availableLockersCount')) document.getElementById('availableLockersCount').innerText = available;
+    if (document.getElementById('occupiedLockersCount')) document.getElementById('occupiedLockersCount').innerText = occupied;
+    if (document.getElementById('maintLockersCount')) document.getElementById('maintLockersCount').innerText = maintenance;
+
+    if (total === 0) {
+        grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; padding:40px; color:var(--text-muted);">No lockers added yet. Click "Add Locker" to begin.</div>';
+        return;
+    }
+
+    grid.innerHTML = lockersData.sort((a, b) => (a.number || "").localeCompare(b.number || "", undefined, {numeric: true})).map(l => {
+        const isOccupied = l.status === 'Occupied';
+        const isMaint = l.status === 'Maintenance';
+        const statusClass = isOccupied ? 'occupied' : (isMaint ? 'maintenance' : 'available');
+        const icon = isOccupied ? 'fa-lock' : (isMaint ? 'fa-tools' : 'fa-lock-open');
+
+        return `
+            <div class="locker-card ${statusClass}" onclick="openAssignLockerModal('${l.id}')">
+                <div class="locker-icon"><i class="fa-solid ${icon}"></i></div>
+                <div class="locker-number">${l.number}</div>
+                <div class="locker-status-text">${l.status}</div>
+                <div class="locker-assignee">${isOccupied ? (l.memberName || 'Assigned') : (l.location || 'Section')}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+window.openAddLockerModal = function() {
+    document.getElementById('addLockerForm').reset();
+    document.getElementById('addLockerModal').style.display = 'flex';
+};
+
+if (document.getElementById('addLockerForm')) {
+    document.getElementById('addLockerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const number = document.getElementById('lockerNumberInput').value.trim();
+        const location = document.getElementById('lockerLocationInput').value.trim();
+
+        try {
+            await addDoc(lockersCol, {
+                number,
+                location,
+                status: 'Available',
+                createdAt: Date.now()
+            });
+            window.closeModal('addLockerModal');
+            showToast(`Locker ${number} created successfully!`, "success");
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to create locker.", "error");
+        }
+    });
+}
+
+window.openAssignLockerModal = function(id) {
+    const locker = lockersData.find(l => l.id === id);
+    if (!locker) return;
+
+    document.getElementById('assignLockerId').value = id;
+    document.getElementById('assignLockerNumberText').innerText = `Locker #${locker.number}`;
+    document.getElementById('assignLockerLocationText').innerText = locker.location || 'General Section';
+    
+    const isOccupied = locker.status === 'Occupied';
+    const form = document.getElementById('assignLockerForm');
+    const info = document.getElementById('activeAssignmentInfo');
+
+    if (isOccupied) {
+        form.style.display = 'none';
+        info.style.display = 'block';
+        document.getElementById('assigneeName').innerText = locker.memberName || 'Unknown Member';
+        document.getElementById('assigneeInitial').innerText = (locker.memberName || '?')[0];
+        if (locker.expiryDate) {
+            const exp = new Date(locker.expiryDate);
+            document.getElementById('assignmentExpiry').innerText = `Expires: ${exp.toLocaleDateString()}`;
+        } else {
+            document.getElementById('assignmentExpiry').innerText = 'Expires: N/A';
+        }
+    } else {
+        form.style.display = 'block';
+        info.style.display = 'none';
+        populateAssignMemberSelect();
+    }
+
+    document.getElementById('assignLockerModal').style.display = 'flex';
+};
+
+function populateAssignMemberSelect() {
+    const select = document.getElementById('assignMemberSelect');
+    if (!select) return;
+
+    select.innerHTML = '<option value="" disabled selected>Search for a member...</option>';
+    membersData.filter(m => (m.status || "").toLowerCase() !== 'archived').forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.setAttribute('data-name', `${m.givenName || m.name} ${m.familyName || ''}`.trim());
+        opt.textContent = `${m.givenName || m.name} ${m.familyName || ''}`.trim();
+        select.appendChild(opt);
+    });
+}
+
+if (document.getElementById('assignLockerForm')) {
+    document.getElementById('assignLockerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const lockerId = document.getElementById('assignLockerId').value;
+        const memberId = document.getElementById('assignMemberSelect').value;
+        const duration = parseInt(document.getElementById('assignDuration').value);
+        
+        const memberOpt = document.querySelector(`#assignMemberSelect option[value="${memberId}"]`);
+        const memberName = memberOpt ? memberOpt.getAttribute('data-name') : 'Unknown';
+
+        const now = new Date();
+        const expiryDate = new Date(now.setMonth(now.getMonth() + duration)).getTime();
+
+        try {
+            await updateDoc(doc(db, "lockers", lockerId), {
+                status: 'Occupied',
+                memberId,
+                memberName,
+                expiryDate,
+                assignedAt: Date.now()
+            });
+            
+            // Also update member profile
+            await updateDoc(doc(db, "users", memberId), { hasLocker: true, lockerId: lockerId });
+
+            window.closeModal('assignLockerModal');
+            showToast(`Locker assigned to ${memberName} for ${duration} month(s).`, "success");
+            if (window.logActivity) window.logActivity("Locker Assigned", `Assigned locker to ${memberName}`);
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to assign locker.", "error");
+        }
+    });
+}
+
+window.releaseLocker = async function() {
+    const lockerId = document.getElementById('assignLockerId').value;
+    const locker = lockersData.find(l => l.id === lockerId);
+    if (!locker) return;
+
+    showConfirm(`Are you sure you want to release Locker #${locker.number}?`, async () => {
+        try {
+            // Remove from member profile if exists
+            if (locker.memberId) {
+                await updateDoc(doc(db, "users", locker.memberId), { hasLocker: false, lockerId: null });
+            }
+
+            await updateDoc(doc(db, "lockers", lockerId), {
+                status: 'Available',
+                memberId: null,
+                memberName: null,
+                expiryDate: null,
+                assignedAt: null
+            });
+            window.closeModal('assignLockerModal');
+            showToast("Locker released successfully.", "success");
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to release locker.", "error");
+        }
+    });
+};
+
+window.printLockerReceipt = function() {
+    showToast("Printing locker assignment receipt...", "info");
+    window.print();
+};
 
 function renderMembers() {
     const memTbody = document.querySelector('#membersTable tbody');
     const arcTbody = document.querySelector('#archivedMembersTable tbody');
-    if (memTbody) memTbody.innerHTML = "";
-    if (arcTbody) arcTbody.innerHTML = "";
+    // Remove early return to allow KPI updates even if table is missing
 
-    let activeMembers = 0, totalNonArchived = 0;
+
+    // 1. Calculate KPI Metrics
+    let activeMembers = 0;
+    let expiringSoon = 0;
+    let newMembers30d = 0;
+    
     const now = new Date().getTime();
+    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
 
-    let memHtml = [];
-    let arcHtml = [];
+    const activeList = [];
+    const archivedList = [];
+
+    // Filter Logic
+    const searchVal = (document.getElementById('memberSearch')?.value || "").toLowerCase();
+    const planFilter = document.getElementById('memberFilterPlan')?.value || "all";
+    const statusFilter = document.getElementById('memberFilterStatus')?.value || "all";
 
     membersData.forEach(m => {
-        const statusStr = (m.status || "Active").trim().toLowerCase();
+        const statusStr = (m.status || "Active").trim();
+        const statusLower = statusStr.toLowerCase();
+        
+        // Count New Members (Last 30 Days)
+        if (m.dateRegistered && m.dateRegistered > thirtyDaysAgo) {
+            newMembers30d++;
+        }
+
+        if (statusLower === 'archived') {
+            archivedList.push(m);
+        } else {
+            // Apply Filters to Active List only for display
+            const matchesSearch = !searchVal || 
+                (m.name || "").toLowerCase().includes(searchVal) || 
+                (m.email || "").toLowerCase().includes(searchVal) ||
+                (m.givenName || "").toLowerCase().includes(searchVal) ||
+                (m.familyName || "").toLowerCase().includes(searchVal);
+            
+            const matchesPlan = planFilter === "all" || m.plan === planFilter;
+            const matchesStatus = statusFilter === "all" || statusStr === statusFilter;
+
+            if (matchesSearch && matchesPlan && matchesStatus) {
+                activeList.push(m);
+            }
+
+            if (statusLower === 'active') activeMembers++;
+
+            // Count Expiring Soon
+            const plan = m.plan || 'Standard Member';
+            const planDays = window.getPlanDays(plan);
+            if (m.dateRegistered) {
+                const expiryDate = m.dateRegistered + (planDays * 24 * 60 * 60 * 1000);
+                const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                if (diffDays > 0 && diffDays <= 7) expiringSoon++;
+            }
+        }
+    });
+
+    // Update KPI UI
+    if (document.getElementById('financialTotalActiveMembers')) document.getElementById('financialTotalActiveMembers').innerText = activeMembers;
+    if (document.getElementById('financialExpiringSoon')) document.getElementById('financialExpiringSoon').innerText = expiringSoon;
+    if (document.getElementById('financialNewMembers')) document.getElementById('financialNewMembers').innerText = newMembers30d;
+
+    // 2. Render Rows
+    const renderMemberRow = (m, isArchived) => {
         let plan = m.plan || 'Standard Member';
         let daysLeftText = "N/A", timerBadgeClass = "active";
-
         const planDays = window.getPlanDays(plan);
 
         if (m.dateRegistered) {
             const expiryDate = m.dateRegistered + (planDays * 24 * 60 * 60 * 1000);
             const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-            if (diffDays > 0) { daysLeftText = `${diffDays} Days`; if (diffDays <= 7) timerBadgeClass = "pending"; }
-            else { daysLeftText = "Expired"; timerBadgeClass = "broken"; }
-        } else { daysLeftText = `${planDays} Days`; }
-
-        let renewBtnHtml = `<button class="btn-icon btn-edit" style="color: #10B981;" title="Renew Membership" onclick="renewMember('${m.id}')"><i class="fa-solid fa-rotate-right"></i></button>`;
-
-        if (statusStr === 'archived') {
-            if (arcTbody) {
-                arcHtml.push(`
-                    <tr>
-                        <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
-                        <td>${m.email}</td><td><strong>${plan}</strong></td><td><span class="badge maintenance">Archived</span></td>
-                        <td>
-                            <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
-                            <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
-                        </td>
-                    </tr>
-                `);
+            if (diffDays > 0) { 
+                daysLeftText = `${diffDays} Days`; 
+                if (diffDays <= 7) timerBadgeClass = "pending"; 
+            } else { 
+                daysLeftText = "Expired"; 
+                timerBadgeClass = "broken"; 
             }
-        } else {
-            totalNonArchived++;
-            let badgeClass = statusStr === 'active' ? 'active' : 'inactive';
-            const avatarHtml = m.image ? `<img src="${m.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` : `<div class="initial-avatar" style="width:32px; height:32px; font-size:11px;">${(m.givenName || m.name || "?")[0]}${(m.familyName || "")[0] || ""}</div>`;
-            
-            if (memTbody) {
-                memHtml.push(`
-                    <tr>
-                        <td style="display:flex; align-items:center; gap:10px; border-bottom:none;">${avatarHtml} ${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
-                        <td>${m.email}</td><td><strong>${plan}</strong></td>
-                        <td><span class="badge ${timerBadgeClass}"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
-                        <td><strong>₱${(m.creditBalance || 0).toFixed(2)}</strong></td>
-                        <td><span class="badge ${badgeClass}">${m.status || 'Active'}</span></td>
-                        <td>
-                            ${renewBtnHtml}
-                            <button class="btn-icon btn-edit" style="color: #8b5cf6;" title="Top-Up Credit" onclick="openAddCreditModal('${m.id}')"><i class="fa-solid fa-wallet"></i></button>
-                            <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Member" onclick="openEditMemberModal('${m.id}')"><i class="fa-solid fa-edit"></i></button>
-                            <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Archive Account" onclick="archiveUser('${m.id}', '${m.status || 'Active'}')"><i class="fas fa-box-archive"></i></button>
-                        </td>
-                    </tr>
-                `);
-            }
-            if (statusStr === 'active') activeMembers++;
+        } else { 
+            daysLeftText = `${planDays} Days`; 
         }
-    });
 
-    if (memTbody) memTbody.innerHTML = memHtml.join('');
-    if (arcTbody) arcTbody.innerHTML = arcHtml.join('');
+        if (isArchived) {
+            return `
+                <tr>
+                    <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
+                    <td>${m.email}</td><td><strong>${plan}</strong></td><td><span class="status-badge-solid voided">Archived</span></td>
+                    <td style="text-align: right;">
+                        <button type="button" class="btn-icon" style="color: #10B981;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
+                        <button type="button" class="btn-icon" style="color: #EF4444;" title="Permanently Delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `;
+        } else {
+            let badgeClass = (m.status || "Active").trim().toLowerCase() === 'active' ? 'active' : 'inactive';
+            let statusHtml = `<span class="badge ${badgeClass}">${m.status || 'Active'}</span>`;
+            
+            const avatarHtml = m.image 
+                ? `<img src="${m.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` 
+                : `<div class="initial-avatar" style="width:32px; height:32px; font-size:11px;">${(m.givenName || m.name || "?")[0]}${(m.familyName || "")[0] || ""}</div>`;
+            
+            // Inline Action Buttons (Similar to Staff/Trainers)
+            const actionHtml = `
+                <div class="flex gap-1 justify-end">
+                    <button type="button" class="btn-icon" style="color: #3B82F6;" title="Renew/Extend" onclick="renewMember('${m.id}')"><i class="fa-solid fa-rotate-right"></i></button>
+                    <button type="button" class="btn-icon" style="color: var(--dark-black);" title="Edit Profile" onclick="openEditMemberModal('${m.id}')"><i class="fa-solid fa-user-edit"></i></button>
+                    <button type="button" class="btn-icon" style="color: #10B981;" title="Top-up Credit" onclick="openAddCreditModal('${m.id}')"><i class="fa-solid fa-wallet"></i></button>
+                    <button type="button" class="btn-icon" style="color: #f39c12;" title="Archive Member" onclick="archiveUser('${m.id}', '${m.status || 'Active'}')"><i class="fas fa-box-archive"></i></button>
+                </div>
+            `;
 
+            return `
+                <tr>
+                    <td style="display:flex; align-items:center; gap:10px; border-bottom:none;">
+                        ${avatarHtml}
+                        <div>
+                            <div style="font-weight: 600;">${m.givenName || m.name} ${m.familyName || ''}</div>
+                            <div style="font-size: 11px; color: #94a3b8;">${m.email}</div>
+                        </div>
+                    </td>
+                    <td style="font-weight: 500;">${plan}</td>
+                    <td><span class="badge ${timerBadgeClass}" style="font-size: 11px; padding: 2px 6px;"><i class="fa-regular fa-clock"></i> ${daysLeftText}</span></td>
+                    <td style="font-weight: 600;">₱${(m.creditBalance || 0).toFixed(2)}</td>
+                    <td>${statusHtml}</td>
+                    <td style="text-align: right;">${actionHtml}</td>
+                </tr>
+            `;
+        }
+    };
+
+    if (memTbody) window.syncDOM(memTbody, activeList, (m) => renderMemberRow(m, false), 'mem-row');
+    if (arcTbody) window.syncDOM(arcTbody, archivedList, (m) => renderMemberRow(m, true), 'arc-row');
+
+
+    // Update pagination counts
+    if (document.getElementById('memberTotalCount')) document.getElementById('memberTotalCount').innerText = activeList.length;
+    if (document.getElementById('memberShowingCount')) document.getElementById('memberShowingCount').innerText = activeList.length > 0 ? `1-${activeList.length}` : '0-0';
+    
     if (document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
-    if (document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = totalNonArchived;
+    if (document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = activeList.length;
     if (window.refreshDashboardAnalytics) window.refreshDashboardAnalytics();
 }
+
+// Member UI Helpers
+window.sendMessageToMember = function(id) {
+    showToast("Opening messaging interface for member ID: " + id, "info");
+};
+
+window.filterMembers = function() {
+    renderMembers();
+};
+
+window.sortMembers = function(field) {
+    showToast("Sorting members by " + field, "info");
+};
+
+window.changeMemberPagination = function() {
+    renderMembers();
+};
 
 window.openEditMemberModal = function (id) {
     const member = membersData.find(m => m.id === id);
     if (!member) return;
-    document.getElementById('editMemberId').value = member.id;
-    document.getElementById('editMemberGiven').value = member.givenName || '';
-    document.getElementById('editMemberMI').value = member.mi || '';
-    document.getElementById('editMemberFamily').value = member.familyName || '';
 
+    if (document.getElementById('editMemberId')) {
+        document.getElementById('editMemberId').value = id;
+    }
+    if (document.getElementById('editMemberGiven')) {
+        document.getElementById('editMemberGiven').value = member.givenName || '';
+    }
+    if (document.getElementById('editMemberMI')) {
+        document.getElementById('editMemberMI').value = member.mi || '';
+    }
+    if (document.getElementById('editMemberFamily')) {
+        document.getElementById('editMemberFamily').value = member.familyName || '';
+    }
     if (document.getElementById('editMemberRfid')) {
         document.getElementById('editMemberRfid').value = member.rfid || '';
     }
-
     if (document.getElementById('editMemberPlan')) {
         document.getElementById('editMemberPlan').value = member.plan || 'Gold Plan';
     }
@@ -2574,87 +3174,205 @@ function renderStaff() {
     const trainerTbody = document.querySelector('#trainerTable tbody');
     const arcStaffTbody = document.querySelector('#archivedStaffTable tbody');
     const arcTrainerTbody = document.querySelector('#archivedTrainerTable tbody');
+    // Early return removed to allow dashboard feed updates
 
-    if (staffTbody) staffTbody.innerHTML = "";
-    if (trainerTbody) trainerTbody.innerHTML = "";
-    if (arcStaffTbody) arcStaffTbody.innerHTML = "";
-    if (arcTrainerTbody) arcTrainerTbody.innerHTML = "";
 
-    let totalTrainers = 0, totalEmployees = 0, activeTrainers = 0, trainersFeed = "";
+    // 1. Initialize KPI Metrics
+    let staffActive = 0, staffOnShift = 0, staffMgmt = 0;
+    let trainerActive = 0, trainerOnFloor = 0, trainerNewHires = 0;
+    
+    const now = new Date().getTime();
+    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+
+    const staffList = [];
+    const trainerList = [];
+    const arcStaffList = [];
+    const arcTrainerList = [];
+
+    // Filter values - Staff
+    const staffSearch = (document.getElementById('staffSearchModern')?.value || "").toLowerCase();
+    const staffRoleFilter = document.getElementById('staffFilterRole')?.value || "all";
+    const staffStatusFilter = document.getElementById('staffFilterStatus')?.value || "all";
+
+    // Filter values - Trainers
+    const trainerSearch = (document.getElementById('trainerSearchModern')?.value || "").toLowerCase();
+    const trainerSpecFilter = document.getElementById('trainerFilterSpecialty')?.value || "all";
+    const trainerStatusFilter = document.getElementById('trainerFilterStatus')?.value || "all";
 
     allUsersData.forEach(u => {
-        const roleStr = (u.role || "").trim().toLowerCase();
-        const statusStr = (u.status || "Active").trim().toLowerCase();
-        let fullName = `${u.givenName || u.name} ${u.mi ? u.mi + '. ' : ''}${u.familyName || ''}`.trim();
-        let specialty = u.specialty || '-';
+        const roleStr = (u.role || "").trim();
+        const roleLower = roleStr.toLowerCase();
+        const statusStr = (u.status || "Active").trim();
+        const statusLower = statusStr.toLowerCase();
 
-        if (statusStr === 'archived') {
-            let actionBtns = `
-                <button class="btn-icon btn-delete" style="color: #27ae60;" title="Restore Account" onclick="archiveUser('${u.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
-                <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Permanently Delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button>
-            `;
-
-            if (roleStr === 'trainer') {
-                if (arcTrainerTbody) arcTrainerTbody.innerHTML += `<tr><td>${fullName}</td><td>${u.role}</td><td>${specialty}</td><td>${u.email}</td><td><span class="badge maintenance">Archived</span></td><td>${actionBtns}</td></tr>`;
-            }
-            else {
-                if (arcStaffTbody) arcStaffTbody.innerHTML += `<tr><td>${fullName}</td><td>${u.role}</td><td>${u.email}</td><td><span class="badge maintenance">Archived</span></td><td>${actionBtns}</td></tr>`;
-            }
+        if (statusLower === 'archived') {
+            if (roleLower === 'trainer') arcTrainerList.push(u);
+            else arcStaffList.push(u);
         } else {
-            let badgeClass = (statusStr === 'active' || statusStr === 'on leave') ? 'active' : 'inactive';
+            const isTrainer = roleLower === 'trainer';
+            const isStaffOrAdmin = roleLower === 'staff' || roleLower === 'admin';
 
-            let actionBtns = `
-                <button class="btn-icon btn-edit" style="color: var(--dark-black);" title="Edit Details" onclick="openEditStaffModal('${u.id}')"><i class="fa-solid fa-edit"></i></button>
-                <button class="btn-icon btn-delete" style="color: #f39c12;" title="Archive Account" onclick="archiveUser('${u.id}', '${u.status || 'Active'}')"><i class="fas fa-box-archive"></i></button>
-            `;
+            // Process Staff/Admin
+            if (isStaffOrAdmin) {
+                if (statusLower === 'active') staffActive++;
+                if (u.shiftStatus === 'On Shift') staffOnShift++;
+                if (roleLower === 'admin') staffMgmt++;
 
-            let shiftBadge = '';
-            if (roleStr === 'staff' || roleStr === 'admin') {
-                const isWorking = u.shiftStatus === 'On Shift';
-                shiftBadge = `<span class="badge ${isWorking ? 'active' : 'inactive'}" style="${isWorking ? 'background: var(--dark-black); color: white;' : ''}">${isWorking ? 'On Shift' : 'Off Shift'}</span>`;
-            } else if (roleStr === 'trainer') {
-                const isOnFloor = u.shiftStatus === 'On Floor';
-                shiftBadge = `<span class="badge ${isOnFloor ? 'active' : 'inactive'}" style="${isOnFloor ? 'background: #3498db; color: white;' : ''}">${isOnFloor ? 'On Floor' : 'Off Floor'}</span>`;
+                const matchesSearch = !staffSearch || 
+                    (u.name || "").toLowerCase().includes(staffSearch) || 
+                    (u.email || "").toLowerCase().includes(staffSearch) ||
+                    (u.givenName || "").toLowerCase().includes(staffSearch) ||
+                    (u.familyName || "").toLowerCase().includes(staffSearch);
+                const matchesRole = staffRoleFilter === "all" || roleStr === staffRoleFilter;
+                const matchesStatus = staffStatusFilter === "all" || statusStr === staffStatusFilter;
+
+                if (matchesSearch && matchesRole && matchesStatus) staffList.push(u);
             }
 
-            let statusHtml = `<div style="display: flex; gap: 5px;"><span class="badge ${badgeClass}">${u.status || 'Active'}</span>${shiftBadge}</div>`;
-            const avatarHtml = u.image ? `<img src="${u.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` : `<div class="initial-avatar" style="width:32px; height:32px; font-size:11px;">${(u.givenName || u.name || "?")[0]}${(u.familyName || "")[0] || ""}</div>`;
+            // Process Trainers
+            if (isTrainer) {
+                if (statusLower === 'active') trainerActive++;
+                if (u.shiftStatus === 'On Floor') trainerOnFloor++;
+                if (u.dateRegistered && u.dateRegistered > thirtyDaysAgo) trainerNewHires++;
 
-            if (roleStr === 'trainer') {
-                if (trainerTbody) trainerTbody.innerHTML += `<tr><td style="display:flex; align-items:center; gap:10px; border-bottom:none;">${avatarHtml} ${fullName}</td><td>${u.role}</td><td>${specialty}</td><td>${u.email}</td><td>${statusHtml}</td><td>${actionBtns}</td></tr>`;
-                totalTrainers++;
+                const matchesSearch = !trainerSearch || 
+                    (u.name || "").toLowerCase().includes(trainerSearch) || 
+                    (u.email || "").toLowerCase().includes(trainerSearch) ||
+                    (u.givenName || "").toLowerCase().includes(trainerSearch) ||
+                    (u.familyName || "").toLowerCase().includes(trainerSearch);
+                const matchesSpec = trainerSpecFilter === "all" || (u.specialty || "General Fitness") === trainerSpecFilter;
+                const matchesStatus = trainerStatusFilter === "all" || statusStr === trainerStatusFilter;
 
-                if (statusStr === 'active' && u.shiftStatus === 'On Floor') {
-                    activeTrainers++;
-                    trainersFeed += `
-                        <div class="list-item">
-                            <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
-                            <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                                <div><div class="trainer-name">${fullName}</div><p style="font-size: 12px; color: var(--text-muted);">${specialty} | ${u.email}</p></div>
-                                <span class="status-badge status-progress" style="background: #3498db; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px;">On Floor</span>
-                            </div>
-                        </div>
-                    `;
-                }
-            } else {
-                if (staffTbody) staffTbody.innerHTML += `<tr><td style="display:flex; align-items:center; gap:10px; border-bottom:none;">${avatarHtml} ${fullName}</td><td>${u.role}</td><td>${u.email}</td><td>${statusHtml}</td><td>${actionBtns}</td></tr>`;
-                totalEmployees++;
+                if (matchesSearch && matchesSpec && matchesStatus) trainerList.push(u);
             }
         }
     });
 
-    if (document.getElementById('dashStaffTotal')) document.getElementById('dashStaffTotal').innerText = totalEmployees;
-    if (document.getElementById('gridTrainers')) document.getElementById('gridTrainers').innerText = totalTrainers;
+    // Update Staff KPI UI
+    if (document.getElementById('staffTotalActive')) document.getElementById('staffTotalActive').innerText = staffActive;
+    if (document.getElementById('staffOnShift')) document.getElementById('staffOnShift').innerText = staffOnShift;
+    if (document.getElementById('staffManagement')) document.getElementById('staffManagement').innerText = staffMgmt;
 
+    // Update Trainer KPI UI
+    if (document.getElementById('trainerTotalActive')) document.getElementById('trainerTotalActive').innerText = trainerActive;
+    if (document.getElementById('trainerOnFloor')) document.getElementById('trainerOnFloor').innerText = trainerOnFloor;
+    if (document.getElementById('trainerNewHires')) document.getElementById('trainerNewHires').innerText = trainerNewHires;
+
+    const renderStaffRow = (u, isArchived) => {
+        const roleStr = (u.role || "").trim();
+        const roleLower = roleStr.toLowerCase();
+        const statusStr = (u.status || "Active").trim();
+        const statusLower = statusStr.toLowerCase();
+        let fullName = `${u.givenName || u.name} ${u.familyName || ''}`.trim();
+        let specialty = u.specialty || 'General Fitness';
+
+        const avatarHtml = u.image 
+            ? `<img src="${u.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` 
+            : `<div class="initial-avatar" style="width:32px; height:32px; font-size:11px;">${(u.givenName || u.name || "?")[0]}${(u.familyName || "")[0] || ""}</div>`;
+
+        let actionBtns = isArchived ? `
+            <div class="flex gap-1 justify-end">
+                <button type="button" class="btn-icon" style="color: #10B981;" title="Restore Account" onclick="archiveUser('${u.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
+                <button type="button" class="btn-icon" style="color: #EF4444;" title="Permanently Delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button>
+            </div>
+        ` : `
+            <div class="flex gap-1 justify-end">
+                <button type="button" class="btn-icon" style="color: var(--dark-black);" title="Edit Details" onclick="openEditStaffModal('${u.id}')"><i class="fa-solid fa-user-edit"></i></button>
+                <button type="button" class="btn-icon" style="color: #f39c12;" title="Archive Account" onclick="archiveUser('${u.id}', '${statusStr}')"><i class="fas fa-box-archive"></i></button>
+            </div>
+        `;
+
+        let statusBadgeClass = (statusLower === 'active' || statusLower === 'on leave') ? 'active' : 'inactive';
+        let shiftBadge = '';
+        if (roleLower === 'staff' || roleLower === 'admin') {
+            const isWorking = u.shiftStatus === 'On Shift';
+            shiftBadge = `<span class="badge ${isWorking ? 'active' : 'inactive'}" style="${isWorking ? 'background: var(--dark-black); color: white;' : ''}">${isWorking ? 'On Shift' : 'Off Shift'}</span>`;
+        } else if (roleLower === 'trainer') {
+            const isOnFloor = u.shiftStatus === 'On Floor';
+            shiftBadge = `<span class="badge ${isOnFloor ? 'active' : 'inactive'}" style="${isOnFloor ? 'background: #3B82F6; color: white;' : ''}">${isOnFloor ? 'On Floor' : 'Off Floor'}</span>`;
+        }
+
+        let statusHtml = `<div style="display: flex; gap: 5px;"><span class="badge ${statusBadgeClass}">${statusStr}</span>${shiftBadge}</div>`;
+
+        if (roleLower === 'trainer') {
+            return `
+                <tr>
+                    <td style="display:flex; align-items:center; gap:10px; border-bottom:none;">
+                        ${avatarHtml}
+                        <div>
+                            <div style="font-weight: 600;">${fullName}</div>
+                            <div style="font-size: 11px; color: #94a3b8;">${u.email}</div>
+                        </div>
+                    </td>
+                    <td style="font-weight: 500;">${specialty}</td>
+                    <td><strong>${roleStr}</strong></td>
+                    <td>${statusHtml}</td>
+                    <td style="text-align: right;">${actionBtns}</td>
+                </tr>
+            `;
+        } else {
+            return `
+                <tr>
+                    <td style="display:flex; align-items:center; gap:10px; border-bottom:none;">
+                        ${avatarHtml}
+                        <div>
+                            <div style="font-weight: 600;">${fullName}</div>
+                            <div style="font-size: 11px; color: #94a3b8;">${u.email}</div>
+                        </div>
+                    </td>
+                    <td style="font-weight: 500;">${roleStr}</td>
+                    <td>${u.email}</td>
+                    <td>${statusHtml}</td>
+                    <td style="text-align: right;">${actionBtns}</td>
+                </tr>
+            `;
+        }
+    };
+
+    if (staffTbody) window.syncDOM(staffTbody, staffList, (u) => renderStaffRow(u, false), 'staff-row');
+    if (trainerTbody) window.syncDOM(trainerTbody, trainerList, (u) => renderStaffRow(u, false), 'trainer-row');
+    if (arcStaffTbody) window.syncDOM(arcStaffTbody, arcStaffList, (u) => renderStaffRow(u, true), 'arc-staff-row');
+    if (arcTrainerTbody) window.syncDOM(arcTrainerTbody, arcTrainerList, (u) => renderStaffRow(u, true), 'arc-trainer-row');
+
+    // Update Pagination Counts
+    if (document.getElementById('staffTotalCount')) document.getElementById('staffTotalCount').innerText = staffList.length;
+    if (document.getElementById('staffShowingCount')) document.getElementById('staffShowingCount').innerText = staffList.length > 0 ? `1-${staffList.length}` : '0-0';
+    if (document.getElementById('trainerTotalCount')) document.getElementById('trainerTotalCount').innerText = trainerList.length;
+    if (document.getElementById('trainerShowingCount')) document.getElementById('trainerShowingCount').innerText = trainerList.length > 0 ? `1-${trainerList.length}` : '0-0';
+
+    // Dashboard Stats Feed
+    let trainersFeed = "";
+    allUsersData.forEach(u => {
+        if ((u.role || "").toLowerCase() === 'trainer' && (u.status || 'Active') === 'Active' && u.shiftStatus === 'On Floor') {
+            let fullName = `${u.givenName || u.name} ${u.familyName || ''}`.trim();
+            trainersFeed += `
+                <div class="list-item">
+                    <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
+                    <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <div><div class="trainer-name">${fullName}</div><p style="font-size: 12px; color: var(--text-muted);">${u.specialty || 'Trainer'} | ${u.email}</p></div>
+                        <span class="status-badge status-progress" style="background: #3B82F6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px;">On Floor</span>
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    if (document.getElementById('dashStaffTotal')) document.getElementById('dashStaffTotal').innerText = staffActive;
+    if (document.getElementById('gridTrainers')) document.getElementById('gridTrainers').innerText = trainerActive;
     const dashTrainers = document.getElementById('dashActiveTrainersFeed');
     if (dashTrainers) { dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>'; }
 }
+
+// Staff & Trainer UI Helpers
+window.filterStaff = function() { renderStaff(); };
+window.filterTrainers = function() { renderStaff(); };
+window.sortStaff = function(field) { showToast("Sorting staff by " + field, "info"); };
+window.sortTrainers = function(field) { showToast("Sorting trainers by " + field, "info"); };
 
 function renderMemberTrainers() {
     const grid = document.getElementById('memberTrainerGrid');
     if (!grid) return;
 
-    grid.innerHTML = "";
     let activeTrainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer' && u.status !== 'Archived');
 
     if (activeTrainers.length === 0) {
@@ -2662,7 +3380,7 @@ function renderMemberTrainers() {
         return;
     }
 
-    activeTrainers.forEach(t => {
+    const renderTrainerCard = (t) => {
         let fullName = `${t.givenName || t.name} ${t.familyName || ''}`.trim();
         let specialty = t.specialty || "General Fitness";
         let isOnFloor = t.shiftStatus === 'On Floor';
@@ -2671,7 +3389,7 @@ function renderMemberTrainers() {
             ? `<span class="badge" style="background: #3498db; color: white; padding: 3px 8px; font-size: 11px;">On Floor</span>`
             : `<span class="badge" style="background: #eee; color: #888; padding: 3px 8px; font-size: 11px;">Off Floor</span>`;
 
-        grid.innerHTML += `
+        return `
             <div class="trainer-card member-trainer-card" data-search="${fullName.toLowerCase()} ${specialty.toLowerCase()}">
                 <div class="trainer-avatar">${t.image ? `<img src="${t.image}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">` : fullName.charAt(0).toUpperCase()}</div>
                 <div class="trainer-info">
@@ -2681,22 +3399,30 @@ function renderMemberTrainers() {
                 <div>${badgeHtml}</div>
             </div>
         `;
-    });
+    };
+
+    window.syncDOM(grid, activeTrainers, renderTrainerCard, 'member-trainer-card');
 }
 
 window.openEditStaffModal = function (id) {
     const user = allUsersData.find(u => u.id === id);
     if (!user) return;
 
-    document.getElementById('editStaffId').value = user.id;
-    document.getElementById('editStaffGiven').value = user.givenName || '';
-    document.getElementById('editStaffMI').value = user.mi || '';
-    document.getElementById('editStaffFamily').value = user.familyName || '';
-
+    if (document.getElementById('editStaffId')) {
+        document.getElementById('editStaffId').value = id;
+    }
+    if (document.getElementById('editStaffGiven')) {
+        document.getElementById('editStaffGiven').value = user.givenName || '';
+    }
+    if (document.getElementById('editStaffMI')) {
+        document.getElementById('editStaffMI').value = user.mi || '';
+    }
+    if (document.getElementById('editStaffFamily')) {
+        document.getElementById('editStaffFamily').value = user.familyName || '';
+    }
     if (document.getElementById('editStaffRfid')) {
         document.getElementById('editStaffRfid').value = user.rfid || '';
     }
-
     if (document.getElementById('editStaffImage')) {
         document.getElementById('editStaffImage').value = user.image || '';
     }
@@ -3113,13 +3839,21 @@ function initUI() {
     const greetingText = document.getElementById('greetingText');
     if (greetingText) {
         const hour = new Date().getHours();
-        const name = localStorage.getItem("loggedInUser") || "Admin";
+        const name = localStorage.getItem("loggedInUser") || "User";
         const firstName = name.split(' ')[0];
 
         if (hour < 12) greetingText.innerText = `Good Morning, ${firstName}.`;
         else if (hour < 18) greetingText.innerText = `Good Afternoon, ${firstName}.`;
         else greetingText.innerText = `Good Evening, ${firstName}.`;
     }
+
+    // --- Topbar Name Initialization ---
+    const topBarName = document.getElementById('topBarName');
+    if (topBarName) {
+        const name = localStorage.getItem("loggedInUser") || "User";
+        topBarName.innerText = name.split(' ')[0];
+    }
+
 
     function updateShiftTimer() {
         const role = localStorage.getItem("userRole");
@@ -3298,14 +4032,13 @@ onSnapshot(bookingsCol, (snapshot) => {
 function renderBookings() {
     const tbody = document.getElementById('bookingsBody');
     const myTbody = document.getElementById('myBookingsBody');
-    const loggedInRole = localStorage.getItem("userRole");
+    const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
     const loggedInUserId = localStorage.getItem("userId");
 
-    let displayData = bookingsData.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+    let displayData = [...bookingsData].sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
 
-    if (loggedInRole === "Member") {
+    if (loggedInRole === "member") {
         displayData = displayData.filter(b => b.memberId === loggedInUserId);
-        if (myTbody) myTbody.innerHTML = "";
 
         const notifArea = document.getElementById('memberNotificationArea');
         if (notifArea) {
@@ -3324,7 +4057,7 @@ function renderBookings() {
                 html += `
                     <div class="notification-banner">
                         <div><i class="fas fa-check-circle" style="font-size: 20px; margin-right: 10px;"></i> <strong>Booking Confirmed!</strong> Your session with ${nextSession.trainerName} is scheduled for ${dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at ${dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.</div>
-                        <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
+                        <button type="button" onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
                     </div>
                 `;
             }
@@ -3333,7 +4066,7 @@ function renderBookings() {
                 html += `
                     <div class="notification-banner" style="background-color: #e2e3e5; color: #383d41; border-left-color: #6c757d;">
                         <div><i class="fas fa-hourglass-half" style="font-size: 20px; margin-right: 10px;"></i> <strong>Pending Approval:</strong> You have ${pending.length} request(s) waiting for a trainer to accept.</div>
-                        <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
+                        <button type="button" onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
                     </div>
                 `;
             }
@@ -3344,16 +4077,15 @@ function renderBookings() {
                 html += `
                     <div class="notification-banner" style="background-color: #f8d7da; color: #721c24; border-left-color: #f5c6cb;">
                         <div><i class="fas fa-exclamation-circle" style="font-size: 20px; margin-right: 10px;"></i> <strong>Update:</strong> Your request with ${nextDeclined.trainerName} on ${dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} was declined or cancelled. Please book another time.</div>
-                        <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
+                        <button type="button" onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
                     </div>
                 `;
             }
 
             notifArea.innerHTML = html;
         }
-    } else if (loggedInRole === "Trainer") {
+    } else if (loggedInRole === "trainer") {
         displayData = displayData.filter(b => b.trainerId === loggedInUserId);
-        if (tbody) tbody.innerHTML = "";
 
         const notifArea = document.getElementById('trainerNotificationArea');
         if (notifArea) {
@@ -3363,7 +4095,7 @@ function renderBookings() {
                 notifArea.innerHTML = `
                     <div class="notification-banner" style="background-color: #fff3cd; color: #856404; border-left-color: #ffc107;">
                         <div><i class="fas fa-bell" style="font-size: 20px; margin-right: 10px;"></i> <strong>New Request!</strong> You have <strong>${pendingRequests.length}</strong> pending session request(s) to review in your Schedule tab.</div>
-                        <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
+                        <button type="button" onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
                     </div>
                 `;
 
@@ -3380,14 +4112,12 @@ function renderBookings() {
                 }
             }
         }
-    } else {
-        if (tbody) tbody.innerHTML = "";
     }
 
     const dateFilter = document.getElementById('bookingDateFilter')?.value;
     if (dateFilter) displayData = displayData.filter(b => b.date === dateFilter);
 
-    displayData.forEach(b => {
+    const renderBookingRow = (b) => {
         let badgeClass = "active";
         if (b.status === "Pending") badgeClass = "pending";
         if (b.status === "Completed") badgeClass = "maintenance";
@@ -3397,8 +4127,8 @@ function renderBookings() {
         const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-        if (loggedInRole === "Member" && myTbody) {
-            myTbody.innerHTML += `
+        if (loggedInRole === "member") {
+            return `
                 <tr>
                     <td>${b.trainerName}</td>
                     <td>${dateStr}</td>
@@ -3406,25 +4136,25 @@ function renderBookings() {
                     <td><span class="badge ${badgeClass}">${b.status}</span></td>
                 </tr>
             `;
-        } else if (tbody) {
+        } else {
             let actions = "";
-            if (loggedInRole === "Trainer") {
+            if (loggedInRole === "trainer") {
                 if (b.status === "Pending") {
                     actions = `
-                        <button class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed')"><i class="fas fa-check"></i></button>
-                        <button class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Cancelled')"><i class="fas fa-times"></i></button>
+                        <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed')"><i class="fas fa-check"></i></button>
+                        <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Cancelled')"><i class="fas fa-times"></i></button>
                      `;
                 } else {
-                    actions = `<button class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
+                    actions = `<button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
                 }
             } else {
                 actions = `
-                    <button class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>
-                    <button class="btn-icon btn-delete" title="Delete Booking" onclick="deleteBooking('${b.id}')"><i class="fas fa-trash"></i></button>
+                    <button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>
+                    <button type="button" class="btn-icon btn-delete" title="Delete Booking" onclick="deleteBooking('${b.id}')"><i class="fas fa-trash"></i></button>
                 `;
             }
 
-            tbody.innerHTML += `
+            return `
                 <tr>
                     <td>${b.memberName}</td>
                     <td>${b.trainerName}</td>
@@ -3435,7 +4165,13 @@ function renderBookings() {
                 </tr>
             `;
         }
-    });
+    };
+
+    if (loggedInRole === "member" && myTbody) {
+        window.syncDOM(myTbody, displayData, renderBookingRow, 'my-booking');
+    } else if (tbody) {
+        window.syncDOM(tbody, displayData, renderBookingRow, 'booking');
+    }
 }
 
 window.filterBookingsByDate = () => { renderBookings(); }

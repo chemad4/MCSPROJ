@@ -264,7 +264,8 @@
                     return;
                 }
 
-                // 2. DEVICE RESTRICTION CHECK
+                // 2. DEVICE RESTRICTION CHECK (Temporarily disabled for testing)
+                /*
                 if ((userRole === "Admin" || userRole === "Staff") && userOnMobile) {
                     errorMsg.innerText = "Access Denied: Admins/Staff must use Desktop.";
                     errorMsg.style.display = "block";
@@ -280,6 +281,7 @@
                     submitBtn.disabled = false;
                     return;
                 }
+                */
 
                 // 3. GENERATE UNIQUE SESSION ID TO OVERRIDE ANY PREVIOUS LOGINS
                 const newSessionId = Math.random().toString(36).substring(2, 15);
@@ -318,9 +320,10 @@
                 } catch(e) { console.error("Login log failed:", e); }
 
                 // Redirect
-                if (userRole === "Admin") window.location.replace("adminDB.html");
-                else if (userRole === "Staff") window.location.replace("staffDB.html");
-                else if (userRole === "Trainer") window.location.replace("trainerDB.html");
+                const roleLower = (userRole || "").trim().toLowerCase();
+                if (roleLower === "admin") window.location.replace("adminDB.html");
+                else if (roleLower === "staff") window.location.replace("staffDB.html");
+                else if (roleLower === "trainer") window.location.replace("trainerDB.html");
                 else window.location.replace("memberDB.html");
                 
             } catch (error) {

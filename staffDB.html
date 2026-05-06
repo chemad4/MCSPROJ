@@ -9,7 +9,8 @@
     <link rel="icon" type="image/png" href="images/icon-192.png">
 
     <script>
-        if (!localStorage.getItem("loggedInUser") || localStorage.getItem("userRole") !== "Staff") {
+        const role = (localStorage.getItem("userRole") || "").toLowerCase();
+        if (!localStorage.getItem("loggedInUser") || role !== "staff") {
             window.location.replace("index.html");
         }
     </script>
@@ -23,6 +24,7 @@
 
     <link rel="stylesheet" href="css/styles.css">
     <script src="js/ui.js"></script>
+    <script src="js/bookings-ui.js"></script>
 
     <style>
         .pos-grid {
@@ -67,7 +69,7 @@
         }
 
         .grid-stat-box {
-            background: #f8f9fa;
+            background: rgba(0, 0, 0, 0.03);
             border-radius: 8px;
             padding: 20px;
             text-align: center;
@@ -266,6 +268,9 @@
 
             <li class="nav-item nav-clickable" onclick="switchTab('members', this)"><i class="fa-solid fa-users"></i>
                 <span class="menu-text">Member Directory</span></li>
+
+            <li class="nav-item nav-clickable" onclick="switchTab('lockers', this)"><i class="fa-solid fa-lock"></i>
+                <span class="menu-text">Locker Management</span></li>
 
             <li class="nav-item nav-clickable" onclick="switchTab('attendance', this)"><i
                     class="fa-solid fa-clipboard-user"></i> <span class="menu-text">Attendance Log</span></li>
@@ -470,12 +475,12 @@
                     </div>
                 </div>
                 <div class="cart-panel">
-                    <h3 style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;"><i
+                    <h3 style="margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;"><i
                             class="fa-solid fa-cart-shopping"></i> Current Order</h3>
                     <div class="cart-items" id="posCartBody"></div>
                     <div style="margin-bottom: 15px;">
                         <input type="text" id="posCustomerName" placeholder="Customer Name (Optional)"
-                            style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(255,255,255,0.5); color: var(--text-primary);">
+                            style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                     <div class="pos-totals"></div>
                 </div>
@@ -541,6 +546,49 @@
                         </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="lockers" class="content-section" style="padding: 32px;">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i class="fa-solid fa-lock mr-2 text-slate-400"></i>Locker System</h2>
+                    <p class="text-sm text-slate-500 mt-1">Manage locker assignments and availability.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button class="bg-[#991b1b] hover:bg-red-800 text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-2" onclick="openAddLockerModal()">
+                        <i class="fas fa-plus"></i> Add Locker
+                    </button>
+                </div>
+            </div>
+
+            <!-- Locker Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Total Lockers</div>
+                    <div class="text-2xl font-bold text-slate-900" id="totalLockersCount">0</div>
+                </div>
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Available</div>
+                    <div class="text-2xl font-bold text-emerald-600" id="availableLockersCount">0</div>
+                </div>
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Occupied</div>
+                    <div class="text-2xl font-bold text-amber-600" id="occupiedLockersCount">0</div>
+                </div>
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Maintenance</div>
+                    <div class="text-2xl font-bold text-slate-400" id="maintLockersCount">0</div>
+                </div>
+            </div>
+
+            <!-- Locker Grid -->
+            <div class="panel">
+                <div class="panel-body">
+                    <div class="locker-grid-layout" id="lockerGrid">
+                        <!-- Rendered by JS -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -616,7 +664,7 @@
                         style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white); color: var(--text-primary);">
                         <i class="fa-solid fa-address-book"></i> Contacts
                     </div>
-                    <div style="padding: 10px; border-bottom: 1px solid var(--border-color); background: #fafafa;">
+                    <div style="padding: 10px; border-bottom: 1px solid var(--border-color); background: var(--panel-bg);">
                         <div class="search-box" style="width: 100%;">
                             <i class="fas fa-search" style="left: 10px;"></i>
                             <input type="text" id="chatSearch" placeholder="Search users..." onkeyup="filterChatUsers()"
@@ -1074,6 +1122,90 @@
                     <p>Date Generated:</p>
                     <p style="margin-top: 30px; border-top: 1px solid black; padding-top: 5px;"><strong
                             id="pdfCompletionDate">--/--/--</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- ADD LOCKER MODAL                           -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="addLockerModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-lock mr-2"></i> Add New Locker</h3>
+                <span class="close-btn" onclick="closeModal('addLockerModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="addLockerForm">
+                <div class="form-group">
+                    <label class="form-label">Locker Number</label>
+                    <input type="text" id="lockerNumberInput" placeholder="e.g. L01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Location / Section</label>
+                    <input type="text" id="lockerLocationInput" placeholder="e.g. Male Locker Room" required>
+                </div>
+                <button type="submit" class="modal-submit-btn" style="background-color: var(--primary-red); color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; cursor: pointer;">Create Locker</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- ASSIGN LOCKER MODAL                        -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="assignLockerModal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-user-tag mr-2"></i> Locker Assignment</h3>
+                <span class="close-btn" onclick="closeModal('assignLockerModal')">&times;</span>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center gap-4 mb-6 p-4 bg-slate-50 rounded border border-slate-200">
+                    <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 text-xl font-bold" id="assignLockerIcon">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-slate-900" id="assignLockerNumberText">Locker #--</div>
+                        <div class="text-sm text-slate-500" id="assignLockerLocationText">Location --</div>
+                    </div>
+                </div>
+
+                <form id="assignLockerForm">
+                    <input type="hidden" id="assignLockerId">
+                    <div class="form-group">
+                        <label class="form-label">Select Member</label>
+                        <select id="assignMemberSelect" class="form-input" required style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+                            <option value="" disabled selected>Search for a member...</option>
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Rental Duration (Months)</label>
+                        <input type="number" id="assignDuration" class="form-input" value="1" min="1" required style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button type="button" class="btn-cancel" style="flex: 1;" onclick="closeModal('assignLockerModal')">Cancel</button>
+                        <button type="submit" class="btn-submit" style="flex: 1; background-color: var(--primary-red);">Assign Locker</button>
+                    </div>
+                </form>
+
+                <div id="activeAssignmentInfo" style="display: none;">
+                    <div class="divider my-4" style="height: 1px; background: var(--border-color); margin: 20px 0;"></div>
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-sm font-semibold text-slate-900">Current Assignee</span>
+                        <span class="status-badge-solid paid" style="background: #10B981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Active</span>
+                    </div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 bg-[#991b1b] text-white rounded-full flex items-center justify-center font-bold" id="assigneeInitial">A</div>
+                        <div>
+                            <div class="font-bold text-slate-900" id="assigneeName">--</div>
+                            <div class="text-xs text-slate-500" id="assignmentExpiry">Expires: --</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" class="action-btn" style="flex: 1; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;" onclick="releaseLocker()">Release Locker</button>
+                        <button type="button" class="action-btn" style="background: #1e293b; color: white;" onclick="printLockerReceipt()">Print</button>
+                    </div>
                 </div>
             </div>
         </div>

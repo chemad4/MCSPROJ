@@ -132,7 +132,7 @@
         }
 
         .pos-product-card {
-            background: #fff;
+            background: var(--panel-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             overflow: hidden;
@@ -149,7 +149,7 @@
 
         .pos-card-image {
             height: 120px;
-            background: #f8f9fa;
+            background: rgba(0, 0, 0, 0.03);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -161,7 +161,24 @@
         .pos-card-image img {
             width: 100%;
             height: 100%;
-            object-fit: cover;
+            object-fit: contain;
+            padding: 10px;
+        }
+
+        .pos-product-card.featured {
+            grid-column: span 2;
+            background: linear-gradient(135deg, var(--panel-bg) 0%, rgba(255, 200, 200, 0.08) 100%);
+            border-color: var(--primary-red);
+        }
+
+        .pos-product-card.featured .pos-card-image {
+            height: 160px;
+            background: var(--panel-bg);
+        }
+
+        .pos-product-card.featured .pos-card-name {
+            font-size: 18px;
+            color: var(--primary-red);
         }
 
         .pos-card-info {
@@ -185,13 +202,19 @@
             color: #27ae60;
         }
 
+        .pos-card-size {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
         .pos-card-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 10px 12px;
-            border-top: 1px solid #f1f1f1;
-            background: #fafafa;
+            border-top: 1px solid var(--border-color);
+            background: rgba(0, 0, 0, 0.02);
         }
 
         .pos-card-price {
@@ -222,7 +245,7 @@
             display: flex;
             align-items: center;
             padding: 10px;
-            background: #fff;
+            background: var(--panel-bg);
             border: 1px solid var(--border-color);
             border-radius: 6px;
             gap: 10px;
@@ -232,7 +255,7 @@
             width: 40px;
             height: 40px;
             border-radius: 4px;
-            background: #f1f1f1;
+            background: rgba(0, 0, 0, 0.04);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -276,7 +299,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #f1f1f1;
+            background: rgba(0, 0, 0, 0.04);
             border: none;
             border-radius: 4px;
             cursor: pointer;
@@ -285,7 +308,7 @@
         }
 
         .qty-btn:hover {
-            background: #e2e8f0;
+            background: rgba(0, 0, 0, 0.06);
         }
 
         .pos-cart-line-total {
@@ -329,7 +352,7 @@
             justify-content: center;
             gap: 8px;
             padding: 15px 10px;
-            background: #fff;
+            background: var(--panel-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             cursor: pointer;
@@ -353,7 +376,7 @@
 
         .payment-method-btn.active {
             border-color: var(--dark-black);
-            background: #fafafa;
+            background: rgba(0, 0, 0, 0.03);
             color: var(--dark-black);
             box-shadow: 0 0 0 1px var(--dark-black);
         }
@@ -380,7 +403,7 @@
         }
 
         .grid-stat-box {
-            background: #f8f9fa;
+            background: rgba(0, 0, 0, 0.03);
             border-radius: 8px;
             padding: 20px;
             text-align: center;
@@ -577,6 +600,7 @@
             <li class="nav-item has-submenu"><i class="fa-solid fa-id-card-clip"></i> <span class="menu-text">Membership</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
                 <li class="nav-item sub-item nav-clickable" onclick="switchTab('membershipPlans', this)"><span class="menu-text">Plans & Pricing</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('lockers', this)"><span class="menu-text">Locker Management</span></li>
             </ul>
 
             <li class="nav-item nav-clickable" onclick="switchTab('pos', this)"><i class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale</span></li>
@@ -810,7 +834,7 @@
                     <div class="widgets-grid">
                         <div class="panel">
                             <div class="panel-header"
-                                style="background: white; border-bottom: none; padding-bottom: 0;"><i
+                                style="background: var(--panel-bg); border-bottom: none; padding-bottom: 0;"><i
                                     class="fa-solid fa-calendar-day"></i> Today's Bookings</div>
                             <div class="panel-body" id="todayBookingsList">
                                 <p style="color: var(--text-muted); font-size: 14px;">Loading bookings...</p>
@@ -818,7 +842,7 @@
                         </div>
                         <div class="panel">
                             <div class="panel-header"
-                                style="background: white; border-bottom: none; padding-bottom: 0;"><i
+                                style="background: var(--panel-bg); border-bottom: none; padding-bottom: 0;"><i
                                     class="fa-solid fa-user-check"></i> Recent Check-ins</div>
                             <div class="panel-body" id="recentCheckinsList">
                                 <p style="color: var(--text-muted); font-size: 14px;">Loading check-ins...</p>
@@ -1019,89 +1043,206 @@
         </div>
 
         <div id="payments" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="paymentSearch" placeholder="Search transactions..."
-                        onkeyup="filterTable('paymentTable', 'paymentSearch')">
+            <!-- Top-Level KPI Cards -->
+            <div class="financial-kpi-row">
+                <div class="financial-kpi-card">
+                    <span class="label">Total Revenue</span>
+                    <span class="value" id="financialTotalRevenue">₱0.00</span>
                 </div>
-                <button class="action-btn" style="background-color: var(--dark-black);" onclick="generateWeeklyPDF()"><i
-                        class="fas fa-file-pdf"></i> Generate Weekly Report</button>
+                <div class="financial-kpi-card">
+                    <span class="label">Total VAT</span>
+                    <span class="value" id="financialTotalVAT">₱0.00</span>
+                </div>
+                <div class="financial-kpi-card">
+                    <span class="label" style="color: #991b1b;">Total Voided</span>
+                    <span class="value" id="financialTotalVoided">₱0.00</span>
+                </div>
             </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fa-solid fa-receipt"></i> Transaction History</div>
+
+            <!-- Advanced Filtering Controls -->
+            <div class="dense-control-bar">
+                <div class="search-box" style="width: 250px; margin-bottom: 0;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="paymentSearch" placeholder="Search customer or ID..." onkeyup="filterPayments()">
+                </div>
+                
+                <div class="filter-group">
+                    <select id="paymentFilterRange" onchange="filterPayments()">
+                        <option value="all">All Dates</option>
+                        <option value="today">Today</option>
+                        <option value="7days">Last 7 Days</option>
+                        <option value="30days">Last 30 Days</option>
+                        <option value="custom">Custom Range...</option>
+                    </select>
+                    
+                    <select id="paymentFilterStatus" onchange="filterPayments()">
+                        <option value="all">All Statuses</option>
+                        <option value="Paid">Paid</option>
+                        <option value="Voided">Voided</option>
+                    </select>
+                    
+                    <select id="paymentFilterMethod" onchange="filterPayments()">
+                        <option value="all">All Methods</option>
+                        <option value="Cash">Cash</option>
+                        <option value="GCash">GCash</option>
+                        <option value="RFID">RFID Credit</option>
+                    </select>
+                </div>
+
+                <div style="margin-left: auto; display: flex; gap: 8px;">
+                    <button class="action-btn" style="background-color: var(--dark-black); padding: 6px 12px;" onclick="generateWeeklyPDF()">
+                        <i class="fas fa-file-pdf"></i> Export Report
+                    </button>
+                </div>
+            </div>
+
+            <!-- Transaction Table -->
+            <div class="panel" style="border-radius: 0 0 4px 4px; border-top: none;">
                 <div class="table-container no-shadow">
-                    <table id="paymentTable">
+                    <table id="paymentTable" class="dense-table">
                         <thead>
                             <tr>
-                                <th>Customer Name</th>
-                                <th>Purchased Items</th>
-                                <th>Date & Time</th>
-                                <th>Subtotal</th>
-                                <th>VAT (12%)</th>
-                                <th>Grand Total</th>
-                                <th>Action</th>
+                                <th onclick="sortPayments('customerName')">Customer <i class="fas fa-sort"></i></th>
+                                <th style="width: 250px;">Purchased Items</th>
+                                <th onclick="sortPayments('timestamp')">Date & Time <i class="fas fa-sort"></i></th>
+                                <th onclick="sortPayments('subtotal')">Subtotal <i class="fas fa-sort"></i></th>
+                                <th onclick="sortPayments('vat')">VAT (12%) <i class="fas fa-sort"></i></th>
+                                <th onclick="sortPayments('grandTotal')">Grand Total <i class="fas fa-sort"></i></th>
+                                <th>Status</th>
+                                <th style="width: 50px;"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Skeleton loader (Audit Fix 1.5) - cleared by renderPayments() -->
-                            <tr class="skeleton-row"><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
-                            <tr class="skeleton-row"><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
-                            <tr class="skeleton-row"><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
+                            <!-- Populated by script.js -->
                         </tbody>
                     </table>
+                </div>
+                
+                <!-- Table Footer / Pagination -->
+                <div class="table-footer">
+                    <div>
+                        Showing <span id="paymentShowingCount">0-0</span> of <span id="paymentTotalCount">0</span> transactions
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div>
+                            Rows per page: 
+                            <select id="paymentRowsPerPage" onchange="changePaymentPagination()" style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ddd;">
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                        <div class="pagination-controls" id="paymentPagination">
+                            <button class="page-btn" disabled><i class="fas fa-chevron-left"></i></button>
+                            <button class="page-btn active">1</button>
+                            <button class="page-btn" disabled><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div id="members" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="memberSearch" placeholder="Search active members..."
-                        onkeyup="filterTable('membersTable', 'memberSearch')">
+            <!-- Top-Level KPI Cards -->
+            <div class="financial-kpi-row">
+                <div class="financial-kpi-card">
+                    <span class="label">Active Members</span>
+                    <span class="value" id="financialTotalActiveMembers">0</span>
                 </div>
-                <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-user-plus"></i> Register
-                    Member</button>
+                <div class="financial-kpi-card">
+                    <span class="label" style="color: #92400e;">Expiring Soon (< 7d)</span>
+                    <span class="value" id="financialExpiringSoon">0</span>
+                </div>
+                <div class="financial-kpi-card">
+                    <span class="label" style="color: #166534;">New Sign-ups (30d)</span>
+                    <span class="value" id="financialNewMembers">0</span>
+                </div>
             </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-users"></i> Active Members</div>
+
+            <!-- Advanced Filtering Controls -->
+            <div class="dense-control-bar">
+                <div class="search-box" style="width: 250px; margin-bottom: 0;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="memberSearch" placeholder="Search name or email..." onkeyup="filterMembers()">
+                </div>
+                
+                <div class="filter-group">
+                    <select id="memberFilterPlan" onchange="filterMembers()">
+                        <option value="all">All Plans</option>
+                        <option value="Gold Plan">Gold Plan</option>
+                        <option value="Silver Plan">Silver Plan</option>
+                    </select>
+                    
+                    <select id="memberFilterStatus" onchange="filterMembers()">
+                        <option value="all">All Statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="Expired">Expired</option>
+                    </select>
+                </div>
+
+                <div style="margin-left: auto; display: flex; gap: 8px;">
+                    <button class="action-btn" onclick="openMemberModal()">
+                        <i class="fas fa-user-plus"></i> Register Member
+                    </button>
+                </div>
+            </div>
+
+            <!-- Member Table -->
+            <div class="panel" style="border-radius: 0 0 4px 4px; border-top: none;">
                 <div class="table-container no-shadow">
                     <table id="membersTable">
                         <thead>
                             <tr>
-                                <th>First Name</th>
-                                <th>M.I.</th>
-                                <th>Last Name</th>
-                                <th>Email</th>
-                                <th>Plan</th>
-                                <th>Time Left</th>
-                                <th>Credit Bal.</th>
+                                <th onclick="sortMembers('name')">Member <i class="fas fa-sort"></i></th>
+                                <th onclick="sortMembers('plan')">Plan <i class="fas fa-sort"></i></th>
+                                <th onclick="sortMembers('daysLeft')">Time Left <i class="fas fa-sort"></i></th>
+                                <th onclick="sortMembers('credit')">Credit Bal. <i class="fas fa-sort"></i></th>
                                 <th>Status</th>
-                                <th>Actions</th>
+                                <th style="width: 50px;"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Skeleton loader (Audit Fix 1.5) - cleared by renderMembers() -->
-                            <tr class="skeleton-row"><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-20"></div></td><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
-                            <tr class="skeleton-row"><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-20"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-60"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
-                            <tr class="skeleton-row"><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-20"></div></td><td><div class="skeleton-bar w-80"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-40"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-30"></div></td><td><div class="skeleton-bar w-20"></div></td></tr>
+                            <!-- Populated by script.js -->
                         </tbody>
                     </table>
+                </div>
+                
+                <!-- Table Footer / Pagination -->
+                <div class="table-footer">
+                    <div>
+                        Showing <span id="memberShowingCount">0-0</span> of <span id="memberTotalCount">0</span> members
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div>
+                            Rows per page: 
+                            <select id="memberRowsPerPage" onchange="changeMemberPagination()" style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ddd;">
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                        <div class="pagination-controls" id="memberPagination">
+                            <button class="page-btn" disabled><i class="fas fa-chevron-left"></i></button>
+                            <button class="page-btn active">1</button>
+                            <button class="page-btn" disabled><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div id="archivedMembers" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
+            <div class="dense-control-bar">
+                <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="archivedMemberSearch" placeholder="Search archived members..."
-                        onkeyup="filterTable('archivedMembersTable', 'archivedMemberSearch')">
+                    <input type="text" id="archivedMemberSearch" placeholder="Search archived members..." onkeyup="filterTable('archivedMembersTable', 'archivedMemberSearch')">
+                </div>
+                <div style="margin-left: auto;">
+                    <span class="label" style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Archived Directory</span>
                 </div>
             </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-archive"></i> Archived Members</div>
+            <div class="panel" style="border-radius: 0 0 4px 4px; border-top: none;">
                 <div class="table-container no-shadow">
                     <table id="archivedMembersTable">
                         <thead>
@@ -1112,7 +1253,7 @@
                                 <th>Email</th>
                                 <th>Plan</th>
                                 <th>Status</th>
-                                <th>Actions</th>
+                                <th style="width: 100px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -1159,30 +1300,82 @@
         </div>
 
         <div id="staff" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="staffSearch" placeholder="Search active staff..."
-                        onkeyup="filterTable('staffTable', 'staffSearch')">
+            <!-- Top-Level KPI Cards -->
+            <div class="financial-kpi-row">
+                <div class="financial-kpi-card">
+                    <span class="label">Total Staff</span>
+                    <span class="value" id="staffTotalActive">0</span>
                 </div>
-                <button class="action-btn" onclick="openStaffModal('Staff')"><i class="fas fa-user-plus"></i> Register
-                    Staff</button>
+                <div class="financial-kpi-card">
+                    <span class="label" style="color: #92400e;">On Shift</span>
+                    <span class="value" id="staffOnShift">0</span>
+                </div>
+                <div class="financial-kpi-card">
+                    <span class="label" style="color: #166534;">Management</span>
+                    <span class="value" id="staffManagement">0</span>
+                </div>
             </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-id-badge"></i> Active Staff Members</div>
-                <div class="table-container" style="box-shadow: none;">
+
+            <!-- Advanced Filtering Controls -->
+            <div class="dense-control-bar">
+                <div class="search-box" style="width: 250px; margin-bottom: 0;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="staffSearchModern" placeholder="Search name or email..." onkeyup="filterStaff()">
+                </div>
+                
+                <div class="filter-group">
+                    <select id="staffFilterRole" onchange="filterStaff()">
+                        <option value="all">All Roles</option>
+                        <option value="Staff">Staff</option>
+                        <option value="Admin">Admin</option>
+                    </select>
+                    
+                    <select id="staffFilterStatus" onchange="filterStaff()">
+                        <option value="all">All Statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                        <option value="On Leave">On Leave</option>
+                    </select>
+                </div>
+
+                <div style="margin-left: auto; display: flex; gap: 8px;">
+                    <button class="action-btn" onclick="openStaffModal('Staff')">
+                        <i class="fas fa-user-plus"></i> Register Staff
+                    </button>
+                </div>
+            </div>
+
+            <!-- Staff Table -->
+            <div class="panel" style="border-radius: 0 0 4px 4px; border-top: none;">
+                <div class="table-container no-shadow">
                     <table id="staffTable">
                         <thead>
                             <tr>
-                                <th>Full Name</th>
-                                <th>Role</th>
-                                <th>Email</th>
+                                <th onclick="sortStaff('name')">Staff Member <i class="fas fa-sort"></i></th>
+                                <th onclick="sortStaff('role')">Role <i class="fas fa-sort"></i></th>
+                                <th onclick="sortStaff('email')">Email <i class="fas fa-sort"></i></th>
                                 <th>Status</th>
-                                <th>Actions</th>
+                                <th style="width: 50px;"></th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody>
+                            <!-- Populated by script.js -->
+                        </tbody>
                     </table>
+                </div>
+                
+                <!-- Table Footer / Pagination -->
+                <div class="table-footer">
+                    <div>
+                        Showing <span id="staffShowingCount">0-0</span> of <span id="staffTotalCount">0</span> staff
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="pagination-controls" id="staffPagination">
+                            <button class="page-btn" disabled><i class="fas fa-chevron-left"></i></button>
+                            <button class="page-btn active">1</button>
+                            <button class="page-btn" disabled><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1208,31 +1401,83 @@
         </div>
 
         <div id="trainers" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="trainerSearch" placeholder="Search active trainers..."
-                        onkeyup="filterTable('trainerTable', 'trainerSearch')">
+            <!-- Top-Level KPI Cards -->
+            <div class="financial-kpi-row">
+                <div class="financial-kpi-card">
+                    <span class="label">Total Trainers</span>
+                    <span class="value" id="trainerTotalActive">0</span>
                 </div>
-                <button class="action-btn" onclick="openStaffModal('Trainer')"><i class="fas fa-user-plus"></i> Register
-                    Trainer</button>
+                <div class="financial-kpi-card">
+                    <span class="label" style="color: #92400e;">On Floor</span>
+                    <span class="value" id="trainerOnFloor">0</span>
+                </div>
+                <div class="financial-kpi-card">
+                    <span class="label" style="color: #166534;">New Hires (30d)</span>
+                    <span class="value" id="trainerNewHires">0</span>
+                </div>
             </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-dumbbell"></i> Active Trainers</div>
-                <div class="table-container" style="box-shadow: none;">
+
+            <!-- Advanced Filtering Controls -->
+            <div class="dense-control-bar">
+                <div class="search-box" style="width: 250px; margin-bottom: 0;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="trainerSearchModern" placeholder="Search name or email..." onkeyup="filterTrainers()">
+                </div>
+                
+                <div class="filter-group">
+                    <select id="trainerFilterSpecialty" onchange="filterTrainers()">
+                        <option value="all">All Specialties</option>
+                        <option value="General Fitness">General Fitness</option>
+                        <option value="Bodybuilding">Bodybuilding</option>
+                        <option value="Yoga">Yoga</option>
+                        <option value="HIIT">HIIT</option>
+                    </select>
+                    
+                    <select id="trainerFilterStatus" onchange="filterTrainers()">
+                        <option value="all">All Statuses</option>
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                </div>
+
+                <div style="margin-left: auto; display: flex; gap: 8px;">
+                    <button class="action-btn" onclick="openStaffModal('Trainer')">
+                        <i class="fas fa-user-plus"></i> Register Trainer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Trainer Table -->
+            <div class="panel" style="border-radius: 0 0 4px 4px; border-top: none;">
+                <div class="table-container no-shadow">
                     <table id="trainerTable">
                         <thead>
                             <tr>
-                                <th>Full Name</th>
-                                <th>Role</th>
-                                <th>Specialty</th>
-                                <th>Email</th>
+                                <th onclick="sortTrainers('name')">Trainer <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTrainers('specialty')">Specialty <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTrainers('role')">Role <i class="fas fa-sort"></i></th>
                                 <th>Status</th>
-                                <th>Actions</th>
+                                <th style="width: 50px;"></th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody>
+                            <!-- Populated by script.js -->
+                        </tbody>
                     </table>
+                </div>
+                
+                <!-- Table Footer / Pagination -->
+                <div class="table-footer">
+                    <div>
+                        Showing <span id="trainerShowingCount">0-0</span> of <span id="trainerTotalCount">0</span> trainers
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="pagination-controls" id="trainerPagination">
+                            <button class="page-btn" disabled><i class="fas fa-chevron-left"></i></button>
+                            <button class="page-btn active">1</button>
+                            <button class="page-btn" disabled><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1259,25 +1504,110 @@
         </div>
 
         <div id="bookings" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="bookingSearch" placeholder="Search sessions..."
-                        onkeyup="filterTable('bookingsTable', 'bookingSearch')">
+            <!-- Module Header -->
+            <div class="panel panel-transparent">
+                <div class="panel-body panel-body-compact">
+                    <h2 style="margin-bottom: 4px; font-size: 26px; font-weight: 700; color: var(--text-primary);">
+                        <i class="fa-solid fa-calendar-check" style="color: var(--primary-red); margin-right: 8px;"></i>Booking Management
+                    </h2>
+                    <p class="text-muted-sm">Schedule, track, and manage all personal training sessions.</p>
                 </div>
-                <button class="action-btn" onclick="openBookingModal()"><i class="fas fa-calendar-plus"></i> Manual
-                    Booking</button>
             </div>
-            <div class="panel">
-                <div class="panel-header"><i class="fas fa-calendar-alt"></i> Master Booking Calendar</div>
+
+            <!-- KPI Ribbon -->
+            <div class="bk-kpi-ribbon">
+                <div class="bk-kpi-card">
+                    <div class="bk-kpi-icon" style="background: rgba(16, 185, 129, 0.1); color: #10B981;"><i class="fa-solid fa-calendar-day"></i></div>
+                    <div class="bk-kpi-info">
+                        <span class="bk-kpi-value" id="bkTodayCount">0</span>
+                        <span class="bk-kpi-label">Today's Sessions</span>
+                    </div>
+                </div>
+                <div class="bk-kpi-card">
+                    <div class="bk-kpi-icon" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B;"><i class="fa-solid fa-hourglass-half"></i></div>
+                    <div class="bk-kpi-info">
+                        <span class="bk-kpi-value" id="bkPendingCount">0</span>
+                        <span class="bk-kpi-label">Pending Approval</span>
+                    </div>
+                </div>
+                <div class="bk-kpi-card">
+                    <div class="bk-kpi-icon" style="background: rgba(59, 130, 246, 0.1); color: #3B82F6;"><i class="fa-solid fa-check-double"></i></div>
+                    <div class="bk-kpi-info">
+                        <span class="bk-kpi-value" id="bkConfirmedCount">0</span>
+                        <span class="bk-kpi-label">Confirmed</span>
+                    </div>
+                </div>
+                <div class="bk-kpi-card">
+                    <div class="bk-kpi-icon" style="background: rgba(153, 27, 27, 0.1); color: var(--primary-red);"><i class="fa-solid fa-chart-line"></i></div>
+                    <div class="bk-kpi-info">
+                        <span class="bk-kpi-value" id="bkTotalWeek">0</span>
+                        <span class="bk-kpi-label">This Week</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Bar -->
+            <div class="bk-action-bar">
+                <div class="bk-action-left">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="bookingSearch" placeholder="Search member, trainer..."
+                            oninput="handleBookingSearch()">
+                    </div>
+                    <!-- View Toggle -->
+                    <div class="bk-view-toggle" role="tablist" aria-label="View mode">
+                        <button class="bk-toggle-btn active" id="bkListToggle" role="tab" aria-selected="true" onclick="switchBookingView('list', this)">
+                            <i class="fa-solid fa-list"></i> List
+                        </button>
+                        <button class="bk-toggle-btn" id="bkCalToggle" role="tab" aria-selected="false" onclick="switchBookingView('calendar', this)">
+                            <i class="fa-regular fa-calendar"></i> Calendar
+                        </button>
+                    </div>
+                </div>
+                <div class="bk-action-right">
+                    <!-- Advanced Filters -->
+                    <select id="bkFilterTrainer" class="bk-filter-select" onchange="renderBookings()" aria-label="Filter by Trainer">
+                        <option value="">All Trainers</option>
+                    </select>
+                    <select id="bkFilterStatus" class="bk-filter-select" onchange="renderBookings()" aria-label="Filter by Status">
+                        <option value="">All Statuses</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="No Show">No Show</option>
+                    </select>
+                    <div class="bk-date-range">
+                        <input type="date" id="bkDateFrom" class="bk-filter-date" onchange="renderBookings()" aria-label="Date from" title="From date">
+                        <span class="bk-date-sep">–</span>
+                        <input type="date" id="bkDateTo" class="bk-filter-date" onchange="renderBookings()" aria-label="Date to" title="To date">
+                    </div>
+                    <button class="bk-manual-btn" onclick="openBookingDrawer()" id="bkManualBookingBtn">
+                        <i class="fas fa-calendar-plus"></i> Manual Booking
+                    </button>
+                </div>
+            </div>
+
+            <!-- List View Panel -->
+            <div class="panel" id="bkListPanel">
+                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fas fa-calendar-alt" style="margin-right: 6px;"></i> Master Booking Calendar</span>
+                    <span class="bk-record-count" id="bkRecordCount" style="font-weight: 400; font-size: 12px; color: var(--text-muted);"></span>
+                </div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="bookingsTable">
                         <thead>
                             <tr>
-                                <th>Member Name</th>
+                                <th class="bk-sortable" onclick="sortBookings('memberName')" id="bkSortMember">
+                                    Member Name <i class="fa-solid fa-sort bk-sort-icon"></i>
+                                </th>
                                 <th>Trainer</th>
-                                <th>Date</th>
-                                <th>Time</th>
+                                <th class="bk-sortable" onclick="sortBookings('date')" id="bkSortDate">
+                                    Date <i class="fa-solid fa-sort bk-sort-icon"></i>
+                                </th>
+                                <th class="bk-sortable" onclick="sortBookings('time')" id="bkSortTime">
+                                    Time <i class="fa-solid fa-sort bk-sort-icon"></i>
+                                </th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -1286,7 +1616,58 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Calendar View Panel -->
+            <div class="panel" id="bkCalendarPanel" style="display: none;">
+                <div class="bk-cal-header">
+                    <div class="bk-cal-nav">
+                        <button class="bk-cal-nav-btn" onclick="navigateBookingCal(-1)" title="Previous week"><i class="fa-solid fa-chevron-left"></i></button>
+                        <h3 class="bk-cal-title" id="bkCalTitle">This Week</h3>
+                        <button class="bk-cal-nav-btn" onclick="navigateBookingCal(1)" title="Next week"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                    <button class="bk-cal-today-btn" onclick="navigateBookingCal(0)">Today</button>
+                </div>
+                <div class="bk-cal-grid-wrapper">
+                    <div class="bk-cal-grid" id="bkCalGrid">
+                        <!-- Calendar grid rendered by JS -->
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <!-- Booking Slide-Over Drawer -->
+        <div class="bk-drawer-overlay" id="bkDrawerOverlay" onclick="closeBookingDrawer()"></div>
+        <aside class="bk-drawer" id="bkDrawer" aria-label="Manual Booking Drawer">
+            <div class="bk-drawer-header">
+                <h3><i class="fa-solid fa-calendar-plus" style="margin-right: 8px; color: var(--primary-red);"></i>New Booking</h3>
+                <button class="bk-drawer-close" onclick="closeBookingDrawer()" aria-label="Close drawer">&times;</button>
+            </div>
+            <div class="bk-drawer-body">
+                <form id="bookingForm" class="bk-drawer-form">
+                    <div class="bk-form-group">
+                        <label for="bookMember" class="bk-form-label">Member</label>
+                        <select id="bookMember" required></select>
+                    </div>
+                    <div class="bk-form-group">
+                        <label for="bookTrainer" class="bk-form-label">Trainer</label>
+                        <select id="bookTrainer" required></select>
+                    </div>
+                    <div class="bk-form-row">
+                        <div class="bk-form-group" style="flex: 1;">
+                            <label for="bookDate" class="bk-form-label">Date</label>
+                            <input type="date" id="bookDate" required>
+                        </div>
+                        <div class="bk-form-group" style="flex: 1;">
+                            <label for="bookTime" class="bk-form-label">Time</label>
+                            <input type="time" id="bookTime" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="bk-drawer-submit">
+                        <i class="fas fa-check" style="margin-right: 6px;"></i>Confirm Booking
+                    </button>
+                </form>
+            </div>
+        </aside>
 
         <div id="chats" class="content-section" style="padding: 0;">
             <div class="chat-container">
@@ -1295,7 +1676,7 @@
                         style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white); color: var(--text-primary);">
                         <i class="fa-solid fa-address-book"></i> Contacts
                     </div>
-                    <div style="padding: 10px; border-bottom: 1px solid var(--border-color); background: #fafafa;">
+                    <div style="padding: 10px; border-bottom: 1px solid var(--border-color); background: var(--panel-bg);">
                         <div class="search-box" style="width: 100%;">
                             <i class="fas fa-search" style="left: 10px;"></i>
                             <input type="text" id="chatSearch" placeholder="Search users..." onkeyup="filterChatUsers()"
@@ -1478,6 +1859,52 @@
             </div>
         </div>
 
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- LOCKER MANAGEMENT SECTION                 -->
+        <!-- ═══════════════════════════════════════════ -->
+        <div id="lockers" class="content-section" style="padding: 32px;">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i class="fa-solid fa-lock mr-2 text-slate-400"></i>Locker System</h2>
+                    <p class="text-sm text-slate-500 mt-1">Manage locker assignments and availability.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button class="bg-[#991b1b] hover:bg-red-800 text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-2" onclick="openAddLockerModal()">
+                        <i class="fas fa-plus"></i> Add Locker
+                    </button>
+                </div>
+            </div>
+
+            <!-- Locker Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Total Lockers</div>
+                    <div class="text-2xl font-bold text-slate-900" id="totalLockersCount">0</div>
+                </div>
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Available</div>
+                    <div class="text-2xl font-bold text-emerald-600" id="availableLockersCount">0</div>
+                </div>
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Occupied</div>
+                    <div class="text-2xl font-bold text-amber-600" id="occupiedLockersCount">0</div>
+                </div>
+                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Maintenance</div>
+                    <div class="text-2xl font-bold text-slate-400" id="maintLockersCount">0</div>
+                </div>
+            </div>
+
+            <!-- Locker Grid -->
+            <div class="panel">
+                <div class="panel-body">
+                    <div class="locker-grid-layout" id="lockerGrid">
+                        <!-- Rendered by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- ═══════════════════════════════════════════ -->
@@ -1603,6 +2030,90 @@
                         onclick="window.__walkinIssueRetry && window.__walkinIssueRetry()">
                         Retry
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- ADD LOCKER MODAL                           -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="addLockerModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-lock mr-2"></i> Add New Locker</h3>
+                <span class="close-btn" onclick="closeModal('addLockerModal')">&times;</span>
+            </div>
+            <form class="modal-form" id="addLockerForm">
+                <div class="form-group">
+                    <label class="form-label">Locker Number</label>
+                    <input type="text" id="lockerNumberInput" placeholder="e.g. L01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Location / Section</label>
+                    <input type="text" id="lockerLocationInput" placeholder="e.g. Male Locker Room" required>
+                </div>
+                <button type="submit" class="modal-submit-btn" style="background-color: var(--primary-red); color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; cursor: pointer;">Create Locker</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- ASSIGN LOCKER MODAL                        -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="assignLockerModal" class="modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-user-tag mr-2"></i> Locker Assignment</h3>
+                <span class="close-btn" onclick="closeModal('assignLockerModal')">&times;</span>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center gap-4 mb-6 p-4 bg-slate-50 rounded border border-slate-200">
+                    <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 text-xl font-bold" id="assignLockerIcon">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <div>
+                        <div class="text-lg font-bold text-slate-900" id="assignLockerNumberText">Locker #--</div>
+                        <div class="text-sm text-slate-500" id="assignLockerLocationText">Location --</div>
+                    </div>
+                </div>
+
+                <form id="assignLockerForm">
+                    <input type="hidden" id="assignLockerId">
+                    <div class="form-group">
+                        <label class="form-label">Select Member</label>
+                        <select id="assignMemberSelect" class="form-input" required style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+                            <option value="" disabled selected>Search for a member...</option>
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Rental Duration (Months)</label>
+                        <input type="number" id="assignDuration" class="form-input" value="1" min="1" required style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button type="button" class="btn-cancel" style="flex: 1;" onclick="closeModal('assignLockerModal')">Cancel</button>
+                        <button type="submit" class="btn-submit" style="flex: 1; background-color: var(--primary-red);">Assign Locker</button>
+                    </div>
+                </form>
+
+                <div id="activeAssignmentInfo" style="display: none;">
+                    <div class="divider my-4" style="height: 1px; background: var(--border-color); margin: 20px 0;"></div>
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-sm font-semibold text-slate-900">Current Assignee</span>
+                        <span class="status-badge-solid paid" style="background: #10B981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Active</span>
+                    </div>
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 bg-[#991b1b] text-white rounded-full flex items-center justify-center font-bold" id="assigneeInitial">A</div>
+                        <div>
+                            <div class="font-bold text-slate-900" id="assigneeName">--</div>
+                            <div class="text-xs text-slate-500" id="assignmentExpiry">Expires: --</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="button" class="action-btn" style="flex: 1; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;" onclick="releaseLocker()">Release Locker</button>
+                        <button type="button" class="action-btn" style="background: #1e293b; color: white;" onclick="printLockerReceipt()">Print</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1833,6 +2344,8 @@
             </div>
             <form class="modal-form" id="editMemberForm">
                 <input type="hidden" id="editMemberId">
+                <input type="hidden" id="editMemberImage">
+                
                 <div class="profile-upload-wrapper">
                     <img src="images/default-profile.png" id="editMemberPreview" class="profile-upload-img">
                     <label for="editMemberImageFile" class="profile-upload-btn">
@@ -1840,25 +2353,23 @@
                     </label>
                 </div>
                 <input type="file" id="editMemberImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editMemberPreview')">
-                <input type="url" id="editMemberImage" placeholder="...or paste Photo URL" style="margin-bottom: 15px;">
 
                 <div style="display: flex; gap: 10px;">
                     <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;">
                     <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2">
                 </div>
                 <input type="text" id="editMemberFamily" placeholder="Last Name" required>
+                
                 <select id="editMemberPlan" required>
                     <option value="Gold Plan">Gold Plan</option>
                     <option value="Silver Plan">Silver Plan</option>
                 </select>
 
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">Update RFID
-                    Tag (Tap Card or type):</p>
-                <input type="text" id="editMemberRfid" class="rfid-register-input"
-                    placeholder="Leave blank to keep current tag">
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag:</p>
+                <input type="text" id="editMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card...">
 
-                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save
-                    Changes</button>
+                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;"><i
+                        class="fas fa-save"></i> Save Changes</button>
             </form>
         </div>
     </div>
@@ -1906,11 +2417,13 @@
     <div id="editStaffModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="editStaffModalTitle">Edit Details</h3><span class="close-btn"
+                <h3 id="editStaffModalTitle">Edit Staff Details</h3><span class="close-btn"
                     onclick="closeModal('editStaffModal')">&times;</span>
             </div>
             <form class="modal-form" id="editStaffForm">
                 <input type="hidden" id="editStaffId">
+                <input type="hidden" id="editStaffImage">
+
                 <div class="profile-upload-wrapper">
                     <img src="images/default-profile.png" id="editStaffPreview" class="profile-upload-img">
                     <label for="editStaffImageFile" class="profile-upload-btn">
@@ -1918,50 +2431,36 @@
                     </label>
                 </div>
                 <input type="file" id="editStaffImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editStaffPreview')">
-                <input type="url" id="editStaffImage" placeholder="...or paste Photo URL" style="margin-bottom: 15px;">
 
                 <div style="display: flex; gap: 10px;">
                     <input type="text" id="editStaffGiven" placeholder="First Name" required style="flex: 2;">
                     <input type="text" id="editStaffMI" placeholder="M.I." style="flex: 1;" maxlength="2">
                 </div>
                 <input type="text" id="editStaffFamily" placeholder="Last Name" required>
+                
                 <div id="editSpecialtyContainer" style="display: none;">
-                    <input type="text" id="editStaffSpecialty" placeholder="Trainer Specialty (e.g. Yoga)">
+                    <input type="text" id="editStaffSpecialty" placeholder="Specialty (e.g. Yoga, Boxing)">
                 </div>
-                <select id="editStaffStatus" required>
-                    <option value="Active">Active</option>
-                    <option value="On Leave">On Leave</option>
-                </select>
 
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">Update RFID
-                    Tag (Tap Card or type):</p>
-                <input type="text" id="editStaffRfid" class="rfid-register-input"
-                    placeholder="Leave blank to keep current tag">
+                <div class="form-group">
+                    <label class="form-label">Account Status</label>
+                    <select id="editStaffStatus">
+                        <option value="Active">Active</option>
+                        <option value="On Leave">On Leave</option>
+                        <option value="Suspended">Suspended</option>
+                    </select>
+                </div>
 
-                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save
-                    Changes</button>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag:</p>
+                <input type="text" id="editStaffRfid" class="rfid-register-input" placeholder="Tap RFID Card...">
+
+                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;"><i
+                        class="fas fa-save"></i> Save Changes</button>
             </form>
         </div>
     </div>
 
-    <div id="bookingModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Book Personal Training</h3><span class="close-btn"
-                    onclick="closeModal('bookingModal')">&times;</span>
-            </div>
-            <form class="modal-form" id="bookingForm">
-                <select id="bookMember" required></select>
-                <select id="bookTrainer" required></select>
-                <div style="display: flex; gap: 10px;">
-                    <input type="date" id="bookDate" required style="flex: 1;">
-                    <input type="time" id="bookTime" required style="flex: 1;">
-                </div>
-                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Confirm
-                    Booking</button>
-            </form>
-        </div>
-    </div>
+
 
     <div id="editBookingModal" class="modal">
         <div class="modal-content">
@@ -2023,6 +2522,7 @@
     </div>
 
     <script type="module" src="js/script.js"></script>
+    <script src="js/bookings-ui.js" defer></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -2070,7 +2570,7 @@
             <div class="modal-body">
                 <form id="addCreditForm">
                     <input type="hidden" id="addCreditMemberId">
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid var(--border-color);">
+                    <div style="background: rgba(0,0,0,0.03); padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid var(--border-color);">
                         <div style="font-weight: 600; color: var(--dark-black);" id="addCreditMemberName">Loading...</div>
                         <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
                             Current Balance: <strong id="addCreditCurrentBalance" style="color: var(--primary-red);">₱0.00</strong>
@@ -2123,9 +2623,74 @@
                 <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Or search member manually if RFID is unavailable.</p>
                 <div style="position: relative;">
                     <input type="text" class="bm-rfid rfid-register-input" id="posRfidInput" placeholder="Tap Card or Search Name..." style="width: 100%; padding: 12px; text-align: center; border: 1px solid var(--primary-red); border-radius: 6px; box-shadow: 0 0 5px rgba(153,27,27,0.2);">
-                    <div id="posRfidSearchDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid var(--border-color); border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 100; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                    <div id="posRfidSearchDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 100; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
                 </div>
                 <div id="rfidPaymentStatus" style="margin-top: 15px; font-weight: 600;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="invoiceModal" class="modal">
+        <div class="modal-content" style="max-width: 600px; padding: 0; overflow: hidden; border-radius: 12px;">
+            <div style="background: linear-gradient(135deg, #1a1a1a 0%, #333 100%); color: white; padding: 30px; position: relative;">
+                <span class="close-btn" onclick="closeModal('invoiceModal')" style="color: white; opacity: 0.8;">&times;</span>
+                <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.7; margin-bottom: 5px;">Official Receipt</div>
+                <h2 id="invoiceId" style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">#INV-000000</h2>
+                <div id="invoiceStatus" style="position: absolute; top: 30px; right: 60px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; background: #27ae60;">Paid</div>
+            </div>
+            
+            <div style="padding: 30px; background: var(--panel-bg);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px;">
+                    <div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">Customer Details</div>
+                        <div id="invoiceCustomerName" style="font-weight: 600; color: var(--dark-black); font-size: 16px;">John Doe</div>
+                        <div id="invoiceDate" style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Oct 24, 2023 • 02:45 PM</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">Payment Method</div>
+                        <div id="invoiceMethod" style="font-weight: 600; color: var(--dark-black); font-size: 14px;">Cash</div>
+                        <div style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Processed by: Admin</div>
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); margin-bottom: 25px;">
+                    <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                        <thead>
+                            <tr style="text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-muted);">
+                                <th style="padding-bottom: 10px;">Item Description</th>
+                                <th style="padding-bottom: 10px; text-align: center; width: 60px;">Qty</th>
+                                <th style="padding-bottom: 10px; text-align: right; width: 100px;">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoiceItemsList">
+                            <!-- Items here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                    <div style="display: flex; width: 220px; justify-content: space-between; font-size: 14px; color: var(--text-muted);">
+                        <span>Subtotal</span>
+                        <span id="invoiceSubtotal">₱0.00</span>
+                    </div>
+                    <div style="display: flex; width: 220px; justify-content: space-between; font-size: 14px; color: var(--text-muted);">
+                        <span>VAT (12%)</span>
+                        <span id="invoiceVAT">₱0.00</span>
+                    </div>
+                    <div style="display: flex; width: 220px; justify-content: space-between; font-size: 20px; font-weight: 700; color: var(--dark-black); margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--border-color);">
+                        <span>Total Paid</span>
+                        <span id="invoiceTotal">₱0.00</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="padding: 20px 30px; background: rgba(0,0,0,0.03); display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="action-btn" style="background: var(--panel-bg); border: 1px solid var(--border-color); color: var(--dark-black);" onclick="window.print()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button class="action-btn" style="background: var(--dark-black); color: white;" onclick="closeModal('invoiceModal')">
+                    Done
+                </button>
             </div>
         </div>
     </div>
