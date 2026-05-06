@@ -5,11 +5,11 @@
 // --- State ---
 let bkCurrentView = 'list';
 let bkSortField = 'date';
-let bkSortDir = 'asc';
+let bkSortDir = 'desc';
 let bkCalWeekOffset = 0;
 
 // --- View Toggle ---
-window.switchBookingView = function(view, btn) {
+window.switchBookingView = function (view, btn) {
     bkCurrentView = view;
     document.querySelectorAll('.bk-toggle-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
@@ -19,10 +19,10 @@ window.switchBookingView = function(view, btn) {
 };
 
 // --- Search ---
-window.handleBookingSearch = function() { renderBookings(); };
+window.handleBookingSearch = function () { renderBookings(); };
 
 // --- Sorting ---
-window.sortBookings = function(field) {
+window.sortBookings = function (field) {
     if (bkSortField === field) {
         bkSortDir = bkSortDir === 'asc' ? 'desc' : 'asc';
     } else {
@@ -47,7 +47,7 @@ window.sortBookings = function(field) {
 };
 
 // --- Inline Status Dropdown ---
-window.toggleBkStatusDropdown = function(e, bookingId) {
+window.toggleBkStatusDropdown = function (e, bookingId) {
     e.stopPropagation();
     const wrapper = e.currentTarget.closest('.bk-status-wrapper');
     const wasOpen = wrapper.classList.contains('open');
@@ -56,7 +56,7 @@ window.toggleBkStatusDropdown = function(e, bookingId) {
     if (!wasOpen) wrapper.classList.add('open');
 };
 
-window.quickUpdateStatus = function(e, bookingId, newStatus) {
+window.quickUpdateStatus = function (e, bookingId, newStatus) {
     e.stopPropagation();
     document.querySelectorAll('.bk-status-wrapper.open').forEach(w => w.classList.remove('open'));
     if (typeof window.updateBookingStatus === 'function') {
@@ -70,7 +70,7 @@ document.addEventListener('click', () => {
 });
 
 // --- Drawer ---
-window.openBookingDrawer = function() {
+window.openBookingDrawer = function () {
     const memberSelect = document.getElementById('bookMember');
     const trainerSelect = document.getElementById('bookTrainer');
     if (memberSelect && typeof membersData !== 'undefined') {
@@ -89,7 +89,7 @@ window.openBookingDrawer = function() {
     document.getElementById('bkDrawer').classList.add('open');
 };
 
-window.closeBookingDrawer = function() {
+window.closeBookingDrawer = function () {
     document.getElementById('bkDrawerOverlay').classList.remove('open');
     document.getElementById('bkDrawer').classList.remove('open');
 };
@@ -158,8 +158,13 @@ function applyBookingFilters(data) {
     if (dateFrom) filtered = filtered.filter(b => b.date >= dateFrom);
     if (dateTo) filtered = filtered.filter(b => b.date <= dateTo);
 
-    // Sort
+    // Sort — cancelled/declined always sink to the bottom
+    const isCancelled = (s) => s === 'Cancelled' || s === 'Declined';
     filtered.sort((a, b) => {
+        const aCancelled = isCancelled(a.status);
+        const bCancelled = isCancelled(b.status);
+        if (aCancelled !== bCancelled) return aCancelled ? 1 : -1;
+
         let va, vb;
         if (bkSortField === 'memberName') { va = (a.memberName || '').toLowerCase(); vb = (b.memberName || '').toLowerCase(); }
         else if (bkSortField === 'time') { va = a.time || ''; vb = b.time || ''; }
@@ -217,7 +222,7 @@ function renderEnhancedBookingRow(b) {
 }
 
 // --- Calendar View ---
-window.navigateBookingCal = function(dir) {
+window.navigateBookingCal = function (dir) {
     if (dir === 0) bkCalWeekOffset = 0;
     else bkCalWeekOffset += dir;
     renderBookingCalendar();
@@ -284,7 +289,7 @@ function renderBookingCalendar() {
                 const ap = parseInt(th) >= 12 ? 'PM' : 'AM';
                 const dhr = parseInt(th) % 12 || 12;
                 cellContent += `<div class="bk-cal-block ${cls}" onclick="openEditBookingModal('${b.id}')" title="${b.memberName} with ${b.trainerName}">
-                    ${b.memberName}<br><span class="bk-cal-block-sub">${b.trainerName} · ${dhr}:${(tm||'00').padStart(2,'0')} ${ap}</span>
+                    ${b.memberName}<br><span class="bk-cal-block-sub">${b.trainerName} · ${dhr}:${(tm || '00').padStart(2, '0')} ${ap}</span>
                 </div>`;
             });
             html += `<div class="bk-cal-cell">${cellContent}</div>`;
@@ -295,7 +300,7 @@ function renderBookingCalendar() {
 }
 
 // --- Monkey-patch renderBookings to use enhanced rendering ---
-(function() {
+(function () {
     // Wait for the original renderBookings to be defined, then wrap it
     const origInterval = setInterval(() => {
         if (typeof renderBookings !== 'function') return;
@@ -303,7 +308,7 @@ function renderBookingCalendar() {
 
         const _origRender = renderBookings;
 
-        window.renderBookings = function() {
+        window.renderBookings = function () {
             // Call original for member/trainer notification logic
             _origRender();
         };
@@ -340,7 +345,7 @@ function renderBookingCalendar() {
 })();
 
 // --- Drawer Form Submit (replaces old bookingModal submit) ---
-(function() {
+(function () {
     const interval = setInterval(() => {
         const form = document.getElementById('bookingForm');
         if (!form) return;
@@ -395,7 +400,7 @@ function renderBookingCalendar() {
                     if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; }
                     return;
                 }
-            } catch(err) { console.warn('Conflict check skipped', err); }
+            } catch (err) { console.warn('Conflict check skipped', err); }
 
             const fb2 = window._fb || {};
             await fb2.addDoc(fb2.bookingsCol, { memberId, memberName, trainerId, trainerName, date: bookDate, time: bookTime, status: "Confirmed", timestamp: Date.now() });

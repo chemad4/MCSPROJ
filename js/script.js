@@ -15,16 +15,16 @@ window.formatCurrency = formatCurrency;
 /**
  * Synchronizes a container with a data array using DOM diffing to prevent UI flickering.
  */
-window.syncDOM = function(container, dataArray, renderFunc, idPrefix) {
+window.syncDOM = function (container, dataArray, renderFunc, idPrefix) {
     if (!container) return;
-    
+
     // Clear initial skeleton loaders if they exist (Audit Fix)
     if (container.querySelector('.skeleton-row') || (container.innerHTML.includes('Loading...') && !container.innerHTML.includes(idPrefix))) {
         container.innerHTML = "";
     }
 
     const currentIds = new Set(dataArray.map(item => `${idPrefix}-${item.id}`));
-    
+
     // 1. Remove elements no longer in the data array
     Array.from(container.children).forEach(child => {
         if (child.id && child.id.startsWith(idPrefix) && !currentIds.has(child.id)) {
@@ -37,7 +37,7 @@ window.syncDOM = function(container, dataArray, renderFunc, idPrefix) {
         const id = `${idPrefix}-${item.id}`;
         const html = renderFunc(item);
         let el = document.getElementById(id);
-        
+
         if (el) {
             // Update existing if content changed
             if (el.innerHTML !== html) {
@@ -60,7 +60,7 @@ window.syncDOM = function(container, dataArray, renderFunc, idPrefix) {
                 }
             }
         }
-        
+
         // 3. Maintain correct order if it changed
         const currentElAtIndex = container.children[index];
         if (currentElAtIndex && currentElAtIndex.id !== id) {
@@ -485,6 +485,7 @@ let attendanceData = [];
 let messagesData = [];
 let activityData = [];
 let bookingsData = [];
+window.bookingsData = bookingsData;
 let posCart = [];
 let currentPOSCategory = 'all';
 let selectedPaymentMethod = 'Cash';
@@ -760,7 +761,7 @@ function renderInventory() {
 
     let ops = 0, maint = 0, low = 0, totalMachines = 0;
     let alertsHtmlArr = [];
-    
+
     // Sort and filter data first
     const consumables = [];
     const equipment = [];
@@ -849,7 +850,7 @@ function renderInventory() {
         if (item.currentStatus === 'Out of Stock' || item.currentStatus === 'Out of Order') badge = 'broken';
         else if (item.currentStatus === 'Low Stock') badge = 'stock-low';
         else if (item.currentStatus === 'Maintenance') badge = 'maintenance';
-        
+
         const isSelected = selectedEquipItems.has(item.id);
         return `
             <tr class="${isSelected ? 'selected' : ''}">
@@ -901,7 +902,7 @@ function renderInventory() {
     if (document.getElementById('dashInventoryTotal')) document.getElementById('dashInventoryTotal').innerText = inventoryData.length;
     if (document.getElementById('gridEquip')) document.getElementById('gridEquip').innerText = ops;
     if (document.getElementById('navInventoryCount')) document.getElementById('navInventoryCount').innerText = ` ${inventoryData.length} `;
-    
+
     const dashAlerts = document.getElementById('dashInventoryAlerts');
     if (dashAlerts) dashAlerts.innerHTML = alertsHtmlArr.join('') || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
 }
@@ -1215,14 +1216,14 @@ async function issueWalkinPassAndCheckIn({ rfidTag, paymentId, dateStr, timeStr,
     });
 }
 
-window.filterPOSCategory = function(cat, btn) {
+window.filterPOSCategory = function (cat, btn) {
     currentPOSCategory = cat;
     document.querySelectorAll('.pos-tab').forEach(t => t.classList.remove('active'));
-    if(btn) btn.classList.add('active');
+    if (btn) btn.classList.add('active');
     renderPOSProducts();
 }
 
-window.filterPOSCatalog = function() {
+window.filterPOSCatalog = function () {
     renderPOSProducts();
 }
 
@@ -1238,13 +1239,13 @@ function getPOSCategoryLabel(item) {
 function renderPOSProducts() {
     const grid = document.getElementById('posProductGrid');
     if (!grid) return;
-    
+
     const searchTerm = (document.getElementById('posSearch')?.value || '').toLowerCase();
 
     // Walk-in Passes
     const walkinPlan = (window.__membershipPlansData || []).find(p => p.name.toLowerCase().includes('walk-in'));
     let walkinPrice = walkinPlan ? Number(walkinPlan.price || 0) : 150;
-    
+
     let allItems = [];
     allItems.push({
         id: 'WALKIN',
@@ -1334,10 +1335,10 @@ window.changeQty = function (id, delta) {
 function renderCart() {
     const cartBody = document.getElementById('posCartBody');
     if (!cartBody) return;
-    if (posCart.length === 0) { 
-        cartBody.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>`; 
-        updatePOSTotals(0, 0, 0, 0); 
-        return; 
+    if (posCart.length === 0) {
+        cartBody.innerHTML = `<p style="color: var(--text-muted); text-align: center; margin-top: 50px;">Cart is empty.</p>`;
+        updatePOSTotals(0, 0, 0, 0);
+        return;
     }
 
     const renderCartItem = (item) => `
@@ -1383,10 +1384,10 @@ function updatePOSTotals(sub, vat, disc, grand) {
     `;
 }
 
-window.selectPaymentMethod = function(method, btn) {
+window.selectPaymentMethod = function (method, btn) {
     selectedPaymentMethod = method;
     document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active'));
-    if(btn) btn.classList.add('active');
+    if (btn) btn.classList.add('active');
 }
 
 window.processPayment = async function () {
@@ -1407,7 +1408,7 @@ window.processPayment = async function () {
         const modal = document.getElementById('rfidPaymentModal');
         const input = document.getElementById('posRfidInput');
         const statusEl = document.getElementById('rfidPaymentStatus');
-        
+
         statusEl.innerHTML = `Amount Due: ₱${grandTotal.toFixed(2)}`;
         statusEl.style.color = "var(--dark-black)";
         modal.style.display = 'flex';
@@ -1422,18 +1423,18 @@ window.processPayment = async function () {
                 clearInterval(checkInterval);
                 resolve(null);
             };
-            closeBtn.addEventListener('click', handleClose, {once: true});
-            
+            closeBtn.addEventListener('click', handleClose, { once: true });
+
             // Search manually
             let debounceTimer;
             const inputHandler = (e) => {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(async () => {
                     const q = e.target.value.trim().toLowerCase();
-                    if(q.length > 0) {
-                         const searchRes = membersData.filter(m => (m.name && m.name.toLowerCase().includes(q)) || (m.givenName && m.givenName.toLowerCase().includes(q)) || (m.familyName && m.familyName.toLowerCase().includes(q)) || (m.rfid && m.rfid === q));
-                         const dropdown = document.getElementById('posRfidSearchDropdown');
-                         if(searchRes.length > 0) {
+                    if (q.length > 0) {
+                        const searchRes = membersData.filter(m => (m.name && m.name.toLowerCase().includes(q)) || (m.givenName && m.givenName.toLowerCase().includes(q)) || (m.familyName && m.familyName.toLowerCase().includes(q)) || (m.rfid && m.rfid === q));
+                        const dropdown = document.getElementById('posRfidSearchDropdown');
+                        if (searchRes.length > 0) {
                             dropdown.innerHTML = searchRes.map(m => `
                                 <div style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;" onclick="window.selectMemberForPayment('${m.id}', '${m.rfid || ''}', '${m.name || (m.givenName + ' ' + m.familyName)}')">
                                     <div style="font-weight: 600;">${m.name || (m.givenName + ' ' + m.familyName)}</div>
@@ -1441,9 +1442,9 @@ window.processPayment = async function () {
                                 </div>
                             `).join('');
                             dropdown.style.display = 'block';
-                         } else {
+                        } else {
                             dropdown.style.display = 'none';
-                         }
+                        }
                     } else {
                         document.getElementById('posRfidSearchDropdown').style.display = 'none';
                     }
@@ -1458,7 +1459,7 @@ window.processPayment = async function () {
                 input.removeEventListener('input', inputHandler);
                 resolve({ id, rfid, name });
             };
-            
+
             const checkInterval = setInterval(async () => {
                 if (modal.style.display === 'none') {
                     clearInterval(checkInterval);
@@ -1471,7 +1472,7 @@ window.processPayment = async function () {
                 // If it's a full RFID scan
                 if (val && val !== lastVal && val.length >= 8 && !val.includes(' ')) {
                     const memberMatch = membersData.find(m => m.rfid === val);
-                    if(memberMatch) {
+                    if (memberMatch) {
                         clearInterval(checkInterval);
                         closeBtn.removeEventListener('click', handleClose);
                         input.removeEventListener('input', inputHandler);
@@ -1486,10 +1487,10 @@ window.processPayment = async function () {
             closeModal('rfidPaymentModal');
             return; // cancelled
         }
-        
+
         memberIdForCredit = rfidData.id;
         customerName = rfidData.name;
-        if(customerNameInput) customerNameInput.value = customerName;
+        if (customerNameInput) customerNameInput.value = customerName;
 
         const memberDoc = await getDoc(doc(db, "users", memberIdForCredit));
         const currentBalance = memberDoc.data().creditBalance || 0;
@@ -1503,12 +1504,12 @@ window.processPayment = async function () {
 
         closeModal('rfidPaymentModal');
         showToast("Payment processing with Credit...", "info");
-        
+
         // Deduct balance
-        await updateDoc(doc(db, "users", memberIdForCredit), { 
-            creditBalance: increment(-grandTotal) 
+        await updateDoc(doc(db, "users", memberIdForCredit), {
+            creditBalance: increment(-grandTotal)
         });
-        
+
         const itemsStrForLog = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
         await addDoc(creditTransactionsCol, {
             memberId: memberIdForCredit,
@@ -1609,7 +1610,7 @@ window.processPayment = async function () {
         showToast("Payment Processed Successfully!", "success");
     }
     posCart = []; renderCart();
-    if(customerNameInput) customerNameInput.value = '';
+    if (customerNameInput) customerNameInput.value = '';
 }
 
 // ==========================================
@@ -1855,9 +1856,9 @@ function renderPayments() {
     });
 
     // Update KPI UI
-    if (document.getElementById('financialTotalRevenue')) document.getElementById('financialTotalRevenue').innerText = `₱${totalRevenue.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-    if (document.getElementById('financialTotalVAT')) document.getElementById('financialTotalVAT').innerText = `₱${totalVAT.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-    if (document.getElementById('financialTotalVoided')) document.getElementById('financialTotalVoided').innerText = `₱${totalVoided.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    if (document.getElementById('financialTotalRevenue')) document.getElementById('financialTotalRevenue').innerText = `₱${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    if (document.getElementById('financialTotalVAT')) document.getElementById('financialTotalVAT').innerText = `₱${totalVAT.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    if (document.getElementById('financialTotalVoided')) document.getElementById('financialTotalVoided').innerText = `₱${totalVoided.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
     // 2. Filter and Sort for the Table
     let filtered = [...paymentsData];
@@ -1867,8 +1868,8 @@ function renderPayments() {
     const filterMethod = document.getElementById('paymentFilterMethod')?.value;
 
     if (searchTerm) {
-        filtered = filtered.filter(p => 
-            (p.name && p.name.toLowerCase().includes(searchTerm)) || 
+        filtered = filtered.filter(p =>
+            (p.name && p.name.toLowerCase().includes(searchTerm)) ||
             (p.id && p.id.toLowerCase().includes(searchTerm)) ||
             (p.items && p.items.toLowerCase().includes(searchTerm))
         );
@@ -1916,10 +1917,10 @@ function renderPayments() {
         const amount = Number(t.amount || 0);
         const vat = (t.vat != null ? Number(t.vat) : (amount / 1.12 * 0.12)).toFixed(2);
         const isVoided = t.status === 'Voided';
-        
+
         // Status Badge
-        const statusBadge = isVoided 
-            ? '<span class="status-badge-solid voided">Voided</span>' 
+        const statusBadge = isVoided
+            ? '<span class="status-badge-solid voided">Voided</span>'
             : '<span class="status-badge-solid paid">Paid</span>';
 
         // Purchased Items Truncation
@@ -1969,14 +1970,14 @@ function renderPayments() {
     };
 
     window.syncDOM(payTbody, filtered, renderPaymentRow, 'pay-row');
-    
+
     // Update pagination counts
     if (document.getElementById('paymentTotalCount')) document.getElementById('paymentTotalCount').innerText = filtered.length;
     if (document.getElementById('paymentShowingCount')) document.getElementById('paymentShowingCount').innerText = filtered.length > 0 ? `1-${filtered.length}` : '0-0';
 }
 
 // Financial Report UI Helpers
-window.toggleKebab = function(event, id) {
+window.toggleKebab = function (event, id) {
     event.stopPropagation();
     document.querySelectorAll('.kebab-dropdown').forEach(d => {
         if (d.id !== `kebab-${id}`) d.classList.remove('show');
@@ -1990,7 +1991,7 @@ document.addEventListener('click', () => {
     document.querySelectorAll('.kebab-dropdown').forEach(d => d.classList.remove('show'));
 });
 
-window.viewInvoice = function(id) { 
+window.viewInvoice = function (id) {
     const tx = paymentsData.find(p => p.id === id);
     if (!tx) return;
 
@@ -2006,9 +2007,9 @@ window.viewInvoice = function(id) {
     const vat = tx.vat || (Number(tx.amount || 0) - subtotal);
     const total = Number(tx.amount || 0);
 
-    document.getElementById('invoiceSubtotal').innerText = `₱${subtotal.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-    document.getElementById('invoiceVAT').innerText = `₱${vat.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-    document.getElementById('invoiceTotal').innerText = `₱${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+    document.getElementById('invoiceSubtotal').innerText = `₱${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    document.getElementById('invoiceVAT').innerText = `₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    document.getElementById('invoiceTotal').innerText = `₱${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
     const itemsList = document.getElementById('invoiceItemsList');
     itemsList.innerHTML = "";
@@ -2038,26 +2039,26 @@ window.viewInvoice = function(id) {
     document.getElementById('invoiceModal').style.display = 'flex';
 };
 
-window.printReceipt = function(id) { window.viewInvoice(id); setTimeout(() => window.print(), 500); };
-window.processRefund = function(id) { showToast("Refund processing initiated for " + id, "info"); };
+window.printReceipt = function (id) { window.viewInvoice(id); setTimeout(() => window.print(), 500); };
+window.processRefund = function (id) { showToast("Refund processing initiated for " + id, "info"); };
 
-window.filterPayments = function() {
+window.filterPayments = function () {
     renderPayments();
 };
 
-window.sortPayments = function(field) {
+window.sortPayments = function (field) {
     if (currentPaymentSortField === field) {
         currentPaymentSortOrder = currentPaymentSortOrder === 'asc' ? 'desc' : 'asc';
     } else {
         currentPaymentSortField = field;
         currentPaymentSortOrder = 'asc';
     }
-    
+
     // Update sort icons in headers
     document.querySelectorAll('#paymentTable th i').forEach(icon => {
         icon.className = 'fas fa-sort';
     });
-    
+
     const th = document.querySelector(`#paymentTable th[onclick*="${field}"]`);
     if (th) {
         const icon = th.querySelector('i');
@@ -2069,7 +2070,7 @@ window.sortPayments = function(field) {
     renderPayments();
 };
 
-window.changePaymentPagination = function() {
+window.changePaymentPagination = function () {
     renderPayments();
 };
 
@@ -2324,7 +2325,7 @@ document.addEventListener('submit', async (e) => {
 
             showToast("Profile updated successfully!", "success");
             document.getElementById('profileSettingsModal').style.display = 'none';
-            
+
             // Refresh topbar name if present
             if (document.getElementById('topBarName')) {
                 document.getElementById('topBarName').innerText = name.split(' ')[0];
@@ -2402,7 +2403,7 @@ window.renewMember = async (id) => {
             document.getElementById('renewDuration').innerText = `${plan.duration} days`;
             const expiry = new Date(Date.now() + plan.duration * 24 * 60 * 60 * 1000);
             document.getElementById('renewExpiry').innerText = expiry.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            
+
             let basePrice = Number(plan.price);
             let discount = 0;
             const now = new Date().getTime();
@@ -2410,7 +2411,7 @@ window.renewMember = async (id) => {
                 const currentPlanDays = window.getPlanDays(member.plan);
                 const currentExpiryDate = member.dateRegistered + (currentPlanDays * 24 * 60 * 60 * 1000);
                 const remainingDays = Math.ceil((currentExpiryDate - now) / (1000 * 60 * 60 * 24));
-                
+
                 if (remainingDays > 0) {
                     const currentPlanObj = (window.__membershipPlansData || []).find(p => p.name.toLowerCase() === (member.plan || '').toLowerCase());
                     if (currentPlanObj) {
@@ -2419,28 +2420,43 @@ window.renewMember = async (id) => {
                     }
                 }
             }
-            
+
             const lockerCheckbox = document.getElementById('renewAddLocker');
             const lockerPrice = (lockerCheckbox && lockerCheckbox.checked) ? 300 : 0;
-            
+
             const finalDue = Math.max(0, basePrice - discount + lockerPrice);
-            
+
             let totalDueHtml = `₱${finalDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
             if (discount > 0) {
                 totalDueHtml = `<span style="font-size:12px; color:var(--text-muted); font-weight:normal; margin-right:8px;">(Prorated -₱${discount.toFixed(2)})</span>` + totalDueHtml;
             }
-            
+
             document.getElementById('renewTotalDue').innerHTML = totalDueHtml;
         }
     };
-    
+
     // Listen to locker toggle
     const lockerCheckbox = document.getElementById('renewAddLocker');
     if (lockerCheckbox) {
         lockerCheckbox.onchange = () => select.dispatchEvent(new Event('change'));
     }
-    
+
     select.dispatchEvent(new Event('change'));
+
+    // Reset payment method toggle to Cash
+    window.__renewPaymentMethod = 'Cash';
+    const payToggle = document.getElementById('renewPaymentToggle');
+    if (payToggle) {
+        payToggle.querySelectorAll('.pay-opt').forEach(o => o.classList.remove('selected'));
+        const cashOpt = payToggle.querySelector('[data-method="Cash"]');
+        if (cashOpt) cashOpt.classList.add('selected');
+    }
+    const gcashW = document.getElementById('renewGcashRefWrapper');
+    if (gcashW) {
+        gcashW.classList.remove('visible');
+        const inp = gcashW.querySelector('input');
+        if (inp) inp.value = '';
+    }
 
     document.getElementById('renewMemberModal').style.display = 'flex';
 };
@@ -2471,7 +2487,7 @@ window.confirmRenewal = async function () {
             if (currentPlanObj) discount = (Number(currentPlanObj.price) / currentPlanDays) * remainingDays;
         }
     }
-    
+
     const lockerCheckbox = document.getElementById('renewAddLocker');
     const hasLocker = lockerCheckbox && lockerCheckbox.checked;
     const lockerPrice = hasLocker ? 300 : 0;
@@ -2479,6 +2495,16 @@ window.confirmRenewal = async function () {
 
     showConfirm(`Charge ₱${finalDue.toLocaleString(undefined, { minimumFractionDigits: 2 })} for ${plan.name}${hasLocker ? ' + Locker' : ''}?`, async () => {
         try {
+            // Capture payment method + GCash ref for renewal
+            const renewPayMethod = window.__renewPaymentMethod || 'Cash';
+            const renewGcashRef = (document.getElementById('renewGcashRefId') ? document.getElementById('renewGcashRefId').value.trim() : '');
+
+            // Validate GCash ref when GCash is selected
+            if (renewPayMethod === 'GCash' && !renewGcashRef) {
+                showToast('Please enter the GCash Reference ID.', 'error');
+                return;
+            }
+
             const currentTimestamp = new Date().getTime();
             let updates = {
                 plan: plan.name,
@@ -2488,24 +2514,29 @@ window.confirmRenewal = async function () {
             if (hasLocker) {
                 updates.hasLocker = true;
             }
-            
+
             await updateDoc(doc(db, "users", id), updates);
 
             // Record renewal payment
-            await addDoc(paymentsCol, {
+            const paymentData = {
                 name: `${member.givenName || member.name} ${member.familyName || ''}`.trim(),
                 amount: finalDue,
                 items: `Renewal: ${plan.name}${hasLocker ? ' & Locker' : ''}`,
                 type: "Membership",
                 status: "Paid",
+                paymentMethod: renewPayMethod,
                 date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
                 time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: currentTimestamp
-            });
+            };
+            if (renewPayMethod === 'GCash' && renewGcashRef) {
+                paymentData.gcashRefId = renewGcashRef;
+            }
+            await addDoc(paymentsCol, paymentData);
 
             window.closeModal('renewMemberModal');
             showToast("Membership renewed successfully!", "success");
-            if (window.logActivity) window.logActivity("Membership Renewed", `Renewed ${member.givenName || member.name} ${member.familyName || ''} with ${plan.name} (₱${finalDue})`);
+            if (window.logActivity) window.logActivity("Membership Renewed", `Renewed ${member.givenName || member.name} ${member.familyName || ''} with ${plan.name} (₱${finalDue}) via ${renewPayMethod}`);
         } catch (err) {
             console.error("Renewal failed:", err);
             showToast("Error renewing membership. Please try again.", "error");
@@ -2560,12 +2591,12 @@ function renderMembershipPlans() {
         const isActive = p.status === 'Active';
         const subscriberCount = membersData.filter(m => (m.plan || '').toLowerCase() === (p.name || '').toLowerCase() && (m.status || '').toLowerCase() !== 'archived').length;
         const isPremium = p.name.toLowerCase().includes('gold') || p.price >= 2000;
-        
-        let cardStyle = isPremium 
-            ? 'ring-1 ring-[#991b1b]/10' 
+
+        let cardStyle = isPremium
+            ? 'ring-1 ring-[#991b1b]/10'
             : '';
-        let premiumAccent = isPremium 
-            ? '<div class="absolute top-0 left-0 w-1 h-full bg-[#991b1b]"></div>' 
+        let premiumAccent = isPremium
+            ? '<div class="absolute top-0 left-0 w-1 h-full bg-[#991b1b]"></div>'
             : '';
         let priceColor = isPremium ? 'text-[#991b1b]' : 'text-slate-900';
         let plClass = isPremium ? 'pl-7' : '';
@@ -2771,7 +2802,7 @@ function renderLockers() {
         return;
     }
 
-    grid.innerHTML = lockersData.sort((a, b) => (a.number || "").localeCompare(b.number || "", undefined, {numeric: true})).map(l => {
+    grid.innerHTML = lockersData.sort((a, b) => (a.number || "").localeCompare(b.number || "", undefined, { numeric: true })).map(l => {
         const isOccupied = l.status === 'Occupied';
         const isMaint = l.status === 'Maintenance';
         const statusClass = isOccupied ? 'occupied' : (isMaint ? 'maintenance' : 'available');
@@ -2788,7 +2819,7 @@ function renderLockers() {
     }).join('');
 }
 
-window.openAddLockerModal = function() {
+window.openAddLockerModal = function () {
     document.getElementById('addLockerForm').reset();
     document.getElementById('addLockerModal').style.display = 'flex';
 };
@@ -2815,14 +2846,14 @@ if (document.getElementById('addLockerForm')) {
     });
 }
 
-window.openAssignLockerModal = function(id) {
+window.openAssignLockerModal = function (id) {
     const locker = lockersData.find(l => l.id === id);
     if (!locker) return;
 
     document.getElementById('assignLockerId').value = id;
     document.getElementById('assignLockerNumberText').innerText = `Locker #${locker.number}`;
     document.getElementById('assignLockerLocationText').innerText = locker.location || 'General Section';
-    
+
     const isOccupied = locker.status === 'Occupied';
     const form = document.getElementById('assignLockerForm');
     const info = document.getElementById('activeAssignmentInfo');
@@ -2867,7 +2898,7 @@ if (document.getElementById('assignLockerForm')) {
         const lockerId = document.getElementById('assignLockerId').value;
         const memberId = document.getElementById('assignMemberSelect').value;
         const duration = parseInt(document.getElementById('assignDuration').value);
-        
+
         const memberOpt = document.querySelector(`#assignMemberSelect option[value="${memberId}"]`);
         const memberName = memberOpt ? memberOpt.getAttribute('data-name') : 'Unknown';
 
@@ -2882,7 +2913,7 @@ if (document.getElementById('assignLockerForm')) {
                 expiryDate,
                 assignedAt: Date.now()
             });
-            
+
             // Also update member profile
             await updateDoc(doc(db, "users", memberId), { hasLocker: true, lockerId: lockerId });
 
@@ -2896,7 +2927,7 @@ if (document.getElementById('assignLockerForm')) {
     });
 }
 
-window.releaseLocker = async function() {
+window.releaseLocker = async function () {
     const lockerId = document.getElementById('assignLockerId').value;
     const locker = lockersData.find(l => l.id === lockerId);
     if (!locker) return;
@@ -2924,7 +2955,7 @@ window.releaseLocker = async function() {
     });
 };
 
-window.printLockerReceipt = function() {
+window.printLockerReceipt = function () {
     showToast("Printing locker assignment receipt...", "info");
     window.print();
 };
@@ -2939,7 +2970,7 @@ function renderMembers() {
     let activeMembers = 0;
     let expiringSoon = 0;
     let newMembers30d = 0;
-    
+
     const now = new Date().getTime();
     const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
 
@@ -2954,7 +2985,7 @@ function renderMembers() {
     membersData.forEach(m => {
         const statusStr = (m.status || "Active").trim();
         const statusLower = statusStr.toLowerCase();
-        
+
         // Count New Members (Last 30 Days)
         if (m.dateRegistered && m.dateRegistered > thirtyDaysAgo) {
             newMembers30d++;
@@ -2964,12 +2995,12 @@ function renderMembers() {
             archivedList.push(m);
         } else {
             // Apply Filters to Active List only for display
-            const matchesSearch = !searchVal || 
-                (m.name || "").toLowerCase().includes(searchVal) || 
+            const matchesSearch = !searchVal ||
+                (m.name || "").toLowerCase().includes(searchVal) ||
                 (m.email || "").toLowerCase().includes(searchVal) ||
                 (m.givenName || "").toLowerCase().includes(searchVal) ||
                 (m.familyName || "").toLowerCase().includes(searchVal);
-            
+
             const matchesPlan = planFilter === "all" || m.plan === planFilter;
             const matchesStatus = statusFilter === "all" || statusStr === statusFilter;
 
@@ -3004,15 +3035,15 @@ function renderMembers() {
         if (m.dateRegistered) {
             const expiryDate = m.dateRegistered + (planDays * 24 * 60 * 60 * 1000);
             const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-            if (diffDays > 0) { 
-                daysLeftText = `${diffDays} Days`; 
-                if (diffDays <= 7) timerBadgeClass = "pending"; 
-            } else { 
-                daysLeftText = "Expired"; 
-                timerBadgeClass = "broken"; 
+            if (diffDays > 0) {
+                daysLeftText = `${diffDays} Days`;
+                if (diffDays <= 7) timerBadgeClass = "pending";
+            } else {
+                daysLeftText = "Expired";
+                timerBadgeClass = "broken";
             }
-        } else { 
-            daysLeftText = `${planDays} Days`; 
+        } else {
+            daysLeftText = `${planDays} Days`;
         }
 
         if (isArchived) {
@@ -3029,11 +3060,11 @@ function renderMembers() {
         } else {
             let badgeClass = (m.status || "Active").trim().toLowerCase() === 'active' ? 'active' : 'inactive';
             let statusHtml = `<span class="badge ${badgeClass}">${m.status || 'Active'}</span>`;
-            
-            const avatarHtml = m.image 
-                ? `<img src="${m.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` 
+
+            const avatarHtml = m.image
+                ? `<img src="${m.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">`
                 : `<div class="initial-avatar" style="width:32px; height:32px; font-size:11px;">${(m.givenName || m.name || "?")[0]}${(m.familyName || "")[0] || ""}</div>`;
-            
+
             // Inline Action Buttons (Similar to Staff/Trainers)
             const actionHtml = `
                 <div class="flex gap-1 justify-end">
@@ -3070,26 +3101,26 @@ function renderMembers() {
     // Update pagination counts
     if (document.getElementById('memberTotalCount')) document.getElementById('memberTotalCount').innerText = activeList.length;
     if (document.getElementById('memberShowingCount')) document.getElementById('memberShowingCount').innerText = activeList.length > 0 ? `1-${activeList.length}` : '0-0';
-    
+
     if (document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
     if (document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = activeList.length;
     if (window.refreshDashboardAnalytics) window.refreshDashboardAnalytics();
 }
 
 // Member UI Helpers
-window.sendMessageToMember = function(id) {
+window.sendMessageToMember = function (id) {
     showToast("Opening messaging interface for member ID: " + id, "info");
 };
 
-window.filterMembers = function() {
+window.filterMembers = function () {
     renderMembers();
 };
 
-window.sortMembers = function(field) {
+window.sortMembers = function (field) {
     showToast("Sorting members by " + field, "info");
 };
 
-window.changeMemberPagination = function() {
+window.changeMemberPagination = function () {
     renderMembers();
 };
 
@@ -3180,7 +3211,7 @@ function renderStaff() {
     // 1. Initialize KPI Metrics
     let staffActive = 0, staffOnShift = 0, staffMgmt = 0;
     let trainerActive = 0, trainerOnFloor = 0, trainerNewHires = 0;
-    
+
     const now = new Date().getTime();
     const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
 
@@ -3218,8 +3249,8 @@ function renderStaff() {
                 if (u.shiftStatus === 'On Shift') staffOnShift++;
                 if (roleLower === 'admin') staffMgmt++;
 
-                const matchesSearch = !staffSearch || 
-                    (u.name || "").toLowerCase().includes(staffSearch) || 
+                const matchesSearch = !staffSearch ||
+                    (u.name || "").toLowerCase().includes(staffSearch) ||
                     (u.email || "").toLowerCase().includes(staffSearch) ||
                     (u.givenName || "").toLowerCase().includes(staffSearch) ||
                     (u.familyName || "").toLowerCase().includes(staffSearch);
@@ -3235,8 +3266,8 @@ function renderStaff() {
                 if (u.shiftStatus === 'On Floor') trainerOnFloor++;
                 if (u.dateRegistered && u.dateRegistered > thirtyDaysAgo) trainerNewHires++;
 
-                const matchesSearch = !trainerSearch || 
-                    (u.name || "").toLowerCase().includes(trainerSearch) || 
+                const matchesSearch = !trainerSearch ||
+                    (u.name || "").toLowerCase().includes(trainerSearch) ||
                     (u.email || "").toLowerCase().includes(trainerSearch) ||
                     (u.givenName || "").toLowerCase().includes(trainerSearch) ||
                     (u.familyName || "").toLowerCase().includes(trainerSearch);
@@ -3266,8 +3297,8 @@ function renderStaff() {
         let fullName = `${u.givenName || u.name} ${u.familyName || ''}`.trim();
         let specialty = u.specialty || 'General Fitness';
 
-        const avatarHtml = u.image 
-            ? `<img src="${u.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">` 
+        const avatarHtml = u.image
+            ? `<img src="${u.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">`
             : `<div class="initial-avatar" style="width:32px; height:32px; font-size:11px;">${(u.givenName || u.name || "?")[0]}${(u.familyName || "")[0] || ""}</div>`;
 
         let actionBtns = isArchived ? `
@@ -3364,10 +3395,10 @@ function renderStaff() {
 }
 
 // Staff & Trainer UI Helpers
-window.filterStaff = function() { renderStaff(); };
-window.filterTrainers = function() { renderStaff(); };
-window.sortStaff = function(field) { showToast("Sorting staff by " + field, "info"); };
-window.sortTrainers = function(field) { showToast("Sorting trainers by " + field, "info"); };
+window.filterStaff = function () { renderStaff(); };
+window.filterTrainers = function () { renderStaff(); };
+window.sortStaff = function (field) { showToast("Sorting staff by " + field, "info"); };
+window.sortTrainers = function (field) { showToast("Sorting trainers by " + field, "info"); };
 
 function renderMemberTrainers() {
     const grid = document.getElementById('memberTrainerGrid');
@@ -3558,12 +3589,56 @@ window.addBatchRow = function () {
     tbody.appendChild(tr); batchRowCount++;
 }
 
+// Payment Method Toggle for Registration / Renewal Modals
+window.__regPaymentMethod = 'Cash';
+window.__renewPaymentMethod = 'Cash';
+
+window.selectRegPayment = function (method, el, context) {
+    const prefix = context || 'reg';
+    // Update global state
+    if (prefix === 'reg') window.__regPaymentMethod = method;
+    else window.__renewPaymentMethod = method;
+
+    // Toggle visual state
+    const toggle = el.parentElement;
+    toggle.querySelectorAll('.pay-opt').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+
+    // Show/hide GCash reference ID field
+    const wrapper = document.getElementById(prefix + 'GcashRefWrapper');
+    if (wrapper) {
+        if (method === 'GCash') {
+            wrapper.classList.add('visible');
+            const inp = wrapper.querySelector('input');
+            if (inp) setTimeout(() => inp.focus(), 300);
+        } else {
+            wrapper.classList.remove('visible');
+            const inp = wrapper.querySelector('input');
+            if (inp) inp.value = '';
+        }
+    }
+};
+
 window.openMemberModal = () => {
     if (document.getElementById('memberRegistrationForm')) {
         document.getElementById('memberRegistrationForm').reset();
         if (document.getElementById('regMemberPreview')) {
             document.getElementById('regMemberPreview').src = 'images/default-profile.png';
         }
+    }
+    // Reset payment method toggle to Cash
+    window.__regPaymentMethod = 'Cash';
+    const toggle = document.getElementById('regPaymentToggle');
+    if (toggle) {
+        toggle.querySelectorAll('.pay-opt').forEach(o => o.classList.remove('selected'));
+        const cashOpt = toggle.querySelector('[data-method="Cash"]');
+        if (cashOpt) cashOpt.classList.add('selected');
+    }
+    const gcashWrapper = document.getElementById('regGcashRefWrapper');
+    if (gcashWrapper) {
+        gcashWrapper.classList.remove('visible');
+        const inp = gcashWrapper.querySelector('input');
+        if (inp) inp.value = '';
     }
     document.getElementById('memberModal').style.display = 'flex';
 }
@@ -3642,16 +3717,33 @@ if (document.getElementById('memberRegistrationForm')) {
             // Record membership payment — dynamic price from plans collection
             const planObj = (window.__membershipPlansData || []).find(p => p.name.toLowerCase() === plan.toLowerCase());
             const planPrice = planObj ? Number(planObj.price) : (plan === 'Gold Plan' ? 1500 : (plan === 'Silver Plan' ? 1000 : 800));
-            await addDoc(paymentsCol, {
+
+            // Capture payment method + GCash ref
+            const regPayMethod = window.__regPaymentMethod || 'Cash';
+            const regGcashRef = (document.getElementById('regGcashRefId') ? document.getElementById('regGcashRefId').value.trim() : '');
+
+            // Validate GCash ref when GCash is selected
+            if (regPayMethod === 'GCash' && !regGcashRef) {
+                showToast('Please enter the GCash Reference ID.', 'error');
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+
+            const paymentData = {
                 name: `${given} ${family}`,
                 amount: planPrice,
                 items: `Membership: ${plan}`,
                 type: "Membership",
                 status: "Paid",
+                paymentMethod: regPayMethod,
                 date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
                 time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: currentTimestamp
-            });
+            };
+            if (regPayMethod === 'GCash' && regGcashRef) {
+                paymentData.gcashRefId = regGcashRef;
+            }
+            await addDoc(paymentsCol, paymentData);
 
             showToast(`Member ${given} ${family} registered successfully!`, "success");
             if (window.logActivity) window.logActivity("Member Registered", `Registered: ${given} ${family}`);
@@ -4025,17 +4117,27 @@ setBookingDateMin(document.getElementById("bookDate"));
 onSnapshot(bookingsCol, (snapshot) => {
     bookingsData = [];
     snapshot.forEach(doc => bookingsData.push({ id: doc.id, ...doc.data() }));
+    window.bookingsData = bookingsData; // Keep global in sync
     renderBookings();
     renderTodayBookings();
 });
 
+window.renderBookings = renderBookings;
 function renderBookings() {
     const tbody = document.getElementById('bookingsBody');
     const myTbody = document.getElementById('myBookingsBody');
     const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
     const loggedInUserId = localStorage.getItem("userId");
 
-    let displayData = [...bookingsData].sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+    let displayData = [...bookingsData].sort((a, b) => {
+        const isCancelled = (s) => s === 'Cancelled' || s === 'Declined';
+        const aCancelled = isCancelled(a.status);
+        const bCancelled = isCancelled(b.status);
+        if (aCancelled !== bCancelled) return aCancelled ? 1 : -1;
+
+        // Default to newest first
+        return new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`);
+    });
 
     if (loggedInRole === "member") {
         displayData = displayData.filter(b => b.memberId === loggedInUserId);
@@ -4581,16 +4683,16 @@ window.renderTodayBookings = function () {
         `;
     }).join('');
 };
-window.openAddCreditModal = function(memberId) {
+window.openAddCreditModal = function (memberId) {
     const member = membersData.find(m => m.id === memberId);
     if (!member) return;
-    
+
     document.getElementById('addCreditMemberId').value = member.id;
     document.getElementById('addCreditMemberName').innerText = member.name || (member.givenName + ' ' + member.familyName);
     document.getElementById('addCreditCurrentBalance').innerText = `₱${(member.creditBalance || 0).toFixed(2)}`;
     document.getElementById('addCreditAmount').value = '';
     document.getElementById('addCreditNote').value = '';
-    
+
     document.getElementById('addCreditModal').style.display = 'flex';
 }
 
@@ -4601,23 +4703,23 @@ if (document.getElementById('addCreditForm')) {
         const amount = Number(document.getElementById('addCreditAmount').value);
         const paymentMethod = document.getElementById('addCreditPaymentMethod').value;
         const note = document.getElementById('addCreditNote').value.trim();
-        
+
         const member = membersData.find(m => m.id === memberId);
         if (!member) return;
-        
+
         const submitBtn = e.target.querySelector('.btn-save');
         const originalText = submitBtn.innerText;
         submitBtn.disabled = true;
         submitBtn.innerText = 'Processing...';
-        
+
         try {
             const memberRef = doc(db, "users", memberId);
             const currentBalance = member.creditBalance || 0;
-            
-            await updateDoc(memberRef, { 
-                creditBalance: increment(amount) 
+
+            await updateDoc(memberRef, {
+                creditBalance: increment(amount)
             });
-            
+
             await addDoc(creditTransactionsCol, {
                 memberId,
                 memberName: member.name || (member.givenName + ' ' + member.familyName),
@@ -4631,7 +4733,7 @@ if (document.getElementById('addCreditForm')) {
                 processedByName: localStorage.getItem("loggedInUser"),
                 timestamp: Date.now()
             });
-            
+
             const now = new Date();
             await addDoc(paymentsCol, {
                 name: member.name || (member.givenName + ' ' + member.familyName),
@@ -4644,7 +4746,7 @@ if (document.getElementById('addCreditForm')) {
                 time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: now.getTime()
             });
-            
+
             showToast("Credit added successfully!", "success");
             closeModal('addCreditModal');
         } catch (err) {

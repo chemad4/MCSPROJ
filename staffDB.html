@@ -238,6 +238,90 @@
                 display: block !important;
             }
         }
+
+        /* Registration Payment Method Selector */
+        .reg-payment-section {
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px dashed var(--border-color);
+        }
+        .reg-payment-section .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .reg-payment-toggle {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .reg-payment-toggle .pay-opt {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 10px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 8px;
+            cursor: pointer;
+            background: var(--panel-bg);
+            color: var(--text-muted);
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .reg-payment-toggle .pay-opt:hover {
+            border-color: var(--dark-black);
+            color: var(--dark-black);
+        }
+        .reg-payment-toggle .pay-opt.selected {
+            border-color: var(--dark-black);
+            background: rgba(0,0,0,0.04);
+            color: var(--dark-black);
+            box-shadow: 0 0 0 1px var(--dark-black);
+        }
+        .reg-payment-toggle .pay-opt i {
+            font-size: 16px;
+        }
+        .gcash-ref-wrapper {
+            margin-top: 10px;
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.25s ease;
+        }
+        .gcash-ref-wrapper.visible {
+            max-height: 100px;
+            opacity: 1;
+            margin-top: 10px;
+        }
+        .gcash-ref-wrapper input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid #3B82F6;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #eff6ff;
+            color: #1e3a5f;
+            letter-spacing: 0.04em;
+            font-weight: 600;
+        }
+        .gcash-ref-wrapper input::placeholder {
+            color: #93c5fd;
+            font-weight: 500;
+        }
+        .gcash-ref-wrapper input:focus {
+            outline: none;
+            border-color: #2563EB;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
     </style>
 </head>
 
@@ -925,6 +1009,22 @@
 
                 <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag (Tap Card or type):</p>
                 <input type="text" id="regMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card..." required>
+
+                <!-- Payment Method Selector -->
+                <div class="reg-payment-section">
+                    <div class="section-label"><i class="fa-solid fa-wallet"></i> Payment Method</div>
+                    <div class="reg-payment-toggle" id="regPaymentToggle">
+                        <div class="pay-opt selected" data-method="Cash" onclick="selectRegPayment('Cash', this, 'reg')">
+                            <i class="fa-solid fa-money-bill-wave"></i> Cash
+                        </div>
+                        <div class="pay-opt" data-method="GCash" onclick="selectRegPayment('GCash', this, 'reg')">
+                            <i class="fa-solid fa-mobile-screen-button"></i> GCash
+                        </div>
+                    </div>
+                    <div class="gcash-ref-wrapper" id="regGcashRefWrapper">
+                        <input type="text" id="regGcashRefId" placeholder="GCash Reference ID (e.g. 1234 5678 9012)" autocomplete="off">
+                    </div>
+                </div>
                 
                 <button type="submit" style="background-color: var(--primary-red); margin-top: 15px;"><i
                         class="fas fa-paper-plane"></i> Register & Send Email</button>
