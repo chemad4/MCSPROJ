@@ -3544,37 +3544,41 @@ function renderMemberTrainers() {
     window.syncDOM(grid, activeTrainers, renderTrainerCard, 'member-trainer-card');
 
     // --- Update Dashboard "Trainers on Floor" Feed ---
-    const activeTrainersFeed = document.getElementById('dashActiveTrainersFeed');
-    if (activeTrainersFeed) {
-        const onFloor = activeTrainers.filter(u => u.shiftStatus === 'On Floor');
-        if (onFloor.length > 0) {
-            activeTrainersFeed.innerHTML = onFloor.map(t => {
-                let fullName = `${t.givenName || t.name} ${t.familyName || ''}`.trim();
-                return `
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 12px; background: var(--body-bg); border-radius: 12px; border: 1px solid var(--border-color); transition: transform 0.2s ease;">
-                        <div style="width: 40px; height: 40px; background: var(--primary-red); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; box-shadow: 0 4px 10px rgba(153, 27, 27, 0.2);">
-                            ${t.image ? `<img src="${t.image}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">` : fullName.charAt(0).toUpperCase()}
-                        </div>
-                        <div style="flex-grow: 1;">
-                            <div style="font-weight: 700; font-size: 14px; color: var(--text-primary);">${fullName}</div>
-                            <div style="font-size: 12px; color: var(--accent-green); font-weight: 600; display: flex; align-items: center; gap: 4px;">
-                                <span style="width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; display: inline-block; animation: pulse 2s infinite;"></span> On Floor
+    try {
+        const activeTrainersFeed = document.getElementById('dashActiveTrainersFeed');
+        if (activeTrainersFeed) {
+            const onFloor = activeTrainers.filter(u => u.shiftStatus === 'On Floor');
+            if (onFloor.length > 0) {
+                activeTrainersFeed.innerHTML = onFloor.map(t => {
+                    let fullName = `${t.givenName || t.name} ${t.familyName || ''}`.trim();
+                    return `
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 12px; background: var(--body-bg); border-radius: 12px; border: 1px solid var(--border-color); transition: transform 0.2s ease;">
+                            <div style="width: 40px; height: 40px; background: var(--primary-red); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; box-shadow: 0 4px 10px rgba(153, 27, 27, 0.2);">
+                                ${t.image ? `<img src="${t.image}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">` : fullName.charAt(0).toUpperCase()}
+                            </div>
+                            <div style="flex-grow: 1;">
+                                <div style="font-weight: 700; font-size: 14px; color: var(--text-primary);">${fullName}</div>
+                                <div style="font-size: 12px; color: var(--accent-green); font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                    <span style="width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; display: inline-block; animation: pulse 2s infinite;"></span> On Floor
+                                </div>
+                            </div>
+                            <div style="font-size: 11px; background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 20px; color: var(--text-muted); font-weight: 500;">
+                                ${t.specialty || "General Fitness"}
                             </div>
                         </div>
-                        <div style="font-size: 11px; background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 20px; color: var(--text-muted); font-weight: 500;">
-                            ${t.specialty || "General Fitness"}
-                        </div>
+                    `;
+                }).join('');
+            } else {
+                activeTrainersFeed.innerHTML = `
+                    <div style="text-align: center; padding: 40px 20px; opacity: 0.5;">
+                        <i class="fa-solid fa-person-walking" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                        <p style="color: var(--text-muted); font-size: 13px;">No trainers on the floor right now.</p>
                     </div>
                 `;
-            }).join('');
-        } else {
-            activeTrainersFeed.innerHTML = `
-                <div style="text-align: center; padding: 40px 20px; opacity: 0.5;">
-                    <i class="fa-solid fa-person-walking" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
-                    <p style="color: var(--text-muted); font-size: 13px;">No trainers on the floor right now.</p>
-                </div>
-            `;
+            }
         }
+    } catch (err) {
+        console.warn("Dashboard feed update failed:", err);
     }
 }
 
