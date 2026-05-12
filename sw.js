@@ -2,19 +2,19 @@
 // Using date-based versioning for clarity (Audit Fix 3.6).
 const CACHE_NAME = 'fit-track-cache-20260428';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/adminDB.html',
-  '/staffDB.html',
-  '/trainerDB.html',
-  '/memberDB.html',
-  '/css/styles.css',
-  '/js/script.js',
-  '/js/attendance.js',
-  '/js/rfid.js',
-  '/js/utils.js',
-  '/js/ui.js',
-  '/images/icon-192.png'
+  './',
+  'index.html',
+  'adminDB.html',
+  'staffDB.html',
+  'trainerDB.html',
+  'memberDB.html',
+  'css/styles.css',
+  'js/script.js',
+  'js/attendance.js',
+  'js/rfid.js',
+  'js/utils.js',
+  'js/ui.js',
+  'images/icon-192.png'
 ];
 
 // Install the service worker and cache the core files
