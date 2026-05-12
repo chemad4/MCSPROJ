@@ -198,6 +198,8 @@ function renderEnhancedBookingRow(b) {
     const statuses = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'No Show'];
     const dotColors = { Pending: '#F59E0B', Confirmed: '#10B981', Completed: '#3B82F6', Cancelled: '#EF4444', 'No Show': '#991B1B' };
 
+    const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
+
     const statusCell = `
         <div class="bk-status-wrapper">
             <span class="bk-status-badge ${statusClass}" onclick="toggleBkStatusDropdown(event, '${b.id}')">
@@ -213,14 +215,33 @@ function renderEnhancedBookingRow(b) {
         </div>
     `;
 
-    const actions = `
-        <button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>
-        <button type="button" class="btn-icon btn-delete" title="Delete Booking" onclick="deleteBooking('${b.id}')"><i class="fas fa-trash"></i></button>
-    `;
+    // Trainer: show accept/decline for pending, edit for others; Admin/Staff: full actions
+    let actions = '';
+    if (loggedInRole === 'trainer') {
+        if (b.status === 'Pending') {
+            actions = `
+                <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed')"><i class="fas fa-check"></i></button>
+                <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Cancelled')"><i class="fas fa-times"></i></button>
+            `;
+        } else {
+            actions = `<button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
+        }
+    } else {
+        actions = `
+            <button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>
+            <button type="button" class="btn-icon btn-delete" title="Delete Booking" onclick="deleteBooking('${b.id}')"><i class="fas fa-trash"></i></button>
+        `;
+    }
+
+    // Trainer: make member name clickable to view profile
+    let memberNameCell = `<span style="font-weight: 500;">${b.memberName}</span>`;
+    if (loggedInRole === 'trainer' && b.memberId) {
+        memberNameCell = `<a href="javascript:void(0)" onclick="window.openMemberProfile('${b.memberId}')" class="mp-link">${b.memberName}</a>`;
+    }
 
     return `
         <tr>
-            <td style="font-weight: 500;">${b.memberName}</td>
+            <td>${memberNameCell}</td>
             <td>${b.trainerName}</td>
             <td>${dateStr}</td>
             <td><span class="bk-time-display"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>

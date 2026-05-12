@@ -5052,51 +5052,141 @@ window.openMemberProfile = async function (memberId) {
         const m = docSnap.data();
         const fullName = m.name || `${m.givenName || ''} ${m.familyName || ''}`.trim();
 
-        // Populate Modal
+        // --- Avatar ---
         const avatar = document.getElementById('mpAvatar');
         if (avatar) {
-            avatar.innerText = fullName.charAt(0).toUpperCase();
             if (m.image) {
-                avatar.innerHTML = `<img src="${m.image}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+                avatar.innerHTML = `<img src="${m.image}" alt="${fullName}">`;
             } else {
                 avatar.innerHTML = fullName.charAt(0).toUpperCase();
             }
         }
 
+        // --- Name & Email ---
         const nameEl = document.getElementById('mpName');
         if (nameEl) nameEl.innerText = fullName;
 
         const emailEl = document.getElementById('mpEmail');
         if (emailEl) emailEl.innerText = m.email || "No email provided";
 
+        // --- Status Pill ---
         const statusEl = document.getElementById('mpStatus');
         if (statusEl) {
             const status = m.status || "Active";
             statusEl.innerText = status;
-            statusEl.style.background = status.toLowerCase() === 'active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(100, 116, 139, 0.1)';
-            statusEl.style.color = status.toLowerCase() === 'active' ? '#059669' : '#475569';
+            if (status.toLowerCase() === 'active') {
+                statusEl.style.background = 'rgba(16, 185, 129, 0.1)';
+                statusEl.style.color = '#059669';
+            } else {
+                statusEl.style.background = 'rgba(100, 116, 139, 0.1)';
+                statusEl.style.color = '#475569';
+            }
         }
 
+        // --- UID ---
+        const uidEl = document.getElementById('mpUid');
+        if (uidEl) uidEl.innerText = m.uid || '—';
+
+        // --- Plan ---
+        const planEl = document.getElementById('mpPlan');
+        if (planEl) planEl.innerText = m.plan || "No plan";
+
+        // --- Member Since ---
+        const sinceEl = document.getElementById('mpSince');
+        if (sinceEl) {
+            if (m.dateRegistered) {
+                sinceEl.innerText = new Date(m.dateRegistered).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } else if (m.registrationDate) {
+                sinceEl.innerText = m.registrationDate;
+            } else if (m.timestamp) {
+                sinceEl.innerText = new Date(m.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            } else {
+                sinceEl.innerText = '—';
+            }
+        }
+
+        // --- Fitness Goals ---
         const goalsEl = document.getElementById('mpGoals');
         if (goalsEl) goalsEl.innerText = m.fitnessGoals || "No goals set by the member yet.";
 
-        const planEl = document.getElementById('mpPlan');
-        if (planEl) planEl.innerText = m.plan || "No active plan";
+        // --- Emergency Contact ---
+        const emergEl = document.getElementById('mpEmergency');
+        if (emergEl) emergEl.innerText = m.emergencyContact || '—';
 
-        const sinceEl = document.getElementById('mpSince');
-        if (sinceEl) {
-            const date = m.registrationDate || (m.timestamp ? new Date(m.timestamp).toLocaleDateString() : "Unknown");
-            sinceEl.innerText = date;
+        // --- Plan Status (Days Left) ---
+        const planStatusEl = document.getElementById('mpPlanStatus');
+        if (planStatusEl) {
+            if (m.dateRegistered && m.plan) {
+                const now = Date.now();
+                const planDays = window.getPlanDays ? window.getPlanDays(m.plan) : 30;
+                const expiryDate = m.dateRegistered + (planDays * 24 * 60 * 60 * 1000);
+                const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                if (diffDays > 0) {
+                    planStatusEl.innerHTML = `<span style="color: #059669; font-weight: 700;">${diffDays} days left</span>`;
+                } else {
+                    planStatusEl.innerHTML = `<span style="color: #dc2626; font-weight: 700;">Expired</span>`;
+                }
+            } else {
+                planStatusEl.innerText = '—';
+            }
         }
 
+        // --- Session History & Total Sessions ---
+        const trainerUserId = localStorage.getItem("userId");
+        const memberBookings = bookingsData.filter(b => b.memberId === memberId);
+        const trainerBookings = memberBookings.filter(b => b.trainerId === trainerUserId);
+        
+        // Sort by date descending
+        trainerBookings.sort((a, b) => {
+            const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
+            const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
+            return dateB - dateA;
+        });
+
+        const totalEl = document.getElementById('mpTotalSessions');
+        if (totalEl) totalEl.innerText = trainerBookings.length;
+
+        const sessionList = document.getElementById('mpSessionList');
+        if (sessionList) {
+            if (trainerBookings.length === 0) {
+                sessionList.innerHTML = `<div class="mp-empty-state">No session history with you yet.</div>`;
+            } else {
+                const recent = trainerBookings.slice(0, 5);
+                sessionList.innerHTML = recent.map(s => {
+                    const sDate = new Date(`${s.date}T${s.time || '00:00'}`);
+                    const dateStr = sDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    const timeStr = sDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    const statusKey = (s.status || 'pending').toLowerCase().replace(' ', '');
+                    const dotClass = statusKey === 'noshow' ? 'dot-noshow' : `dot-${statusKey}`;
+                    const statusBadge = statusKey === 'noshow' ? 's-noshow' : `s-${statusKey}`;
+                    return `
+                        <div class="mp-session-item">
+                            <div class="mp-session-dot ${dotClass}"></div>
+                            <div class="mp-session-info">
+                                <div class="mp-session-date">${dateStr}</div>
+                                <div class="mp-session-meta">${timeStr}</div>
+                            </div>
+                            <span class="mp-session-status ${statusBadge}">${s.status}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+
+        // --- Message Button ---
         const messageBtn = document.getElementById('mpMessageBtn');
         if (messageBtn) {
             messageBtn.onclick = () => {
                 if (window.closeModal) window.closeModal('memberProfileModal');
-                if (window.openChatTab) window.openChatTab(memberId, null, fullName);
+                // Open chat with the member by name
+                if (window.openChat) {
+                    window.openChatTab('all', null, 'Internal Messages');
+                    setTimeout(() => { window.openChat(fullName); }, 300);
+                }
             };
         }
 
+        // --- Show Modal ---
         const modal = document.getElementById('memberProfileModal');
         if (modal) modal.style.display = 'flex';
 
