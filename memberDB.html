@@ -253,7 +253,7 @@
                             <i class="fas fa-user-gear"></i> Profile Settings
                         </button>
                         <div class="dropdown-divider"></div>
-                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: var(--primary-red);">
+                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: #ef4444; font-weight: 600;">
                             <i class="fa-solid fa-power-off"></i> Logout
                         </button>
                     </div>
@@ -381,7 +381,7 @@
                     </div>
                     <div style="padding: 20px; background: var(--white); border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
                         <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()" style="flex-grow: 1; padding: 12px 20px; border: 1px solid var(--border-color); border-radius: 25px; outline: none;" disabled>
-                        <button id="chatSendBtn" onclick="sendMessage()" style="background: var(--primary-red); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; transition: 0.2s;" disabled><i class="fas fa-paper-plane"></i></button>
+                        <button id="chatSendBtn" onclick="sendMessage()" style="background: var(--dark-black); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; transition: 0.2s;" disabled><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             </div>
@@ -414,12 +414,38 @@
                     </div>
                 </div>
                 
-                <button type="submit" style="background-color: var(--primary-red); margin-top: 20px;"><i class="fas fa-paper-plane"></i> Send Request</button>
+                <div class="btn-row" style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="action-btn" style="flex: 1; background: var(--body-bg); color: var(--text-primary); box-shadow: none; justify-content: center;" onclick="closeModal('memberBookingModal')">Cancel</button>
+                    <button type="submit" class="action-btn" style="flex: 1; justify-content: center;"><i class="fas fa-paper-plane"></i> Send Request</button>
+                </div>
             </form>
         </div>
     </div>
 
+    <div id="membershipExpiredModal" class="modal" style="display: none; z-index: 10000; backdrop-filter: blur(8px); background: rgba(0,0,0,0.85);">
+        <div class="modal-content" style="max-width: 400px; text-align: center; border: 1px solid rgba(255,255,255,0.1); background: var(--panel-bg);">
+            <div style="padding: 30px 20px;">
+                <div style="width: 80px; height: 80px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px;">
+                    <i class="fa-solid fa-hourglass-end"></i>
+                </div>
+                <h2 style="font-weight: 700; margin-bottom: 10px; color: var(--text-primary);">Membership Expired</h2>
+                <p style="color: var(--text-muted); line-height: 1.6; margin-bottom: 25px;">
+                    Your membership has expired. To continue using our facilities and booking sessions, please renew your plan at the front desk.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button onclick="handleLogout()" class="action-btn" style="width: 100%; background: var(--dark-black); justify-content: center;">
+                        <i class="fa-solid fa-power-off"></i> Logout
+                    </button>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 15px;">
+                        Need help? Contact us at support@fittrack.com
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="js/script.js"></script>
+
 
     <script>
         function filterMemberTrainers() {

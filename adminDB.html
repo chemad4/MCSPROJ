@@ -142,7 +142,7 @@
         }
 
         .pos-product-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
             transform: translateY(-2px);
             border-color: var(--primary-red);
         }
@@ -387,6 +387,7 @@
             padding-top: 16px;
             border-top: 1px dashed var(--border-color);
         }
+
         .reg-payment-section .section-label {
             font-size: 11px;
             font-weight: 700;
@@ -398,11 +399,13 @@
             align-items: center;
             gap: 6px;
         }
+
         .reg-payment-toggle {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
         }
+
         .reg-payment-toggle .pay-opt {
             display: flex;
             align-items: center;
@@ -419,19 +422,23 @@
             transition: all 0.2s ease;
             user-select: none;
         }
+
         .reg-payment-toggle .pay-opt:hover {
             border-color: var(--dark-black);
             color: var(--dark-black);
         }
+
         .reg-payment-toggle .pay-opt.selected {
             border-color: var(--dark-black);
-            background: rgba(0,0,0,0.04);
+            background: rgba(0, 0, 0, 0.04);
             color: var(--dark-black);
             box-shadow: 0 0 0 1px var(--dark-black);
         }
+
         .reg-payment-toggle .pay-opt i {
             font-size: 16px;
         }
+
         .gcash-ref-wrapper {
             margin-top: 10px;
             overflow: hidden;
@@ -439,11 +446,13 @@
             opacity: 0;
             transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.25s ease;
         }
+
         .gcash-ref-wrapper.visible {
             max-height: 100px;
             opacity: 1;
             margin-top: 10px;
         }
+
         .gcash-ref-wrapper input {
             width: 100%;
             padding: 10px 12px;
@@ -455,14 +464,16 @@
             letter-spacing: 0.04em;
             font-weight: 600;
         }
+
         .gcash-ref-wrapper input::placeholder {
             color: #93c5fd;
             font-weight: 500;
         }
+
         .gcash-ref-wrapper input:focus {
             outline: none;
             border-color: #2563EB;
-            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
 
         .process-payment-btn {
@@ -669,55 +680,78 @@
         <ul class="nav-menu" id="navMenu">
             <!-- ─── MAIN ─── -->
             <li class="nav-section-label">OVERVIEW</li>
-            <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)"><i class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span></li>
+            <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)"><i
+                    class="fa-solid fa-gauge"></i> <span class="menu-text">Dashboard</span></li>
 
             <!-- ─── BUSINESS ─── -->
             <li class="nav-section-label">BUSINESS</li>
 
-            <li class="nav-item has-submenu"><i class="fa-solid fa-boxes-stacked"></i> <span class="menu-text">Inventory</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <li class="nav-item has-submenu"><i class="fa-solid fa-boxes-stacked"></i> <span
+                    class="menu-text">Inventory</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('equipment', this)"><span class="menu-text">Gym Equipment</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('products', this)"><span class="menu-text">Products & Goods</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('ledger', this)"><span class="menu-text">Stock Movements</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('equipment', this)"><span
+                        class="menu-text">Gym Equipment</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('products', this)"><span
+                        class="menu-text">Products & Goods</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('ledger', this)"><span
+                        class="menu-text">Stock Movements</span></li>
             </ul>
 
-            <li class="nav-item has-submenu"><i class="fa-solid fa-id-card-clip"></i> <span class="menu-text">Membership</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <li class="nav-item has-submenu"><i class="fa-solid fa-id-card-clip"></i> <span
+                    class="menu-text">Membership</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('membershipPlans', this)"><span class="menu-text">Plans & Pricing</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('lockers', this)"><span class="menu-text">Locker Management</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('membershipPlans', this)"><span
+                        class="menu-text">Plans & Pricing</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('lockers', this)"><span
+                        class="menu-text">Locker Management</span></li>
             </ul>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('pos', this)"><i class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale</span></li>
-            <li class="nav-item nav-clickable" onclick="switchTab('payments', this)"><i class="fa-solid fa-file-invoice-dollar"></i> <span class="menu-text">Financial Reports</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('pos', this)"><i
+                    class="fa-solid fa-cash-register"></i> <span class="menu-text">Point of Sale</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('payments', this)"><i
+                    class="fa-solid fa-file-invoice-dollar"></i> <span class="menu-text">Financial Reports</span></li>
 
             <!-- ─── PEOPLE ─── -->
             <li class="nav-section-label">PEOPLE</li>
 
-            <li class="nav-item has-submenu"><i class="fa-solid fa-users"></i> <span class="menu-text">Members</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <li class="nav-item has-submenu"><i class="fa-solid fa-users"></i> <span class="menu-text">Members</span> <i
+                    class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('members', this)"><span class="menu-text">Active Members</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedMembers', this)"><span class="menu-text">Archived Members</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('members', this)"><span
+                        class="menu-text">Active Members</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedMembers', this)"><span
+                        class="menu-text">Archived Members</span></li>
             </ul>
 
-            <li class="nav-item has-submenu"><i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff Team</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <li class="nav-item has-submenu"><i class="fa-solid fa-user-tie"></i> <span class="menu-text">Staff
+                    Team</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('staff', this)"><span class="menu-text">Active Staff</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedStaff', this)"><span class="menu-text">Archived Staff</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('staff', this)"><span
+                        class="menu-text">Active Staff</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedStaff', this)"><span
+                        class="menu-text">Archived Staff</span></li>
             </ul>
 
-            <li class="nav-item has-submenu"><i class="fa-solid fa-dumbbell"></i> <span class="menu-text">Trainers</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
+            <li class="nav-item has-submenu"><i class="fa-solid fa-dumbbell"></i> <span
+                    class="menu-text">Trainers</span> <i class="fa-solid fa-chevron-down toggle-icon"></i></li>
             <ul class="submenu">
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('trainers', this)"><span class="menu-text">Active Trainers</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedTrainers', this)"><span class="menu-text">Archived Trainers</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('trainers', this)"><span
+                        class="menu-text">Active Trainers</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('archivedTrainers', this)"><span
+                        class="menu-text">Archived Trainers</span></li>
             </ul>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)"><i class="fa-solid fa-calendar-check"></i> <span class="menu-text">Bookings</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)"><i
+                    class="fa-solid fa-calendar-check"></i> <span class="menu-text">Bookings</span></li>
 
             <!-- ─── SYSTEM ─── -->
             <li class="nav-section-label">SYSTEM</li>
-            <li class="nav-item nav-clickable" onclick="switchTab('attendance', this)"><i class="fa-solid fa-clipboard-user"></i> <span class="menu-text">Attendance Log</span></li>
-            <li class="nav-item nav-clickable" onclick="switchTab('activityLog', this)"><i class="fa-solid fa-clock-rotate-left"></i> <span class="menu-text">Activity Log</span></li>
-            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Internal Messages')"><i class="fa-solid fa-comments"></i> <span class="menu-text">Messages</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('attendance', this)"><i
+                    class="fa-solid fa-clipboard-user"></i> <span class="menu-text">Attendance Log</span></li>
+            <li class="nav-item nav-clickable" onclick="switchTab('activityLog', this)"><i
+                    class="fa-solid fa-clock-rotate-left"></i> <span class="menu-text">Activity Log</span></li>
+            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Internal Messages')"><i
+                    class="fa-solid fa-comments"></i> <span class="menu-text">Messages</span></li>
         </ul>
     </aside>
 
@@ -733,7 +767,8 @@
             <div class="topbar-right">
                 <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn-circle"><i id="darkModeIcon"
                         class="fas fa-moon"></i></button>
-                <button onclick="toggleNotifSidebar()" title="Toggle Notifications" class="icon-btn-circle" id="notifToggleBtn">
+                <button onclick="toggleNotifSidebar()" title="Toggle Notifications" class="icon-btn-circle"
+                    id="notifToggleBtn">
                     <i class="fas fa-bell"></i>
                 </button>
 
@@ -757,7 +792,7 @@
                             <i class="fas fa-user-gear"></i> Profile Settings
                         </button>
                         <div class="dropdown-divider"></div>
-                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: var(--primary-red);">
+                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: #ef4444; font-weight: 600;">
                             <i class="fa-solid fa-power-off"></i> Logout
                         </button>
                     </div>
@@ -935,30 +970,6 @@
                     </div>
                 </div>
 
-                <!-- Right Column (1fr) -->
-                <div class="notif-column">
-                    <div class="notif-card">
-                        <div class="notif-header">
-                            Expiring Memberships
-                            <span class="notif-badge" id="dashExpiringBadge">0</span>
-                        </div>
-                        <div class="notif-list" id="dashExpiringList">
-                            <p style="color: var(--text-muted); font-size: 12px;">Checking for expirations...</p>
-                        </div>
-                        <a href="#" class="view-all-notif" onclick="switchTab('members', this)">View all</a>
-                    </div>
-
-                    <div class="notif-card">
-                        <div class="notif-header">
-                            Low Stock Alerts
-                            <span class="notif-badge" id="dashLowStockBadge">0</span>
-                        </div>
-                        <div class="notif-list" id="dashLowStockList">
-                            <p style="color: var(--text-muted); font-size: 12px;">Checking stock levels...</p>
-                        </div>
-                        <a href="#" class="view-all-notif" onclick="switchTab('products', this)">View all</a>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -1064,7 +1075,8 @@
         <div id="pos" class="content-section">
             <div class="pos-grid">
                 <div class="panel">
-                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="panel-header"
+                        style="display: flex; justify-content: space-between; align-items: center;">
                         <div><i class="fa-solid fa-box"></i> Product Catalog</div>
                         <div class="search-box" style="width: 250px; margin: 0; box-shadow: none;">
                             <i class="fas fa-search"></i>
@@ -1072,12 +1084,18 @@
                         </div>
                     </div>
                     <div class="pos-category-tabs" id="posCategoryTabs">
-                        <button class="pos-tab active" data-cat="all" onclick="filterPOSCategory('all', this)">All</button>
-                        <button class="pos-tab" data-cat="gym passes" onclick="filterPOSCategory('gym passes', this)">Gym Passes</button>
-                        <button class="pos-tab" data-cat="drinks" onclick="filterPOSCategory('drinks', this)">Drinks</button>
-                        <button class="pos-tab" data-cat="supplements" onclick="filterPOSCategory('supplements', this)">Supplements</button>
-                        <button class="pos-tab" data-cat="services" onclick="filterPOSCategory('services', this)">Services</button>
-                        <button class="pos-tab" data-cat="other" onclick="filterPOSCategory('other', this)">Other</button>
+                        <button class="pos-tab active" data-cat="all"
+                            onclick="filterPOSCategory('all', this)">All</button>
+                        <button class="pos-tab" data-cat="gym passes"
+                            onclick="filterPOSCategory('gym passes', this)">Gym Passes</button>
+                        <button class="pos-tab" data-cat="drinks"
+                            onclick="filterPOSCategory('drinks', this)">Drinks</button>
+                        <button class="pos-tab" data-cat="supplements"
+                            onclick="filterPOSCategory('supplements', this)">Supplements</button>
+                        <button class="pos-tab" data-cat="services"
+                            onclick="filterPOSCategory('services', this)">Services</button>
+                        <button class="pos-tab" data-cat="other"
+                            onclick="filterPOSCategory('other', this)">Other</button>
                     </div>
                     <div class="pos-product-grid" id="posProductGrid">
                         <!-- Rendered by JS -->
@@ -1086,7 +1104,7 @@
                 <div class="cart-panel">
                     <h3 style="margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;"><i
                             class="fa-solid fa-cart-shopping"></i> Current Order</h3>
-                    
+
                     <div style="margin-bottom: 15px;">
                         <input type="text" id="posCustomerName" placeholder="Customer Name (Optional)"
                             style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: rgba(255,255,255,0.5); color: var(--text-primary);">
@@ -1099,21 +1117,24 @@
                     </div>
 
                     <div class="cart-items" id="posCartBody"></div>
-                    
+
                     <div class="pos-totals"></div>
 
                     <div class="pos-payment-methods">
                         <h4>Quick-Payment Method</h4>
                         <div class="payment-method-grid">
-                            <button class="payment-method-btn active" data-method="Cash" onclick="selectPaymentMethod('Cash', this)">
+                            <button class="payment-method-btn active" data-method="Cash"
+                                onclick="selectPaymentMethod('Cash', this)">
                                 <i class="fa-solid fa-money-bill-wave"></i>
                                 <span>Cash</span>
                             </button>
-                            <button class="payment-method-btn" data-method="RFID" onclick="selectPaymentMethod('RFID', this)">
+                            <button class="payment-method-btn" data-method="RFID"
+                                onclick="selectPaymentMethod('RFID', this)">
                                 <i class="fa-solid fa-id-card"></i>
                                 <span>RFID Credit</span>
                             </button>
-                            <button class="payment-method-btn" data-method="GCash" onclick="selectPaymentMethod('GCash', this)">
+                            <button class="payment-method-btn" data-method="GCash"
+                                onclick="selectPaymentMethod('GCash', this)">
                                 <i class="fa-solid fa-mobile-screen-button"></i>
                                 <span>GCash</span>
                             </button>
@@ -1147,9 +1168,10 @@
             <div class="dense-control-bar">
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="paymentSearch" placeholder="Search customer or ID..." onkeyup="filterPayments()">
+                    <input type="text" id="paymentSearch" placeholder="Search customer or ID..."
+                        onkeyup="filterPayments()">
                 </div>
-                
+
                 <div class="filter-group">
                     <select id="paymentFilterRange" onchange="filterPayments()">
                         <option value="all">All Dates</option>
@@ -1158,13 +1180,13 @@
                         <option value="30days">Last 30 Days</option>
                         <option value="custom">Custom Range...</option>
                     </select>
-                    
+
                     <select id="paymentFilterStatus" onchange="filterPayments()">
                         <option value="all">All Statuses</option>
                         <option value="Paid">Paid</option>
                         <option value="Voided">Voided</option>
                     </select>
-                    
+
                     <select id="paymentFilterMethod" onchange="filterPayments()">
                         <option value="all">All Methods</option>
                         <option value="Cash">Cash</option>
@@ -1174,7 +1196,8 @@
                 </div>
 
                 <div style="margin-left: auto; display: flex; gap: 8px;">
-                    <button class="action-btn" style="background-color: var(--dark-black); padding: 6px 12px;" onclick="generateWeeklyPDF()">
+                    <button class="action-btn" style="background-color: var(--dark-black); padding: 6px 12px;"
+                        onclick="generateWeeklyPDF()">
                         <i class="fas fa-file-pdf"></i> Export Report
                     </button>
                 </div>
@@ -1201,16 +1224,18 @@
                         </tbody>
                     </table>
                 </div>
-                
+
                 <!-- Table Footer / Pagination -->
                 <div class="table-footer">
                     <div>
-                        Showing <span id="paymentShowingCount">0-0</span> of <span id="paymentTotalCount">0</span> transactions
+                        Showing <span id="paymentShowingCount">0-0</span> of <span id="paymentTotalCount">0</span>
+                        transactions
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <div>
-                            Rows per page: 
-                            <select id="paymentRowsPerPage" onchange="changePaymentPagination()" style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ddd;">
+                            Rows per page:
+                            <select id="paymentRowsPerPage" onchange="changePaymentPagination()"
+                                style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ddd;">
                                 <option value="25">25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
@@ -1235,7 +1260,7 @@
                 </div>
                 <div class="financial-kpi-card">
                     <span class="label" style="color: #92400e;">Expiring Soon (< 7d)</span>
-                    <span class="value" id="financialExpiringSoon">0</span>
+                            <span class="value" id="financialExpiringSoon">0</span>
                 </div>
                 <div class="financial-kpi-card">
                     <span class="label" style="color: #166534;">New Sign-ups (30d)</span>
@@ -1247,16 +1272,17 @@
             <div class="dense-control-bar">
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="memberSearch" placeholder="Search name or email..." onkeyup="filterMembers()">
+                    <input type="text" id="memberSearch" placeholder="Search name or email..."
+                        onkeyup="filterMembers()">
                 </div>
-                
+
                 <div class="filter-group">
                     <select id="memberFilterPlan" onchange="filterMembers()">
                         <option value="all">All Plans</option>
                         <option value="Gold Plan">Gold Plan</option>
                         <option value="Silver Plan">Silver Plan</option>
                     </select>
-                    
+
                     <select id="memberFilterStatus" onchange="filterMembers()">
                         <option value="all">All Statuses</option>
                         <option value="Active">Active</option>
@@ -1291,7 +1317,7 @@
                         </tbody>
                     </table>
                 </div>
-                
+
                 <!-- Table Footer / Pagination -->
                 <div class="table-footer">
                     <div>
@@ -1299,8 +1325,9 @@
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <div>
-                            Rows per page: 
-                            <select id="memberRowsPerPage" onchange="changeMemberPagination()" style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ddd;">
+                            Rows per page:
+                            <select id="memberRowsPerPage" onchange="changeMemberPagination()"
+                                style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ddd;">
                                 <option value="25">25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
@@ -1320,10 +1347,13 @@
             <div class="dense-control-bar">
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="archivedMemberSearch" placeholder="Search archived members..." onkeyup="filterTable('archivedMembersTable', 'archivedMemberSearch')">
+                    <input type="text" id="archivedMemberSearch" placeholder="Search archived members..."
+                        onkeyup="filterTable('archivedMembersTable', 'archivedMemberSearch')">
                 </div>
                 <div style="margin-left: auto;">
-                    <span class="label" style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Archived Directory</span>
+                    <span class="label"
+                        style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Archived
+                        Directory</span>
                 </div>
             </div>
             <div class="panel" style="border-radius: 0 0 4px 4px; border-top: none;">
@@ -1404,16 +1434,17 @@
             <div class="dense-control-bar">
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="staffSearchModern" placeholder="Search name or email..." onkeyup="filterStaff()">
+                    <input type="text" id="staffSearchModern" placeholder="Search name or email..."
+                        onkeyup="filterStaff()">
                 </div>
-                
+
                 <div class="filter-group">
                     <select id="staffFilterRole" onchange="filterStaff()">
                         <option value="all">All Roles</option>
                         <option value="Staff">Staff</option>
                         <option value="Admin">Admin</option>
                     </select>
-                    
+
                     <select id="staffFilterStatus" onchange="filterStaff()">
                         <option value="all">All Statuses</option>
                         <option value="Active">Active</option>
@@ -1447,7 +1478,7 @@
                         </tbody>
                     </table>
                 </div>
-                
+
                 <!-- Table Footer / Pagination -->
                 <div class="table-footer">
                     <div>
@@ -1505,9 +1536,10 @@
             <div class="dense-control-bar">
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="trainerSearchModern" placeholder="Search name or email..." onkeyup="filterTrainers()">
+                    <input type="text" id="trainerSearchModern" placeholder="Search name or email..."
+                        onkeyup="filterTrainers()">
                 </div>
-                
+
                 <div class="filter-group">
                     <select id="trainerFilterSpecialty" onchange="filterTrainers()">
                         <option value="all">All Specialties</option>
@@ -1516,7 +1548,7 @@
                         <option value="Yoga">Yoga</option>
                         <option value="HIIT">HIIT</option>
                     </select>
-                    
+
                     <select id="trainerFilterStatus" onchange="filterTrainers()">
                         <option value="all">All Statuses</option>
                         <option value="Active">Active</option>
@@ -1549,11 +1581,12 @@
                         </tbody>
                     </table>
                 </div>
-                
+
                 <!-- Table Footer / Pagination -->
                 <div class="table-footer">
                     <div>
-                        Showing <span id="trainerShowingCount">0-0</span> of <span id="trainerTotalCount">0</span> trainers
+                        Showing <span id="trainerShowingCount">0-0</span> of <span id="trainerTotalCount">0</span>
+                        trainers
                     </div>
                     <div style="display: flex; align-items: center; gap: 15px;">
                         <div class="pagination-controls" id="trainerPagination">
@@ -1592,7 +1625,8 @@
             <div class="panel panel-transparent">
                 <div class="panel-body panel-body-compact">
                     <h2 style="margin-bottom: 4px; font-size: 26px; font-weight: 700; color: var(--text-primary);">
-                        <i class="fa-solid fa-calendar-check" style="color: var(--primary-red); margin-right: 8px;"></i>Booking Management
+                        <i class="fa-solid fa-calendar-check"
+                            style="color: var(--primary-red); margin-right: 8px;"></i>Booking Management
                     </h2>
                     <p class="text-muted-sm">Schedule, track, and manage all personal training sessions.</p>
                 </div>
@@ -1601,28 +1635,32 @@
             <!-- KPI Ribbon -->
             <div class="bk-kpi-ribbon">
                 <div class="bk-kpi-card">
-                    <div class="bk-kpi-icon" style="background: rgba(16, 185, 129, 0.1); color: #10B981;"><i class="fa-solid fa-calendar-day"></i></div>
+                    <div class="bk-kpi-icon" style="background: rgba(16, 185, 129, 0.1); color: #10B981;"><i
+                            class="fa-solid fa-calendar-day"></i></div>
                     <div class="bk-kpi-info">
                         <span class="bk-kpi-value" id="bkTodayCount">0</span>
                         <span class="bk-kpi-label">Today's Sessions</span>
                     </div>
                 </div>
                 <div class="bk-kpi-card">
-                    <div class="bk-kpi-icon" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B;"><i class="fa-solid fa-hourglass-half"></i></div>
+                    <div class="bk-kpi-icon" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B;"><i
+                            class="fa-solid fa-hourglass-half"></i></div>
                     <div class="bk-kpi-info">
                         <span class="bk-kpi-value" id="bkPendingCount">0</span>
                         <span class="bk-kpi-label">Pending Approval</span>
                     </div>
                 </div>
                 <div class="bk-kpi-card">
-                    <div class="bk-kpi-icon" style="background: rgba(59, 130, 246, 0.1); color: #3B82F6;"><i class="fa-solid fa-check-double"></i></div>
+                    <div class="bk-kpi-icon" style="background: rgba(59, 130, 246, 0.1); color: #3B82F6;"><i
+                            class="fa-solid fa-check-double"></i></div>
                     <div class="bk-kpi-info">
                         <span class="bk-kpi-value" id="bkConfirmedCount">0</span>
                         <span class="bk-kpi-label">Confirmed</span>
                     </div>
                 </div>
                 <div class="bk-kpi-card">
-                    <div class="bk-kpi-icon" style="background: rgba(153, 27, 27, 0.1); color: var(--primary-red);"><i class="fa-solid fa-chart-line"></i></div>
+                    <div class="bk-kpi-icon" style="background: rgba(153, 27, 27, 0.1); color: var(--primary-red);"><i
+                            class="fa-solid fa-chart-line"></i></div>
                     <div class="bk-kpi-info">
                         <span class="bk-kpi-value" id="bkTotalWeek">0</span>
                         <span class="bk-kpi-label">This Week</span>
@@ -1640,20 +1678,24 @@
                     </div>
                     <!-- View Toggle -->
                     <div class="bk-view-toggle" role="tablist" aria-label="View mode">
-                        <button class="bk-toggle-btn active" id="bkListToggle" role="tab" aria-selected="true" onclick="switchBookingView('list', this)">
+                        <button class="bk-toggle-btn active" id="bkListToggle" role="tab" aria-selected="true"
+                            onclick="switchBookingView('list', this)">
                             <i class="fa-solid fa-list"></i> List
                         </button>
-                        <button class="bk-toggle-btn" id="bkCalToggle" role="tab" aria-selected="false" onclick="switchBookingView('calendar', this)">
+                        <button class="bk-toggle-btn" id="bkCalToggle" role="tab" aria-selected="false"
+                            onclick="switchBookingView('calendar', this)">
                             <i class="fa-regular fa-calendar"></i> Calendar
                         </button>
                     </div>
                 </div>
                 <div class="bk-action-right">
                     <!-- Advanced Filters -->
-                    <select id="bkFilterTrainer" class="bk-filter-select" onchange="renderBookings()" aria-label="Filter by Trainer">
+                    <select id="bkFilterTrainer" class="bk-filter-select" onchange="renderBookings()"
+                        aria-label="Filter by Trainer">
                         <option value="">All Trainers</option>
                     </select>
-                    <select id="bkFilterStatus" class="bk-filter-select" onchange="renderBookings()" aria-label="Filter by Status">
+                    <select id="bkFilterStatus" class="bk-filter-select" onchange="renderBookings()"
+                        aria-label="Filter by Status">
                         <option value="">All Statuses</option>
                         <option value="Pending">Pending</option>
                         <option value="Confirmed">Confirmed</option>
@@ -1662,9 +1704,11 @@
                         <option value="No Show">No Show</option>
                     </select>
                     <div class="bk-date-range">
-                        <input type="date" id="bkDateFrom" class="bk-filter-date" onchange="renderBookings()" aria-label="Date from" title="From date">
+                        <input type="date" id="bkDateFrom" class="bk-filter-date" onchange="renderBookings()"
+                            aria-label="Date from" title="From date">
                         <span class="bk-date-sep">–</span>
-                        <input type="date" id="bkDateTo" class="bk-filter-date" onchange="renderBookings()" aria-label="Date to" title="To date">
+                        <input type="date" id="bkDateTo" class="bk-filter-date" onchange="renderBookings()"
+                            aria-label="Date to" title="To date">
                     </div>
                     <button class="bk-manual-btn" onclick="openBookingDrawer()" id="bkManualBookingBtn">
                         <i class="fas fa-calendar-plus"></i> Manual Booking
@@ -1676,7 +1720,8 @@
             <div class="panel" id="bkListPanel">
                 <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <span><i class="fas fa-calendar-alt" style="margin-right: 6px;"></i> Master Booking Calendar</span>
-                    <span class="bk-record-count" id="bkRecordCount" style="font-weight: 400; font-size: 12px; color: var(--text-muted);"></span>
+                    <span class="bk-record-count" id="bkRecordCount"
+                        style="font-weight: 400; font-size: 12px; color: var(--text-muted);"></span>
                 </div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="bookingsTable">
@@ -1705,9 +1750,11 @@
             <div class="panel" id="bkCalendarPanel" style="display: none;">
                 <div class="bk-cal-header">
                     <div class="bk-cal-nav">
-                        <button class="bk-cal-nav-btn" onclick="navigateBookingCal(-1)" title="Previous week"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button class="bk-cal-nav-btn" onclick="navigateBookingCal(-1)" title="Previous week"><i
+                                class="fa-solid fa-chevron-left"></i></button>
                         <h3 class="bk-cal-title" id="bkCalTitle">This Week</h3>
-                        <button class="bk-cal-nav-btn" onclick="navigateBookingCal(1)" title="Next week"><i class="fa-solid fa-chevron-right"></i></button>
+                        <button class="bk-cal-nav-btn" onclick="navigateBookingCal(1)" title="Next week"><i
+                                class="fa-solid fa-chevron-right"></i></button>
                     </div>
                     <button class="bk-cal-today-btn" onclick="navigateBookingCal(0)">Today</button>
                 </div>
@@ -1719,12 +1766,50 @@
             </div>
         </div>
 
+        <!-- Notification Slide-Over Drawer -->
+        <div class="bk-drawer-overlay" id="notifDrawerOverlay" onclick="toggleNotifSidebar()"></div>
+        <aside class="bk-drawer" id="notifDrawer" aria-label="Notifications Drawer">
+            <div class="bk-drawer-header">
+                <h3><i class="fa-solid fa-bell" style="margin-right: 8px; color: var(--primary-red);"></i>Notifications
+                </h3>
+                <button class="bk-drawer-close" onclick="toggleNotifSidebar()"
+                    aria-label="Close drawer">&times;</button>
+            </div>
+            <div class="bk-drawer-body">
+                <div class="notif-column" style="width: 100%; transform: none; opacity: 1; pointer-events: auto;">
+                    <div class="notif-card">
+                        <div class="notif-header">
+                            Expiring Memberships
+                            <span class="notif-badge" id="dashExpiringBadge">0</span>
+                        </div>
+                        <div class="notif-list" id="dashExpiringList">
+                            <p style="color: var(--text-muted); font-size: 12px;">Checking for expirations...</p>
+                        </div>
+                        <a href="#" class="view-all-notif" onclick="switchTab('members', this)">View all</a>
+                    </div>
+
+                    <div class="notif-card">
+                        <div class="notif-header">
+                            Low Stock Alerts
+                            <span class="notif-badge" id="dashLowStockBadge">0</span>
+                        </div>
+                        <div class="notif-list" id="dashLowStockList">
+                            <p style="color: var(--text-muted); font-size: 12px;">Checking stock levels...</p>
+                        </div>
+                        <a href="#" class="view-all-notif" onclick="switchTab('products', this)">View all</a>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
         <!-- Booking Slide-Over Drawer -->
         <div class="bk-drawer-overlay" id="bkDrawerOverlay" onclick="closeBookingDrawer()"></div>
         <aside class="bk-drawer" id="bkDrawer" aria-label="Manual Booking Drawer">
             <div class="bk-drawer-header">
-                <h3><i class="fa-solid fa-calendar-plus" style="margin-right: 8px; color: var(--primary-red);"></i>New Booking</h3>
-                <button class="bk-drawer-close" onclick="closeBookingDrawer()" aria-label="Close drawer">&times;</button>
+                <h3><i class="fa-solid fa-calendar-plus" style="margin-right: 8px; color: var(--primary-red);"></i>New
+                    Booking</h3>
+                <button class="bk-drawer-close" onclick="closeBookingDrawer()"
+                    aria-label="Close drawer">&times;</button>
             </div>
             <div class="bk-drawer-body">
                 <form id="bookingForm" class="bk-drawer-form">
@@ -1760,7 +1845,8 @@
                         style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white); color: var(--text-primary);">
                         <i class="fa-solid fa-address-book"></i> Contacts
                     </div>
-                    <div style="padding: 10px; border-bottom: 1px solid var(--border-color); background: var(--panel-bg);">
+                    <div
+                        style="padding: 10px; border-bottom: 1px solid var(--border-color); background: var(--panel-bg);">
                         <div class="search-box" style="width: 100%;">
                             <i class="fas fa-search" style="left: 10px;"></i>
                             <input type="text" id="chatSearch" placeholder="Search users..." onkeyup="filterChatUsers()"
@@ -1893,10 +1979,14 @@
         <div id="membershipPlans" class="content-section bg-slate-50" style="padding: 32px;">
             <div class="flex justify-between items-center mb-6">
                 <div>
-                    <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i class="fa-solid fa-id-card-clip mr-2 text-slate-400"></i>Membership Plans & Pricing</h2>
-                    <p class="text-sm text-slate-500 mt-1">Configure access tiers, pricing models, and billing logic.</p>
+                    <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i
+                            class="fa-solid fa-id-card-clip mr-2 text-slate-400"></i>Membership Plans & Pricing</h2>
+                    <p class="text-sm text-slate-500 mt-1">Configure access tiers, pricing models, and billing logic.
+                    </p>
                 </div>
-                <button class="bg-[#991b1b] hover:bg-red-800 text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-2" onclick="openPlanModal()">
+                <button
+                    class="bg-[#991b1b] hover:bg-red-800 text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-2"
+                    onclick="openPlanModal()">
                     <i class="fas fa-plus"></i> Create New Plan
                 </button>
             </div>
@@ -1905,30 +1995,36 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <!-- KPI 1 -->
                 <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm flex flex-col">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Total Active Subscribers</div>
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Total Active
+                        Subscribers</div>
                     <div class="flex items-end justify-between">
                         <div class="text-2xl font-bold text-slate-900" id="mpActivePlans">0</div>
-                        <div class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 shadow-sm">
+                        <div
+                            class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 shadow-sm">
                             <i class="fas fa-arrow-up text-[10px]"></i> +5.2%
                         </div>
                     </div>
                 </div>
                 <!-- KPI 2 -->
                 <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm flex flex-col">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Monthly Recurring Revenue (MRR)</div>
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Monthly Recurring
+                        Revenue (MRR)</div>
                     <div class="flex items-end justify-between">
                         <div class="text-2xl font-bold text-slate-900" id="mpAvgPrice">₱0</div>
-                        <div class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 shadow-sm">
+                        <div
+                            class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 shadow-sm">
                             <i class="fas fa-arrow-up text-[10px]"></i> +8.1%
                         </div>
                     </div>
                 </div>
                 <!-- KPI 3 -->
                 <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm flex flex-col">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">New Sign-ups This Month</div>
+                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">New Sign-ups This
+                        Month</div>
                     <div class="flex items-end justify-between">
                         <div class="text-2xl font-bold text-slate-900" id="mpTotalPlans">0</div>
-                        <div class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 shadow-sm">
+                        <div
+                            class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1 shadow-sm">
                             <i class="fas fa-arrow-up text-[10px]"></i> +12.4%
                         </div>
                     </div>
@@ -1936,8 +2032,10 @@
             </div>
 
             <!-- Core Layout Shift -->
-            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-solid border-gray-200 pb-2">Active Plan Configurations</h3>
-            
+            <h3
+                class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-solid border-gray-200 pb-2">
+                Active Plan Configurations</h3>
+
             <div id="plansTableBody" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Dynamic Plans will be rendered here by renderMembershipPlans() -->
             </div>
@@ -1949,11 +2047,14 @@
         <div id="lockers" class="content-section" style="padding: 32px;">
             <div class="flex justify-between items-center mb-6">
                 <div>
-                    <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i class="fa-solid fa-lock mr-2 text-slate-400"></i>Locker System</h2>
+                    <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i
+                            class="fa-solid fa-lock mr-2 text-slate-400"></i>Locker System</h2>
                     <p class="text-sm text-slate-500 mt-1">Manage locker assignments and availability.</p>
                 </div>
                 <div class="flex gap-2">
-                    <button class="bg-[#991b1b] hover:bg-red-800 text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-2" onclick="openAddLockerModal()">
+                    <button
+                        class="bg-[#991b1b] hover:bg-red-800 text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-2"
+                        onclick="openAddLockerModal()">
                         <i class="fas fa-plus"></i> Add Locker
                     </button>
                 </div>
@@ -2018,7 +2119,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Description (Optional)</label>
-                    <textarea id="planDescription" placeholder="Short description for this plan..." rows="3" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:6px; font-family:inherit; font-size:14px; resize:vertical; background:rgba(255,255,255,0.5); color:var(--text-primary);"></textarea>
+                    <textarea id="planDescription" placeholder="Short description for this plan..." rows="3"
+                        style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:6px; font-family:inherit; font-size:14px; resize:vertical; background:rgba(255,255,255,0.5); color:var(--text-primary);"></textarea>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Status</label>
@@ -2029,7 +2131,7 @@
                 </div>
                 <div class="btn-row">
                     <button type="button" class="btn-cancel" onclick="closeModal('planModal')">Cancel</button>
-                    <button type="submit" class="btn-submit" style="background-color: var(--primary-red);">Save Plan</button>
+                    <button type="submit" class="action-btn">Save Plan</button>
                 </div>
             </form>
         </div>
@@ -2047,12 +2149,17 @@
             <div class="modal-form">
                 <input type="hidden" id="renewMemberId">
                 <div style="text-align:center; margin-bottom:20px;">
-                    <div style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, var(--primary-red), #c0392b); color:white; display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 12px;">
+                    <div
+                        style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg, var(--primary-red), #c0392b); color:white; display:flex; align-items:center; justify-content:center; font-size:24px; margin:0 auto 12px;">
                         <i class="fa-solid fa-user"></i>
                     </div>
-                    <h3 id="renewMemberName" style="margin:0; font-size:18px; color:var(--text-primary);">Member Name</h3>
-                    <p id="renewMemberEmail" style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">email@example.com</p>
-                    <div id="renewCurrentPlanBadge" style="display:inline-block; margin-top:8px; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; background:#FEF2F2; color:#991B1B; border:1px solid #FECACA;">Expired</div>
+                    <h3 id="renewMemberName" style="margin:0; font-size:18px; color:var(--text-primary);">Member Name
+                    </h3>
+                    <p id="renewMemberEmail" style="margin:4px 0 0; font-size:13px; color:var(--text-muted);">
+                        email@example.com</p>
+                    <div id="renewCurrentPlanBadge"
+                        style="display:inline-block; margin-top:8px; padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; background:#FEF2F2; color:#991B1B; border:1px solid #FECACA;">
+                        Expired</div>
                 </div>
 
                 <div class="form-group">
@@ -2061,13 +2168,17 @@
                         <option value="" disabled selected>Loading plans...</option>
                     </select>
                 </div>
-                
-                <div class="form-group" style="background:#fff; padding:10px; border:1px solid var(--border-color); border-radius:6px; display:flex; align-items:center; gap:10px;">
+
+                <div class="form-group"
+                    style="background:#fff; padding:10px; border:1px solid var(--border-color); border-radius:6px; display:flex; align-items:center; gap:10px;">
                     <input type="checkbox" id="renewAddLocker" style="width:18px; height:18px;">
-                    <label for="renewAddLocker" style="margin:0; font-size:14px; font-weight:600; cursor:pointer;">Include Locker Rental (+₱300)</label>
+                    <label for="renewAddLocker"
+                        style="margin:0; font-size:14px; font-weight:600; cursor:pointer;">Include Locker Rental
+                        (+₱300)</label>
                 </div>
 
-                <div id="renewPlanSummary" style="background:#f8fafc; border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:15px;">
+                <div id="renewPlanSummary"
+                    style="background:#f8fafc; border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:15px;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
                         <span style="color:var(--text-muted); font-size:13px;">Duration</span>
                         <span id="renewDuration" style="font-weight:600; font-size:14px;">— days</span>
@@ -2076,9 +2187,11 @@
                         <span style="color:var(--text-muted); font-size:13px;">New Expiry</span>
                         <span id="renewExpiry" style="font-weight:600; font-size:14px;">—</span>
                     </div>
-                    <div style="display:flex; justify-content:space-between; border-top:1px dashed var(--border-color); padding-top:8px;">
+                    <div
+                        style="display:flex; justify-content:space-between; border-top:1px dashed var(--border-color); padding-top:8px;">
                         <span style="font-weight:700; font-size:14px;">Total Due</span>
-                        <span id="renewTotalDue" style="font-weight:700; font-size:18px; color:var(--primary-red);">₱0.00</span>
+                        <span id="renewTotalDue"
+                            style="font-weight:700; font-size:18px; color:var(--primary-red);">₱0.00</span>
                     </div>
                 </div>
 
@@ -2086,7 +2199,8 @@
                 <div class="reg-payment-section" style="margin-top: 0; padding-top: 0; border-top: none;">
                     <div class="section-label"><i class="fa-solid fa-wallet"></i> Payment Method</div>
                     <div class="reg-payment-toggle" id="renewPaymentToggle">
-                        <div class="pay-opt selected" data-method="Cash" onclick="selectRegPayment('Cash', this, 'renew')">
+                        <div class="pay-opt selected" data-method="Cash"
+                            onclick="selectRegPayment('Cash', this, 'renew')">
                             <i class="fa-solid fa-money-bill-wave"></i> Cash
                         </div>
                         <div class="pay-opt" data-method="GCash" onclick="selectRegPayment('GCash', this, 'renew')">
@@ -2094,13 +2208,15 @@
                         </div>
                     </div>
                     <div class="gcash-ref-wrapper" id="renewGcashRefWrapper">
-                        <input type="text" id="renewGcashRefId" placeholder="GCash Reference ID (e.g. 1234 5678 9012)" autocomplete="off">
+                        <input type="text" id="renewGcashRefId" placeholder="GCash Reference ID (e.g. 1234 5678 9012)"
+                            autocomplete="off">
                     </div>
                 </div>
 
                 <div class="btn-row">
                     <button type="button" class="btn-cancel" onclick="closeModal('renewMemberModal')">Cancel</button>
-                    <button type="button" class="btn-submit" style="background-color: #10B981;" onclick="confirmRenewal()"><i class="fa-solid fa-check"></i> Confirm & Renew</button>
+                    <button type="button" class="btn-submit" style="background-color: #10B981;"
+                        onclick="confirmRenewal()"><i class="fa-solid fa-check"></i> Confirm & Renew</button>
                 </div>
             </div>
         </div>
@@ -2153,7 +2269,7 @@
                     <label class="form-label">Location / Section</label>
                     <input type="text" id="lockerLocationInput" placeholder="e.g. Male Locker Room" required>
                 </div>
-                <button type="submit" class="modal-submit-btn" style="background-color: var(--primary-red); color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; cursor: pointer;">Create Locker</button>
+                <button type="submit" class="action-btn" style="width: 100%; justify-content: center;">Create Locker</button>
             </form>
         </div>
     </div>
@@ -2169,7 +2285,8 @@
             </div>
             <div class="p-6">
                 <div class="flex items-center gap-4 mb-6 p-4 bg-slate-50 rounded border border-slate-200">
-                    <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 text-xl font-bold" id="assignLockerIcon">
+                    <div class="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 text-xl font-bold"
+                        id="assignLockerIcon">
                         <i class="fa-solid fa-lock"></i>
                     </div>
                     <div>
@@ -2182,37 +2299,47 @@
                     <input type="hidden" id="assignLockerId">
                     <div class="form-group">
                         <label class="form-label">Select Member</label>
-                        <select id="assignMemberSelect" class="form-input" required style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+                        <select id="assignMemberSelect" class="form-input" required
+                            style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
                             <option value="" disabled selected>Search for a member...</option>
                             <!-- Populated by JS -->
                         </select>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Rental Duration (Months)</label>
-                        <input type="number" id="assignDuration" class="form-input" value="1" min="1" required style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+                        <input type="number" id="assignDuration" class="form-input" value="1" min="1" required
+                            style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
                     </div>
                     <div class="flex gap-3 mt-6">
-                        <button type="button" class="btn-cancel" style="flex: 1;" onclick="closeModal('assignLockerModal')">Cancel</button>
-                        <button type="submit" class="btn-submit" style="flex: 1; background-color: var(--primary-red);">Assign Locker</button>
+                        <button type="button" class="btn-cancel" style="flex: 1;"
+                            onclick="closeModal('assignLockerModal')">Cancel</button>
+                        <button type="submit" class="action-btn"
+                            style="flex: 1; justify-content: center;">Assign Locker</button>
                     </div>
                 </form>
 
                 <div id="activeAssignmentInfo" style="display: none;">
-                    <div class="divider my-4" style="height: 1px; background: var(--border-color); margin: 20px 0;"></div>
+                    <div class="divider my-4" style="height: 1px; background: var(--border-color); margin: 20px 0;">
+                    </div>
                     <div class="flex justify-between items-center mb-4">
                         <span class="text-sm font-semibold text-slate-900">Current Assignee</span>
-                        <span class="status-badge-solid paid" style="background: #10B981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Active</span>
+                        <span class="status-badge-solid paid"
+                            style="background: #10B981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Active</span>
                     </div>
                     <div class="flex items-center gap-3 mb-4">
-                        <div class="w-10 h-10 bg-[#991b1b] text-white rounded-full flex items-center justify-center font-bold" id="assigneeInitial">A</div>
+                        <div class="w-10 h-10 bg-[#991b1b] text-white rounded-full flex items-center justify-center font-bold"
+                            id="assigneeInitial">A</div>
                         <div>
                             <div class="font-bold text-slate-900" id="assigneeName">--</div>
                             <div class="text-xs text-slate-500" id="assignmentExpiry">Expires: --</div>
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button type="button" class="action-btn" style="flex: 1; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;" onclick="releaseLocker()">Release Locker</button>
-                        <button type="button" class="action-btn" style="background: #1e293b; color: white;" onclick="printLockerReceipt()">Print</button>
+                        <button type="button" class="action-btn"
+                            style="flex: 1; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;"
+                            onclick="releaseLocker()">Release Locker</button>
+                        <button type="button" class="action-btn" style="background: #1e293b; color: white;"
+                            onclick="printLockerReceipt()">Print</button>
                     </div>
                 </div>
             </div>
@@ -2220,12 +2347,21 @@
     </div>
 
     <div id="equipmentModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 480px;">
             <div class="modal-header">
                 <h3>Register New Equipment</h3><span class="close-btn"
                     onclick="closeModal('equipmentModal')">&times;</span>
             </div>
             <form class="modal-form" id="equipmentForm">
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-equip.png" id="regEquipPreview" class="profile-upload-img">
+                    <div class="profile-upload-btn" onclick="openImageChoice('regEquipPreview', 'equipImageFile', 'equipImage')">
+                        <i class="fas fa-pencil-alt"></i>
+                    </div>
+                </div>
+                <input type="file" id="equipImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'regEquipPreview')">
+                <input type="hidden" id="equipImage">
+
                 <div class="form-group">
                     <label class="form-label">Equipment Name</label>
                     <input type="text" id="equipName" placeholder="e.g. Treadmill Pro 5000" required>
@@ -2253,36 +2389,29 @@
                         <input type="text" id="equipAssetTag" placeholder="e.g. TRD-001">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Equipment Image</label>
-                    <div style="display: flex; flex-direction: column; gap: 8px;">
-                        <input type="file" id="equipImageFile" accept="image/*" class="form-control">
-                        <input type="url" id="equipImage" placeholder="...or paste image URL" class="form-control">
-                    </div>
-                </div>
                 <div class="btn-row">
-                    <button type="button" class="btn-cancel" onclick="closeModal('equipmentModal')">Cancel</button>
-                    <button type="submit" class="btn-submit" style="background-color: var(--primary-red);">Register
-                        Equipment</button>
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('equipmentModal')">Cancel</button>
+                    <button type="submit" class="action-btn">Register Equipment</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div id="editEquipModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 480px;">
             <div class="modal-header">
                 <h3>Edit Equipment</h3><span class="close-btn" onclick="closeModal('editEquipModal')">&times;</span>
             </div>
             <form class="modal-form" id="editEquipForm">
                 <div class="profile-upload-wrapper">
                     <img src="images/default-equip.png" id="editEquipPreview" class="profile-upload-img">
-                    <label for="editEquipImageFile" class="profile-upload-btn">
+                    <div class="profile-upload-btn" onclick="openImageChoice('editEquipPreview', 'editEquipImageFile', 'editEquipImage')">
                         <i class="fas fa-pencil-alt"></i>
-                    </label>
+                    </div>
                 </div>
-                <input type="file" id="editEquipImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editEquipPreview')">
-                <input type="url" id="editEquipImage" placeholder="...or paste image URL" class="form-control" style="margin-bottom: 15px;">
+                <input type="file" id="editEquipImageFile" accept="image/*" style="display: none;"
+                    onchange="previewImage(this, 'editEquipPreview')">
+                <input type="hidden" id="editEquipImage">
                 <input type="hidden" id="editEquipId">
                 <div class="form-group">
                     <label class="form-label">Equipment Name</label>
@@ -2320,16 +2449,15 @@
                     <input type="text" id="editEquipAssetTag" placeholder="e.g. TRD-001">
                 </div>
                 <div class="btn-row">
-                    <button type="button" class="btn-cancel" onclick="closeModal('editEquipModal')">Cancel</button>
-                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save
-                        Changes</button>
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editEquipModal')">Cancel</button>
+                    <button type="submit" class="action-btn">Save Changes</button>
                 </div>
             </form>
         </div>
     </div>
 
     <div id="editProductModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 480px;">
             <div class="modal-header">
                 <h3>Edit Product</h3><span class="close-btn" onclick="closeModal('editProductModal')">&times;</span>
             </div>
@@ -2337,12 +2465,13 @@
                 <input type="hidden" id="editProdId">
                 <div class="profile-upload-wrapper">
                     <img src="images/default-product.png" id="editProdPreview" class="profile-upload-img">
-                    <label for="editProdImageFile" class="profile-upload-btn">
+                    <div class="profile-upload-btn" onclick="openImageChoice('editProdPreview', 'editProdImageFile', 'editProdImage')">
                         <i class="fas fa-pencil-alt"></i>
-                    </label>
+                    </div>
                 </div>
-                <input type="file" id="editProdImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editProdPreview')">
-                <input type="url" id="editProdImage" placeholder="Product Image URL" class="mb-15">
+                <input type="file" id="editProdImageFile" accept="image/*" style="display: none;"
+                    onchange="previewImage(this, 'editProdPreview')">
+                <input type="hidden" id="editProdImage">
                 <div class="form-group">
                     <label class="form-label">Product Name</label>
                     <input type="text" id="editProdName" required>
@@ -2369,72 +2498,114 @@
                     <label class="form-label">Volume / Size</label>
                     <input type="text" id="editProdVol" placeholder="e.g. 500ml">
                 </div>
-                <button type="submit" style="background-color: var(--dark-black);">Save Changes</button>
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editProductModal')">Cancel</button>
+                    <button type="submit" class="action-btn">Save Changes</button>
+                </div>
             </form>
         </div>
     </div>
 
     <div id="productModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 480px;">
             <div class="modal-header">
                 <h3>Register New Product</h3><span class="close-btn" onclick="closeModal('productModal')">&times;</span>
             </div>
             <form class="modal-form" id="productForm">
-                <input type="text" id="prodName" placeholder="Product Name" required>
-                <select id="prodCategory" required>
-                    <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
-                    <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
-                    <option value="Apparel / Merchandise">Apparel / Merchandise</option>
-                </select>
-                <input type="number" id="prodPrice" placeholder="Selling Price (₱)" min="1" step="0.01" required>
-                <input type="text" id="prodVol" placeholder="Volume/Size (e.g. 500ml) - Optional">
-                <input type="date" id="prodExpiry">
-                <input type="number" id="prodQty" placeholder="Quantity" min="1" required>
-                <input type="file" id="prodImageFile" accept="image/*">
-                <input type="url" id="prodImage" placeholder="Product Image URL">
-                <button type="submit" style="background-color: var(--primary-red);">Register Product</button>
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-product.png" id="regProdPreview" class="profile-upload-img">
+                    <div class="profile-upload-btn" onclick="openImageChoice('regProdPreview', 'prodImageFile', 'prodImage')">
+                        <i class="fas fa-pencil-alt"></i>
+                    </div>
+                </div>
+                <input type="file" id="prodImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'regProdPreview')">
+                <input type="hidden" id="prodImage">
+
+                <div class="form-group">
+                    <label class="form-label">Product Name</label>
+                    <input type="text" id="prodName" placeholder="Product Name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select id="prodCategory" required>
+                        <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
+                        <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
+                        <option value="Apparel / Merchandise">Apparel / Merchandise</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Price (₱)</label>
+                        <input type="number" id="prodPrice" placeholder="Selling Price (₱)" min="1" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" id="prodQty" placeholder="Quantity" min="1" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Volume/Size (e.g. 500ml)</label>
+                    <input type="text" id="prodVol" placeholder="Optional">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Expiration Date (Optional)</label>
+                    <input type="date" id="prodExpiry">
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('productModal')">Cancel</button>
+                    <button type="submit" class="action-btn">Register Product</button>
+                </div>
             </form>
         </div>
     </div>
 
     <div id="memberModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 520px;">
             <div class="modal-header">
                 <h3>Register Member</h3><span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
             </div>
             <form class="modal-form" id="memberRegistrationForm">
                 <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;"><i
                         class="fas fa-info-circle"></i> Member will be automatically emailed their login password.</p>
-                
+
                 <div class="profile-upload-wrapper">
                     <img src="images/default-profile.png" id="regMemberPreview" class="profile-upload-img">
-                    <label for="regMemberImageFile" class="profile-upload-btn">
+                    <div class="profile-upload-btn" onclick="openImageChoice('regMemberPreview', 'regMemberImageFile', 'regMemberImage')">
                         <i class="fas fa-pencil-alt"></i>
-                    </label>
+                    </div>
                 </div>
-                <input type="file" id="regMemberImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'regMemberPreview')">
+                <input type="file" id="regMemberImageFile" accept="image/*" style="display: none;"
+                    onchange="previewImage(this, 'regMemberPreview')">
+                <input type="hidden" id="regMemberImage">
 
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="regMemberGiven" placeholder="First Name" required style="flex: 2;">
-                    <input type="text" id="regMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2">
+                    <input type="text" id="regMemberGiven" placeholder="First Name" required style="flex: 2;"
+                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <input type="text" id="regMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2"
+                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
-                <input type="text" id="regMemberFamily" placeholder="Last Name" required>
+                <input type="text" id="regMemberFamily" placeholder="Last Name" required
+                    oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 <input type="email" id="regMemberEmail" placeholder="Email Address" required>
-                
+                <input type="text" id="regMemberEmergency" placeholder="Emergency Contact Name/Number" required>
+
                 <select id="regMemberPlan" required>
                     <option value="" disabled selected>Select Plan...</option>
                     <option value="Gold Plan">Gold Plan</option>
                     <option value="Silver Plan">Silver Plan</option>
                 </select>
 
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag (Tap Card or type):</p>
-                <input type="text" id="regMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card..." required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag
+                    (Tap Card or type):</p>
+                <input type="text" id="regMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card..."
+                    required>
 
                 <!-- Payment Method Selector -->
                 <div class="reg-payment-section">
                     <div class="section-label"><i class="fa-solid fa-wallet"></i> Payment Method</div>
                     <div class="reg-payment-toggle" id="regPaymentToggle">
-                        <div class="pay-opt selected" data-method="Cash" onclick="selectRegPayment('Cash', this, 'reg')">
+                        <div class="pay-opt selected" data-method="Cash"
+                            onclick="selectRegPayment('Cash', this, 'reg')">
                             <i class="fa-solid fa-money-bill-wave"></i> Cash
                         </div>
                         <div class="pay-opt" data-method="GCash" onclick="selectRegPayment('GCash', this, 'reg')">
@@ -2442,56 +2613,67 @@
                         </div>
                     </div>
                     <div class="gcash-ref-wrapper" id="regGcashRefWrapper">
-                        <input type="text" id="regGcashRefId" placeholder="GCash Reference ID (e.g. 1234 5678 9012)" autocomplete="off">
+                        <input type="text" id="regGcashRefId" placeholder="GCash Reference ID (e.g. 1234 5678 9012)"
+                            autocomplete="off">
                     </div>
                 </div>
-                
-                <button type="submit" style="background-color: var(--primary-red); margin-top: 15px;"><i
-                        class="fas fa-paper-plane"></i> Register & Send Email</button>
+
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('memberModal')">Cancel</button>
+                    <button type="submit" class="action-btn"><i class="fas fa-paper-plane"></i> Register & Send Email</button>
+                </div>
             </form>
         </div>
     </div>
 
     <div id="editMemberModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 520px;">
             <div class="modal-header">
                 <h3>Edit Member Details</h3><span class="close-btn"
                     onclick="closeModal('editMemberModal')">&times;</span>
             </div>
             <form class="modal-form" id="editMemberForm">
                 <input type="hidden" id="editMemberId">
-                <input type="hidden" id="editMemberImage">
-                
+
                 <div class="profile-upload-wrapper">
                     <img src="images/default-profile.png" id="editMemberPreview" class="profile-upload-img">
-                    <label for="editMemberImageFile" class="profile-upload-btn">
+                    <div class="profile-upload-btn" onclick="openImageChoice('editMemberPreview', 'editMemberImageFile', 'editMemberImage')">
                         <i class="fas fa-pencil-alt"></i>
-                    </label>
+                    </div>
                 </div>
-                <input type="file" id="editMemberImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editMemberPreview')">
+                <input type="file" id="editMemberImageFile" accept="image/*" style="display: none;"
+                    onchange="previewImage(this, 'editMemberPreview')">
+                <input type="hidden" id="editMemberImage">
 
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;">
-                    <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2">
+                    <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;"
+                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2"
+                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
-                <input type="text" id="editMemberFamily" placeholder="Last Name" required>
-                
+                <input type="text" id="editMemberFamily" placeholder="Last Name" required
+                    oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                <input type="text" id="editMemberEmergency" placeholder="Emergency Contact Name/Number" required>
+
                 <select id="editMemberPlan" required>
                     <option value="Gold Plan">Gold Plan</option>
                     <option value="Silver Plan">Silver Plan</option>
                 </select>
 
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag:</p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag:
+                </p>
                 <input type="text" id="editMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card...">
 
-                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;"><i
-                        class="fas fa-save"></i> Save Changes</button>
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editMemberModal')">Cancel</button>
+                    <button type="submit" class="action-btn"><i class="fas fa-save"></i> Save Changes</button>
+                </div>
             </form>
         </div>
     </div>
 
     <div id="staffModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 520px;">
             <div class="modal-header">
                 <h3 id="staffModalTitle">Register Staff</h3><span class="close-btn"
                     onclick="closeModal('staffModal')">&times;</span>
@@ -2504,56 +2686,69 @@
 
                 <div class="profile-upload-wrapper">
                     <img src="images/default-profile.png" id="regStaffPreview" class="profile-upload-img">
-                    <label for="regStaffImageFile" class="profile-upload-btn">
+                    <div class="profile-upload-btn" onclick="openImageChoice('regStaffPreview', 'regStaffImageFile', 'regStaffImage')">
                         <i class="fas fa-pencil-alt"></i>
-                    </label>
+                    </div>
                 </div>
-                <input type="file" id="regStaffImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'regStaffPreview')">
+                <input type="file" id="regStaffImageFile" accept="image/*" style="display: none;"
+                    onchange="previewImage(this, 'regStaffPreview')">
+                <input type="hidden" id="regStaffImage">
 
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="regStaffGiven" placeholder="First Name" required style="flex: 2;">
-                    <input type="text" id="regStaffMI" placeholder="M.I." style="flex: 1;" maxlength="2">
+                    <input type="text" id="regStaffGiven" placeholder="First Name" required style="flex: 2;"
+                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <input type="text" id="regStaffMI" placeholder="M.I." style="flex: 1;" maxlength="2"
+                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
-                <input type="text" id="regStaffFamily" placeholder="Last Name" required>
+                <input type="text" id="regStaffFamily" placeholder="Last Name" required
+                    oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 <input type="email" id="regStaffEmail" placeholder="Email Address" required>
 
                 <div id="regSpecialtyContainer" style="display: none;">
                     <input type="text" id="regStaffSpecialty" placeholder="Specialty (e.g. Yoga, Boxing)">
                 </div>
 
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag (Tap Card or type):</p>
-                <input type="text" id="regStaffRfid" class="rfid-register-input" placeholder="Tap RFID Card..." required>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag
+                    (Tap Card or type):</p>
+                <input type="text" id="regStaffRfid" class="rfid-register-input" placeholder="Tap RFID Card..."
+                    required>
 
-                <button type="submit" style="background-color: var(--primary-red); margin-top: 15px;"><i
-                        class="fas fa-paper-plane"></i> Register & Send Email</button>
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('staffModal')">Cancel</button>
+                    <button type="submit" class="action-btn"><i class="fas fa-paper-plane"></i> Register & Send Email</button>
+                </div>
             </form>
         </div>
     </div>
 
     <div id="editStaffModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 520px;">
             <div class="modal-header">
                 <h3 id="editStaffModalTitle">Edit Staff Details</h3><span class="close-btn"
                     onclick="closeModal('editStaffModal')">&times;</span>
             </div>
             <form class="modal-form" id="editStaffForm">
                 <input type="hidden" id="editStaffId">
-                <input type="hidden" id="editStaffImage">
 
                 <div class="profile-upload-wrapper">
                     <img src="images/default-profile.png" id="editStaffPreview" class="profile-upload-img">
-                    <label for="editStaffImageFile" class="profile-upload-btn">
+                    <div class="profile-upload-btn" onclick="openImageChoice('editStaffPreview', 'editStaffImageFile', 'editStaffImage')">
                         <i class="fas fa-pencil-alt"></i>
-                    </label>
+                    </div>
                 </div>
-                <input type="file" id="editStaffImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editStaffPreview')">
+                <input type="file" id="editStaffImageFile" accept="image/*" style="display: none;"
+                    onchange="previewImage(this, 'editStaffPreview')">
+                <input type="hidden" id="editStaffImage">
 
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="editStaffGiven" placeholder="First Name" required style="flex: 2;">
-                    <input type="text" id="editStaffMI" placeholder="M.I." style="flex: 1;" maxlength="2">
+                    <input type="text" id="editStaffGiven" placeholder="First Name" required style="flex: 2;"
+                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <input type="text" id="editStaffMI" placeholder="M.I." style="flex: 1;" maxlength="2"
+                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
-                <input type="text" id="editStaffFamily" placeholder="Last Name" required>
-                
+                <input type="text" id="editStaffFamily" placeholder="Last Name" required
+                    oninput="this.value = this.value.replace(/[0-9]/g, '')">
+
                 <div id="editSpecialtyContainer" style="display: none;">
                     <input type="text" id="editStaffSpecialty" placeholder="Specialty (e.g. Yoga, Boxing)">
                 </div>
@@ -2567,11 +2762,14 @@
                     </select>
                 </div>
 
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag:</p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag:
+                </p>
                 <input type="text" id="editStaffRfid" class="rfid-register-input" placeholder="Tap RFID Card...">
 
-                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;"><i
-                        class="fas fa-save"></i> Save Changes</button>
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editStaffModal')">Cancel</button>
+                    <button type="submit" class="action-btn"><i class="fas fa-save"></i> Save Changes</button>
+                </div>
             </form>
         </div>
     </div>
@@ -2579,7 +2777,7 @@
 
 
     <div id="editBookingModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 400px;">
             <div class="modal-header">
                 <h3>Update Session Status</h3><span class="close-btn"
                     onclick="closeModal('editBookingModal')">&times;</span>
@@ -2587,14 +2785,19 @@
             <form class="modal-form" id="editBookingForm">
                 <input type="hidden" id="editBookingId">
                 <p style="font-size: 14px; margin-bottom: 10px;">Session: <strong id="editBookingDetails"></strong></p>
-                <select id="editBookingStatus" required>
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
-                    <option value="No Show">No Show</option>
-                </select>
-                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save
-                    Changes</button>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="editBookingStatus" required>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="No Show">No Show</option>
+                    </select>
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editBookingModal')">Cancel</button>
+                    <button type="submit" class="action-btn">Save Changes</button>
+                </div>
             </form>
         </div>
     </div>
@@ -2637,7 +2840,25 @@
         </div>
     </div>
 
+    <div id="imageSourceModal" class="modal" style="z-index: 12000;">
+        <div class="modal-content" style="max-width: 350px; text-align: center;">
+            <div class="modal-header">
+                <h3>Select Image Source</h3>
+                <span class="close-btn" onclick="closeModal('imageSourceModal')">&times;</span>
+            </div>
+            <div style="padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+                <button class="action-btn" onclick="chooseImageUpload()" style="justify-content: center; width: 100%;">
+                    <i class="fas fa-upload"></i> Upload from Device
+                </button>
+                <button class="action-btn" onclick="chooseImageUrl()" style="justify-content: center; width: 100%; background: #f1f5f9; color: var(--text-primary);">
+                    <i class="fas fa-link"></i> Paste Image URL
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="js/script.js"></script>
+
     <script src="js/bookings-ui.js" defer></script>
 
     <script>
@@ -2686,23 +2907,35 @@
             <div class="modal-body">
                 <form id="addCreditForm">
                     <input type="hidden" id="addCreditMemberId">
-                    <div style="background: rgba(0,0,0,0.03); padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid var(--border-color);">
-                        <div style="font-weight: 600; color: var(--dark-black);" id="addCreditMemberName">Loading...</div>
+                    <div
+                        style="background: rgba(0,0,0,0.03); padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid var(--border-color);">
+                        <div style="font-weight: 600; color: var(--dark-black);" id="addCreditMemberName">Loading...
+                        </div>
                         <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                            Current Balance: <strong id="addCreditCurrentBalance" style="color: var(--primary-red);">₱0.00</strong>
+                            Current Balance: <strong id="addCreditCurrentBalance"
+                                style="color: var(--primary-red);">₱0.00</strong>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label>Amount to Add (₱)</label>
-                        <input type="number" id="addCreditAmount" required min="1" step="0.01" style="font-size: 20px; font-weight: bold; text-align: center;">
+                        <input type="number" id="addCreditAmount" required min="1" step="0.01"
+                            style="font-size: 20px; font-weight: bold; text-align: center;">
                     </div>
 
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
-                        <button type="button" class="action-btn" style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);" onclick="document.getElementById('addCreditAmount').value=100">₱100</button>
-                        <button type="button" class="action-btn" style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);" onclick="document.getElementById('addCreditAmount').value=200">₱200</button>
-                        <button type="button" class="action-btn" style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);" onclick="document.getElementById('addCreditAmount').value=500">₱500</button>
-                        <button type="button" class="action-btn" style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);" onclick="document.getElementById('addCreditAmount').value=1000">₱1000</button>
+                        <button type="button" class="action-btn"
+                            style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);"
+                            onclick="document.getElementById('addCreditAmount').value=100">₱100</button>
+                        <button type="button" class="action-btn"
+                            style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);"
+                            onclick="document.getElementById('addCreditAmount').value=200">₱200</button>
+                        <button type="button" class="action-btn"
+                            style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);"
+                            onclick="document.getElementById('addCreditAmount').value=500">₱500</button>
+                        <button type="button" class="action-btn"
+                            style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);"
+                            onclick="document.getElementById('addCreditAmount').value=1000">₱1000</button>
                     </div>
 
                     <div class="form-group">
@@ -2726,7 +2959,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="rfidPaymentModal" class="modal">
         <div class="modal-content" style="max-width: 400px; text-align: center;">
             <div class="modal-header">
@@ -2734,12 +2967,18 @@
                 <span class="close-btn" onclick="closeModal('rfidPaymentModal')">&times;</span>
             </div>
             <div class="modal-body" style="padding: 30px 20px;">
-                <i class="fa-solid fa-wifi" style="font-size: 40px; color: var(--primary-red); margin-bottom: 15px; animation: pulse 1.5s infinite;"></i>
+                <i class="fa-solid fa-wifi"
+                    style="font-size: 40px; color: var(--primary-red); margin-bottom: 15px; animation: pulse 1.5s infinite;"></i>
                 <h4 style="margin-bottom: 10px;">Please tap Member RFID Card</h4>
-                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Or search member manually if RFID is unavailable.</p>
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px;">Or search member manually if
+                    RFID is unavailable.</p>
                 <div style="position: relative;">
-                    <input type="text" class="bm-rfid rfid-register-input" id="posRfidInput" placeholder="Tap Card or Search Name..." style="width: 100%; padding: 12px; text-align: center; border: 1px solid var(--primary-red); border-radius: 6px; box-shadow: 0 0 5px rgba(153,27,27,0.2);">
-                    <div id="posRfidSearchDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 100; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                    <input type="text" class="bm-rfid rfid-register-input" id="posRfidInput"
+                        placeholder="Tap Card or Search Name..."
+                        style="width: 100%; padding: 12px; text-align: center; border: 1px solid var(--primary-red); border-radius: 6px; box-shadow: 0 0 5px rgba(153,27,27,0.2);">
+                    <div id="posRfidSearchDropdown"
+                        style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 100; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    </div>
                 </div>
                 <div id="rfidPaymentStatus" style="margin-top: 15px; font-weight: 600;"></div>
             </div>
@@ -2748,31 +2987,48 @@
 
     <div id="invoiceModal" class="modal">
         <div class="modal-content" style="max-width: 600px; padding: 0; overflow: hidden; border-radius: 12px;">
-            <div style="background: linear-gradient(135deg, #1a1a1a 0%, #333 100%); color: white; padding: 30px; position: relative;">
-                <span class="close-btn" onclick="closeModal('invoiceModal')" style="color: white; opacity: 0.8;">&times;</span>
-                <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.7; margin-bottom: 5px;">Official Receipt</div>
-                <h2 id="invoiceId" style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">#INV-000000</h2>
-                <div id="invoiceStatus" style="position: absolute; top: 30px; right: 60px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; background: #27ae60;">Paid</div>
+            <div
+                style="background: linear-gradient(135deg, #1a1a1a 0%, #333 100%); color: white; padding: 30px; position: relative;">
+                <span class="close-btn" onclick="closeModal('invoiceModal')"
+                    style="color: white; opacity: 0.8;">&times;</span>
+                <div
+                    style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.7; margin-bottom: 5px;">
+                    Official Receipt</div>
+                <h2 id="invoiceId" style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">
+                    #INV-000000</h2>
+                <div id="invoiceStatus"
+                    style="position: absolute; top: 30px; right: 60px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; text-transform: uppercase; background: #27ae60;">
+                    Paid</div>
             </div>
-            
+
             <div style="padding: 30px; background: var(--panel-bg);">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px;">
                     <div>
-                        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">Customer Details</div>
-                        <div id="invoiceCustomerName" style="font-weight: 600; color: var(--dark-black); font-size: 16px;">John Doe</div>
-                        <div id="invoiceDate" style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Oct 24, 2023 • 02:45 PM</div>
+                        <div
+                            style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">
+                            Customer Details</div>
+                        <div id="invoiceCustomerName"
+                            style="font-weight: 600; color: var(--dark-black); font-size: 16px;">John Doe</div>
+                        <div id="invoiceDate" style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Oct
+                            24, 2023 • 02:45 PM</div>
                     </div>
                     <div>
-                        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">Payment Method</div>
-                        <div id="invoiceMethod" style="font-weight: 600; color: var(--dark-black); font-size: 14px;">Cash</div>
-                        <div style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Processed by: Admin</div>
+                        <div
+                            style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 8px;">
+                            Payment Method</div>
+                        <div id="invoiceMethod" style="font-weight: 600; color: var(--dark-black); font-size: 14px;">
+                            Cash</div>
+                        <div style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Processed by: Admin
+                        </div>
                     </div>
                 </div>
 
-                <div style="border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); margin-bottom: 25px;">
+                <div
+                    style="border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); margin-bottom: 25px;">
                     <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
                         <thead>
-                            <tr style="text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-muted);">
+                            <tr
+                                style="text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-muted);">
                                 <th style="padding-bottom: 10px;">Item Description</th>
                                 <th style="padding-bottom: 10px; text-align: center; width: 60px;">Qty</th>
                                 <th style="padding-bottom: 10px; text-align: right; width: 100px;">Price</th>
@@ -2785,26 +3041,33 @@
                 </div>
 
                 <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
-                    <div style="display: flex; width: 220px; justify-content: space-between; font-size: 14px; color: var(--text-muted);">
+                    <div
+                        style="display: flex; width: 220px; justify-content: space-between; font-size: 14px; color: var(--text-muted);">
                         <span>Subtotal</span>
                         <span id="invoiceSubtotal">₱0.00</span>
                     </div>
-                    <div style="display: flex; width: 220px; justify-content: space-between; font-size: 14px; color: var(--text-muted);">
+                    <div
+                        style="display: flex; width: 220px; justify-content: space-between; font-size: 14px; color: var(--text-muted);">
                         <span>VAT (12%)</span>
                         <span id="invoiceVAT">₱0.00</span>
                     </div>
-                    <div style="display: flex; width: 220px; justify-content: space-between; font-size: 20px; font-weight: 700; color: var(--dark-black); margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--border-color);">
+                    <div
+                        style="display: flex; width: 220px; justify-content: space-between; font-size: 20px; font-weight: 700; color: var(--dark-black); margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--border-color);">
                         <span>Total Paid</span>
                         <span id="invoiceTotal">₱0.00</span>
                     </div>
                 </div>
             </div>
-            
-            <div style="padding: 20px 30px; background: rgba(0,0,0,0.03); display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="action-btn" style="background: var(--panel-bg); border: 1px solid var(--border-color); color: var(--dark-black);" onclick="window.print()">
+
+            <div
+                style="padding: 20px 30px; background: rgba(0,0,0,0.03); display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="action-btn"
+                    style="background: var(--panel-bg); border: 1px solid var(--border-color); color: var(--dark-black);"
+                    onclick="window.print()">
                     <i class="fas fa-print"></i> Print
                 </button>
-                <button class="action-btn" style="background: var(--dark-black); color: white;" onclick="closeModal('invoiceModal')">
+                <button class="action-btn" style="background: var(--dark-black); color: white;"
+                    onclick="closeModal('invoiceModal')">
                     Done
                 </button>
             </div>

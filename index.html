@@ -35,27 +35,37 @@
             align-items: center; 
             justify-content: center; 
             background-color: var(--dark-black); 
+            background-image: url('https://scontent.fcrk3-4.fna.fbcdn.net/v/t39.30808-6/691896653_1494666168708250_282785071666366013_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=7b2446&_nc_eui2=AeGlzYKtTIgSuDPeJjRKzGxlM2Psjg2A7MUzY-yODYDsxcYvLk1YCJh7IVz3Ius92_PA0zDbliTkVmNsEzmvxcPe&_nc_ohc=Xwb5rFW0-78Q7kNvwFTGaUc&_nc_oc=AdrtcQP4ANyiTT0Dy9KdGiIrPikQTtQ2_p31YZRXgQCqlm3lX0pC8R6OpHQQKgHfkjs&_nc_zt=23&_nc_ht=scontent.fcrk3-4.fna&_nc_gid=U9XRKyz_BnHfSboII9F0iQ&_nc_ss=7b2a8&oh=00_Af4I0CWTBn3ClpQks2dIsbeT-rBrgdi9FR0mLOm-2LgQOA&oe=6A041382');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
             height: 100vh; 
             margin: 0; 
             padding: 20px; 
+            position: relative;
         }
         .login-container { 
-            background: rgba(255, 255, 255, 0.95); 
+            background: rgba(20, 20, 20, 0.4); 
             padding: 40px 30px; 
-            border-radius: 12px; 
-            box-shadow: 0 15px 50px rgba(0,0,0,0.1); 
+            border-radius: 16px; 
+            box-shadow: 0 15px 50px rgba(0,0,0,0.5); 
             width: 100%; 
             max-width: 450px; 
             text-align: center; 
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+            z-index: 10;
         }
         .login-logo { 
             font-size: 2.8rem; 
             font-weight: 700; 
             margin-bottom: 40px; 
             letter-spacing: 1px; 
-            color: var(--text-primary); 
+            color: #ffffff; 
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
         .login-logo span { 
             color: var(--primary-red); 
@@ -64,16 +74,24 @@
             width: 100%; 
             padding: 18px; 
             margin-bottom: 20px; 
-            border: 1px solid var(--border-color); 
+            border: 1px solid rgba(255, 255, 255, 0.2); 
             border-radius: 8px; 
             outline: none; 
             font-size: 16px; 
             box-sizing: border-box; 
-            background: rgba(255, 255, 255, 0.5);
-            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+        .login-form input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
         }
         .login-form input:focus { 
-            border-color: var(--primary-red); 
+            border-color: rgba(255, 255, 255, 0.5); 
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
         }
         .login-btn { 
             width: 100%; 
@@ -86,16 +104,19 @@
             font-weight: bold; 
             cursor: pointer; 
             transition: 0.3s; 
+            box-shadow: 0 4px 15px rgba(153, 27, 27, 0.4);
         }
         .login-btn:hover { 
             background-color: #900f14; 
+            box-shadow: 0 6px 20px rgba(153, 27, 27, 0.6);
         }
         .login-btn:disabled { 
             background-color: #e0abae; 
             cursor: not-allowed; 
+            box-shadow: none;
         }
         #errorMsg { 
-            color: var(--primary-red); 
+            color: #ffb3b3; 
             margin-bottom: 15px; 
             font-size: 14px; 
             display: none; 
@@ -107,16 +128,33 @@
             width: 100%; 
             padding: 18px; 
             margin-top: 20px; 
-            background-color: #333; 
+            background: rgba(255, 255, 255, 0.1); 
             color: white; 
-            border: none; 
+            border: 1px solid rgba(255, 255, 255, 0.2); 
             border-radius: 8px; 
             font-size: 16px; 
             cursor: pointer; 
             font-weight: bold; 
             transition: 0.3s; 
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        #installAppBtn:hover {
+            background: rgba(255, 255, 255, 0.2);
         }
         
+        /* Links and text colors inside glass */
+        p a#forgotPasswordBtn {
+            color: rgba(255, 255, 255, 0.8) !important;
+            transition: color 0.3s ease;
+        }
+        p a#forgotPasswordBtn:hover {
+            color: #ffffff !important;
+        }
+        p.desktop-only {
+            color: rgba(255, 255, 255, 0.7) !important;
+        }
+
         /* NEW: Mobile specific override */
         @media (max-width: 800px) {
             .desktop-only { display: none !important; }
@@ -287,11 +325,15 @@
                 const newSessionId = Math.random().toString(36).substring(2, 15);
                 let updateData = { currentSession: newSessionId };
 
-                if (userRole === "Admin" || userRole === "Staff") {
+                if (userRole === "Admin" || userRole === "Staff" || userRole === "Trainer") {
                     const now = Date.now();
-                    updateData.shiftStatus = "On Shift";
+                    const status = userRole === "Trainer" ? "On Floor" : "On Shift";
+                    updateData.shiftStatus = status;
                     updateData.shiftStart = now;
                     localStorage.setItem("shiftStart", now);
+                    if (userRole === "Trainer") {
+                        localStorage.setItem("trainerShiftStatus", "On Floor");
+                    }
                 }
 
                 // Save to Firebase
@@ -299,7 +341,8 @@
                 
                 // Save universally needed items to Local Storage
                 localStorage.setItem("userId", userId);
-                localStorage.setItem("loggedInUser", userData.name || userData.givenName);
+                const displayName = userData.name || `${userData.givenName || ''} ${userData.familyName || ''}`.trim() || "User";
+                localStorage.setItem("loggedInUser", displayName);
                 localStorage.setItem("userRole", userRole);
                 localStorage.setItem("sessionId", newSessionId); // Save Session ID locally!
                 if(userData.rfid) localStorage.setItem("userRfid", userData.rfid);

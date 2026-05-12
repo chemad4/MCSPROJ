@@ -7,6 +7,7 @@ let bkCurrentView = 'list';
 let bkSortField = 'date';
 let bkSortDir = 'desc';
 let bkCalWeekOffset = 0;
+let _bkRenderLock = false; // Prevent infinite re-render loops
 
 // --- View Toggle ---
 window.switchBookingView = function (view, btn) {
@@ -19,7 +20,9 @@ window.switchBookingView = function (view, btn) {
 };
 
 // --- Search ---
-window.handleBookingSearch = function () { renderBookings(); };
+window.handleBookingSearch = function () {
+    if (typeof window.renderBookings === 'function') window.renderBookings();
+};
 
 // --- Sorting ---
 window.sortBookings = function (field) {
@@ -43,7 +46,7 @@ window.sortBookings = function (field) {
         const icon = activeHeader.querySelector('.bk-sort-icon');
         if (icon) icon.className = `fa-solid fa-sort-${bkSortDir === 'asc' ? 'up' : 'down'} bk-sort-icon`;
     }
-    renderBookings();
+    if (typeof window.renderBookings === 'function') window.renderBookings();
 };
 
 // --- Inline Status Dropdown ---
@@ -73,14 +76,17 @@ document.addEventListener('click', () => {
 window.openBookingDrawer = function () {
     const memberSelect = document.getElementById('bookMember');
     const trainerSelect = document.getElementById('bookTrainer');
-    if (memberSelect && typeof membersData !== 'undefined') {
+    const members = window.membersData || [];
+    const allUsers = window.allUsersData || [];
+
+    if (memberSelect) {
         memberSelect.innerHTML = '<option value="" disabled selected>Select a Member...</option>' +
-            membersData.map(m => `<option value="${m.id}">${m.name || (m.givenName + ' ' + m.familyName)}</option>`).join('');
+            members.map(m => `<option value="${m.id}">${m.uid ? m.uid + ' - ' : ''}${m.name || (m.givenName + ' ' + m.familyName)}</option>`).join('');
     }
-    if (trainerSelect && typeof allUsersData !== 'undefined') {
-        const trainers = allUsersData.filter(u => (u.role || '').toLowerCase() === 'trainer');
+    if (trainerSelect) {
+        const trainers = allUsers.filter(u => (u.role || '').toLowerCase() === 'trainer');
         trainerSelect.innerHTML = '<option value="" disabled selected>Select a Trainer...</option>' +
-            trainers.map(t => `<option value="${t.id}">${t.name || (t.givenName + ' ' + t.familyName)}</option>`).join('');
+            trainers.map(t => `<option value="${t.id}">${t.uid ? t.uid + ' - ' : ''}${t.name || (t.givenName + ' ' + t.familyName)}</option>`).join('');
     }
     const form = document.getElementById('bookingForm');
     if (form) form.reset();
@@ -99,11 +105,12 @@ window.openBookingModal = window.openBookingDrawer;
 
 // --- KPI Update ---
 function updateBookingKPIs() {
-    if (typeof bookingsData === 'undefined') return;
+    const data = window.bookingsData || [];
+    if (!data.length) return;
     const today = new Date().toLocaleDateString('en-CA');
-    const todayCount = bookingsData.filter(b => b.date === today && b.status !== 'Cancelled').length;
-    const pendingCount = bookingsData.filter(b => b.status === 'Pending').length;
-    const confirmedCount = bookingsData.filter(b => b.status === 'Confirmed').length;
+    const todayCount = data.filter(b => b.date === today && b.status !== 'Cancelled').length;
+    const pendingCount = data.filter(b => b.status === 'Pending').length;
+    const confirmedCount = data.filter(b => b.status === 'Confirmed').length;
 
     // This week
     const now = new Date();
@@ -111,7 +118,7 @@ function updateBookingKPIs() {
     const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6);
     const sow = startOfWeek.toLocaleDateString('en-CA');
     const eow = endOfWeek.toLocaleDateString('en-CA');
-    const weekCount = bookingsData.filter(b => b.date >= sow && b.date <= eow).length;
+    const weekCount = data.filter(b => b.date >= sow && b.date <= eow).length;
 
     const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
     el('bkTodayCount', todayCount);
@@ -123,15 +130,16 @@ function updateBookingKPIs() {
 // --- Trainer Filter Population ---
 function populateTrainerFilter() {
     const select = document.getElementById('bkFilterTrainer');
-    if (!select || typeof allUsersData === 'undefined') return;
-    const trainers = allUsersData.filter(u => (u.role || '').toLowerCase() === 'trainer');
+    const allUsers = window.allUsersData || [];
+    if (!select || !allUsers.length) return;
+    const trainers = allUsers.filter(u => (u.role || '').toLowerCase() === 'trainer');
     const current = select.value;
     select.innerHTML = '<option value="">All Trainers</option>' +
-        trainers.map(t => `<option value="${t.id}">${t.name || (t.givenName + ' ' + t.familyName)}</option>`).join('');
+        trainers.map(t => `<option value="${t.id}">${t.uid ? t.uid + ' - ' : ''}${t.name || (t.givenName + ' ' + t.familyName)}</option>`).join('');
     select.value = current;
 }
 
-// --- Filter + Sort Logic (injected into renderBookings) ---
+// --- Filter + Sort Logic ---
 function applyBookingFilters(data) {
     let filtered = [...data];
 
@@ -169,6 +177,7 @@ function applyBookingFilters(data) {
         if (bkSortField === 'memberName') { va = (a.memberName || '').toLowerCase(); vb = (b.memberName || '').toLowerCase(); }
         else if (bkSortField === 'time') { va = a.time || ''; vb = b.time || ''; }
         else { va = a.date + 'T' + (a.time || ''); vb = b.date + 'T' + (b.time || ''); }
+
         if (va < vb) return bkSortDir === 'asc' ? -1 : 1;
         if (va > vb) return bkSortDir === 'asc' ? 1 : -1;
         return 0;
@@ -231,7 +240,8 @@ window.navigateBookingCal = function (dir) {
 function renderBookingCalendar() {
     const grid = document.getElementById('bkCalGrid');
     const titleEl = document.getElementById('bkCalTitle');
-    if (!grid || typeof bookingsData === 'undefined') return;
+    const data = window.bookingsData || [];
+    if (!grid) return;
 
     const now = new Date();
     const startOfWeek = new Date(now);
@@ -244,11 +254,10 @@ function renderBookingCalendar() {
     }
 
     const fmt = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    titleEl.textContent = `${fmt(days[0])} – ${fmt(days[6])}, ${days[6].getFullYear()}`;
+    if (titleEl) titleEl.textContent = `${fmt(days[0])} – ${fmt(days[6])}, ${days[6].getFullYear()}`;
 
     const hours = [];
     for (let h = 6; h <= 22; h++) hours.push(h);
-    const cols = 8; // 1 time col + 7 days
     grid.style.gridTemplateColumns = `80px repeat(7, 1fr)`;
 
     let html = '<div class="bk-cal-corner"></div>';
@@ -262,9 +271,9 @@ function renderBookingCalendar() {
         </div>`;
     });
 
-    // Build a lookup: date -> hour -> bookings[]
+    // Build a lookup: date -> hour -> bookings[] (show all statuses on calendar)
     const lookup = {};
-    bookingsData.forEach(b => {
+    data.forEach(b => {
         if (!b.date || !b.time) return;
         const h = parseInt(b.time.split(':')[0], 10);
         const key = `${b.date}_${h}`;
@@ -299,49 +308,56 @@ function renderBookingCalendar() {
     grid.innerHTML = html;
 }
 
-// --- Monkey-patch renderBookings to use enhanced rendering ---
+// --- Override renderBookings to use enhanced rendering for admin/staff ---
 (function () {
-    // Wait for the original renderBookings to be defined, then wrap it
-    const origInterval = setInterval(() => {
-        if (typeof renderBookings !== 'function') return;
-        clearInterval(origInterval);
+    const poll = setInterval(() => {
+        // Wait until script.js has assigned window.renderBookings
+        if (typeof window.renderBookings !== 'function') return;
+        clearInterval(poll);
 
-        const _origRender = renderBookings;
+        const _originalRender = window.renderBookings;
 
         window.renderBookings = function () {
-            // Call original for member/trainer notification logic
-            _origRender();
+            // Guard against re-entrant calls
+            if (_bkRenderLock) return;
+            _bkRenderLock = true;
+
+            try {
+                // Call the original to handle member/trainer notifications, etc.
+                _originalRender();
+
+                // Now for admin/staff, re-render the bookingsBody with enhanced UI + proper sort
+                const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
+                if (loggedInRole === 'member') {
+                    // Member view is handled by the original, just update KPIs
+                    updateBookingKPIs();
+                    return;
+                }
+
+                const tbody = document.getElementById('bookingsBody');
+                if (!tbody) return;
+
+                const data = applyBookingFilters(window.bookingsData || []);
+
+                const countEl = document.getElementById('bkRecordCount');
+                if (countEl) countEl.textContent = `${data.length} record${data.length !== 1 ? 's' : ''}`;
+
+                tbody.innerHTML = data.map(renderEnhancedBookingRow).join('');
+
+                // Update KPIs and filters
+                updateBookingKPIs();
+                populateTrainerFilter();
+
+                // Update calendar if visible
+                if (bkCurrentView === 'calendar') renderBookingCalendar();
+            } finally {
+                _bkRenderLock = false;
+            }
         };
 
-        // We need to override the row rendering for admin view
-        // Instead of fully replacing, we hook after the original runs
-        const observer = new MutationObserver(() => {
-            const tbody = document.getElementById('bookingsBody');
-            const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
-            if (!tbody || loggedInRole === 'member') return;
-
-            // Re-render with enhanced rows if we're admin/staff
-            let data = typeof bookingsData !== 'undefined' ? [...bookingsData] : [];
-            data = applyBookingFilters(data);
-
-            const countEl = document.getElementById('bkRecordCount');
-            if (countEl) countEl.textContent = `${data.length} record${data.length !== 1 ? 's' : ''}`;
-
-            tbody.innerHTML = data.map(renderEnhancedBookingRow).join('');
-
-            // Update KPIs
-            updateBookingKPIs();
-            populateTrainerFilter();
-
-            // Update calendar if visible
-            if (bkCurrentView === 'calendar') renderBookingCalendar();
-        });
-
-        const tbody = document.getElementById('bookingsBody');
-        if (tbody) {
-            observer.observe(tbody, { childList: true });
-        }
-    }, 200);
+        // Trigger an initial render now that the override is in place
+        window.renderBookings();
+    }, 100);
 })();
 
 // --- Drawer Form Submit (replaces old bookingModal submit) ---

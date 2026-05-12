@@ -121,7 +121,7 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDat
                   ? `<i id="${chevronId}" class="fa-solid fa-chevron-right" style="font-size:11px; color: var(--text-muted); transition: transform 0.2s;"></i>`
                   : `<span style="display:inline-block; width:15px;"></span>`
               }
-              ${name}
+              ${g.latestRecord.uid ? `<span style="font-size:11px; color:var(--text-muted); font-family:monospace; margin-right:5px;">${g.latestRecord.uid}</span>` : ""} ${name}
               ${hasMultiple ? `<span style="font-size:11px; background: var(--primary-red); color: white; padding: 1px 6px; border-radius: 10px; font-weight:600;">${g.records.length}</span>` : ""}
             </span>
           </td>

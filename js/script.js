@@ -112,6 +112,32 @@ window.previewImage = function (input, previewId) {
     }
 };
 
+// NEW: Image Source Choice Logic
+let currentImageTarget = { preview: null, file: null, url: null };
+
+window.openImageChoice = function(previewId, fileInputId, urlInputId) {
+    currentImageTarget = { preview: previewId, file: fileInputId, url: urlInputId };
+    const modal = document.getElementById('imageSourceModal');
+    if (modal) modal.style.display = 'flex';
+};
+
+window.chooseImageUpload = function() {
+    const fileInput = document.getElementById(currentImageTarget.file);
+    if (fileInput) fileInput.click();
+    closeModal('imageSourceModal');
+};
+
+window.chooseImageUrl = function() {
+    const url = prompt("Please enter the image URL:");
+    if (url) {
+        const preview = document.getElementById(currentImageTarget.preview);
+        const urlInput = document.getElementById(currentImageTarget.url);
+        if (preview) preview.src = url;
+        if (urlInput) urlInput.value = url;
+    }
+    closeModal('imageSourceModal');
+};
+
 // Initialize EmailJS
 emailjs.init("ZqQKGRo5j5KpAhH98");
 
@@ -126,6 +152,25 @@ if (currentUserId && currentSessionId) {
     onSnapshot(doc(db, "users", currentUserId), (docSnap) => {
         if (docSnap.exists()) {
             const userData = docSnap.data();
+
+            // SYNC NAME: Ensure localStorage and UI are always fresh from DB
+            const dbName = userData.name || `${userData.givenName || ''} ${userData.familyName || ''}`.trim() || "User";
+            if (localStorage.getItem("loggedInUser") !== dbName) {
+                localStorage.setItem("loggedInUser", dbName);
+                
+                // Refresh Topbar & Greeting if elements exist
+                const tNameEl = document.getElementById('topBarName');
+                if (tNameEl) tNameEl.innerText = dbName.split(' ')[0];
+                
+                const gTextEl = document.getElementById('greetingText');
+                if (gTextEl) {
+                    const hour = new Date().getHours();
+                    const firstName = dbName.split(' ')[0];
+                    if (hour < 12) gTextEl.innerText = `Good Morning, ${firstName}.`;
+                    else if (hour < 18) gTextEl.innerText = `Good Afternoon, ${firstName}.`;
+                    else gTextEl.innerText = `Good Evening, ${firstName}.`;
+                }
+            }
 
             // Kick out duplicate logins
             if (userData.currentSession && userData.currentSession !== currentSessionId) {
@@ -150,7 +195,19 @@ if (currentUserId && currentSessionId) {
                     const planDays = window.getPlanDays ? window.getPlanDays(planName) : 30;
                     const expiryDate = userData.dateRegistered + (planDays * 24 * 60 * 60 * 1000);
                     const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-                    document.getElementById('myPlanDays').innerHTML = `<i class="fa-regular fa-clock"></i> ${diffDays > 0 ? diffDays + ' Days Left' : 'Expired'}`;
+                    
+                    if (document.getElementById('myPlanDays')) {
+                        document.getElementById('myPlanDays').innerHTML = `<i class="fa-regular fa-clock"></i> ${diffDays > 0 ? diffDays + ' Days Left' : 'Expired'}`;
+                    }
+                    
+                    // BLOCKING LOGIC: If expired, show renewal modal
+                    if (diffDays <= 0) {
+                        const expiredModal = document.getElementById('membershipExpiredModal');
+                        if (expiredModal) expiredModal.style.display = 'flex';
+                    } else {
+                        const expiredModal = document.getElementById('membershipExpiredModal');
+                        if (expiredModal) expiredModal.style.display = 'none';
+                    }
                 }
             }
 
@@ -189,7 +246,7 @@ window.handleLogout = async function () {
             let updateData = { currentSession: null };
             const roleLower = (userRole || "").toLowerCase();
             if (roleLower === "admin" || roleLower === "staff" || roleLower === "trainer") {
-                updateData.shiftStatus = "Off Shift";
+                updateData.shiftStatus = roleLower === "trainer" ? "Off Floor" : "Off Shift";
             }
             await updateDoc(doc(db, "users", userId), updateData);
         } catch (error) {
@@ -252,29 +309,29 @@ window.switchTab = function (tabId, element) {
 }
 
 window.toggleNotifSidebar = function () {
-    const layout = document.getElementById('dashboardLayout');
+    const drawer = document.getElementById('notifDrawer');
+    const overlay = document.getElementById('notifDrawerOverlay');
     const btn = document.getElementById('notifToggleBtn');
-    if (!layout) return;
+    if (!drawer || !overlay) return;
 
-    layout.classList.toggle('notif-collapsed');
-
-    if (layout.classList.contains('notif-collapsed')) {
-        if (btn) btn.innerHTML = '<i class="fas fa-bell-slash"></i>';
-        localStorage.setItem('notifSidebarCollapsed', 'true');
-    } else {
+    const isOpen = drawer.classList.contains('open');
+    
+    if (isOpen) {
+        drawer.classList.remove('open');
+        overlay.classList.remove('open');
         if (btn) btn.innerHTML = '<i class="fas fa-bell"></i>';
+        localStorage.setItem('notifSidebarCollapsed', 'true'); // keep old logic for bell icon state if needed, but just bell is fine
+    } else {
+        drawer.classList.add('open');
+        overlay.classList.add('open');
+        if (btn) btn.innerHTML = '<i class="fas fa-bell-slash"></i>';
         localStorage.setItem('notifSidebarCollapsed', 'false');
     }
 };
 
-// Auto-restore sidebar state on load
+// Remove auto-restore sidebar state logic since it's a drawer now
 document.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.getItem('notifSidebarCollapsed') === 'true') {
-        const layout = document.getElementById('dashboardLayout');
-        const btn = document.getElementById('notifToggleBtn');
-        if (layout) layout.classList.add('notif-collapsed');
-        if (btn) btn.innerHTML = '<i class="fas fa-bell-slash"></i>';
-    }
+    // Drawer should be closed by default
 });
 
 let kpiCharts = {
@@ -1363,10 +1420,8 @@ function renderCart() {
     window.syncDOM(cartBody, posCart, renderCartItem, 'cart-item');
 
     let subtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    let isSenior = document.getElementById('seniorDiscount')?.checked || false;
-    // Senior/PWD Rule: VAT Exempt + 20% Discount
-    let vat = isSenior ? 0 : (subtotal * 0.12);
-    let discount = isSenior ? (subtotal * 0.20) : 0;
+    let vat = subtotal * 0.12;
+    let discount = 0;
     updatePOSTotals(subtotal, vat, discount, subtotal + vat - discount);
 }
 
@@ -1376,10 +1431,6 @@ function updatePOSTotals(sub, vat, disc, grand) {
     totalsDiv.innerHTML = `
         <div class="total-line"><span>Subtotal:</span> <span>₱${sub.toFixed(2)}</span></div>
         <div class="total-line"><span>VAT (12%):</span> <span>₱${vat.toFixed(2)}</span></div>
-        <div class="total-line" style="display: flex; align-items: center; justify-content: space-between;">
-            <span><input type="checkbox" id="seniorDiscount" style="accent-color: var(--primary-red);" ${disc > 0 ? 'checked' : ''} onchange="renderCart()"> Senior Citizen / PWD (20%)</span>
-            <span style="color: #ff4c4c;">- ₱${disc.toFixed(2)}</span>
-        </div>
         <div class="total-line grand"><span>TOTAL:</span> <span>₱${grand.toFixed(2)}</span></div>
     `;
 }
@@ -1394,9 +1445,8 @@ window.processPayment = async function () {
     if (posCart.length === 0) return showToast("Cart is empty!", "error");
 
     let subtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    let isSenior = document.getElementById('seniorDiscount')?.checked || false;
-    let vat = isSenior ? 0 : (subtotal * 0.12);
-    let discount = isSenior ? (subtotal * 0.20) : 0;
+    let vat = subtotal * 0.12;
+    let discount = 0;
     let grandTotal = subtotal + vat - discount;
 
     const customerNameInput = document.getElementById('posCustomerName');
@@ -1432,13 +1482,13 @@ window.processPayment = async function () {
                 debounceTimer = setTimeout(async () => {
                     const q = e.target.value.trim().toLowerCase();
                     if (q.length > 0) {
-                        const searchRes = membersData.filter(m => (m.name && m.name.toLowerCase().includes(q)) || (m.givenName && m.givenName.toLowerCase().includes(q)) || (m.familyName && m.familyName.toLowerCase().includes(q)) || (m.rfid && m.rfid === q));
+                        const searchRes = membersData.filter(m => (m.name && m.name.toLowerCase().includes(q)) || (m.uid && m.uid.toLowerCase().includes(q)) || (m.givenName && m.givenName.toLowerCase().includes(q)) || (m.familyName && m.familyName.toLowerCase().includes(q)) || (m.rfid && m.rfid === q));
                         const dropdown = document.getElementById('posRfidSearchDropdown');
                         if (searchRes.length > 0) {
                             dropdown.innerHTML = searchRes.map(m => `
                                 <div style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;" onclick="window.selectMemberForPayment('${m.id}', '${m.rfid || ''}', '${m.name || (m.givenName + ' ' + m.familyName)}')">
                                     <div style="font-weight: 600;">${m.name || (m.givenName + ' ' + m.familyName)}</div>
-                                    <div style="font-size: 11px; color: var(--text-muted);">RFID: ${m.rfid || 'None'} | Bal: ₱${(m.creditBalance || 0).toFixed(2)}</div>
+                                    <div style="font-size: 11px; color: var(--text-muted);">${m.uid ? m.uid + ' | ' : ''}RFID: ${m.rfid || 'None'} | Bal: ₱${(m.creditBalance || 0).toFixed(2)}</div>
                                 </div>
                             `).join('');
                             dropdown.style.display = 'block';
@@ -1957,12 +2007,12 @@ function renderPayments() {
 
         return `
             <tr style="${isVoided ? 'color: #94a3b8;' : ''}">
-                <td style="font-weight: 500;">${t.name}</td>
-                <td>${itemsHtml}</td>
-                <td><span style="white-space: nowrap;">${t.date}</span> <br><small style="color:#94a3b8;">${t.time || ''}</small></td>
-                <td>₱${(t.subtotal || amount).toFixed(2)}</td>
-                <td>₱${vat}</td>
-                <td style="font-weight:700;">₱${amount.toFixed(2)}</td>
+                <td style="font-weight: 500; ${isVoided ? 'text-decoration: line-through;' : ''}">${t.name}</td>
+                <td style="${isVoided ? 'text-decoration: line-through;' : ''}">${itemsHtml}</td>
+                <td style="${isVoided ? 'text-decoration: line-through;' : ''}"><span style="white-space: nowrap;">${t.date}</span> <br><small style="color:#94a3b8;">${t.time || ''}</small></td>
+                <td style="${isVoided ? 'text-decoration: line-through;' : ''}">₱${(t.subtotal || amount).toFixed(2)}</td>
+                <td style="${isVoided ? 'text-decoration: line-through;' : ''}">₱${vat}</td>
+                <td style="font-weight:700; ${isVoided ? 'text-decoration: line-through;' : ''}">₱${amount.toFixed(2)}</td>
                 <td>${statusBadge}</td>
                 <td style="text-align: right;">${actionHtml}</td>
             </tr>
@@ -2040,7 +2090,7 @@ window.viewInvoice = function (id) {
 };
 
 window.printReceipt = function (id) { window.viewInvoice(id); setTimeout(() => window.print(), 500); };
-window.processRefund = function (id) { showToast("Refund processing initiated for " + id, "info"); };
+window.processRefund = function (id) { window.voidTransaction(id, true); };
 
 window.filterPayments = function () {
     renderPayments();
@@ -2074,20 +2124,22 @@ window.changePaymentPagination = function () {
     renderPayments();
 };
 
-// Void Transaction & Restock Inventory
-window.voidTransaction = async function (id) {
+// Void Transaction & Restock Inventory (also handles Refunds)
+window.voidTransaction = async function (id, isRefund = false) {
     const tx = paymentsData.find(p => p.id === id);
     if (!tx) return;
     if (tx.status === "Voided") return showToast("This transaction is already voided.", "error");
 
-    showConfirm("Are you sure you want to VOID this transaction? This will automatically return the purchased items back into your inventory.", async () => {
+    const actionName = isRefund ? "REFUND" : "VOID";
+
+    showConfirm(`Are you sure you want to ${actionName} this transaction? This will void the transaction, return purchased items to inventory, and refund credit if applicable.`, async () => {
         try {
             if (tx.type === "POS Sale") {
                 if (tx.lineItems && tx.lineItems.length > 0) {
                     for (let item of tx.lineItems) {
                         if (item.id === "WALKIN") continue;
                         await updateDoc(doc(db, "inventory", item.id), { qty: increment(item.qty) });
-                        await logStockMovement(item.id, item.name, item.qty, "Transaction Voided");
+                        await logStockMovement(item.id, item.name, item.qty, `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`);
                     }
                 } else if (tx.items) {
                     const itemList = tx.items.split(', ');
@@ -2103,18 +2155,47 @@ window.voidTransaction = async function (id) {
                                 await updateDoc(doc(db, "inventory", invItem.id), {
                                     qty: increment(qtyRefunded)
                                 });
-                                await logStockMovement(invItem.id, invItem.name, qtyRefunded, "Transaction Voided (Legacy)");
+                                await logStockMovement(invItem.id, invItem.name, qtyRefunded, `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"} (Legacy)`);
                             }
                         }
                     }
                 }
             }
+
+            // Refund credit if paid via RFID
+            if (tx.paymentMethod === 'RFID' || tx.paymentMethod === 'RFID Card' || tx.paymentMethod === 'RFID Credit') {
+                const member = membersData.find(m => 
+                    m.name === tx.name || 
+                    `${m.givenName || ''} ${m.familyName || ''}`.trim() === tx.name
+                );
+                if (member) {
+                    await updateDoc(doc(db, "users", member.id), {
+                        creditBalance: increment(tx.amount)
+                    });
+                    
+                    const currentBalance = member.creditBalance || 0;
+                    await addDoc(creditTransactionsCol, {
+                        memberId: member.id,
+                        memberName: tx.name,
+                        type: "refund",
+                        amount: tx.amount,
+                        balanceBefore: currentBalance,
+                        balanceAfter: currentBalance + tx.amount,
+                        note: `Refunded POS Transaction: ${tx.id}`,
+                        processedBy: localStorage.getItem("userId") || "",
+                        timestamp: Date.now()
+                    });
+                } else {
+                    showToast("Warning: Could not find member to refund credit.", "error");
+                }
+            }
+
             await updateDoc(doc(db, "payments", id), { status: "Voided" });
-            showToast("Transaction successfully voided and inventory restocked!", "success");
-            if (window.logActivity) window.logActivity("Transaction Voided", `Voided transaction ${id} for ${tx.name || 'Unknown'} (₱${tx.amount})`);
+            showToast(`Transaction successfully ${actionName === "REFUND" ? "refunded" : "voided"}!`, "success");
+            if (window.logActivity) window.logActivity(`Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`, `${actionName === "REFUND" ? "Refunded" : "Voided"} transaction ${id} for ${tx.name || 'Unknown'} (₱${tx.amount})`);
         } catch (e) {
             console.error(e);
-            showToast("Error voiding transaction.", "error");
+            showToast(`Error ${actionName === "REFUND" ? "refunding" : "voiding"} transaction.`, "error");
         }
     });
 }
@@ -2239,13 +2320,21 @@ initAttendance({ db, attendanceCol, servicesChartInstanceGetter: () => servicesC
 
 onSnapshot(usersCol, (snapshot) => {
     allUsersData = []; membersData = []; chatUsers = [];
-    snapshot.forEach(doc => {
-        const data = doc.data();
+    snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        
+        if (!data.uid && window.generateUID) {
+            data.uid = window.generateUID(data.role || "Member");
+            updateDoc(doc(db, "users", docSnap.id), { uid: data.uid }).catch(e => console.error(e));
+        }
+
         const roleStr = (data.role || "").trim().toLowerCase();
-        chatUsers.push({ id: doc.id, ...data });
-        if (roleStr === 'member') membersData.push({ id: doc.id, ...data });
-        else if (roleStr !== 'admin') allUsersData.push({ id: doc.id, ...data });
+        chatUsers.push({ id: docSnap.id, ...data });
+        if (roleStr === 'member') membersData.push({ id: docSnap.id, ...data });
+        else if (roleStr !== 'admin') allUsersData.push({ id: docSnap.id, ...data });
     });
+    window.allUsersData = allUsersData;
+    window.membersData = membersData;
     renderStaff();
     renderMembers();
     renderMemberTrainers();
@@ -2284,6 +2373,7 @@ window.openProfileSettingsModal = async function () {
             const userData = userDoc.data();
             document.getElementById('userProfileName').value = userData.name || userData.givenName || '';
             document.getElementById('userProfileEmail').value = userData.email || '';
+            document.getElementById('userProfileEmergency').value = userData.emergencyContact || '';
             document.getElementById('userProfilePreview').src = userData.image || 'images/default-profile.png';
             document.getElementById('userProfilePassword').value = '';
         }
@@ -2316,7 +2406,19 @@ document.addEventListener('submit', async (e) => {
                 imageUrl = await window.uploadImage(imageFile, 'profiles');
             }
 
-            const updates = { name, image: imageUrl };
+            // Attempt to split name for better DB consistency between 'name' and 'givenName/familyName'
+            const nameParts = name.trim().split(' ');
+            const given = nameParts[0] || "";
+            const family = nameParts.length > 1 ? nameParts.slice(1).join(' ') : "";
+            const emergency = document.getElementById('userProfileEmergency').value.trim();
+
+            const updates = { 
+                name, 
+                givenName: given, 
+                familyName: family, 
+                emergencyContact: emergency,
+                image: imageUrl 
+            };
             if (newPassword) {
                 updates.password = newPassword;
             }
@@ -2887,7 +2989,7 @@ function populateAssignMemberSelect() {
         const opt = document.createElement('option');
         opt.value = m.id;
         opt.setAttribute('data-name', `${m.givenName || m.name} ${m.familyName || ''}`.trim());
-        opt.textContent = `${m.givenName || m.name} ${m.familyName || ''}`.trim();
+        opt.textContent = `${m.uid ? m.uid + ' - ' : ''}${m.givenName || m.name} ${m.familyName || ''}`.trim();
         select.appendChild(opt);
     });
 }
@@ -2997,6 +3099,7 @@ function renderMembers() {
             // Apply Filters to Active List only for display
             const matchesSearch = !searchVal ||
                 (m.name || "").toLowerCase().includes(searchVal) ||
+                (m.uid || "").toLowerCase().includes(searchVal) ||
                 (m.email || "").toLowerCase().includes(searchVal) ||
                 (m.givenName || "").toLowerCase().includes(searchVal) ||
                 (m.familyName || "").toLowerCase().includes(searchVal);
@@ -3080,8 +3183,8 @@ function renderMembers() {
                     <td style="display:flex; align-items:center; gap:10px; border-bottom:none;">
                         ${avatarHtml}
                         <div>
-                            <div style="font-weight: 600;">${m.givenName || m.name} ${m.familyName || ''}</div>
-                            <div style="font-size: 11px; color: #94a3b8;">${m.email}</div>
+                            <div style="font-weight: 600;">${m.givenName ? `${m.givenName} ${m.familyName || ''}`.trim() : (m.name || "User")}</div>
+                            <div style="font-size: 11px; color: #94a3b8;">${m.uid ? m.uid + ' • ' : ''}${m.email}</div>
                         </div>
                     </td>
                     <td style="font-weight: 500;">${plan}</td>
@@ -3152,6 +3255,9 @@ window.openEditMemberModal = function (id) {
     if (document.getElementById('editMemberPreview')) {
         document.getElementById('editMemberPreview').src = member.image || 'images/default-profile.png';
     }
+    if (document.getElementById('editMemberEmergency')) {
+        document.getElementById('editMemberEmergency').value = member.emergencyContact || '';
+    }
 
     document.getElementById('editMemberModal').style.display = 'flex';
 }
@@ -3168,7 +3274,8 @@ if (document.getElementById('editMemberForm')) {
             givenName: given,
             mi: mi,
             familyName: family,
-            name: `${given} ${family}`.trim()
+            name: `${given} ${family}`.trim(),
+            emergencyContact: document.getElementById('editMemberEmergency') ? document.getElementById('editMemberEmergency').value.trim() : ""
         };
 
         if (document.getElementById('editMemberPlan')) {
@@ -3251,6 +3358,7 @@ function renderStaff() {
 
                 const matchesSearch = !staffSearch ||
                     (u.name || "").toLowerCase().includes(staffSearch) ||
+                    (u.uid || "").toLowerCase().includes(staffSearch) ||
                     (u.email || "").toLowerCase().includes(staffSearch) ||
                     (u.givenName || "").toLowerCase().includes(staffSearch) ||
                     (u.familyName || "").toLowerCase().includes(staffSearch);
@@ -3268,6 +3376,7 @@ function renderStaff() {
 
                 const matchesSearch = !trainerSearch ||
                     (u.name || "").toLowerCase().includes(trainerSearch) ||
+                    (u.uid || "").toLowerCase().includes(trainerSearch) ||
                     (u.email || "").toLowerCase().includes(trainerSearch) ||
                     (u.givenName || "").toLowerCase().includes(trainerSearch) ||
                     (u.familyName || "").toLowerCase().includes(trainerSearch);
@@ -3294,7 +3403,7 @@ function renderStaff() {
         const roleLower = roleStr.toLowerCase();
         const statusStr = (u.status || "Active").trim();
         const statusLower = statusStr.toLowerCase();
-        let fullName = `${u.givenName || u.name} ${u.familyName || ''}`.trim();
+        let fullName = u.givenName ? `${u.givenName} ${u.familyName || ''}`.trim() : (u.name || "User");
         let specialty = u.specialty || 'General Fitness';
 
         const avatarHtml = u.image
@@ -3332,7 +3441,7 @@ function renderStaff() {
                         ${avatarHtml}
                         <div>
                             <div style="font-weight: 600;">${fullName}</div>
-                            <div style="font-size: 11px; color: #94a3b8;">${u.email}</div>
+                            <div style="font-size: 11px; color: #94a3b8;">${u.uid ? u.uid + ' • ' : ''}${u.email}</div>
                         </div>
                     </td>
                     <td style="font-weight: 500;">${specialty}</td>
@@ -3348,7 +3457,7 @@ function renderStaff() {
                         ${avatarHtml}
                         <div>
                             <div style="font-weight: 600;">${fullName}</div>
-                            <div style="font-size: 11px; color: #94a3b8;">${u.email}</div>
+                            <div style="font-size: 11px; color: #94a3b8;">${u.uid ? u.uid + ' • ' : ''}${u.email}</div>
                         </div>
                     </td>
                     <td style="font-weight: 500;">${roleStr}</td>
@@ -3433,6 +3542,40 @@ function renderMemberTrainers() {
     };
 
     window.syncDOM(grid, activeTrainers, renderTrainerCard, 'member-trainer-card');
+
+    // --- Update Dashboard "Trainers on Floor" Feed ---
+    const activeTrainersFeed = document.getElementById('dashActiveTrainersFeed');
+    if (activeTrainersFeed) {
+        const onFloor = activeTrainers.filter(u => u.shiftStatus === 'On Floor');
+        if (onFloor.length > 0) {
+            activeTrainersFeed.innerHTML = onFloor.map(t => {
+                let fullName = `${t.givenName || t.name} ${t.familyName || ''}`.trim();
+                return `
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 12px; background: var(--body-bg); border-radius: 12px; border: 1px solid var(--border-color); transition: transform 0.2s ease;">
+                        <div style="width: 40px; height: 40px; background: var(--primary-red); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; box-shadow: 0 4px 10px rgba(153, 27, 27, 0.2);">
+                            ${t.image ? `<img src="${t.image}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">` : fullName.charAt(0).toUpperCase()}
+                        </div>
+                        <div style="flex-grow: 1;">
+                            <div style="font-weight: 700; font-size: 14px; color: var(--text-primary);">${fullName}</div>
+                            <div style="font-size: 12px; color: var(--accent-green); font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                                <span style="width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; display: inline-block; animation: pulse 2s infinite;"></span> On Floor
+                            </div>
+                        </div>
+                        <div style="font-size: 11px; background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 20px; color: var(--text-muted); font-weight: 500;">
+                            ${t.specialty || "General Fitness"}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            activeTrainersFeed.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px; opacity: 0.5;">
+                    <i class="fa-solid fa-person-walking" style="font-size: 2rem; margin-bottom: 10px; display: block;"></i>
+                    <p style="color: var(--text-muted); font-size: 13px;">No trainers on the floor right now.</p>
+                </div>
+            `;
+        }
+    }
 }
 
 window.openEditStaffModal = function (id) {
@@ -3645,6 +3788,14 @@ window.openMemberModal = () => {
 
 const generatePassword = () => Math.random().toString(36).slice(-8);
 
+window.generateUID = function(role) {
+    let prefix = "MEM";
+    if (role === "Staff") prefix = "STF";
+    else if (role === "Trainer") prefix = "TRN";
+    else if (role === "Admin") prefix = "ADM";
+    return prefix + "-" + Math.floor(100000 + Math.random() * 900000);
+};
+
 if (document.getElementById('memberRegistrationForm')) {
     document.getElementById('memberRegistrationForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -3661,6 +3812,7 @@ if (document.getElementById('memberRegistrationForm')) {
         const email = document.getElementById('regMemberEmail').value.trim();
         const plan = document.getElementById('regMemberPlan').value;
         const rfidTag = document.getElementById('regMemberRfid').value.trim();
+        const emergency = document.getElementById('regMemberEmergency') ? document.getElementById('regMemberEmergency').value.trim() : "";
         const imageFile = document.getElementById('regMemberImageFile').files[0];
         let imageUrl = '';
 
@@ -3700,6 +3852,7 @@ if (document.getElementById('memberRegistrationForm')) {
             });
 
             await addDoc(usersCol, {
+                uid: window.generateUID("Member"),
                 name: `${given} ${family}`,
                 givenName: given,
                 mi: mi,
@@ -3711,6 +3864,7 @@ if (document.getElementById('memberRegistrationForm')) {
                 rfid: rfidTag,
                 password: randomPassword,
                 image: imageUrl,
+                emergencyContact: emergency,
                 dateRegistered: currentTimestamp
             });
 
@@ -3860,6 +4014,7 @@ if (document.getElementById('batchStaffForm')) {
             await emailjs.send("service_x90mti6", "template_nda1wjc", { to_name: given, to_email: email, generated_password: randomPassword, plan: `${role} Account` });
 
             let newUser = {
+                uid: window.generateUID(role),
                 name: `${given} ${family}`, givenName: given, mi: mi, familyName: family,
                 role: role, email: email, status: "Active", rfid: rfidTag, password: randomPassword, image: imageUrl
             };
@@ -3944,6 +4099,53 @@ function initUI() {
     if (topBarName) {
         const name = localStorage.getItem("loggedInUser") || "User";
         topBarName.innerText = name.split(' ')[0];
+    }
+
+    // --- Real-time Session Sync ---
+    if (localStorage.getItem("userId")) {
+        onSnapshot(doc(db, "users", localStorage.getItem("userId")), (docSnap) => {
+            if (docSnap.exists()) {
+                const userData = docSnap.data();
+                const fullName = userData.name || `${userData.givenName || ''} ${userData.familyName || ''}`.trim();
+                localStorage.setItem("loggedInUser", fullName);
+                
+                // Update Topbar
+                if (document.getElementById('topBarName')) {
+                    document.getElementById('topBarName').innerText = fullName.split(' ')[0];
+                }
+                
+                // Update Greeting
+                const gText = document.getElementById('greetingText');
+                if (gText) {
+                    const hour = new Date().getHours();
+                    const firstName = fullName.split(' ')[0];
+                    if (hour < 12) gText.innerText = `Good Morning, ${firstName}.`;
+                    else if (hour < 18) gText.innerText = `Good Afternoon, ${firstName}.`;
+                    else gText.innerText = `Good Evening, ${firstName}.`;
+                }
+
+                // Update Member Dashboard specific elements
+                if (document.getElementById('myPlanName')) {
+                    document.getElementById('myPlanName').innerText = userData.plan || 'No Plan';
+                }
+
+                // Sync Shift Status
+                if (userData.shiftStatus) {
+                    if (userData.role === 'Trainer') {
+                        localStorage.setItem("trainerShiftStatus", userData.shiftStatus);
+                    }
+                    if (userData.shiftStart) {
+                        localStorage.setItem("shiftStart", userData.shiftStart);
+                    }
+                }
+                
+                
+                // Update Profile Preview in Settings if open
+                if (document.getElementById('userProfilePreview') && !document.getElementById('userProfileFile').files[0]) {
+                    document.getElementById('userProfilePreview').src = userData.image || 'images/default-profile.png';
+                }
+            }
+        });
     }
 
 
@@ -4114,12 +4316,18 @@ wireBookingDateTimeGuards();
 setBookingDateMin(document.getElementById("memberBookDate"));
 setBookingDateMin(document.getElementById("bookDate"));
 
+// Expose helpers for bookings-ui.js (non-module script)
+window.setBookingDateMin = setBookingDateMin;
+window.updateBookingTimeMinForToday = updateBookingTimeMinForToday;
+window.isBookingSessionInPast = isBookingSessionInPast;
+
 onSnapshot(bookingsCol, (snapshot) => {
     bookingsData = [];
     snapshot.forEach(doc => bookingsData.push({ id: doc.id, ...doc.data() }));
     window.bookingsData = bookingsData; // Keep global in sync
-    renderBookings();
-    renderTodayBookings();
+    // Use window.renderBookings so bookings-ui.js override is called
+    if (typeof window.renderBookings === 'function') window.renderBookings();
+    if (typeof window.renderTodayBookings === 'function') window.renderTodayBookings();
 });
 
 window.renderBookings = renderBookings;
@@ -4138,6 +4346,9 @@ function renderBookings() {
         // Default to newest first
         return new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`);
     });
+
+    // --- Update Member Dashboard "Trainers on Floor" Feed ---
+    // Moved to renderMemberTrainers for better sync
 
     if (loggedInRole === "member") {
         displayData = displayData.filter(b => b.memberId === loggedInUserId);
@@ -4234,7 +4445,7 @@ function renderBookings() {
                 <tr>
                     <td>${b.trainerName}</td>
                     <td>${dateStr}</td>
-                    <td><span class="badge active" style="background: var(--dark-black);"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
+                    <td><span class="badge active" style="background: var(--primary-red); color: white; border: none;"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
                     <td><span class="badge ${badgeClass}">${b.status}</span></td>
                 </tr>
             `;
@@ -4261,7 +4472,7 @@ function renderBookings() {
                     <td>${b.memberName}</td>
                     <td>${b.trainerName}</td>
                     <td>${dateStr}</td>
-                    <td><span class="badge active" style="background: var(--dark-black);"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
+                    <td><span class="badge active" style="background: var(--primary-red); color: white; border: none;"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
                     <td><span class="badge ${badgeClass}">${b.status}</span></td>
                     <td>${actions}</td>
                 </tr>
@@ -4287,6 +4498,18 @@ window.updateBookingStatus = async (id, newStatus) => {
 }
 
 window.openMemberBookingModal = () => {
+    // Check if membership is expired before opening
+    const daysText = document.getElementById('myPlanDays')?.innerText || "";
+    if (daysText.includes("Expired")) {
+        const expiredModal = document.getElementById('membershipExpiredModal');
+        if (expiredModal) {
+            expiredModal.style.display = 'flex';
+        } else {
+            showToast("Your membership has expired. Please renew to book sessions.", "error");
+        }
+        return;
+    }
+
     const trainerSelect = document.getElementById('memberBookTrainer');
     const trainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer' && u.status !== 'Archived');
 

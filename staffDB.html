@@ -396,7 +396,7 @@
                             <i class="fas fa-user-gear"></i> Profile Settings
                         </button>
                         <div class="dropdown-divider"></div>
-                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: var(--primary-red);">
+                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: var(--dark-black);">
                             <i class="fa-solid fa-power-off"></i> Logout
                         </button>
                     </div>
@@ -781,7 +781,7 @@
                             style="flex-grow: 1; padding: 12px 20px; border: 1px solid var(--border-color); border-radius: 25px; outline: none;"
                             disabled>
                         <button id="chatSendBtn" onclick="sendMessage()"
-                            style="background: var(--primary-red); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; transition: 0.2s;"
+                            style="background: var(--dark-black); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; transition: 0.2s;"
                             disabled><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
@@ -862,7 +862,7 @@
                 </div>
                 <div class="btn-row">
                     <button type="button" class="btn-cancel" onclick="closeModal('equipmentModal')">Cancel</button>
-                    <button type="submit" class="btn-submit" style="background-color: var(--primary-red);">Register Equipment</button>
+                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Register Equipment</button>
                 </div>
             </form>
         </div>
@@ -971,7 +971,7 @@
                 <input type="number" id="prodQty" placeholder="Quantity" min="1" required>
                 <input type="file" id="prodImageFile" accept="image/*">
                 <input type="url" id="prodImage" placeholder="Product Image URL">
-                <button type="submit" style="background-color: var(--primary-red);">Register Product</button>
+                <button type="submit" style="background-color: var(--dark-black);">Register Product</button>
             </form>
         </div>
     </div>
@@ -995,10 +995,10 @@
                 <input type="url" id="regMemberImageUrl" placeholder="...or paste Photo URL" style="margin-bottom: 15px;">
 
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="regMemberGiven" placeholder="First Name" required style="flex: 2;">
-                    <input type="text" id="regMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2">
+                    <input type="text" id="regMemberGiven" placeholder="First Name" required style="flex: 2;" oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <input type="text" id="regMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2" oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
-                <input type="text" id="regMemberFamily" placeholder="Last Name" required>
+                <input type="text" id="regMemberFamily" placeholder="Last Name" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 <input type="email" id="regMemberEmail" placeholder="Email Address" required>
                 
                 <select id="regMemberPlan" required>
@@ -1026,7 +1026,7 @@
                     </div>
                 </div>
                 
-                <button type="submit" style="background-color: var(--primary-red); margin-top: 15px;"><i
+                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;"><i
                         class="fas fa-paper-plane"></i> Register & Send Email</button>
             </form>
         </div>
@@ -1050,10 +1050,10 @@
 
                 <input type="hidden" id="editMemberId">
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;">
-                    <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2">
+                    <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;" oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2" oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
-                <input type="text" id="editMemberFamily" placeholder="Last Name" required>
+                <input type="text" id="editMemberFamily" placeholder="Last Name" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 <select id="editMemberPlan" required>
                     <option value="Gold Plan">Gold Plan</option>
                     <option value="Silver Plan">Silver Plan</option>
@@ -1101,7 +1101,7 @@
                     <button type="button" onclick="addStaffBatchRow()"
                         style="background-color: #f1f2f6; color: var(--dark-black); flex: 1;"><i
                             class="fas fa-plus"></i> Add Row</button>
-                    <button type="submit" style="background-color: var(--primary-red); flex: 2;"><i
+                    <button type="submit" style="background-color: var(--dark-black); flex: 2;"><i
                             class="fas fa-paper-plane"></i> Save & Send Emails</button>
                 </div>
             </form>
@@ -1126,10 +1126,10 @@
 
                 <input type="hidden" id="editStaffId">
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="editStaffGiven" placeholder="First Name" required style="flex: 2;">
-                    <input type="text" id="editStaffMI" placeholder="M.I." style="flex: 1;" maxlength="2">
+                    <input type="text" id="editStaffGiven" placeholder="First Name" required style="flex: 2;" oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <input type="text" id="editStaffMI" placeholder="M.I." style="flex: 1;" maxlength="2" oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
-                <input type="text" id="editStaffFamily" placeholder="Last Name" required>
+                <input type="text" id="editStaffFamily" placeholder="Last Name" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 <div id="editSpecialtyContainer" style="display: none;">
                     <input type="text" id="editStaffSpecialty" placeholder="Trainer Specialty (e.g. Yoga)">
                 </div>
@@ -1245,7 +1245,7 @@
                     <label class="form-label">Location / Section</label>
                     <input type="text" id="lockerLocationInput" placeholder="e.g. Male Locker Room" required>
                 </div>
-                <button type="submit" class="modal-submit-btn" style="background-color: var(--primary-red); color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; cursor: pointer;">Create Locker</button>
+                <button type="submit" class="modal-submit-btn" style="background-color: var(--dark-black); color: white; border: none; padding: 12px; border-radius: 6px; width: 100%; cursor: pointer;">Create Locker</button>
             </form>
         </div>
     </div>
@@ -1285,7 +1285,7 @@
                     </div>
                     <div class="flex gap-3 mt-6">
                         <button type="button" class="btn-cancel" style="flex: 1;" onclick="closeModal('assignLockerModal')">Cancel</button>
-                        <button type="submit" class="btn-submit" style="flex: 1; background-color: var(--primary-red);">Assign Locker</button>
+                        <button type="submit" class="btn-submit" style="flex: 1; background-color: var(--dark-black);">Assign Locker</button>
                     </div>
                 </form>
 
