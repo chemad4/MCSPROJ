@@ -280,9 +280,9 @@
             </div>
 
             <div class="dashboard-grid">
-                <div class="panel" style="margin-bottom: 0;">
+                <div class="panel" style="margin-bottom: 0; display: flex; flex-direction: column;">
                     <div class="panel-header"><i class="fa-solid fa-clipboard-user"></i> My Recent Attendance</div>
-                    <div class="table-container" style="box-shadow: none;">
+                    <div class="table-container" style="box-shadow: none; flex-grow: 1;">
                         <table id="myAttendanceTable">
                             <thead>
                                 <tr>
@@ -299,10 +299,30 @@
                     </div>
                 </div>
 
-                <div class="panel" style="margin-bottom: 0;">
-                    <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Trainers on Floor</div>
-                    <div class="panel-body" id="dashActiveTrainersFeed" style="max-height: 300px; overflow-y: auto;">
-                        <p style="color: var(--text-muted); font-size: 14px;">Loading...</p>
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Fitness Goals Card -->
+                    <div class="panel" style="margin-bottom: 0;">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><i class="fa-solid fa-bullseye"></i> My Fitness Goals</span>
+                            <button id="saveGoalsBtn" onclick="saveFitnessGoals()" style="background: none; border: none; color: var(--primary-red); cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 8px; border-radius: 4px; transition: 0.2s;">
+                                <i class="fa-solid fa-floppy-disk"></i> Save
+                            </button>
+                        </div>
+                        <div class="panel-body">
+                            <textarea id="fitnessGoalsInput" placeholder="What are you working towards? (e.g., Lose 5kg, Bench 100kg, Run a 5k...)" 
+                                style="width: 100%; min-height: 120px; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-family: inherit; font-size: 14px; resize: none; background: var(--body-bg); color: var(--text-primary); transition: 0.3s;"></textarea>
+                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+                                <i class="fa-solid fa-circle-info"></i> Your trainer can see these to better help you.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Trainers on Floor Card -->
+                    <div class="panel" style="margin-bottom: 0;">
+                        <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Trainers on Floor</div>
+                        <div class="panel-body" id="dashActiveTrainersFeed" style="max-height: 300px; overflow-y: auto;">
+                            <p style="color: var(--text-muted); font-size: 14px;">Loading...</p>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -2713,7 +2713,7 @@ function renderMembershipPlans() {
                             <p class="text-sm text-slate-500 mt-2">${p.description ? escapeHtml(p.description) : 'Standard access plan'}</p>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" class="sr-only peer" ${isActive ? 'checked' : ''} disabled>
+                            <input type="checkbox" class="sr-only peer" ${isActive ? 'checked' : ''} onchange="togglePlanStatus('${p.id}', this.checked)">
                             <div class="w-10 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#991b1b]"></div>
                             <span class="ml-2 text-xs font-medium text-slate-600">${p.status}</span>
                         </label>
@@ -2759,6 +2759,19 @@ function renderMembershipPlans() {
         `;
     }).join('');
 }
+
+window.togglePlanStatus = async function (id, isChecked) {
+    const newStatus = isChecked ? 'Active' : 'Inactive';
+    try {
+        await updateDoc(doc(db, "membershipPlans", id), { status: newStatus });
+        showToast(`Plan ${newStatus} successfully!`, "success");
+        if (window.logActivity) window.logActivity("Plan Updated", `Plan status changed to ${newStatus}.`);
+    } catch (e) {
+        console.error("Error toggling plan status:", e);
+        showToast("Failed to update plan status.", "error");
+        renderMembershipPlans(); // Re-render to revert toggle UI if firestore failed
+    }
+};
 
 // Populate all plan <select> dropdowns across the app
 function populatePlanDropdowns() {
@@ -4118,6 +4131,12 @@ function initUI() {
                     document.getElementById('topBarName').innerText = fullName.split(' ')[0];
                 }
                 
+                // Update Fitness Goals Input (Member Only)
+                const goalsInput = document.getElementById('fitnessGoalsInput');
+                if (goalsInput && !goalsInput.matches(':focus')) {
+                    goalsInput.value = userData.fitnessGoals || "";
+                }
+
                 // Update Greeting
                 const gText = document.getElementById('greetingText');
                 if (gText) {
@@ -4151,6 +4170,9 @@ function initUI() {
             }
         });
     }
+
+
+
 
 
     function updateShiftTimer() {
@@ -4473,7 +4495,7 @@ function renderBookings() {
 
             return `
                 <tr>
-                    <td>${b.memberName}</td>
+                    <td>${loggedInRole === 'trainer' && b.memberId ? `<a href="javascript:void(0)" onclick="window.openMemberProfile('${b.memberId}')" style="color: var(--primary-red); font-weight: 600; text-decoration: none; border-bottom: 1px dashed var(--primary-red);">${b.memberName}</a>` : b.memberName}</td>
                     <td>${b.trainerName}</td>
                     <td>${dateStr}</td>
                     <td><span class="badge active" style="background: var(--primary-red); color: white; border: none;"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
@@ -4985,3 +5007,101 @@ if (document.getElementById('addCreditForm')) {
         }
     });
 }
+
+// --- Global Goals & Profile Functions ---
+window.saveFitnessGoals = async function () {
+    const userId = localStorage.getItem("userId");
+    const goals = document.getElementById('fitnessGoalsInput')?.value.trim();
+    const saveBtn = document.getElementById('saveGoalsBtn');
+
+    if (!userId) return;
+
+    try {
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            const originalContent = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            saveBtn.dataset.original = originalContent;
+        }
+
+        await updateDoc(doc(db, "users", userId), { fitnessGoals: goals });
+        showToast("Fitness goals updated successfully!", "success");
+
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = saveBtn.dataset.original || '<i class="fa-solid fa-floppy-disk"></i> Save';
+        }
+    } catch (err) {
+        console.error("Error saving goals:", err);
+        showToast("Failed to save goals.", "error");
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = saveBtn.dataset.original || '<i class="fa-solid fa-floppy-disk"></i> Save';
+        }
+    }
+};
+
+window.openMemberProfile = async function (memberId) {
+    if (!memberId || memberId === 'undefined') {
+        return showToast("Member ID missing for this booking.", "error");
+    }
+    try {
+        const docSnap = await getDoc(doc(db, "users", memberId));
+        if (!docSnap.exists()) return showToast("Member not found.", "error");
+
+        const m = docSnap.data();
+        const fullName = m.name || `${m.givenName || ''} ${m.familyName || ''}`.trim();
+
+        // Populate Modal
+        const avatar = document.getElementById('mpAvatar');
+        if (avatar) {
+            avatar.innerText = fullName.charAt(0).toUpperCase();
+            if (m.image) {
+                avatar.innerHTML = `<img src="${m.image}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+            } else {
+                avatar.innerHTML = fullName.charAt(0).toUpperCase();
+            }
+        }
+
+        const nameEl = document.getElementById('mpName');
+        if (nameEl) nameEl.innerText = fullName;
+
+        const emailEl = document.getElementById('mpEmail');
+        if (emailEl) emailEl.innerText = m.email || "No email provided";
+
+        const statusEl = document.getElementById('mpStatus');
+        if (statusEl) {
+            const status = m.status || "Active";
+            statusEl.innerText = status;
+            statusEl.style.background = status.toLowerCase() === 'active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(100, 116, 139, 0.1)';
+            statusEl.style.color = status.toLowerCase() === 'active' ? '#059669' : '#475569';
+        }
+
+        const goalsEl = document.getElementById('mpGoals');
+        if (goalsEl) goalsEl.innerText = m.fitnessGoals || "No goals set by the member yet.";
+
+        const planEl = document.getElementById('mpPlan');
+        if (planEl) planEl.innerText = m.plan || "No active plan";
+
+        const sinceEl = document.getElementById('mpSince');
+        if (sinceEl) {
+            const date = m.registrationDate || (m.timestamp ? new Date(m.timestamp).toLocaleDateString() : "Unknown");
+            sinceEl.innerText = date;
+        }
+
+        const messageBtn = document.getElementById('mpMessageBtn');
+        if (messageBtn) {
+            messageBtn.onclick = () => {
+                if (window.closeModal) window.closeModal('memberProfileModal');
+                if (window.openChatTab) window.openChatTab(memberId, null, fullName);
+            };
+        }
+
+        const modal = document.getElementById('memberProfileModal');
+        if (modal) modal.style.display = 'flex';
+
+    } catch (err) {
+        console.error("Error opening profile:", err);
+        showToast("Failed to load member profile.", "error");
+    }
+};

@@ -322,6 +322,54 @@
         </div>
     </div>
 
+    <!-- Member Profile Modal -->
+    <div id="memberProfileModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3>Member Profile</h3>
+                <span class="close-btn" onclick="closeModal('memberProfileModal')">&times;</span>
+            </div>
+            <div id="memberProfileContent" style="padding: 10px 0;">
+                <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);">
+                    <div id="mpAvatar" style="width: 80px; height: 80px; background: var(--primary-red); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; box-shadow: 0 5px 15px rgba(153, 27, 27, 0.2);">
+                        M
+                    </div>
+                    <div>
+                        <h2 id="mpName" style="margin: 0; font-size: 22px; font-weight: 700; color: var(--text-primary);">Member Name</h2>
+                        <p id="mpEmail" style="margin: 4px 0 0; color: var(--text-muted); font-size: 14px;">member@email.com</p>
+                        <div id="mpStatus" style="margin-top: 8px; display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; text-transform: uppercase;">Active</div>
+                    </div>
+                </div>
+
+                <div style="background: var(--body-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color);">
+                    <h4 style="margin: 0 0 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-bullseye" style="color: var(--primary-red);"></i> Fitness Goals
+                    </h4>
+                    <div id="mpGoals" style="font-size: 15px; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap;">
+                        No goals set by the member yet.
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                        <span style="color: var(--text-muted);">Current Plan:</span>
+                        <span id="mpPlan" style="font-weight: 600; color: var(--text-primary);">Loading...</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                        <span style="color: var(--text-muted);">Member Since:</span>
+                        <span id="mpSince" style="font-weight: 600; color: var(--text-primary);">Loading...</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 25px;">
+                    <button class="action-btn" id="mpMessageBtn" style="width: 100%; justify-content: center;">
+                        <i class="fa-solid fa-comments"></i> Send Message
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="js/script.js"></script>
 
     <script>
