@@ -832,7 +832,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Category</label>
-                    <select id="equipCategory" required>
+                    <select id="equipCategory" required onchange="handleEquipCategoryChange('equipCategory', 'equipQty')">
                         <option value="Cardio Machine">Cardio Machine</option>
                         <option value="Strength Machine">Strength Machine</option>
                         <option value="Free Weights">Free Weights</option>
@@ -889,7 +889,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Category</label>
-                    <select id="editEquipCategory" required>
+                    <select id="editEquipCategory" required onchange="handleEquipCategoryChange('editEquipCategory', 'editEquipQty')">
                         <option value="Cardio Machine">Cardio Machine</option>
                         <option value="Strength Machine">Strength Machine</option>
                         <option value="Free Weights">Free Weights</option>

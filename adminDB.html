@@ -1004,6 +1004,11 @@
                 <button class="batch-cancel-btn" onclick="clearBatchSelection('equipment')">Cancel</button>
             </div>
 
+            <!-- Equipment Category Quantity Summary -->
+            <div class="equip-category-summary" id="equipCategorySummary">
+                <!-- Rendered by renderEquipmentCategorySummary() -->
+            </div>
+
             <div class="panel">
                 <div class="panel-body">
                     <div class="inventory-grid" id="machinesGrid"></div>
@@ -1168,7 +1173,7 @@
             <div class="dense-control-bar">
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="paymentSearch" placeholder="Search customer or ID..."
+                    <input type="text" id="paymentSearch" placeholder="Search member, ref ID..."
                         onkeyup="filterPayments()">
                 </div>
 
@@ -1195,11 +1200,34 @@
                     </select>
                 </div>
 
+                <div class="fin-date-range-group" id="finCustomRangeControls" style="display: none;">
+                    <i class="fas fa-calendar-alt" style="color: var(--text-muted); font-size: 12px;"></i>
+                    <input type="date" id="finDateFrom" onchange="filterPayments()" title="From date">
+                    <span class="fin-date-sep">–</span>
+                    <input type="date" id="finDateTo" onchange="filterPayments()" title="To date">
+                    <button type="button" onclick="clearFinDateRange()" style="background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 11px; color: var(--text-muted);" title="Clear date range">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
                 <div style="margin-left: auto; display: flex; gap: 8px;">
                     <button class="action-btn" style="background-color: var(--dark-black); padding: 6px 12px;"
                         onclick="generateWeeklyPDF()">
                         <i class="fas fa-file-pdf"></i> Export Report
                     </button>
+                </div>
+            </div>
+
+            <!-- Weekly Revenue Summary -->
+            <div class="panel weekly-report-panel">
+                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span><i class="fas fa-chart-bar" style="margin-right: 6px;"></i> Weekly Revenue Summary</span>
+                    <small style="color: var(--text-muted);">Current Week</small>
+                </div>
+                <div class="panel-body">
+                    <div class="weekly-report-grid" id="weeklyReportGrid">
+                        <!-- Rendered by renderWeeklyReport() -->
+                    </div>
                 </div>
             </div>
 
@@ -1209,7 +1237,7 @@
                     <table id="paymentTable" class="dense-table">
                         <thead>
                             <tr>
-                                <th onclick="sortPayments('customerName')">Customer <i class="fas fa-sort"></i></th>
+                                <th onclick="sortPayments('customerName')">Member <i class="fas fa-sort"></i></th>
                                 <th style="width: 250px;">Purchased Items</th>
                                 <th onclick="sortPayments('timestamp')">Date & Time <i class="fas fa-sort"></i></th>
                                 <th onclick="sortPayments('subtotal')">Subtotal <i class="fas fa-sort"></i></th>
@@ -2368,7 +2396,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Category</label>
-                    <select id="equipCategory" required>
+                    <select id="equipCategory" required onchange="handleEquipCategoryChange('equipCategory', 'equipQty')">
                         <option value="Cardio Machine">Cardio Machine</option>
                         <option value="Strength Machine">Strength Machine</option>
                         <option value="Free Weights">Free Weights</option>
@@ -2419,7 +2447,7 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Category</label>
-                    <select id="editEquipCategory" required>
+                    <select id="editEquipCategory" required onchange="handleEquipCategoryChange('editEquipCategory', 'editEquipQty')">
                         <option value="Cardio Machine">Cardio Machine</option>
                         <option value="Strength Machine">Strength Machine</option>
                         <option value="Free Weights">Free Weights</option>

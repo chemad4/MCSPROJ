@@ -12,6 +12,19 @@ import { escapeHtml, formatCurrency } from "./utils.js";
 window.escapeHtml = escapeHtml;
 window.formatCurrency = formatCurrency;
 
+// ==========================================
+// UTILITY: Transaction Reference ID Generator
+// ==========================================
+function generateTransactionRef() {
+    const now = new Date();
+    const dateStr = now.getFullYear().toString() +
+        String(now.getMonth() + 1).padStart(2, '0') +
+        String(now.getDate()).padStart(2, '0');
+    const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `XFT-${dateStr}-${randomPart}`;
+}
+window.generateTransactionRef = generateTransactionRef;
+
 /**
  * Synchronizes a container with a data array using DOM diffing to prevent UI flickering.
  */
@@ -962,6 +975,9 @@ function renderInventory() {
 
     const dashAlerts = document.getElementById('dashInventoryAlerts');
     if (dashAlerts) dashAlerts.innerHTML = alertsHtmlArr.join('') || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
+
+    // Render equipment category quantity counter
+    if (window.renderEquipmentCategorySummary) window.renderEquipmentCategorySummary();
 }
 
 window.migrateInventoryDatabase = async function () {
@@ -981,7 +997,11 @@ window.migrateInventoryDatabase = async function () {
     showToast(`Migration complete! Updated ${updatedCount} old items.`, "success");
 }
 
-window.openEquipmentModal = () => { document.getElementById('equipmentForm').reset(); document.getElementById('equipmentModal').style.display = 'flex'; }
+window.openEquipmentModal = () => { 
+    document.getElementById('equipmentForm').reset(); 
+    document.getElementById('equipmentModal').style.display = 'flex'; 
+    window.handleEquipCategoryChange('equipCategory', 'equipQty');
+}
 window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
 window.deleteInventoryItem = async (id) => {
     const item = inventoryData.find(i => i.id === id);
@@ -1007,6 +1027,7 @@ window.openEditEquipModal = function (id) {
         document.getElementById('editEquipPreview').src = item.image || 'images/default-equip.png';
     }
     document.getElementById('editEquipModal').style.display = 'flex';
+    window.handleEquipCategoryChange('editEquipCategory', 'editEquipQty');
 }
 
 if (document.getElementById('editEquipForm')) {
@@ -1342,10 +1363,17 @@ function renderPOSProducts() {
     });
 
     const renderItem = (item) => {
+        // Use fallback icon for walk-in day pass or missing images
+        const hasValidImage = item.image && item.image !== 'images/default-product.png' && item.image.startsWith('http');
+        const imageHtml = hasValidImage
+            ? `<img src="${item.image}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+               <div class="pos-fallback-icon" style="display:none;"><i class="fa-solid ${item.isPlan ? 'fa-ticket' : 'fa-box'}"></i></div>`
+            : `<div class="pos-fallback-icon"><i class="fa-solid ${item.isPlan ? 'fa-ticket' : 'fa-box'}"></i></div>`;
+
         return `
             <div class="pos-product-card ${item.featured ? 'featured' : ''}" onclick="addToCart('${item.id}', '${item.name.replace(/'/g, "\\'")}', ${item.price}, ${item.maxQty}, '${item.image}')">
                 <div class="pos-card-image">
-                    <img src="${item.image}" onerror="this.src='images/default-product.png'">
+                    ${imageHtml}
                 </div>
                 <div class="pos-card-info">
                     <div class="pos-card-name">${item.name}</div>
@@ -1579,8 +1607,11 @@ window.processPayment = async function () {
     const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
 
+    const txnRef = generateTransactionRef();
+
     const paymentRef = await addDoc(paymentsCol, {
         name: customerName,
+        transactionRef: txnRef,
         type: "POS Sale",
         items: itemsStr,
         lineItems: posCart,
@@ -1882,6 +1913,7 @@ onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
     snapshot.forEach(doc => paymentsData.push({ id: doc.id, ...doc.data() }));
     renderPayments();
+    if (window.renderWeeklyReport) window.renderWeeklyReport();
     if (window.refreshDashboardAnalytics) window.refreshDashboardAnalytics();
 });
 
@@ -1916,12 +1948,44 @@ function renderPayments() {
     const searchTerm = document.getElementById('paymentSearch')?.value.toLowerCase();
     const filterStatus = document.getElementById('paymentFilterStatus')?.value;
     const filterMethod = document.getElementById('paymentFilterMethod')?.value;
+    const filterRange = document.getElementById('paymentFilterRange')?.value;
+    let dateFrom = document.getElementById('finDateFrom')?.value;
+    let dateTo = document.getElementById('finDateTo')?.value;
+
+    // Handle Range Presets
+    const finCustomGroup = document.getElementById('finCustomRangeControls');
+    if (finCustomGroup) {
+        if (filterRange === 'custom') {
+            finCustomGroup.style.display = 'flex';
+        } else {
+            finCustomGroup.style.display = 'none';
+            const now = new Date();
+            if (filterRange === 'today') {
+                dateFrom = now.toISOString().split('T')[0];
+                dateTo = now.toISOString().split('T')[0];
+            } else if (filterRange === '7days') {
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(now.getDate() - 7);
+                dateFrom = sevenDaysAgo.toISOString().split('T')[0];
+                dateTo = now.toISOString().split('T')[0];
+            } else if (filterRange === '30days') {
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(now.getDate() - 30);
+                dateFrom = thirtyDaysAgo.toISOString().split('T')[0];
+                dateTo = now.toISOString().split('T')[0];
+            } else {
+                dateFrom = null;
+                dateTo = null;
+            }
+        }
+    }
 
     if (searchTerm) {
         filtered = filtered.filter(p =>
             (p.name && p.name.toLowerCase().includes(searchTerm)) ||
             (p.id && p.id.toLowerCase().includes(searchTerm)) ||
-            (p.items && p.items.toLowerCase().includes(searchTerm))
+            (p.items && p.items.toLowerCase().includes(searchTerm)) ||
+            (p.transactionRef && p.transactionRef.toLowerCase().includes(searchTerm))
         );
     }
 
@@ -1931,6 +1995,24 @@ function renderPayments() {
 
     if (filterMethod && filterMethod !== 'all') {
         filtered = filtered.filter(p => p.paymentMethod === filterMethod);
+    }
+
+    // Custom Date Range Filter
+    if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        filtered = filtered.filter(p => {
+            const pDate = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
+            return pDate >= fromDate;
+        });
+    }
+    if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(p => {
+            const pDate = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
+            return pDate <= toDate;
+        });
     }
 
     // Sorting logic
@@ -1968,10 +2050,20 @@ function renderPayments() {
         const vat = (t.vat != null ? Number(t.vat) : (amount / 1.12 * 0.12)).toFixed(2);
         const isVoided = t.status === 'Voided';
 
+        // Transaction Reference
+        const refDisplay = t.transactionRef
+            ? `<span class="txn-ref">${t.transactionRef}</span>`
+            : `<span class="txn-ref">${t.id.slice(0, 8).toUpperCase()}</span>`;
+
         // Status Badge
         const statusBadge = isVoided
             ? '<span class="status-badge-solid voided">Voided</span>'
             : '<span class="status-badge-solid paid">Paid</span>';
+
+        // Cancel Remarks
+        const remarksHtml = (isVoided && t.cancelRemarks)
+            ? `<div class="cancel-remarks-badge"><i class="fas fa-comment-dots"></i> ${escapeHtml(t.cancelRemarks)}</div>`
+            : '';
 
         // Purchased Items Truncation
         const items = t.items || t.type || "";
@@ -2007,13 +2099,16 @@ function renderPayments() {
 
         return `
             <tr style="${isVoided ? 'color: #94a3b8;' : ''}">
-                <td style="font-weight: 500; ${isVoided ? 'text-decoration: line-through;' : ''}">${t.name}</td>
+                <td style="font-weight: 500; ${isVoided ? 'text-decoration: line-through;' : ''}">
+                    ${t.name}
+                    <div>${refDisplay}</div>
+                </td>
                 <td style="${isVoided ? 'text-decoration: line-through;' : ''}">${itemsHtml}</td>
                 <td style="${isVoided ? 'text-decoration: line-through;' : ''}"><span style="white-space: nowrap;">${t.date}</span> <br><small style="color:#94a3b8;">${t.time || ''}</small></td>
                 <td style="${isVoided ? 'text-decoration: line-through;' : ''}">₱${(t.subtotal || amount).toFixed(2)}</td>
                 <td style="${isVoided ? 'text-decoration: line-through;' : ''}">₱${vat}</td>
                 <td style="font-weight:700; ${isVoided ? 'text-decoration: line-through;' : ''}">₱${amount.toFixed(2)}</td>
-                <td>${statusBadge}</td>
+                <td>${statusBadge}${remarksHtml}</td>
                 <td style="text-align: right;">${actionHtml}</td>
             </tr>
         `;
@@ -2045,8 +2140,9 @@ window.viewInvoice = function (id) {
     const tx = paymentsData.find(p => p.id === id);
     if (!tx) return;
 
-    document.getElementById('invoiceId').innerText = `#${id.slice(0, 8).toUpperCase()}`;
-    document.getElementById('invoiceCustomerName').innerText = tx.name || "Walk-in Customer";
+    const refText = tx.transactionRef || `#${id.slice(0, 8).toUpperCase()}`;
+    document.getElementById('invoiceId').innerText = refText;
+    document.getElementById('invoiceCustomerName').innerText = tx.name || "Walk-in Member";
     document.getElementById('invoiceDate').innerText = `${tx.date} • ${tx.time || ''}`;
     document.getElementById('invoiceMethod').innerText = tx.paymentMethod || "Cash";
     document.getElementById('invoiceStatus').innerText = tx.status || "Paid";
@@ -2124,6 +2220,122 @@ window.changePaymentPagination = function () {
     renderPayments();
 };
 
+// Weekly Report Generation
+window.renderWeeklyReport = function () {
+    const container = document.getElementById('weeklyReportGrid');
+    if (!container) return;
+
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + distanceToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    let html = '';
+
+    for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(monday);
+        dayDate.setDate(monday.getDate() + i);
+        const dayStr = dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const isToday = dayDate.toDateString() === now.toDateString();
+        
+        let dayRevenue = 0;
+        let dayTxCount = 0;
+
+        paymentsData.forEach(p => {
+            if (p.status === 'Voided') return;
+            const pDate = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
+            if (pDate.toDateString() === dayDate.toDateString()) {
+                dayRevenue += Number(p.amount || 0);
+                dayTxCount++;
+            }
+        });
+
+        html += `
+            <div class="weekly-day-card ${isToday ? 'is-today' : ''}">
+                <div class="weekly-day-label">${dayNames[i]}</div>
+                <div class="weekly-day-date">${dayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                <div class="weekly-day-amount">₱${dayRevenue.toLocaleString(undefined, { minimumFractionDigits: 0 })}</div>
+                <div class="weekly-day-count">${dayTxCount} transaction${dayTxCount !== 1 ? 's' : ''}</div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = html;
+};
+
+// Equipment Category Quantity Logic
+window.handleEquipCategoryChange = function (catId, qtyId) {
+    const cat = document.getElementById(catId).value;
+    const qtyInput = document.getElementById(qtyId);
+    if (!qtyInput) return;
+
+    if (cat === "Cardio Machine" || cat === "Strength Machine") {
+        qtyInput.value = 1;
+        qtyInput.disabled = true;
+        qtyInput.title = "Quantity is fixed to 1 for machines.";
+    } else {
+        qtyInput.disabled = false;
+        qtyInput.title = "";
+    }
+};
+
+// Equipment Category Quantity Counter
+window.renderEquipmentCategorySummary = function () {
+    const container = document.getElementById('equipCategorySummary');
+    if (!container) return;
+
+    const categoryMap = {};
+    const categoryIcons = {
+        'Cardio Machine': 'fa-person-running',
+        'Strength Machine': 'fa-dumbbell',
+        'Free Weights': 'fa-weight-hanging',
+        'Accessories / Mats': 'fa-mat-pilates'
+    };
+
+    inventoryData.forEach(item => {
+        let isEquipment = item.itemType === 'equipment' || !['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
+        if (item.itemType === 'product') isEquipment = false;
+        
+        if (isEquipment) {
+            const cat = item.cat || 'Uncategorized';
+            if (!categoryMap[cat]) categoryMap[cat] = { count: 0, qty: 0 };
+            categoryMap[cat].count++;
+            categoryMap[cat].qty += Number(item.qty || 0);
+        }
+    });
+
+    const entries = Object.entries(categoryMap).sort((a, b) => b[1].qty - a[1].qty);
+
+    if (entries.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = entries.map(([cat, data]) => `
+        <div class="equip-cat-card">
+            <div class="equip-cat-icon">
+                <i class="fa-solid ${categoryIcons[cat] || 'fa-box'}"></i>
+            </div>
+            <div class="equip-cat-info">
+                <div class="equip-cat-name">${cat}</div>
+                <div class="equip-cat-count">${data.qty} <span class="equip-cat-units">units</span></div>
+            </div>
+        </div>
+    `).join('');
+};
+
+// Clear date range filter
+window.clearFinDateRange = function () {
+    const fromEl = document.getElementById('finDateFrom');
+    const toEl = document.getElementById('finDateTo');
+    if (fromEl) fromEl.value = '';
+    if (toEl) toEl.value = '';
+    renderPayments();
+};
+
 // Void Transaction & Restock Inventory (also handles Refunds)
 window.voidTransaction = async function (id, isRefund = false) {
     const tx = paymentsData.find(p => p.id === id);
@@ -2131,6 +2343,9 @@ window.voidTransaction = async function (id, isRefund = false) {
     if (tx.status === "Voided") return showToast("This transaction is already voided.", "error");
 
     const actionName = isRefund ? "REFUND" : "VOID";
+
+    // Prompt for cancellation remarks
+    const cancelRemarks = prompt(`Please enter a reason for this ${actionName.toLowerCase()} (optional):`) || '';
 
     showConfirm(`Are you sure you want to ${actionName} this transaction? This will void the transaction, return purchased items to inventory, and refund credit if applicable.`, async () => {
         try {
@@ -2190,9 +2405,14 @@ window.voidTransaction = async function (id, isRefund = false) {
                 }
             }
 
-            await updateDoc(doc(db, "payments", id), { status: "Voided" });
+            const voidUpdate = { status: "Voided" };
+            if (cancelRemarks.trim()) voidUpdate.cancelRemarks = cancelRemarks.trim();
+            voidUpdate.voidedAt = Date.now();
+            voidUpdate.voidedBy = localStorage.getItem("userId") || "";
+
+            await updateDoc(doc(db, "payments", id), voidUpdate);
             showToast(`Transaction successfully ${actionName === "REFUND" ? "refunded" : "voided"}!`, "success");
-            if (window.logActivity) window.logActivity(`Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`, `${actionName === "REFUND" ? "Refunded" : "Voided"} transaction ${id} for ${tx.name || 'Unknown'} (₱${tx.amount})`);
+            if (window.logActivity) window.logActivity(`Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`, `${actionName === "REFUND" ? "Refunded" : "Voided"} transaction ${id} for ${tx.name || 'Unknown'} (₱${tx.amount})${cancelRemarks ? ' — Reason: ' + cancelRemarks : ''}`);
         } catch (e) {
             console.error(e);
             showToast(`Error ${actionName === "REFUND" ? "refunding" : "voiding"} transaction.`, "error");
@@ -2622,6 +2842,7 @@ window.confirmRenewal = async function () {
             // Record renewal payment
             const paymentData = {
                 name: `${member.givenName || member.name} ${member.familyName || ''}`.trim(),
+                transactionRef: generateTransactionRef(),
                 amount: finalDue,
                 items: `Renewal: ${plan.name}${hasLocker ? ' & Locker' : ''}`,
                 type: "Membership",
@@ -2917,17 +3138,27 @@ function renderLockers() {
         return;
     }
 
-    grid.innerHTML = lockersData.sort((a, b) => (a.number || "").localeCompare(b.number || "", undefined, { numeric: true })).map(l => {
+    const statusPriority = { 'Available': 0, 'Occupied': 1, 'Maintenance': 2 };
+
+    grid.innerHTML = lockersData
+        .sort((a, b) => {
+            const pA = statusPriority[a.status] ?? 1;
+            const pB = statusPriority[b.status] ?? 1;
+            if (pA !== pB) return pA - pB;
+            return (a.number || "").localeCompare(b.number || "", undefined, { numeric: true });
+        })
+        .map(l => {
         const isOccupied = l.status === 'Occupied';
         const isMaint = l.status === 'Maintenance';
         const statusClass = isOccupied ? 'occupied' : (isMaint ? 'maintenance' : 'available');
         const icon = isOccupied ? 'fa-lock' : (isMaint ? 'fa-tools' : 'fa-lock-open');
+        const statusLabel = isOccupied ? 'Occupied' : (isMaint ? 'Maintenance' : 'Available');
 
         return `
             <div class="locker-card ${statusClass}" onclick="openAssignLockerModal('${l.id}')">
                 <div class="locker-icon"><i class="fa-solid ${icon}"></i></div>
                 <div class="locker-number">${l.number}</div>
-                <div class="locker-status-text">${l.status}</div>
+                <div class="locker-status-text">${statusLabel}</div>
                 <div class="locker-assignee">${isOccupied ? (l.memberName || 'Assigned') : (l.location || 'Section')}</div>
             </div>
         `;
@@ -3902,6 +4133,7 @@ if (document.getElementById('memberRegistrationForm')) {
 
             const paymentData = {
                 name: `${given} ${family}`,
+                transactionRef: generateTransactionRef(),
                 amount: planPrice,
                 items: `Membership: ${plan}`,
                 type: "Membership",
@@ -4986,6 +5218,7 @@ if (document.getElementById('addCreditForm')) {
             const now = new Date();
             await addDoc(paymentsCol, {
                 name: member.name || (member.givenName + ' ' + member.familyName),
+                transactionRef: generateTransactionRef(),
                 type: "Credit Top-Up",
                 items: `RFID Credit Load (₱${amount.toFixed(2)})`,
                 amount: amount,

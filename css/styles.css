@@ -2524,64 +2524,96 @@ body.dark-theme .table-footer {
 /* Locker Management Grid */
 .locker-grid-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 16px;
 }
 
 .locker-card {
-    background: var(--white);
+    background: var(--panel-bg);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 16px;
+    border-radius: 12px;
+    padding: 20px 16px 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    transition: all 0.2s ease;
+    gap: 6px;
+    transition: all 0.25s ease;
     cursor: pointer;
     position: relative;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .locker-card:hover {
     border-color: var(--primary-red);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.1);
 }
 
 .locker-icon {
-    font-size: 1.5rem;
-    color: var(--text-muted);
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    margin-bottom: 4px;
+    transition: all 0.2s ease;
 }
 
+/* Status: Available */
+.locker-card.available {
+    border-left: 3px solid #10B981;
+}
+.locker-card.available .locker-icon {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+.locker-card.available .locker-status-text {
+    color: #059669;
+}
+
+/* Status: Occupied */
 .locker-card.occupied {
-    background-color: #FFFBEB;
-    border-color: #FDE68A;
+    border-left: 3px solid #F59E0B;
+    background-color: rgba(255, 251, 235, 0.5);
 }
-
 .locker-card.occupied .locker-icon {
+    background: rgba(245, 158, 11, 0.12);
+    color: #92400E;
+}
+.locker-card.occupied .locker-status-text {
     color: #92400E;
 }
 
-.locker-card.available .locker-icon {
-    color: #10B981;
+/* Status: Maintenance */
+.locker-card.maintenance {
+    border-left: 3px solid #94A3B8;
+    opacity: 0.75;
 }
-
 .locker-card.maintenance .locker-icon {
-    color: #94A3B8;
+    background: rgba(148, 163, 184, 0.12);
+    color: #64748B;
+}
+.locker-card.maintenance .locker-status-text {
+    color: #64748B;
 }
 
 .locker-number {
     font-weight: 700;
     font-size: 1.1rem;
     color: var(--text-primary);
+    letter-spacing: -0.02em;
 }
 
 .locker-status-text {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
+    padding: 2px 10px;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.04);
 }
 
 .locker-assignee {
@@ -2593,6 +2625,7 @@ body.dark-theme .table-footer {
     overflow: hidden;
     text-overflow: ellipsis;
     width: 100%;
+    font-weight: 500;
 }
 
 /* ============================================
@@ -3435,8 +3468,46 @@ body.dark-theme .bk-toggle-btn:hover {
 }
 
 body.dark-theme .locker-card.occupied {
-    background-color: rgba(245, 158, 11, 0.12);
+    background-color: rgba(245, 158, 11, 0.08);
     border-color: #92400E;
+}
+
+body.dark-theme .locker-card.available {
+    border-left-color: #34d399;
+}
+
+body.dark-theme .locker-card.maintenance {
+    border-left-color: #64748B;
+}
+
+body.dark-theme .locker-card.available .locker-icon {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6EE7B7;
+}
+
+body.dark-theme .locker-card.occupied .locker-icon {
+    background: rgba(245, 158, 11, 0.15);
+    color: #FCD34D;
+}
+
+body.dark-theme .locker-card.maintenance .locker-icon {
+    background: rgba(148, 163, 184, 0.1);
+    color: #94A3B8;
+}
+
+body.dark-theme .locker-card.available .locker-status-text {
+    color: #6EE7B7;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+body.dark-theme .locker-card.occupied .locker-status-text {
+    color: #FCD34D;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+body.dark-theme .locker-card.maintenance .locker-status-text {
+    color: #94A3B8;
+    background: rgba(148, 163, 184, 0.08);
 }
 
 body.dark-theme .inventory-card.selected {
@@ -3969,4 +4040,357 @@ body.dark-theme .mp-close-btn {
         margin: 8px 16px 20px;
         width: calc(100% - 32px);
     }
+}
+
+/* ============================================
+   MEMBERSHIP PLANS – DARK MODE SPECIFICITY FIX
+   Overrides Tailwind utility classes that don't
+   inherit CSS variable-based dark theme values.
+   ============================================ */
+body.dark-theme #membershipPlans {
+    background-color: var(--body-bg) !important;
+}
+
+body.dark-theme #membershipPlans .bg-white,
+body.dark-theme #membershipPlans .bg-slate-50,
+body.dark-theme #membershipPlans .bg-slate-50\/50 {
+    background-color: var(--panel-bg) !important;
+}
+
+body.dark-theme #membershipPlans .bg-gray-50 {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+body.dark-theme #membershipPlans .text-slate-900,
+body.dark-theme #membershipPlans .text-slate-800 {
+    color: var(--text-primary) !important;
+}
+
+body.dark-theme #membershipPlans .text-slate-700 {
+    color: #cbd5e1 !important;
+}
+
+body.dark-theme #membershipPlans .text-slate-600 {
+    color: var(--text-muted) !important;
+}
+
+body.dark-theme #membershipPlans .text-slate-500 {
+    color: var(--text-muted) !important;
+}
+
+body.dark-theme #membershipPlans .text-slate-400 {
+    color: #64748b !important;
+}
+
+body.dark-theme #membershipPlans .text-2xl,
+body.dark-theme #membershipPlans .text-xl,
+body.dark-theme #membershipPlans .text-3xl {
+    color: var(--text-primary) !important;
+}
+
+body.dark-theme #membershipPlans .text-\[#991b1b\] {
+    color: var(--primary-red) !important;
+}
+
+body.dark-theme #membershipPlans .border-gray-200,
+body.dark-theme #membershipPlans .border-gray-100 {
+    border-color: var(--border-color) !important;
+}
+
+body.dark-theme #membershipPlans .border-solid {
+    border-color: var(--border-color);
+}
+
+body.dark-theme #membershipPlans .ring-1 {
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.15) !important;
+}
+
+body.dark-theme #membershipPlans .bg-\[#991b1b\] {
+    background-color: var(--primary-red) !important;
+}
+
+body.dark-theme #membershipPlans .bg-emerald-50 {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #6EE7B7 !important;
+    border-color: #065F46 !important;
+}
+
+body.dark-theme #membershipPlans .text-emerald-700,
+body.dark-theme #membershipPlans .text-emerald-600 {
+    color: #6EE7B7 !important;
+}
+
+body.dark-theme #membershipPlans .border-emerald-200 {
+    border-color: #065F46 !important;
+}
+
+body.dark-theme #membershipPlans .shadow-sm {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.dark-theme #membershipPlans .peer-checked\:bg-\[#991b1b\] {
+    background-color: var(--primary-red) !important;
+}
+
+body.dark-theme #membershipPlans .bg-gray-200 {
+    background-color: #334155 !important;
+}
+
+body.dark-theme #membershipPlans .bg-red-50 {
+    background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+body.dark-theme #membershipPlans .hover\:bg-red-50:hover {
+    background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+body.dark-theme #membershipPlans .hover\:border-red-200:hover {
+    border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+body.dark-theme #membershipPlans .bg-white.shadow-sm {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Locker section dark mode for Tailwind classes */
+body.dark-theme #lockers .bg-white {
+    background-color: var(--panel-bg) !important;
+}
+
+body.dark-theme #lockers .text-slate-900,
+body.dark-theme #lockers .text-slate-800 {
+    color: var(--text-primary) !important;
+}
+
+body.dark-theme #lockers .text-slate-500,
+body.dark-theme #lockers .text-slate-400 {
+    color: var(--text-muted) !important;
+}
+
+body.dark-theme #lockers .border-gray-200 {
+    border-color: var(--border-color) !important;
+}
+
+body.dark-theme #lockers .text-emerald-600 {
+    color: #6EE7B7 !important;
+}
+
+body.dark-theme #lockers .text-amber-600 {
+    color: #FCD34D !important;
+}
+
+/* ============================================
+   POS – WALK-IN DAY PASS IMAGE FIX
+   ============================================ */
+.pos-card-image .pos-fallback-icon {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    color: var(--primary-red);
+    opacity: 0.6;
+    background: linear-gradient(135deg, rgba(153, 27, 27, 0.04) 0%, rgba(239, 68, 68, 0.08) 100%);
+}
+
+.pos-product-card.featured .pos-card-image .pos-fallback-icon {
+    font-size: 56px;
+    opacity: 0.7;
+}
+
+.pos-card-image img[src=""],
+.pos-card-image img:not([src]),
+.pos-card-image img[src="images/default-product.png"] {
+    display: none;
+}
+
+/* ============================================
+   FINANCIAL REPORTS – DATE RANGE FILTER
+   ============================================ */
+.fin-date-range-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fin-date-range-group input[type="date"] {
+    font-size: 13px;
+    padding: 7px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--panel-bg);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.fin-date-range-group input[type="date"]:focus {
+    border-color: var(--primary-red);
+}
+
+.fin-date-sep {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* ============================================
+   WEEKLY REPORT PANEL
+   ============================================ */
+.weekly-report-panel {
+    margin-top: 20px;
+}
+
+.weekly-report-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+}
+
+.weekly-day-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 14px 10px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.weekly-day-card:hover {
+    border-color: var(--primary-red);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06);
+}
+
+.weekly-day-card.is-today {
+    border-color: var(--primary-red);
+    background: rgba(153, 27, 27, 0.03);
+}
+
+.weekly-day-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.weekly-day-date {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.weekly-day-amount {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.weekly-day-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+body.dark-theme .weekly-day-card.is-today {
+    background: rgba(239, 68, 68, 0.06);
+}
+
+/* ============================================
+   EQUIPMENT CATEGORY COUNTER
+   ============================================ */
+.equip-category-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.equip-cat-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s ease;
+}
+
+.equip-cat-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+.equip-cat-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-primary);
+    flex-shrink: 0;
+}
+
+body.dark-theme .equip-cat-icon {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.equip-cat-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.equip-cat-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.equip-cat-count {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.equip-cat-units {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   CANCELLED REMARKS DISPLAY
+   ============================================ */
+.cancel-remarks-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-style: italic;
+    margin-top: 2px;
+}
+
+.cancel-remarks-badge i {
+    font-size: 10px;
+}
+
+/* Transaction Reference ID */
+.txn-ref {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
 }
