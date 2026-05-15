@@ -224,14 +224,20 @@ if (currentUserId && currentSessionId) {
                 }
             }
 
-            // Automatically start/stop Trainer Shift Timer based on "On Floor" status
-            if (roleLower === "trainer") {
-                const currentStatus = userData.shiftStatus || "Off Floor";
-                localStorage.setItem("trainerShiftStatus", currentStatus);
+            // Automatically start/stop Shift Timer based on "On Floor" / "On Shift" status
+            if (roleLower === "trainer" || roleLower === "staff") {
+                const currentStatus = userData.shiftStatus || (roleLower === "trainer" ? "Off Floor" : "Off Shift");
+                
+                if (roleLower === "trainer") {
+                    localStorage.setItem("trainerShiftStatus", currentStatus);
+                } else {
+                    localStorage.setItem("staffShiftStatus", currentStatus);
+                }
 
-                if (currentStatus === "On Floor" && !localStorage.getItem("shiftStart")) {
+                const activeStatus = roleLower === "trainer" ? "On Floor" : "On Shift";
+                if (currentStatus === activeStatus && !localStorage.getItem("shiftStart")) {
                     localStorage.setItem("shiftStart", Date.now()); // Starts timer
-                } else if (currentStatus !== "On Floor") {
+                } else if (currentStatus !== activeStatus) {
                     localStorage.removeItem("shiftStart"); // Stops timer
                 }
             }
@@ -544,35 +550,8 @@ window.filterGrid = function (gridId, inputId) {
 }
 
 window.filterEquipment = function() {
-    const search = document.getElementById('machineSearch').value.toLowerCase();
-    const equipFilterStatus = document.getElementById('equipFilterStatus');
-    const status = equipFilterStatus ? equipFilterStatus.value : 'all';
-    const grid = document.getElementById('machinesGrid');
-    const table = document.getElementById('machinesListBody');
-    
-    // Filter Grid
-    if (grid) {
-        const cards = grid.querySelectorAll('.inventory-item-filter');
-        cards.forEach(card => {
-            const searchData = card.getAttribute('data-search') || "";
-            const cardStatus = card.getAttribute('data-status') || "";
-            const matchesSearch = searchData.includes(search);
-            const matchesStatus = (status === 'all' || cardStatus === status);
-            card.style.display = (matchesSearch && matchesStatus) ? "flex" : "none";
-        });
-    }
-    
-    // Filter List Table
-    if (table) {
-        const rows = table.querySelectorAll('tr');
-        rows.forEach(row => {
-            const text = row.innerText.toLowerCase();
-            const rowStatus = row.querySelector('.badge').innerText;
-            const matchesSearch = text.includes(search);
-            const matchesStatus = (status === 'all' || rowStatus === status);
-            row.style.display = (matchesSearch && matchesStatus) ? "" : "none";
-        });
-    }
+    equipCurrentPage = 1;
+    renderInventory();
 };
 
 let currentEquipSortField = 'name';
@@ -607,8 +586,10 @@ window.sortEquipment = function(field) {
 };
 
 window.filterProducts = function() {
-    window.filterGrid('productsGrid', 'productSearch');
+    prodCurrentPage = 1;
+    renderInventory();
 };
+
 
 // ==========================================
 // 5. STATE ARRAYS & COLLECTIONS
@@ -618,11 +599,117 @@ let allUsersData = [];
 let membersData = [];
 let chatUsers = [];
 let paymentsData = [];
+// --- Shared Pagination Utility ---
+window.renderPaginationControls = function(containerId, currentPage, totalPages, totalRecords, changeFnName) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (totalRecords === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = `
+        <button class="page-btn" onclick="${changeFnName}(-1)" ${currentPage <= 1 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+        <span class="page-btn active" style="pointer-events:none;">${currentPage} / ${totalPages || 1}</span>
+        <button class="page-btn" onclick="${changeFnName}(1)" ${currentPage >= totalPages ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+    `;
+};
+
+let paymentCurrentPage = 1;
+const paymentItemsPerPage = 20;
+window.changePaymentPage = function(dir) {
+    paymentCurrentPage += dir;
+    if (paymentCurrentPage < 1) paymentCurrentPage = 1;
+    renderPayments();
+};
+
+let memCurrentPage = 1;
+const memItemsPerPage = 20;
+window.changeMemPage = function(dir) {
+    memCurrentPage += dir;
+    if (memCurrentPage < 1) memCurrentPage = 1;
+    renderMembers();
+};
+
+let staffCurrentPage = 1;
+const staffItemsPerPage = 20;
+window.changeStaffPage = function(dir) {
+    staffCurrentPage += dir;
+    if (staffCurrentPage < 1) staffCurrentPage = 1;
+    renderStaff();
+};
+
+let trainerCurrentPage = 1;
+const trainerItemsPerPage = 20;
+window.changeTrainerPage = function(dir) {
+    trainerCurrentPage += dir;
+    if (trainerCurrentPage < 1) trainerCurrentPage = 1;
+    renderStaff();
+};
+
+let attCurrentPage = 1;
+const attItemsPerPage = 20;
+window.changeAttPage = function(dir) {
+    attCurrentPage += dir;
+    if (attCurrentPage < 1) attCurrentPage = 1;
+    window.attCurrentPage = attCurrentPage;
+    if (window.renderAttendanceData) {
+        window.renderAttendanceData();
+    }
+};
+window.attCurrentPage = attCurrentPage;
+window.attItemsPerPage = attItemsPerPage;
+
+let equipCurrentPage = 1;
+const equipItemsPerPage = 20;
+window.changeEquipPage = function(dir) {
+    equipCurrentPage += dir;
+    if (equipCurrentPage < 1) equipCurrentPage = 1;
+    renderInventory();
+};
+
+let prodCurrentPage = 1;
+const prodItemsPerPage = 20;
+window.changeProdPage = function(dir) {
+    prodCurrentPage += dir;
+    if (prodCurrentPage < 1) prodCurrentPage = 1;
+    renderInventory();
+};
+
+let arcMemCurrentPage = 1;
+window.changeArcMemPage = function(dir) {
+    arcMemCurrentPage += dir;
+    if (arcMemCurrentPage < 1) arcMemCurrentPage = 1;
+    renderMembers();
+};
+
+let arcStaffCurrentPage = 1;
+window.changeArcStaffPage = function(dir) {
+    arcStaffCurrentPage += dir;
+    if (arcStaffCurrentPage < 1) arcStaffCurrentPage = 1;
+    renderStaff();
+};
+
+let arcTrainerCurrentPage = 1;
+window.changeArcTrainerPage = function(dir) {
+    arcTrainerCurrentPage += dir;
+    if (arcTrainerCurrentPage < 1) arcTrainerCurrentPage = 1;
+    renderStaff();
+};
 let attendanceData = [];
 let messagesData = [];
 let activityData = [];
 let bookingsData = [];
 window.bookingsData = bookingsData;
+let myBkCurrentPage = 1;
+const myBkItemsPerPage = 20;
+window.myBkCurrentPage = myBkCurrentPage;
+
+window.changeMyBkPage = function (dir) {
+    myBkCurrentPage += dir;
+    if (myBkCurrentPage < 1) myBkCurrentPage = 1;
+    window.myBkCurrentPage = myBkCurrentPage;
+    renderBookings();
+};
 let posCart = [];
 let currentPOSCategory = 'all';
 let selectedPaymentMethod = 'Cash';
@@ -674,14 +761,50 @@ onSnapshot(stockMovementsCol, (snapshot) => {
     renderLedger();
 });
 
+let ledgerCurrentPage = 1;
+const ledgerItemsPerPage = 20;
+
+window.changeLedgerPage = function (dir) {
+    ledgerCurrentPage += dir;
+    if (ledgerCurrentPage < 1) ledgerCurrentPage = 1;
+    renderLedger();
+};
+
 window.renderLedger = function () {
     const tbody = document.querySelector('#ledgerTable tbody');
     if (!tbody) return;
 
-    if (stockMovementsData.length === 0) {
+    // Filter by search
+    const searchVal = (document.getElementById('ledgerSearch')?.value || '').toLowerCase();
+    let filtered = stockMovementsData;
+    if (searchVal) {
+        filtered = filtered.filter(m => 
+            (m.productName || '').toLowerCase().includes(searchVal) ||
+            (m.reason || '').toLowerCase().includes(searchVal) ||
+            (m.userName || '').toLowerCase().includes(searchVal)
+        );
+    }
+
+    const totalRecords = filtered.length;
+    const totalPages = Math.ceil(totalRecords / ledgerItemsPerPage);
+    if (ledgerCurrentPage > totalPages && totalPages > 0) ledgerCurrentPage = totalPages;
+    if (ledgerCurrentPage < 1) ledgerCurrentPage = 1;
+
+    const startIdx = (ledgerCurrentPage - 1) * ledgerItemsPerPage;
+    const endIdx = Math.min(startIdx + ledgerItemsPerPage, totalRecords);
+
+    window.renderPaginationControls('ledgerPagination', ledgerCurrentPage, totalPages, totalRecords, 'changeLedgerPage');
+
+    if (document.getElementById('ledgerRecordCount')) {
+        document.getElementById('ledgerRecordCount').innerText = totalRecords === 0 ? '0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+    }
+
+    if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No stock movements recorded yet.</td></tr>';
         return;
     }
+
+    const displayData = filtered.slice(startIdx, endIdx);
 
     const renderLedgerRow = (m) => {
         let changeStr = m.changeAmount > 0 ? `<span style="color: #27ae60; font-weight: bold;">+${m.changeAmount}</span>` : `<span style="color: #e74c3c; font-weight: bold;">${m.changeAmount}</span>`;
@@ -696,7 +819,7 @@ window.renderLedger = function () {
         `;
     };
 
-    window.syncDOM(tbody, stockMovementsData, renderLedgerRow, 'ledger-row');
+    window.syncDOM(tbody, displayData, renderLedgerRow, 'ledger-row');
 }
 
 let servicesChartInstance = null;
@@ -948,7 +1071,21 @@ function renderInventory() {
         }
     });
 
-    equipment.sort((a, b) => {
+    const equipSearch = (document.getElementById('machineSearch')?.value || "").toLowerCase();
+    const equipStatusFilter = document.getElementById('equipFilterStatus')?.value || "all";
+    
+    let filteredEquipment = equipment.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(equipSearch) || item.cat.toLowerCase().includes(equipSearch);
+        const matchesStatus = equipStatusFilter === 'all' || item.currentStatus === equipStatusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    const prodSearch = (document.getElementById('productSearch')?.value || "").toLowerCase();
+    let filteredProducts = consumables.filter(item => {
+        return item.name.toLowerCase().includes(prodSearch) || item.cat.toLowerCase().includes(prodSearch);
+    });
+
+    filteredEquipment.sort((a, b) => {
         let valA = String(a[currentEquipSortField] || "").toLowerCase();
         let valB = String(b[currentEquipSortField] || "").toLowerCase();
         
@@ -1045,17 +1182,55 @@ function renderInventory() {
     if (currentInventoryView === 'grid') {
         equipGrid.style.display = 'grid';
         if (equipListContainer) equipListContainer.style.display = 'none';
-        window.syncDOM(equipGrid, equipment, renderCard, 'equip-grid');
+
+        const totalRecords = filteredEquipment.length;
+        const totalPages = Math.ceil(totalRecords / equipItemsPerPage);
+        if (equipCurrentPage > totalPages && totalPages > 0) equipCurrentPage = totalPages;
+        if (equipCurrentPage < 1) equipCurrentPage = 1;
+        const startIdx = (equipCurrentPage - 1) * equipItemsPerPage;
+        const endIdx = Math.min(startIdx + equipItemsPerPage, totalRecords);
+        const displayData = filteredEquipment.slice(startIdx, endIdx);
+
+        const countEl = document.getElementById('equipRecordCount');
+        if (countEl) countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+
+        window.renderPaginationControls('equipPagination', equipCurrentPage, totalPages, totalRecords, 'changeEquipPage');
+        window.syncDOM(equipGrid, displayData, renderCard, 'equip-grid');
     } else {
         equipGrid.style.display = 'none';
         if (equipListContainer) {
             equipListContainer.style.display = 'block';
-            window.syncDOM(equipListBody, equipment, renderRow, 'equip-row');
+            
+            const totalRecords = filteredEquipment.length;
+            const totalPages = Math.ceil(totalRecords / equipItemsPerPage);
+            if (equipCurrentPage > totalPages && totalPages > 0) equipCurrentPage = totalPages;
+            if (equipCurrentPage < 1) equipCurrentPage = 1;
+            const startIdx = (equipCurrentPage - 1) * equipItemsPerPage;
+            const endIdx = Math.min(startIdx + equipItemsPerPage, totalRecords);
+            const displayData = filteredEquipment.slice(startIdx, endIdx);
+
+            const countEl = document.getElementById('equipRecordCount');
+            if (countEl) countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+
+            window.renderPaginationControls('equipPagination', equipCurrentPage, totalPages, totalRecords, 'changeEquipPage');
+            window.syncDOM(equipListBody, displayData, renderRow, 'equip-row');
         }
     }
 
     // Render Products
-    window.syncDOM(prodGrid, consumables, renderCard, 'prod-grid');
+    const totalProd = filteredProducts.length;
+    const totalProdPages = Math.ceil(totalProd / prodItemsPerPage);
+    if (prodCurrentPage > totalProdPages && totalProdPages > 0) prodCurrentPage = totalProdPages;
+    if (prodCurrentPage < 1) prodCurrentPage = 1;
+    const startProd = (prodCurrentPage - 1) * prodItemsPerPage;
+    const endProd = Math.min(startProd + prodItemsPerPage, totalProd);
+    const displayProd = filteredProducts.slice(startProd, endProd);
+
+    const prodCountEl = document.getElementById('prodRecordCount');
+    if (prodCountEl) prodCountEl.textContent = totalProd === 0 ? 'Showing 0-0 of 0' : `Showing ${startProd + 1}-${endProd} of ${totalProd}`;
+
+    window.renderPaginationControls('prodPagination', prodCurrentPage, totalProdPages, totalProd, 'changeProdPage');
+    window.syncDOM(prodGrid, displayProd, renderCard, 'prod-grid');
 
     // Update Batch Bar
     if (equipBatchBar) {
@@ -2391,11 +2566,26 @@ function renderPayments() {
         `;
     };
 
-    window.syncDOM(payTbody, filtered, renderPaymentRow, 'pay-row');
+    const totalRecords = filtered.length;
+    const totalPages = Math.ceil(totalRecords / paymentItemsPerPage);
+    if (paymentCurrentPage > totalPages && totalPages > 0) paymentCurrentPage = totalPages;
+    if (paymentCurrentPage < 1) paymentCurrentPage = 1;
+    const startIdx = (paymentCurrentPage - 1) * paymentItemsPerPage;
+    const endIdx = Math.min(startIdx + paymentItemsPerPage, totalRecords);
+    const displayData = filtered.slice(startIdx, endIdx);
+
+    const countEl = document.getElementById('paymentRecordCount');
+    if (countEl) {
+        countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+    }
+
+    window.renderPaginationControls('paymentPagination', paymentCurrentPage, totalPages, totalRecords, 'changePaymentPage');
+
+    window.syncDOM(payTbody, displayData, renderPaymentRow, 'pay-row');
 
     // Update pagination counts
-    if (document.getElementById('paymentTotalCount')) document.getElementById('paymentTotalCount').innerText = filtered.length;
-    if (document.getElementById('paymentShowingCount')) document.getElementById('paymentShowingCount').innerText = filtered.length > 0 ? `1-${filtered.length}` : '0-0';
+    if (document.getElementById('paymentTotalCount')) document.getElementById('paymentTotalCount').innerText = totalRecords;
+    if (document.getElementById('paymentShowingCount')) document.getElementById('paymentShowingCount').innerText = totalRecords === 0 ? '0-0' : `${startIdx + 1}-${endIdx}`;
 }
 
 // Financial Report UI Helpers
@@ -2466,6 +2656,7 @@ window.printReceipt = function (id) { window.viewInvoice(id); setTimeout(() => w
 window.processRefund = function (id) { window.voidTransaction(id, true); };
 
 window.filterPayments = function () {
+    paymentCurrentPage = 1;
     renderPayments();
 };
 
@@ -3960,8 +4151,40 @@ function renderMembers() {
     sortMemberList(activeList);
     sortMemberList(archivedList);
 
-    if (memTbody) window.syncDOM(memTbody, activeList, (m) => renderMemberRow(m, false), 'mem-row');
-    if (arcTbody) window.syncDOM(arcTbody, archivedList, (m) => renderMemberRow(m, true), 'arc-row');
+    if (memTbody) {
+        const totalRecords = activeList.length;
+        const totalPages = Math.ceil(totalRecords / memItemsPerPage);
+        if (memCurrentPage > totalPages && totalPages > 0) memCurrentPage = totalPages;
+        if (memCurrentPage < 1) memCurrentPage = 1;
+        const startIdx = (memCurrentPage - 1) * memItemsPerPage;
+        const endIdx = Math.min(startIdx + memItemsPerPage, totalRecords);
+        const displayData = activeList.slice(startIdx, endIdx);
+
+        const countEl = document.getElementById('memberRecordCount');
+        if (countEl) {
+            countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+        }
+
+        window.renderPaginationControls('memberPagination', memCurrentPage, totalPages, totalRecords, 'changeMemPage');
+
+        window.syncDOM(memTbody, displayData, (m) => renderMemberRow(m, false), 'mem-row');
+    }
+    if (arcTbody) {
+        const totalRecords = archivedList.length;
+        const totalPages = Math.ceil(totalRecords / memItemsPerPage);
+        if (arcMemCurrentPage > totalPages && totalPages > 0) arcMemCurrentPage = totalPages;
+        if (arcMemCurrentPage < 1) arcMemCurrentPage = 1;
+        const startIdx = (arcMemCurrentPage - 1) * memItemsPerPage;
+        const endIdx = Math.min(startIdx + memItemsPerPage, totalRecords);
+        const displayData = archivedList.slice(startIdx, endIdx);
+
+        const countEl = document.getElementById('arcMemberRecordCount');
+        if (countEl) countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+
+        window.renderPaginationControls('arcMemberPagination', arcMemCurrentPage, totalPages, totalRecords, 'changeArcMemPage');
+
+        window.syncDOM(arcTbody, displayData, (m) => renderMemberRow(m, true), 'arc-row');
+    }
 
 
     // Update pagination counts
@@ -3979,6 +4202,8 @@ window.sendMessageToMember = function (id) {
 };
 
 window.filterMembers = function () {
+    memCurrentPage = 1;
+    arcMemCurrentPage = 1;
     renderMembers();
 };
 
@@ -4310,10 +4535,74 @@ function renderStaff() {
     sortTrainerList(trainerList);
     sortTrainerList(arcTrainerList);
 
-    if (staffTbody) window.syncDOM(staffTbody, staffList, (u) => renderStaffRow(u, false), 'staff-row');
-    if (trainerTbody) window.syncDOM(trainerTbody, trainerList, (u) => renderStaffRow(u, false), 'trainer-row');
-    if (arcStaffTbody) window.syncDOM(arcStaffTbody, arcStaffList, (u) => renderStaffRow(u, true), 'arc-staff-row');
-    if (arcTrainerTbody) window.syncDOM(arcTrainerTbody, arcTrainerList, (u) => renderStaffRow(u, true), 'arc-trainer-row');
+    // Staff Pagination
+    if (staffTbody) {
+        const totalRecords = staffList.length;
+        const totalPages = Math.ceil(totalRecords / staffItemsPerPage);
+        if (staffCurrentPage > totalPages && totalPages > 0) staffCurrentPage = totalPages;
+        if (staffCurrentPage < 1) staffCurrentPage = 1;
+        const startIdx = (staffCurrentPage - 1) * staffItemsPerPage;
+        const endIdx = Math.min(startIdx + staffItemsPerPage, totalRecords);
+        const displayData = staffList.slice(startIdx, endIdx);
+
+        const countEl = document.getElementById('staffRecordCount');
+        if (countEl) {
+            countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+        }
+
+        window.renderPaginationControls('staffPagination', staffCurrentPage, totalPages, totalRecords, 'changeStaffPage');
+        window.syncDOM(staffTbody, displayData, (u) => renderStaffRow(u, false), 'staff-row');
+    }
+
+    // Trainer Pagination
+    if (trainerTbody) {
+        const totalRecords = trainerList.length;
+        const totalPages = Math.ceil(totalRecords / trainerItemsPerPage);
+        if (trainerCurrentPage > totalPages && totalPages > 0) trainerCurrentPage = totalPages;
+        if (trainerCurrentPage < 1) trainerCurrentPage = 1;
+        const startIdx = (trainerCurrentPage - 1) * trainerItemsPerPage;
+        const endIdx = Math.min(startIdx + trainerItemsPerPage, totalRecords);
+        const displayData = trainerList.slice(startIdx, endIdx);
+
+        const countEl = document.getElementById('trainerRecordCount');
+        if (countEl) {
+            countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+        }
+
+        window.renderPaginationControls('trainerPagination', trainerCurrentPage, totalPages, totalRecords, 'changeTrainerPage');
+        window.syncDOM(trainerTbody, displayData, (u) => renderStaffRow(u, false), 'trainer-row');
+    }
+    if (arcStaffTbody) {
+        const totalRecords = arcStaffList.length;
+        const totalPages = Math.ceil(totalRecords / staffItemsPerPage);
+        if (arcStaffCurrentPage > totalPages && totalPages > 0) arcStaffCurrentPage = totalPages;
+        if (arcStaffCurrentPage < 1) arcStaffCurrentPage = 1;
+        const startIdx = (arcStaffCurrentPage - 1) * staffItemsPerPage;
+        const endIdx = Math.min(startIdx + staffItemsPerPage, totalRecords);
+        const displayData = arcStaffList.slice(startIdx, endIdx);
+
+        const countEl = document.getElementById('arcStaffRecordCount');
+        if (countEl) countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+
+        window.renderPaginationControls('arcStaffPagination', arcStaffCurrentPage, totalPages, totalRecords, 'changeArcStaffPage');
+        window.syncDOM(arcStaffTbody, displayData, (u) => renderStaffRow(u, true), 'arc-staff-row');
+    }
+
+    if (arcTrainerTbody) {
+        const totalRecords = arcTrainerList.length;
+        const totalPages = Math.ceil(totalRecords / trainerItemsPerPage);
+        if (arcTrainerCurrentPage > totalPages && totalPages > 0) arcTrainerCurrentPage = totalPages;
+        if (arcTrainerCurrentPage < 1) arcTrainerCurrentPage = 1;
+        const startIdx = (arcTrainerCurrentPage - 1) * trainerItemsPerPage;
+        const endIdx = Math.min(startIdx + trainerItemsPerPage, totalRecords);
+        const displayData = arcTrainerList.slice(startIdx, endIdx);
+
+        const countEl = document.getElementById('arcTrainerRecordCount');
+        if (countEl) countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+
+        window.renderPaginationControls('arcTrainerPagination', arcTrainerCurrentPage, totalPages, totalRecords, 'changeArcTrainerPage');
+        window.syncDOM(arcTrainerTbody, displayData, (u) => renderStaffRow(u, true), 'arc-trainer-row');
+    }
 
     // Update Pagination Counts
     if (document.getElementById('staffTotalCount')) document.getElementById('staffTotalCount').innerText = staffList.length;
@@ -4345,8 +4634,8 @@ function renderStaff() {
 }
 
 // Staff & Trainer UI Helpers
-window.filterStaff = function () { renderStaff(); };
-window.filterTrainers = function () { renderStaff(); };
+window.filterStaff = function () { staffCurrentPage = 1; arcStaffCurrentPage = 1; renderStaff(); };
+window.filterTrainers = function () { trainerCurrentPage = 1; arcTrainerCurrentPage = 1; renderStaff(); };
 window.sortStaff = function (field) {
     if (currentStaffSortField === field) {
         currentStaffSortOrder = currentStaffSortOrder === 'asc' ? 'desc' : 'asc';
@@ -5230,7 +5519,7 @@ function initUI() {
 
         document.querySelectorAll('.card-black, .grid-stat-box').forEach(card => {
             const valueDiv = card.querySelector('.value');
-            if (valueDiv && (valueDiv.innerText.includes('Shift') || valueDiv.innerText.includes('Checking Status') || card.querySelector('#shiftStatusText'))) {
+            if (valueDiv && (valueDiv.innerText.toLowerCase().includes('shift') || valueDiv.innerText.toLowerCase().includes('checking status') || card.querySelector('#shiftStatusText'))) {
                 if (valueDiv && !card.querySelector('#shiftStatusText')) valueDiv.innerText = "Shift Status";
 
                 let timerSpan = card.querySelector('.shift-timer');
@@ -5413,11 +5702,6 @@ function renderBookings() {
     const loggedInUserId = localStorage.getItem("userId");
 
     let displayData = [...bookingsData].sort((a, b) => {
-        const isCancelled = (s) => s === 'Cancelled' || s === 'Declined';
-        const aCancelled = isCancelled(a.status);
-        const bCancelled = isCancelled(b.status);
-        if (aCancelled !== bCancelled) return aCancelled ? 1 : -1;
-
         // Default to newest first
         return new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`);
     });
@@ -5587,7 +5871,30 @@ function renderBookings() {
     };
 
     if (loggedInRole === "member" && myTbody) {
-        window.syncDOM(myTbody, displayData, renderBookingRow, 'my-booking');
+        const searchVal = (document.getElementById('myBookingSearch')?.value || '').toLowerCase();
+        if (searchVal) {
+            displayData = displayData.filter(b => 
+                (b.trainerName || '').toLowerCase().includes(searchVal) ||
+                (b.status || '').toLowerCase().includes(searchVal)
+            );
+        }
+
+        const totalRecords = displayData.length;
+        const totalPages = Math.ceil(totalRecords / myBkItemsPerPage);
+        if (myBkCurrentPage > totalPages && totalPages > 0) myBkCurrentPage = totalPages;
+        if (myBkCurrentPage < 1) myBkCurrentPage = 1;
+        const startIdx = (myBkCurrentPage - 1) * myBkItemsPerPage;
+        const endIdx = Math.min(startIdx + myBkItemsPerPage, totalRecords);
+        const pagedData = displayData.slice(startIdx, endIdx);
+
+        const countEl = document.getElementById('myBkRecordCount');
+        if (countEl) {
+            countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+        }
+
+        window.renderPaginationControls('myBkPagination', myBkCurrentPage, totalPages, totalRecords, 'changeMyBkPage');
+
+        window.syncDOM(myTbody, pagedData, renderBookingRow, 'my-booking');
     } else if (tbody) {
         window.syncDOM(tbody, displayData, renderBookingRow, 'booking');
     }
@@ -5879,10 +6186,11 @@ window.deleteBooking = async (id) => {
 // 15. SYSTEM ACTIVITY LOGS
 // ==========================================
 let activityCurrentPage = 1;
-const activityItemsPerPage = 10;
+const activityItemsPerPage = 20;
 
 window.changeActivityPage = function (dir) {
     activityCurrentPage += dir;
+    if (activityCurrentPage < 1) activityCurrentPage = 1;
     renderActivityLogs();
 };
 
@@ -5969,14 +6277,7 @@ function renderActivityLogs() {
         document.getElementById('activityRecordCount').innerText = `Showing ${endIdx - startIdx} of ${totalRecords} records`;
     }
 
-    if (paginationContainer) {
-        let pagHtml = `
-            <button class="page-btn" onclick="changeActivityPage(-1)" ${activityCurrentPage <= 1 || totalRecords === 0 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
-            <button class="page-btn active">${activityCurrentPage}</button>
-            <button class="page-btn" onclick="changeActivityPage(1)" ${activityCurrentPage >= totalPages || totalRecords === 0 ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
-        `;
-        paginationContainer.innerHTML = pagHtml;
-    }
+    window.renderPaginationControls('activityPagination', activityCurrentPage, totalPages, totalRecords, 'changeActivityPage');
 
     if (filtered.length === 0) {
         const emptyRow = document.getElementById('activityEmptyState');

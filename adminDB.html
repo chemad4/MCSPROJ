@@ -1339,7 +1339,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="machineSearch" placeholder="Search equipment..."
-                        onkeyup="filterEquipment()">
+                        onkeyup="equipCurrentPage=1; filterEquipment()">
                 </div>
 
                 <div class="control-cluster">
@@ -1395,6 +1395,10 @@
                             <tbody id="machinesListBody"></tbody>
                         </table>
                     </div>
+                    <div class="table-footer">
+                        <div id="equipRecordCount">Showing 0-0 of 0</div>
+                        <div class="pagination-controls" id="equipPagination"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1404,7 +1408,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="productSearch" placeholder="Search products..."
-                        onkeyup="filterProducts()">
+                        onkeyup="prodCurrentPage=1; filterProducts()">
                 </div>
                 <button class="action-btn" onclick="openProductModal()"><i class="fas fa-plus"></i> Add Product</button>
             </div>
@@ -1419,6 +1423,10 @@
             <div class="panel" style="background: transparent; border: none; box-shadow: none;">
                 <div class="panel-body" style="padding: 0;">
                     <div class="inventory-grid" id="productsGrid"></div>
+                    <div class="table-footer">
+                        <div id="prodRecordCount">Showing 0-0 of 0</div>
+                        <div class="pagination-controls" id="prodPagination"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1428,7 +1436,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="ledgerSearch" placeholder="Search by item name or reason..."
-                        onkeyup="filterTable('ledgerTable', 'ledgerSearch')">
+                        onkeyup="ledgerCurrentPage=1; renderLedger()">
                 </div>
             </div>
             <div class="panel">
@@ -1446,6 +1454,10 @@
                         </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="ledgerRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="ledgerPagination"></div>
                 </div>
             </div>
         </div>
@@ -1547,11 +1559,11 @@
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
                     <input type="text" id="paymentSearch" placeholder="Search member, ref ID..."
-                        onkeyup="filterPayments()">
+                        onkeyup="paymentCurrentPage=1; renderPayments()">
                 </div>
 
                 <div class="filter-group">
-                    <select id="paymentFilterRange" onchange="filterPayments()">
+                    <select id="paymentFilterRange" onchange="paymentCurrentPage=1; renderPayments()">
                         <option value="all">All Dates</option>
                         <option value="today">Today</option>
                         <option value="7days">Last 7 Days</option>
@@ -1559,13 +1571,13 @@
                         <option value="custom">Custom Range...</option>
                     </select>
 
-                    <select id="paymentFilterStatus" onchange="filterPayments()">
+                    <select id="paymentFilterStatus" onchange="paymentCurrentPage=1; renderPayments()">
                         <option value="all">All Statuses</option>
                         <option value="Paid">Paid</option>
                         <option value="Voided">Voided</option>
                     </select>
 
-                    <select id="paymentFilterMethod" onchange="filterPayments()">
+                    <select id="paymentFilterMethod" onchange="paymentCurrentPage=1; renderPayments()">
                         <option value="all">All Methods</option>
                         <option value="Cash">Cash</option>
                         <option value="GCash">GCash</option>
@@ -1575,9 +1587,9 @@
 
                 <div class="fin-date-range-group" id="finCustomRangeControls" style="display: none;">
                     <i class="fas fa-calendar-alt" style="color: var(--text-muted); font-size: 12px;"></i>
-                    <input type="date" id="finDateFrom" onchange="filterPayments()" title="From date">
+                    <input type="date" id="finDateFrom" onchange="paymentCurrentPage=1; renderPayments()">
                     <span class="fin-date-sep">–</span>
-                    <input type="date" id="finDateTo" onchange="filterPayments()" title="To date">
+                    <input type="date" id="finDateTo" onchange="paymentCurrentPage=1; renderPayments()">
                     <button type="button" onclick="clearFinDateRange()" style="background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 11px; color: var(--text-muted);" title="Clear date range">
                         <i class="fas fa-times"></i>
                     </button>
@@ -1626,28 +1638,9 @@
                     </table>
                 </div>
 
-                <!-- Table Footer / Pagination -->
                 <div class="table-footer">
-                    <div>
-                        Showing <span id="paymentShowingCount">0-0</span> of <span id="paymentTotalCount">0</span>
-                        transactions
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <div>
-                            Rows per page:
-                            <select id="paymentRowsPerPage" onchange="changePaymentPagination()"
-                                style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ddd;">
-                                <option value="25">25</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                            </select>
-                        </div>
-                        <div class="pagination-controls" id="paymentPagination">
-                            <button class="page-btn" disabled><i class="fas fa-chevron-left"></i></button>
-                            <button class="page-btn active">1</button>
-                            <button class="page-btn" disabled><i class="fas fa-chevron-right"></i></button>
-                        </div>
-                    </div>
+                    <div id="paymentRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="paymentPagination"></div>
                 </div>
             </div>
         </div>
@@ -1674,17 +1667,17 @@
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
                     <input type="text" id="memberSearch" placeholder="Search name or email..."
-                        onkeyup="filterMembers()">
+                        onkeyup="memCurrentPage=1; renderMembers()">
                 </div>
 
                 <div class="filter-group">
-                    <select id="memberFilterPlan" onchange="filterMembers()">
+                    <select id="memberFilterPlan" onchange="memCurrentPage=1; renderMembers()">
                         <option value="all">All Plans</option>
                         <option value="Gold Plan">Gold Plan</option>
                         <option value="Silver Plan">Silver Plan</option>
                     </select>
 
-                    <select id="memberFilterStatus" onchange="filterMembers()">
+                    <select id="memberFilterStatus" onchange="memCurrentPage=1; renderMembers()">
                         <option value="all">All Statuses</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
@@ -1719,27 +1712,9 @@
                     </table>
                 </div>
 
-                <!-- Table Footer / Pagination -->
                 <div class="table-footer">
-                    <div>
-                        Showing <span id="memberShowingCount">0-0</span> of <span id="memberTotalCount">0</span> members
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <div>
-                            Rows per page:
-                            <select id="memberRowsPerPage" onchange="changeMemberPagination()"
-                                style="padding: 2px 5px; border-radius: 4px; border: 1px solid #ddd;">
-                                <option value="25">25</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                            </select>
-                        </div>
-                        <div class="pagination-controls" id="memberPagination">
-                            <button class="page-btn" disabled><i class="fas fa-chevron-left"></i></button>
-                            <button class="page-btn active">1</button>
-                            <button class="page-btn" disabled><i class="fas fa-chevron-right"></i></button>
-                        </div>
-                    </div>
+                    <div id="memberRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="memberPagination"></div>
                 </div>
             </div>
         </div>
@@ -1774,6 +1749,10 @@
                         <tbody></tbody>
                     </table>
                 </div>
+                <div class="table-footer">
+                    <div id="arcMemberRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="arcMemberPagination"></div>
+                </div>
             </div>
         </div>
 
@@ -1782,14 +1761,14 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="attendanceSearch" placeholder="Search by name or plan..."
-                        onkeyup="filterTable('attendanceTable', 'attendanceSearch')">
+                        onkeyup="attCurrentPage=1; if(window.renderAttendanceData) window.renderAttendanceData()">
                 </div>
             </div>
             <div class="panel">
                 <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
                     <div><i class="fas fa-clipboard-list"></i> Daily Attendance Log</div>
                     <div>
-                        <input type="date" id="attendanceDateFilter" onchange="filterAttendanceByDate(this.value)"
+                        <input type="date" id="attendanceDateFilter" onchange="attCurrentPage=1; filterAttendanceByDate(this.value)"
                             style="padding: 5px; border-radius: 4px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.5); color: var(--text-primary);">
                     </div>
                 </div>
@@ -1810,6 +1789,10 @@
                         </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="attendanceRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="attendancePagination"></div>
                 </div>
             </div>
         </div>
@@ -1836,17 +1819,17 @@
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
                     <input type="text" id="staffSearchModern" placeholder="Search name or email..."
-                        onkeyup="filterStaff()">
+                        onkeyup="staffCurrentPage=1; renderStaff()">
                 </div>
 
                 <div class="filter-group">
-                    <select id="staffFilterRole" onchange="filterStaff()">
+                    <select id="staffFilterRole" onchange="staffCurrentPage=1; renderStaff()">
                         <option value="all">All Roles</option>
                         <option value="Staff">Staff</option>
                         <option value="Admin">Admin</option>
                     </select>
 
-                    <select id="staffFilterStatus" onchange="filterStaff()">
+                    <select id="staffFilterStatus" onchange="staffCurrentPage=1; renderStaff()">
                         <option value="all">All Statuses</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
@@ -1880,18 +1863,9 @@
                     </table>
                 </div>
 
-                <!-- Table Footer / Pagination -->
                 <div class="table-footer">
-                    <div>
-                        Showing <span id="staffShowingCount">0-0</span> of <span id="staffTotalCount">0</span> staff
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <div class="pagination-controls" id="staffPagination">
-                            <button class="page-btn" disabled><i class="fas fa-chevron-left"></i></button>
-                            <button class="page-btn active">1</button>
-                            <button class="page-btn" disabled><i class="fas fa-chevron-right"></i></button>
-                        </div>
-                    </div>
+                    <div id="staffRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="staffPagination"></div>
                 </div>
             </div>
         </div>
@@ -1912,6 +1886,10 @@
                         </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="arcStaffRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="arcStaffPagination"></div>
                 </div>
             </div>
         </div>
@@ -1938,11 +1916,11 @@
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
                     <input type="text" id="trainerSearchModern" placeholder="Search name or email..."
-                        onkeyup="filterTrainers()">
+                        onkeyup="trainerCurrentPage=1; renderStaff()">
                 </div>
 
                 <div class="filter-group">
-                    <select id="trainerFilterSpecialty" onchange="filterTrainers()">
+                    <select id="trainerFilterSpecialty" onchange="trainerCurrentPage=1; renderStaff()">
                         <option value="all">All Specialties</option>
                         <option value="General Fitness">General Fitness</option>
                         <option value="Bodybuilding">Bodybuilding</option>
@@ -1950,7 +1928,7 @@
                         <option value="HIIT">HIIT</option>
                     </select>
 
-                    <select id="trainerFilterStatus" onchange="filterTrainers()">
+                    <select id="trainerFilterStatus" onchange="trainerCurrentPage=1; renderStaff()">
                         <option value="all">All Statuses</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
@@ -1983,19 +1961,9 @@
                     </table>
                 </div>
 
-                <!-- Table Footer / Pagination -->
                 <div class="table-footer">
-                    <div>
-                        Showing <span id="trainerShowingCount">0-0</span> of <span id="trainerTotalCount">0</span>
-                        trainers
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 15px;">
-                        <div class="pagination-controls" id="trainerPagination">
-                            <button class="page-btn" disabled><i class="fas fa-chevron-left"></i></button>
-                            <button class="page-btn active">1</button>
-                            <button class="page-btn" disabled><i class="fas fa-chevron-right"></i></button>
-                        </div>
-                    </div>
+                    <div id="trainerRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="trainerPagination"></div>
                 </div>
             </div>
         </div>
@@ -2017,6 +1985,10 @@
                         </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="arcTrainerRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="arcTrainerPagination"></div>
                 </div>
             </div>
         </div>
@@ -2091,11 +2063,11 @@
                 </div>
                 <div class="bk-action-right">
                     <!-- Advanced Filters -->
-                    <select id="bkFilterTrainer" class="bk-filter-select" onchange="renderBookings()"
+                    <select id="bkFilterTrainer" class="bk-filter-select" onchange="bkCurrentPage=1; renderBookings()"
                         aria-label="Filter by Trainer">
                         <option value="">All Trainers</option>
                     </select>
-                    <select id="bkFilterStatus" class="bk-filter-select" onchange="renderBookings()"
+                    <select id="bkFilterStatus" class="bk-filter-select" onchange="bkCurrentPage=1; renderBookings()"
                         aria-label="Filter by Status">
                         <option value="">All Statuses</option>
                         <option value="Pending">Pending</option>
@@ -2105,10 +2077,10 @@
                         <option value="No Show">No Show</option>
                     </select>
                     <div class="bk-date-range">
-                        <input type="date" id="bkDateFrom" class="bk-filter-date" onchange="renderBookings()"
+                        <input type="date" id="bkDateFrom" class="bk-filter-date" onchange="bkCurrentPage=1; renderBookings()"
                             aria-label="Date from" title="From date">
                         <span class="bk-date-sep">–</span>
-                        <input type="date" id="bkDateTo" class="bk-filter-date" onchange="renderBookings()"
+                        <input type="date" id="bkDateTo" class="bk-filter-date" onchange="bkCurrentPage=1; renderBookings()"
                             aria-label="Date to" title="To date">
                     </div>
                     <button class="bk-manual-btn" onclick="openBookingDrawer()" id="bkManualBookingBtn">
@@ -2144,6 +2116,10 @@
                         </thead>
                         <tbody id="bookingsBody"></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="bkRecordCountDisplay" style="font-size: 13px; color: var(--text-muted);"></div>
+                    <div class="pagination-controls" id="bkPagination"></div>
                 </div>
             </div>
 
@@ -2326,17 +2302,17 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="activitySearch" placeholder="Search by user, action, or details..."
-                        onkeyup="renderActivityLogs()">
+                        onkeyup="activityCurrentPage=1; renderActivityLogs()">
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <select id="activityRoleFilter" onchange="renderActivityLogs()"
+                    <select id="activityRoleFilter" onchange="activityCurrentPage=1; renderActivityLogs()"
                         style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--white); color: var(--text-primary); font-size: 13px;">
                         <option value="all">All Roles</option>
                         <option value="Admin">Admin</option>
                         <option value="Staff">Staff</option>
                         <option value="Trainer">Trainer</option>
                     </select>
-                    <input type="date" id="activityDateFilter" onchange="renderActivityLogs()"
+                    <input type="date" id="activityDateFilter" onchange="activityCurrentPage=1; renderActivityLogs()"
                         style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--white); color: var(--text-primary); font-size: 13px;">
                 </div>
             </div>

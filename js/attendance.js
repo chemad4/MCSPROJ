@@ -86,8 +86,30 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDat
   });
 
   if (attTbody) {
+    // Convert Map to array for pagination
+    const groupedArray = Array.from(grouped);
+    const totalRecords = groupedArray.length;
+    
+    // Reset page if out of bounds
+    const totalPages = Math.ceil(totalRecords / (window.attItemsPerPage || 20));
+    if (window.attCurrentPage > totalPages && totalPages > 0) window.attCurrentPage = totalPages;
+    if (window.attCurrentPage < 1) window.attCurrentPage = 1;
+
+    const startIdx = ((window.attCurrentPage || 1) - 1) * (window.attItemsPerPage || 20);
+    const endIdx = Math.min(startIdx + (window.attItemsPerPage || 20), totalRecords);
+    const pagedGrouped = groupedArray.slice(startIdx, endIdx);
+
+    const countEl = document.getElementById('attendanceRecordCount');
+    if (countEl) {
+      countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+    }
+
+    if (window.renderPaginationControls) {
+      window.renderPaginationControls('attendancePagination', window.attCurrentPage || 1, totalPages, totalRecords, 'changeAttPage');
+    }
+
     let rowIndex = 0;
-    grouped.forEach((g, name) => {
+    pagedGrouped.forEach(([name, g]) => {
       const latestRec = g.latestRecord || g.records[0];
       const hasMultiple = g.records.length > 1;
       const isFlagged = g.inCount >= 3;
@@ -121,7 +143,7 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDat
                   ? `<i id="${chevronId}" class="fa-solid fa-chevron-right" style="font-size:11px; color: var(--text-muted); transition: transform 0.2s;"></i>`
                   : `<span style="display:inline-block; width:15px;"></span>`
               }
-              ${g.latestRecord.uid ? `<span style="font-size:11px; color:var(--text-muted); font-family:monospace; margin-right:5px;">${g.latestRecord.uid}</span>` : ""} ${name}
+              ${latestRec.uid ? `<span style="font-size:11px; color:var(--text-muted); font-family:monospace; margin-right:5px;">${latestRec.uid}</span>` : ""} ${name}
               ${hasMultiple ? `<span style="font-size:11px; background: var(--primary-red); color: white; padding: 1px 6px; border-radius: 10px; font-weight:600;">${g.records.length}</span>` : ""}
             </span>
           </td>
@@ -175,10 +197,13 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDat
       rowIndex++;
     });
 
-    if (grouped.size === 0) {
+    if (totalRecords === 0) {
       const colCount = showCounts ? 9 : 6;
       attTbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center; padding: 30px; color: var(--text-muted);">No attendance records for today.</td></tr>`;
     }
+    
+    // Expose for external re-renders
+    window.renderAttendanceData = () => renderAttendance(attendanceData, servicesChartInstanceGetter, targetDate);
   }
 
 

@@ -9,6 +9,15 @@ let bkSortDir = 'desc';
 let bkCalWeekOffset = 0;
 let _bkRenderLock = false; // Prevent infinite re-render loops
 
+let bkCurrentPage = 1;
+const bkItemsPerPage = 20;
+
+window.changeBkPage = function (dir) {
+    bkCurrentPage += dir;
+    if (bkCurrentPage < 1) bkCurrentPage = 1;
+    window.renderBookings();
+};
+
 // --- View Toggle ---
 window.switchBookingView = function (view, btn) {
     bkCurrentView = view;
@@ -21,6 +30,7 @@ window.switchBookingView = function (view, btn) {
 
 // --- Search ---
 window.handleBookingSearch = function () {
+    bkCurrentPage = 1;
     if (typeof window.renderBookings === 'function') window.renderBookings();
 };
 
@@ -166,13 +176,8 @@ function applyBookingFilters(data) {
     if (dateFrom) filtered = filtered.filter(b => b.date >= dateFrom);
     if (dateTo) filtered = filtered.filter(b => b.date <= dateTo);
 
-    // Sort — cancelled/declined always sink to the bottom
-    const isCancelled = (s) => s === 'Cancelled' || s === 'Declined';
+    // Sort — newest first by default
     filtered.sort((a, b) => {
-        const aCancelled = isCancelled(a.status);
-        const bCancelled = isCancelled(b.status);
-        if (aCancelled !== bCancelled) return aCancelled ? 1 : -1;
-
         let va, vb;
         if (bkSortField === 'memberName') { va = (a.memberName || '').toLowerCase(); vb = (b.memberName || '').toLowerCase(); }
         else if (bkSortField === 'time') { va = a.time || ''; vb = b.time || ''; }
@@ -361,12 +366,31 @@ function renderBookingCalendar() {
                 const tbody = document.getElementById('bookingsBody');
                 if (!tbody) return;
 
-                const data = applyBookingFilters(window.bookingsData || []);
+                const filtered = applyBookingFilters(window.bookingsData || []);
+                const totalRecords = filtered.length;
+                const totalPages = Math.ceil(totalRecords / bkItemsPerPage);
+                if (bkCurrentPage > totalPages && totalPages > 0) bkCurrentPage = totalPages;
+                if (bkCurrentPage < 1) bkCurrentPage = 1;
 
-                const countEl = document.getElementById('bkRecordCount');
-                if (countEl) countEl.textContent = `${data.length} record${data.length !== 1 ? 's' : ''}`;
+                const startIdx = (bkCurrentPage - 1) * bkItemsPerPage;
+                const endIdx = Math.min(startIdx + bkItemsPerPage, totalRecords);
 
-                tbody.innerHTML = data.map(renderEnhancedBookingRow).join('');
+                const countEl = document.getElementById('bkRecordCountDisplay');
+                if (countEl) {
+                    countEl.textContent = totalRecords === 0 ? 'Showing 0-0 of 0' : `Showing ${startIdx + 1}-${endIdx} of ${totalRecords}`;
+                }
+
+                const totalHeaderEl = document.getElementById('bkRecordCount');
+                if (totalHeaderEl) {
+                    totalHeaderEl.textContent = `${totalRecords} record${totalRecords !== 1 ? 's' : ''}`;
+                }
+
+                if (window.renderPaginationControls) {
+                    window.renderPaginationControls('bkPagination', bkCurrentPage, totalPages, totalRecords, 'changeBkPage');
+                }
+
+                const displayData = filtered.slice(startIdx, endIdx);
+                tbody.innerHTML = displayData.map(renderEnhancedBookingRow).join('');
 
                 // Update KPIs and filters
                 updateBookingKPIs();

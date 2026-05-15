@@ -261,7 +261,7 @@
                 <div class="search-box" style="display: flex; gap: 10px; flex-grow: 1;">
                     <div style="position: relative; flex-grow: 1;">
                         <i class="fas fa-search"></i>
-                        <input type="text" id="bookingSearch" placeholder="Search by member name..." onkeyup="filterTable('bookingsTable', 'bookingSearch')">
+                        <input type="text" id="bookingSearch" placeholder="Search by member name..." onkeyup="bkCurrentPage=1; renderBookings()">
                     </div>
                     <input type="date" id="bookingDateFilter" onchange="filterBookingsByDate()" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; background: white;">
                 </div>
@@ -281,9 +281,12 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="bookingsBody">
-                            </tbody>
+                        <tbody id="bookingsBody"></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="bkRecordCountDisplay" style="font-size: 13px; color: var(--text-muted);"></div>
+                    <div class="pagination-controls" id="bkPagination"></div>
                 </div>
             </div>
         </div>

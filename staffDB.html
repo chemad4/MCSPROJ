@@ -953,7 +953,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="ledgerSearch" placeholder="Search by item name or reason..."
-                        onkeyup="filterTable('ledgerTable', 'ledgerSearch')">
+                        onkeyup="ledgerCurrentPage=1; renderLedger()">
                 </div>
             </div>
             <div class="panel">
@@ -971,6 +971,10 @@
                         </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="ledgerRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="ledgerPagination"></div>
                 </div>
             </div>
         </div>
@@ -1038,8 +1042,8 @@
             <div class="table-controls">
                 <div class="search-box">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="paymentSearch" placeholder="Search transactions..."
-                        onkeyup="filterTable('paymentTable', 'paymentSearch')">
+                    <input type="text" id="paymentSearch" placeholder="Search customer, ID or items..."
+                        onkeyup="paymentCurrentPage=1; renderPayments()">
                 </div>
                 <button class="action-btn" style="background-color: var(--dark-black);" onclick="generateWeeklyPDF()"><i
                         class="fas fa-file-pdf"></i> Generate Weekly Report</button>
@@ -1050,17 +1054,20 @@
                     <table id="paymentTable">
                         <thead>
                             <tr>
-                                <th>Customer Name</th>
+                                <th>Member</th>
                                 <th>Purchased Items</th>
                                 <th>Date & Time</th>
-                                <th>Subtotal</th>
-                                <th>VAT (12%)</th>
                                 <th>Grand Total</th>
+                                <th>Status</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="paymentRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="paymentPagination"></div>
                 </div>
             </div>
         </div>
@@ -1070,7 +1077,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="memberSearch" placeholder="Search active members..."
-                        onkeyup="filterTable('membersTable', 'memberSearch')">
+                        onkeyup="memCurrentPage=1; renderMembers()">
                 </div>
                 <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-user-plus"></i> Register
                     Member</button>
@@ -1084,13 +1091,16 @@
                                 <th>Member</th>
                                 <th>Membership Plan</th>
                                 <th>Time Remaining</th>
-                                <th>Balance</th>
-                                <th>Account Status</th>
-                                <th style="text-align: right;">Actions</th>
+                                <th>Status</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="memberRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="memberPagination"></div>
                 </div>
             </div>
         </div>
@@ -1142,7 +1152,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="attendanceSearch" placeholder="Search by name or plan..."
-                        onkeyup="filterTable('attendanceTable', 'attendanceSearch')">
+                        onkeyup="attCurrentPage=1; if(window.renderAttendanceData) window.renderAttendanceData()">
                 </div>
             </div>
             <div class="panel">
@@ -1168,6 +1178,10 @@
                         <tbody></tbody>
                     </table>
                 </div>
+                <div class="table-footer">
+                    <div id="attendanceRecordCount">Showing 0-0 of 0</div>
+                    <div class="pagination-controls" id="attendancePagination"></div>
+                </div>
             </div>
         </div>
 
@@ -1176,7 +1190,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="bookingSearch" placeholder="Search sessions..."
-                        onkeyup="filterTable('bookingsTable', 'bookingSearch')">
+                        onkeyup="bkCurrentPage=1; renderBookings()">
                 </div>
                 <button class="action-btn" onclick="openBookingModal()"><i class="fas fa-calendar-plus"></i> Manual
                     Booking</button>
@@ -1197,6 +1211,10 @@
                         </thead>
                         <tbody id="bookingsBody"></tbody>
                     </table>
+                </div>
+                <div class="table-footer">
+                    <div id="bkRecordCountDisplay" style="font-size: 13px; color: var(--text-muted);"></div>
+                    <div class="pagination-controls" id="bkPagination"></div>
                 </div>
             </div>
         </div>
