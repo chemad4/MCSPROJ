@@ -953,7 +953,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="ledgerSearch" placeholder="Search by item name or reason..."
-                        onkeyup="ledgerCurrentPage=1; renderLedger()">
+                        onkeyup="filterLedger()">
                 </div>
             </div>
             <div class="panel">
@@ -1043,7 +1043,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="paymentSearch" placeholder="Search customer, ID or items..."
-                        onkeyup="paymentCurrentPage=1; renderPayments()">
+                        onkeyup="filterPayments()">
                 </div>
                 <button class="action-btn" style="background-color: var(--dark-black);" onclick="generateWeeklyPDF()"><i
                         class="fas fa-file-pdf"></i> Generate Weekly Report</button>
@@ -1077,7 +1077,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="memberSearch" placeholder="Search active members..."
-                        onkeyup="memCurrentPage=1; renderMembers()">
+                        onkeyup="filterMembers()">
                 </div>
                 <button class="action-btn" onclick="openMemberModal()"><i class="fas fa-user-plus"></i> Register
                     Member</button>
@@ -1190,7 +1190,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="bookingSearch" placeholder="Search sessions..."
-                        onkeyup="bkCurrentPage=1; renderBookings()">
+                        onkeyup="filterBookingsByDate()">
                 </div>
                 <button class="action-btn" onclick="openBookingModal()"><i class="fas fa-calendar-plus"></i> Manual
                     Booking</button>

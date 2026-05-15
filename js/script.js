@@ -2412,19 +2412,25 @@ function renderPayments() {
         } else {
             finCustomGroup.style.display = 'none';
             const now = new Date();
+            const getLocalYMD = (d) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
             if (filterRange === 'today') {
-                dateFrom = now.toISOString().split('T')[0];
-                dateTo = now.toISOString().split('T')[0];
+                dateFrom = getLocalYMD(now);
+                dateTo = getLocalYMD(now);
             } else if (filterRange === '7days') {
-                const sevenDaysAgo = new Date();
+                const sevenDaysAgo = new Date(now);
                 sevenDaysAgo.setDate(now.getDate() - 7);
-                dateFrom = sevenDaysAgo.toISOString().split('T')[0];
-                dateTo = now.toISOString().split('T')[0];
+                dateFrom = getLocalYMD(sevenDaysAgo);
+                dateTo = getLocalYMD(now);
             } else if (filterRange === '30days') {
-                const thirtyDaysAgo = new Date();
+                const thirtyDaysAgo = new Date(now);
                 thirtyDaysAgo.setDate(now.getDate() - 30);
-                dateFrom = thirtyDaysAgo.toISOString().split('T')[0];
-                dateTo = now.toISOString().split('T')[0];
+                dateFrom = getLocalYMD(thirtyDaysAgo);
+                dateTo = getLocalYMD(now);
             } else {
                 dateFrom = null;
                 dateTo = null;
@@ -2442,25 +2448,25 @@ function renderPayments() {
     }
 
     if (filterStatus && filterStatus !== 'all') {
-        filtered = filtered.filter(p => p.status === filterStatus);
+        filtered = filtered.filter(p => (p.status || 'Paid') === filterStatus);
     }
 
     if (filterMethod && filterMethod !== 'all') {
-        filtered = filtered.filter(p => p.paymentMethod === filterMethod);
+        filtered = filtered.filter(p => (p.paymentMethod || 'Cash') === filterMethod);
     }
 
     // Custom Date Range Filter
     if (dateFrom) {
-        const fromDate = new Date(dateFrom);
-        fromDate.setHours(0, 0, 0, 0);
+        const parts = dateFrom.split('-');
+        const fromDate = new Date(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0);
         filtered = filtered.filter(p => {
             const pDate = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
             return pDate >= fromDate;
         });
     }
     if (dateTo) {
-        const toDate = new Date(dateTo);
-        toDate.setHours(23, 59, 59, 999);
+        const parts = dateTo.split('-');
+        const toDate = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
         filtered = filtered.filter(p => {
             const pDate = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
             return pDate <= toDate;
@@ -5900,7 +5906,10 @@ function renderBookings() {
     }
 }
 
-window.filterBookingsByDate = () => { renderBookings(); }
+window.filterBookingsByDate = () => { bkCurrentPage = 1; renderBookings(); };
+window.filterMyBookings = () => { myBkCurrentPage = 1; renderBookings(); };
+window.filterActivityLogs = () => { activityCurrentPage = 1; renderActivityLogs(); };
+window.filterLedger = () => { ledgerCurrentPage = 1; renderLedger(); };
 
 window.updateBookingStatus = async (id, newStatus) => {
     if (newStatus === 'Cancelled' || newStatus === 'Declined') {

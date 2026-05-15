@@ -1436,7 +1436,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="ledgerSearch" placeholder="Search by item name or reason..."
-                        onkeyup="ledgerCurrentPage=1; renderLedger()">
+                        onkeyup="filterLedger()">
                 </div>
             </div>
             <div class="panel">
@@ -1559,11 +1559,11 @@
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
                     <input type="text" id="paymentSearch" placeholder="Search member, ref ID..."
-                        onkeyup="paymentCurrentPage=1; renderPayments()">
+                        onkeyup="filterPayments()">
                 </div>
 
                 <div class="filter-group">
-                    <select id="paymentFilterRange" onchange="paymentCurrentPage=1; renderPayments()">
+                    <select id="paymentFilterRange" onchange="filterPayments()">
                         <option value="all">All Dates</option>
                         <option value="today">Today</option>
                         <option value="7days">Last 7 Days</option>
@@ -1571,13 +1571,13 @@
                         <option value="custom">Custom Range...</option>
                     </select>
 
-                    <select id="paymentFilterStatus" onchange="paymentCurrentPage=1; renderPayments()">
+                    <select id="paymentFilterStatus" onchange="filterPayments()">
                         <option value="all">All Statuses</option>
                         <option value="Paid">Paid</option>
                         <option value="Voided">Voided</option>
                     </select>
 
-                    <select id="paymentFilterMethod" onchange="paymentCurrentPage=1; renderPayments()">
+                    <select id="paymentFilterMethod" onchange="filterPayments()">
                         <option value="all">All Methods</option>
                         <option value="Cash">Cash</option>
                         <option value="GCash">GCash</option>
@@ -1587,9 +1587,9 @@
 
                 <div class="fin-date-range-group" id="finCustomRangeControls" style="display: none;">
                     <i class="fas fa-calendar-alt" style="color: var(--text-muted); font-size: 12px;"></i>
-                    <input type="date" id="finDateFrom" onchange="paymentCurrentPage=1; renderPayments()">
+                    <input type="date" id="finDateFrom" onchange="filterPayments()">
                     <span class="fin-date-sep">–</span>
-                    <input type="date" id="finDateTo" onchange="paymentCurrentPage=1; renderPayments()">
+                    <input type="date" id="finDateTo" onchange="filterPayments()">
                     <button type="button" onclick="clearFinDateRange()" style="background: none; border: 1px solid var(--border-color); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 11px; color: var(--text-muted);" title="Clear date range">
                         <i class="fas fa-times"></i>
                     </button>
@@ -1667,17 +1667,17 @@
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
                     <input type="text" id="memberSearch" placeholder="Search name or email..."
-                        onkeyup="memCurrentPage=1; renderMembers()">
+                        onkeyup="filterMembers()">
                 </div>
 
                 <div class="filter-group">
-                    <select id="memberFilterPlan" onchange="memCurrentPage=1; renderMembers()">
+                    <select id="memberFilterPlan" onchange="filterMembers()">
                         <option value="all">All Plans</option>
                         <option value="Gold Plan">Gold Plan</option>
                         <option value="Silver Plan">Silver Plan</option>
                     </select>
 
-                    <select id="memberFilterStatus" onchange="memCurrentPage=1; renderMembers()">
+                    <select id="memberFilterStatus" onchange="filterMembers()">
                         <option value="all">All Statuses</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
@@ -1819,17 +1819,17 @@
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
                     <input type="text" id="staffSearchModern" placeholder="Search name or email..."
-                        onkeyup="staffCurrentPage=1; renderStaff()">
+                        onkeyup="filterStaff()">
                 </div>
 
                 <div class="filter-group">
-                    <select id="staffFilterRole" onchange="staffCurrentPage=1; renderStaff()">
+                    <select id="staffFilterRole" onchange="filterStaff()">
                         <option value="all">All Roles</option>
                         <option value="Staff">Staff</option>
                         <option value="Admin">Admin</option>
                     </select>
 
-                    <select id="staffFilterStatus" onchange="staffCurrentPage=1; renderStaff()">
+                    <select id="staffFilterStatus" onchange="filterStaff()">
                         <option value="all">All Statuses</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
@@ -1916,11 +1916,11 @@
                 <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
                     <input type="text" id="trainerSearchModern" placeholder="Search name or email..."
-                        onkeyup="trainerCurrentPage=1; renderStaff()">
+                        onkeyup="filterTrainers()">
                 </div>
 
                 <div class="filter-group">
-                    <select id="trainerFilterSpecialty" onchange="trainerCurrentPage=1; renderStaff()">
+                    <select id="trainerFilterSpecialty" onchange="filterTrainers()">
                         <option value="all">All Specialties</option>
                         <option value="General Fitness">General Fitness</option>
                         <option value="Bodybuilding">Bodybuilding</option>
@@ -1928,7 +1928,7 @@
                         <option value="HIIT">HIIT</option>
                     </select>
 
-                    <select id="trainerFilterStatus" onchange="trainerCurrentPage=1; renderStaff()">
+                    <select id="trainerFilterStatus" onchange="filterTrainers()">
                         <option value="all">All Statuses</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
@@ -2063,11 +2063,11 @@
                 </div>
                 <div class="bk-action-right">
                     <!-- Advanced Filters -->
-                    <select id="bkFilterTrainer" class="bk-filter-select" onchange="bkCurrentPage=1; renderBookings()"
+                    <select id="bkFilterTrainer" class="bk-filter-select" onchange="filterBookingsByDate()"
                         aria-label="Filter by Trainer">
                         <option value="">All Trainers</option>
                     </select>
-                    <select id="bkFilterStatus" class="bk-filter-select" onchange="bkCurrentPage=1; renderBookings()"
+                    <select id="bkFilterStatus" class="bk-filter-select" onchange="filterBookingsByDate()"
                         aria-label="Filter by Status">
                         <option value="">All Statuses</option>
                         <option value="Pending">Pending</option>
@@ -2077,10 +2077,10 @@
                         <option value="No Show">No Show</option>
                     </select>
                     <div class="bk-date-range">
-                        <input type="date" id="bkDateFrom" class="bk-filter-date" onchange="bkCurrentPage=1; renderBookings()"
+                        <input type="date" id="bkDateFrom" class="bk-filter-date" onchange="filterBookingsByDate()"
                             aria-label="Date from" title="From date">
                         <span class="bk-date-sep">–</span>
-                        <input type="date" id="bkDateTo" class="bk-filter-date" onchange="bkCurrentPage=1; renderBookings()"
+                        <input type="date" id="bkDateTo" class="bk-filter-date" onchange="filterBookingsByDate()"
                             aria-label="Date to" title="To date">
                     </div>
                     <button class="bk-manual-btn" onclick="openBookingDrawer()" id="bkManualBookingBtn">
@@ -2302,17 +2302,17 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="activitySearch" placeholder="Search by user, action, or details..."
-                        onkeyup="activityCurrentPage=1; renderActivityLogs()">
+                        onkeyup="filterActivityLogs()">
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <select id="activityRoleFilter" onchange="activityCurrentPage=1; renderActivityLogs()"
+                    <select id="activityRoleFilter" onchange="filterActivityLogs()"
                         style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--white); color: var(--text-primary); font-size: 13px;">
                         <option value="all">All Roles</option>
                         <option value="Admin">Admin</option>
                         <option value="Staff">Staff</option>
                         <option value="Trainer">Trainer</option>
                     </select>
-                    <input type="date" id="activityDateFilter" onchange="activityCurrentPage=1; renderActivityLogs()"
+                    <input type="date" id="activityDateFilter" onchange="filterActivityLogs()"
                         style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--white); color: var(--text-primary); font-size: 13px;">
                 </div>
             </div>
