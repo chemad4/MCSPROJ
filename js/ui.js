@@ -15,16 +15,39 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmModal.id = 'customConfirmModal';
         confirmModal.innerHTML = `
             <div class="modal-content">
-                <i class="fas fa-exclamation-circle" style="font-size: 40px; color: var(--primary-red); margin-bottom: 10px;"></i>
-                <h3>Confirmation</h3>
+                <div class="modal-icon" style="margin-bottom: 20px;">
+                    <i class="fas fa-question-circle" style="font-size: 48px; color: var(--primary-red); opacity: 0.9;"></i>
+                </div>
+                <h3 style="font-weight: 700; font-size: 20px; color: var(--text-primary); margin-bottom: 8px;">Confirmation</h3>
                 <p id="customConfirmMessage">Are you sure?</p>
                 <div class="confirm-actions">
-                    <button class="btn-cancel" id="customConfirmCancel">Cancel</button>
-                    <button class="btn-confirm" id="customConfirmOk">Confirm</button>
+                    <button class="btn-cancel" id="customConfirmCancel" style="background: rgba(0,0,0,0.05); color: var(--text-muted);">Cancel</button>
+                    <button class="btn-confirm" id="customConfirmOk" style="background: var(--dark-black); color: white;">Confirm</button>
                 </div>
             </div>
         `;
         document.body.appendChild(confirmModal);
+    }
+
+    // Inject Custom Prompt Modal
+    if (!document.getElementById('customPromptModal')) {
+        const promptModal = document.createElement('div');
+        promptModal.id = 'customPromptModal';
+        promptModal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-icon" style="margin-bottom: 20px;">
+                    <i class="fas fa-comment-dots" style="font-size: 48px; color: var(--primary-red); opacity: 0.9;"></i>
+                </div>
+                <h3 id="customPromptTitle" style="font-weight: 700; font-size: 20px; color: var(--text-primary); margin-bottom: 8px;">Required Remarks</h3>
+                <p id="customPromptMessage">Please provide details below:</p>
+                <textarea id="customPromptInput" placeholder="Type your remarks here..."></textarea>
+                <div class="confirm-actions">
+                    <button class="btn-cancel" id="customPromptCancel" style="background: rgba(0,0,0,0.05); color: var(--text-muted);">Cancel</button>
+                    <button class="btn-confirm" id="customPromptOk" style="background: var(--dark-black); color: white;">Submit</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(promptModal);
     }
 
     // Inject Profile Settings Modal
@@ -138,6 +161,44 @@ window.showConfirm = function(message, onConfirm) {
     };
 
     modal.style.display = 'flex';
+};
+
+// Global showPrompt function
+window.showPrompt = function({ title, message, placeholder, onConfirm }) {
+    const modal = document.getElementById('customPromptModal');
+    if (!modal) return;
+
+    if (title) document.getElementById('customPromptTitle').innerText = title;
+    if (message) document.getElementById('customPromptMessage').innerText = message;
+    
+    const input = document.getElementById('customPromptInput');
+    input.value = "";
+    if (placeholder) input.placeholder = placeholder;
+    
+    const cancelBtn = document.getElementById('customPromptCancel');
+    const okBtn = document.getElementById('customPromptOk');
+
+    const closeModal = () => {
+        modal.style.display = 'none';
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+    };
+
+    cancelBtn.onclick = closeModal;
+    
+    okBtn.onclick = () => {
+        const val = input.value.trim();
+        if (!val) {
+            input.style.borderColor = 'var(--primary-red)';
+            setTimeout(() => input.style.borderColor = '', 2000);
+            return;
+        }
+        closeModal();
+        if (typeof onConfirm === 'function') onConfirm(val);
+    };
+
+    modal.style.display = 'flex';
+    setTimeout(() => input.focus(), 100);
 };
 
 // Global toggleDarkMode function

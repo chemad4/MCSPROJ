@@ -3331,7 +3331,9 @@ function renderMembershipPlans() {
     tbody.innerHTML = plans.map((p, index) => {
         const isActive = p.status === 'Active';
         const subscriberCount = membersData.filter(m => (m.plan || '').toLowerCase() === (p.name || '').toLowerCase() && (m.status || '').toLowerCase() !== 'archived').length;
-        const isPremium = p.name.toLowerCase().includes('gold') || p.price >= 2000;
+        
+        // Premium styling based on price threshold or explicitly marked
+        const isPremium = p.price >= 2000;
 
         let cardStyle = isPremium
             ? 'ring-1 ring-[#991b1b]/10'
@@ -3349,7 +3351,7 @@ function renderMembershipPlans() {
                     <div class="flex justify-between items-start mb-2">
                         <div>
                             <h3 class="text-xl font-bold text-slate-900 leading-none tracking-tight">${escapeHtml(p.name)}</h3>
-                            <p class="text-sm text-slate-500 mt-2">${p.description ? escapeHtml(p.description) : 'Standard access plan'}</p>
+                            <p class="text-sm text-slate-500 mt-2">${p.description ? escapeHtml(p.description) : ''}</p>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" class="sr-only peer" ${isActive ? 'checked' : ''} onchange="togglePlanStatus('${p.id}', this.checked)">
@@ -3366,20 +3368,16 @@ function renderMembershipPlans() {
                 <div class="p-6 flex-grow bg-slate-50/50 ${plClass}">
                     <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider mb-4">Features</h4>
                     <ul class="space-y-3 text-sm text-slate-700">
-                        <li class="flex items-start gap-3">
-                            <i class="fas fa-check text-emerald-600 mt-0.5 font-bold"></i>
-                            <span class="leading-snug">Gym Floor Access</span>
-                        </li>
-                        ${isPremium ? `
-                        <li class="flex items-start gap-3">
-                            <i class="fas fa-check text-[#991b1b] mt-0.5 font-bold"></i>
-                            <span class="font-bold text-slate-900 leading-snug">Mobile App Access included</span>
-                        </li>
-                        ` : `
-                        <li class="flex items-start gap-3">
-                            <i class="fas fa-times text-slate-400 mt-0.5 font-bold"></i>
-                            <span class="text-slate-500 leading-snug">No Mobile App Access</span>
-                        </li>
+                        ${(p.features && p.features.length > 0) ? p.features.map(feat => `
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check text-emerald-600 mt-0.5 font-bold"></i>
+                                <span class="leading-snug">${escapeHtml(feat)}</span>
+                            </li>
+                        `).join('') : `
+                            <li class="flex items-start gap-3">
+                                <i class="fas fa-check text-slate-400 mt-0.5 font-bold"></i>
+                                <span class="text-slate-500 leading-snug">No specific features listed.</span>
+                            </li>
                         `}
                     </ul>
                 </div>
@@ -3457,6 +3455,14 @@ window.openPlanModal = function (editId) {
     if (form) form.reset();
     document.getElementById('planEditId').value = '';
     document.getElementById('planModalTitle').innerHTML = '<i class="fa-solid fa-tags"></i> Create Membership Plan';
+    
+    // Reset features
+    const list = document.getElementById('planFeaturesList');
+    if (list) {
+        list.innerHTML = '';
+        addPlanFeatureInput("Gym Floor Access");
+    }
+
     document.getElementById('planModal').style.display = 'flex';
 };
 
@@ -3470,6 +3476,18 @@ window.openEditPlanModal = function (id) {
     document.getElementById('planPrice').value = plan.price || '';
     document.getElementById('planDescription').value = plan.description || '';
     document.getElementById('planStatus').value = plan.status || 'Active';
+    
+    // Load features
+    const list = document.getElementById('planFeaturesList');
+    if (list) {
+        list.innerHTML = '';
+        if (plan.features && plan.features.length > 0) {
+            plan.features.forEach(f => addPlanFeatureInput(f));
+        } else {
+            addPlanFeatureInput("Gym Floor Access");
+        }
+    }
+
     document.getElementById('planModalTitle').innerHTML = '<i class="fa-solid fa-edit"></i> Edit Membership Plan';
     document.getElementById('planModal').style.display = 'flex';
 };
@@ -3497,12 +3515,18 @@ if (document.getElementById('planForm')) {
         if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
 
         const editId = document.getElementById('planEditId').value;
+        
+        // Collect features
+        const featureInputs = document.querySelectorAll('.plan-feature-input');
+        const features = Array.from(featureInputs).map(inp => inp.value.trim()).filter(v => v !== "");
+
         const planData = {
             name: document.getElementById('planName').value.trim(),
             duration: parseInt(document.getElementById('planDuration').value),
             price: parseFloat(document.getElementById('planPrice').value),
             description: document.getElementById('planDescription').value.trim(),
             status: document.getElementById('planStatus').value,
+            features: features,
             updatedAt: new Date().getTime()
         };
 
@@ -3526,6 +3550,21 @@ if (document.getElementById('planForm')) {
         }
     });
 }
+
+window.addPlanFeatureInput = function(val = "") {
+    const container = document.getElementById('planFeaturesList');
+    if (!container) return;
+    
+    const div = document.createElement('div');
+    div.className = 'plan-feature-row';
+    div.innerHTML = `
+        <input type="text" class="plan-feature-input" placeholder="e.g. Free Towel" value="${val}">
+        <button type="button" class="btn-remove-feature" onclick="this.parentElement.remove()" title="Remove feature">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    container.appendChild(div);
+};
 
 // ==========================================
 // 10.5 LOCKER SYSTEM MODULE
@@ -5472,35 +5511,37 @@ function renderBookings() {
     const dateFilter = document.getElementById('bookingDateFilter')?.value;
     if (dateFilter) displayData = displayData.filter(b => b.date === dateFilter);
 
-    const renderBookingRow = (b) => {
-        let badgeClass = "active";
-        if (b.status === "Pending") badgeClass = "pending";
-        if (b.status === "Completed") badgeClass = "maintenance";
-        if (b.status === "Cancelled" || b.status === "No Show") badgeClass = "broken";
+        const renderBookingRow = (b) => {
+            let badgeClass = "pending";
+            if (b.status === "Confirmed") badgeClass = "confirmed";
+            if (b.status === "Completed") badgeClass = "completed";
+            if (b.status === "Cancelled") badgeClass = "cancelled";
+            if (b.status === "Declined") badgeClass = "declined";
+            if (b.status === "No Show") badgeClass = "noshow";
 
-        const dateObj = new Date(`${b.date}T${b.time}`);
-        const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const dateObj = new Date(`${b.date}T${b.time}`);
+            const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-        if (loggedInRole === "member") {
-            const remarksHtml = (b.status === "Cancelled" || b.status === "Declined") && b.cancelRemarks 
-                ? `<div style="font-size: 11px; color: #e74c3c; margin-top: 4px; font-style: italic;"><i class="fas fa-comment-dots"></i> Reason: ${b.cancelRemarks}</div>`
-                : "";
-            return `
-                <tr>
-                    <td>${b.trainerName}</td>
-                    <td>${dateStr}</td>
-                    <td><span class="badge active" style="background: var(--primary-red); color: white; border: none;"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
-                    <td><span class="badge ${badgeClass}">${b.status}</span>${remarksHtml}</td>
-                </tr>
-            `;
-        } else {
+            if (loggedInRole === "member") {
+                const remarksHtml = (b.status === "Cancelled" || b.status === "Declined") && b.cancelRemarks 
+                    ? `<div style="font-size: 11px; color: #e74c3c; margin-top: 10px; font-weight: 500; font-style: italic;"><i class="fas fa-comment-dots"></i> Reason: ${b.cancelRemarks}</div>`
+                    : "";
+                return `
+                    <tr>
+                        <td>${b.trainerName}</td>
+                        <td>${dateStr}</td>
+                        <td><span class="badge confirmed" style="background: var(--primary-red); color: white; border: none;"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
+                        <td><span class="badge ${badgeClass}">${b.status}</span>${remarksHtml}</td>
+                    </tr>
+                `;
+            } else {
             let actions = "";
             if (loggedInRole === "trainer") {
                 if (b.status === "Pending") {
                     actions = `
                         <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed')"><i class="fas fa-check"></i></button>
-                        <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Cancelled')"><i class="fas fa-times"></i></button>
+                        <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Declined')"><i class="fas fa-times"></i></button>
                      `;
                 } else {
                     actions = `<button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
@@ -5542,17 +5583,48 @@ function renderBookings() {
 window.filterBookingsByDate = () => { renderBookings(); }
 
 window.updateBookingStatus = async (id, newStatus) => {
-    let remarks = "";
-    if (newStatus === 'Cancelled') {
-        remarks = prompt("Please enter remarks for cancellation:");
-        if (remarks === null) return; 
+    if (newStatus === 'Cancelled' || newStatus === 'Declined') {
+        showPrompt({
+            title: `Confirm ${newStatus}`,
+            message: `Please provide a reason for marking this session as ${newStatus.toLowerCase()}:`,
+            placeholder: "e.g. Schedule conflict, personal emergency...",
+            onConfirm: (remarks) => {
+                const template = `I have to decline due to the reason: ${remarks}`;
+                
+                showConfirm(`The following message will be sent to the member via chat:\n\n"${template}"\n\nConfirm ${newStatus.toLowerCase()}?`, async () => {
+                    const b = (window.bookingsData || []).find(x => x.id === id);
+                    if (!b) return;
+
+                    const updateData = { status: newStatus, cancelRemarks: template };
+                    await updateDoc(doc(db, "bookings", id), updateData);
+
+                    // Send as chat message to the member
+                    if (b.memberName && b.trainerName) {
+                        try {
+                            await addDoc(messagesCol, {
+                                sender: b.trainerName,
+                                receiver: b.memberName,
+                                text: template,
+                                timestamp: Date.now()
+                            });
+                        } catch (msgErr) {
+                            console.error("Chat message failed:", msgErr);
+                        }
+                    }
+
+                    showToast(`Session ${newStatus.toLowerCase()} and message sent.`, "success");
+                    if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}. Message sent to ${b.memberName}.`);
+                });
+            }
+        });
+        return;
     }
+
     showConfirm(`Are you sure you want to mark this session as ${newStatus}?`, async () => {
         const updateData = { status: newStatus };
-        if (remarks) updateData.cancelRemarks = remarks;
         await updateDoc(doc(db, "bookings", id), updateData);
         showToast(`Session marked as ${newStatus}.`, "success");
-        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}. ${remarks ? 'Reason: ' + remarks : ''}`);
+        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}.`);
     });
 }
 
@@ -5747,16 +5819,39 @@ if (document.getElementById('editBookingForm')) {
         e.preventDefault();
         const id = document.getElementById('editBookingId').value;
         const status = document.getElementById('editBookingStatus').value;
-        const remarks = document.getElementById('editBookingRemarks') ? document.getElementById('editBookingRemarks').value : "";
+        let remarks = document.getElementById('editBookingRemarks') ? document.getElementById('editBookingRemarks').value : "";
         
         const updateData = { status: status };
-        if (remarks) updateData.cancelRemarks = remarks;
+        if (remarks) {
+            if ((status === 'Cancelled' || status === 'Declined') && !remarks.includes("I have to decline")) {
+                remarks = `I have to decline due to the reason: ${remarks}`;
+            }
+            updateData.cancelRemarks = remarks;
+        }
         
         await updateDoc(doc(db, "bookings", id), updateData);
+
+        // Send as chat message if cancelled/declined
+        if ((status === 'Cancelled' || status === 'Declined') && remarks) {
+            const b = (window.bookingsData || []).find(x => x.id === id);
+            if (b && b.memberName && b.trainerName) {
+                try {
+                    await addDoc(messagesCol, {
+                        sender: b.trainerName,
+                        receiver: b.memberName,
+                        text: remarks,
+                        timestamp: Date.now()
+                    });
+                } catch (msgErr) {
+                    console.error("Chat message failed from modal:", msgErr);
+                }
+            }
+        }
+
         window.closeModal('editBookingModal');
+        showToast(`Booking updated to ${status}.`, "success");
         if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} status changed to ${status}. ${remarks ? 'Reason: ' + remarks : ''}`);
     });
-
 }
 
 window.deleteBooking = async (id) => {

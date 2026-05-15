@@ -195,8 +195,8 @@ function renderEnhancedBookingRow(b) {
     const statusKey = b.status.toLowerCase().replace(' ', '');
     const statusClass = `status-${statusKey === 'noshow' ? 'noshow' : statusKey}`;
 
-    const statuses = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'No Show'];
-    const dotColors = { Pending: '#F59E0B', Confirmed: '#10B981', Completed: '#3B82F6', Cancelled: '#EF4444', 'No Show': '#991B1B' };
+    const statuses = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Declined', 'No Show'];
+    const dotColors = { Pending: '#F59E0B', Confirmed: '#3B82F6', Completed: '#10B981', Cancelled: '#EF4444', Declined: '#B91C1C', 'No Show': '#7F1D1D' };
 
     const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
 
@@ -224,7 +224,7 @@ function renderEnhancedBookingRow(b) {
         if (b.status === 'Pending') {
             actions = `
                 <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed')"><i class="fas fa-check"></i></button>
-                <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Cancelled')"><i class="fas fa-times"></i></button>
+                <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Declined')"><i class="fas fa-times"></i></button>
             `;
         } else {
             actions = `<button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
