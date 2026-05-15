@@ -3011,7 +3011,7 @@
                     <input type="text" id="regMemberFamily" placeholder="Last Name" required
                         oninput="this.value = this.value.replace(/[0-9]/g, '')">
                     <input type="email" id="regMemberEmail" placeholder="Email Address" required>
-                    <input type="text" id="regMemberEmergency" placeholder="Emergency Contact Name/Number" required>
+                    <input type="text" id="regMemberEmergency" placeholder="Emergency Contact Number" required>
 
                     <div class="btn-row" style="margin-top: 8px;">
                         <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('memberModal')">Cancel</button>
@@ -3080,11 +3080,30 @@
 
                     <!-- Payment Section -->
                     <div class="reg-payment-section" style="margin-top: 16px; padding-top: 0; border-top: none;">
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label class="form-label">Total Amount (₱)</label>
-                            <input type="number" id="regMemberTotalAmount" placeholder="0.00" min="0" step="0.01" required readonly 
-                                style="width: 100%; padding: 12px 14px; border: 1.5px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.03); color: var(--text-primary); font-weight: 700; font-size: 18px; cursor: not-allowed; text-align: center; letter-spacing: 0.02em;">
+                        <div class="reg-receipt-container">
+                            <div class="receipt-header">
+                                <h4>Registration Receipt</h4>
+                            </div>
+                            <div class="receipt-line">
+                                <span class="receipt-label" id="receiptPlanLabel">Membership Plan</span>
+                                <span class="receipt-value" id="receiptPlanValue">₱0.00</span>
+                            </div>
+                            <div class="receipt-line" id="receiptLockerRow" style="display: none;">
+                                <span class="receipt-label">Locker Assignment</span>
+                                <span class="receipt-value">₱300.00</span>
+                            </div>
+                            <div class="receipt-divider"></div>
+                            <div class="receipt-total">
+                                <span class="receipt-total-label">Total Amount</span>
+                                <span class="receipt-total-amount" id="regMemberTotalDisplay">₱0.00</span>
+                            </div>
+                            <div class="receipt-footer">
+                                Official Enrollment Summary
+                            </div>
+                            <!-- Hidden input for form submission compatibility -->
+                            <input type="hidden" id="regMemberTotalAmount" value="0">
                         </div>
+
                         <div class="section-label"><i class="fa-solid fa-wallet"></i> Payment Method</div>
                         <div class="reg-payment-toggle" id="regPaymentToggle">
                             <div class="pay-opt selected" data-method="Cash"
@@ -3137,7 +3156,7 @@
                 </div>
                 <input type="text" id="editMemberFamily" placeholder="Last Name" required
                     oninput="this.value = this.value.replace(/[0-9]/g, '')">
-                <input type="text" id="editMemberEmergency" placeholder="Emergency Contact Name/Number" required>
+                <input type="text" id="editMemberEmergency" placeholder="Emergency Contact Number" required>
 
                 <select id="editMemberPlan" required>
                     <option value="Gold Plan">Gold Plan</option>

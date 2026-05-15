@@ -4707,3 +4707,84 @@ body.dark-theme .cat-value-badge {
 body.dark-theme .plan-feature-row .btn-remove-feature {
     background: rgba(239, 68, 68, 0.15) !important;
 }
+
+/* ── Member Registration Receipt ── */
+.reg-receipt-container {
+    background: var(--panel-bg);
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    position: relative;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.receipt-header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px dashed var(--border-color);
+}
+
+.receipt-header h4 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.receipt-line {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.receipt-label {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.receipt-value {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.receipt-divider {
+    border-top: 1px dashed var(--border-color);
+    margin: 15px 0;
+}
+
+.receipt-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 5px;
+}
+
+.receipt-total-label {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-primary);
+    text-transform: uppercase;
+}
+
+.receipt-total-amount {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--primary-red);
+    letter-spacing: -0.02em;
+}
+
+.receipt-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 11px;
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+body.dark-theme .reg-receipt-container {
+    background: rgba(255, 255, 255, 0.02);
+}

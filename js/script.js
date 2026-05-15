@@ -4964,11 +4964,28 @@ window.openMemberModal = () => {
         const calculateTotal = () => {
             if (!planSelect || !totalInput) return;
             const selectedPlan = (window.__membershipPlansData || []).find(p => p.name === planSelect.value);
-            let total = selectedPlan ? Number(selectedPlan.price) : 0;
-            if (lockerSelect && lockerSelect.value) {
-                total += 300; // Standard locker price
-            }
+            let planPrice = selectedPlan ? Number(selectedPlan.price) : 0;
+            let lockerPrice = (lockerSelect && lockerSelect.value) ? 300 : 0;
+            let total = planPrice + lockerPrice;
+            
             totalInput.value = total.toFixed(2);
+
+            // Update premium receipt elements
+            const planLabel = document.getElementById('receiptPlanLabel');
+            const planValue = document.getElementById('receiptPlanValue');
+            const lockerRow = document.getElementById('receiptLockerRow');
+            const totalDisplay = document.getElementById('regMemberTotalDisplay');
+
+            if (planLabel) planLabel.textContent = planSelect.value || 'Membership Plan';
+            if (planValue) planValue.textContent = `₱${planPrice.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            
+            if (lockerRow) {
+                lockerRow.style.display = lockerPrice > 0 ? 'flex' : 'none';
+            }
+            
+            if (totalDisplay) {
+                totalDisplay.textContent = `₱${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            }
         };
 
         if (planSelect) planSelect.onchange = calculateTotal;
@@ -5034,9 +5051,28 @@ window.regWizardNext = function (currentStep) {
         const totalInput = document.getElementById('regMemberTotalAmount');
         if (planSelect && totalInput) {
             const selectedPlan = (window.__membershipPlansData || []).find(p => p.name === planSelect.value);
-            let total = selectedPlan ? Number(selectedPlan.price) : 0;
-            if (lockerSelect && lockerSelect.value) total += 300;
+            let planPrice = selectedPlan ? Number(selectedPlan.price) : 0;
+            let lockerPrice = (lockerSelect && lockerSelect.value) ? 300 : 0;
+            let total = planPrice + lockerPrice;
+
             totalInput.value = total.toFixed(2);
+
+            // Update premium receipt elements
+            const planLabel = document.getElementById('receiptPlanLabel');
+            const planValue = document.getElementById('receiptPlanValue');
+            const lockerRow = document.getElementById('receiptLockerRow');
+            const totalDisplay = document.getElementById('regMemberTotalDisplay');
+
+            if (planLabel) planLabel.textContent = planSelect.value || 'Membership Plan';
+            if (planValue) planValue.textContent = `₱${planPrice.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            
+            if (lockerRow) {
+                lockerRow.style.display = lockerPrice > 0 ? 'flex' : 'none';
+            }
+            
+            if (totalDisplay) {
+                totalDisplay.textContent = `₱${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+            }
         }
     }
 
