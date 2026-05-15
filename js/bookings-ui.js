@@ -215,6 +215,9 @@ function renderEnhancedBookingRow(b) {
         </div>
     `;
 
+    // Hide trainer column if role is trainer
+    const trainerColumnStyle = loggedInRole === 'trainer' ? 'display: none;' : '';
+
     // Trainer: show accept/decline for pending, edit for others; Admin/Staff: full actions
     let actions = '';
     if (loggedInRole === 'trainer') {
@@ -241,10 +244,10 @@ function renderEnhancedBookingRow(b) {
 
     return `
         <tr>
-            <td>${memberNameCell}</td>
-            <td>${b.trainerName}</td>
-            <td>${dateStr}</td>
-            <td><span class="bk-time-display"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
+            <td style="min-width: 120px;">${memberNameCell}</td>
+            <td class="trainer-col" style="${trainerColumnStyle}">${b.trainerName}</td>
+            <td style="min-width: 100px;">${dateStr}</td>
+            <td style="min-width: 90px;"><span class="bk-time-display"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
             <td>${statusCell}</td>
             <td>${actions}</td>
         </tr>

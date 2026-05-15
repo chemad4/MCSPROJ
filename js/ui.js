@@ -62,9 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <label class="form-label" style="font-size: 12px; font-weight: 600;">New Password (Leave blank to keep current)</label>
                         <input type="password" id="userProfilePassword" placeholder="********" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
-                    <div style="display: flex; gap: 10px; margin-top: 15px;">
-                        <button type="button" class="btn-cancel" style="flex: 1; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: #f1f5f9; color: #334155; cursor: pointer;" onclick="document.getElementById('profileSettingsModal').style.display='none'">Cancel</button>
-                        <button type="submit" class="submit-btn" style="flex: 2; background-color: var(--dark-black); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; padding: 10px;">Save Changes</button>
+                    <div class="btn-row" style="margin-top: 15px;">
+                        <button type="button" class="btn-cancel" onclick="document.getElementById('profileSettingsModal').style.display='none'">Cancel</button>
+                        <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
                     </div>
                 </form>
             </div>

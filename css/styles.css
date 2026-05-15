@@ -587,6 +587,7 @@ body.dark-theme .badge.pending {
     font-weight: 600;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
@@ -856,7 +857,7 @@ body.dark-theme .badge.pending {
 
 .dashboard-layout {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: 2fr 1fr;
     gap: 24px;
     margin-top: 10px;
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1103,6 +1104,8 @@ body.dark-theme .kpi-unified-item.active-item {
     grid-template-columns: 1fr 1fr;
     gap: 20px;
 }
+
+
 
 /* Sidebar Alerts */
 /* Sidebar Alerts - Replaced by transition block above */
@@ -1672,8 +1675,14 @@ body.dark-theme .close-btn:hover {
 
 .btn-row {
     display: flex;
-    gap: 10px;
-    margin-top: 8px;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.btn-row button,
+.btn-row .action-btn {
+    flex: 1;
+    justify-content: center;
 }
 
 .btn-cancel {
@@ -1687,6 +1696,9 @@ body.dark-theme .close-btn:hover {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-cancel:hover {
@@ -1694,7 +1706,7 @@ body.dark-theme .close-btn:hover {
 }
 
 .btn-submit {
-    flex: 2;
+    flex: 1;
     padding: 12px;
     border: none;
     border-radius: 8px;
@@ -1703,6 +1715,9 @@ body.dark-theme .close-btn:hover {
     cursor: pointer;
     color: white;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* --- View Toggle --- */
@@ -2026,12 +2041,16 @@ body.dark-theme .inventory-list-table tr:hover {
 }
 
 .confirm-actions button {
-    padding: 10px 20px;
+    flex: 1;
+    padding: 12px 20px;
     border: none;
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
     transition: 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-cancel {
@@ -2043,9 +2062,15 @@ body.dark-theme .inventory-list-table tr:hover {
     background: #d1d5db;
 }
 
-.btn-confirm {
+.btn-confirm,
+.btn-save {
     background: var(--primary-red);
     color: white;
+}
+
+.btn-confirm:hover,
+.btn-save:hover {
+    background: #7f1d1d;
 }
 
 .btn-confirm:hover {

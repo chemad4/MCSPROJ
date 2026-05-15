@@ -75,6 +75,7 @@
 
         /* Mobile Button Default Hidden */
         .mobile-only-btn { display: none; }
+        .trainer-col { display: none !important; }
 
         /* MASTER MOBILE OVERRIDES: APP-STYLE BOTTOM NAV */
         @media (max-width: 768px) {
@@ -149,6 +150,11 @@
             .chat-container.mobile-chat-open .chat-sidebar { display: none !important; }
             .chat-container.mobile-chat-open .chat-main { display: flex !important; flex-direction: column; flex-grow: 1; }
             .mobile-only-btn { display: block !important; }
+
+            /* Fix table cutting on mobile */
+            .trainer-col { display: none !important; }
+            .bk-time-display { white-space: nowrap !important; }
+            th, td { padding: 10px 8px !important; font-size: 13px !important; }
         }
     </style>
 </head>
@@ -220,13 +226,32 @@
             </div>
 
             <div class="stat-cards">
-                <div class="stat-card card-black" style="cursor: default;">
+                <div class="stat-card card-black" id="closestBookingCard" style="cursor: default;">
                     <i class="fa-solid fa-clock"></i>
-                    <div class="value">Checking Status...</div>
+                    <div class="mp-stat-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;">Closest Booking</div>
+                    <div class="value" id="closestBookingValue">Checking...</div>
+                    <div id="closestBookingSub" style="font-size: 13px; color: var(--text-muted); margin-top: 5px;"></div>
+                </div>
+
+                <div class="stat-card card-black" style="cursor: default; position: relative; overflow: hidden;">
+                    <i class="fa-solid fa-person-walking-arrow-right"></i>
+                    <div class="mp-stat-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;">Floor Presence</div>
+                    <div class="value" style="display: flex; align-items: center; gap: 10px;">
+                        <span id="shiftStatusText">Checking...</span>
+                        <span class="shift-timer" style="font-size: 14px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">--:--:--</span>
                     </div>
+                </div>
+
                 <div class="stat-card card-red" onclick="switchTab('bookings')">
                     <i class="fa-solid fa-calendar-day"></i>
                     <div class="value">View Schedule</div>
+                </div>
+            </div>
+
+            <div class="panel" style="margin-top: 20px;">
+                <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Colleagues on Floor</div>
+                <div class="panel-body" id="dashActiveTrainersFeed" style="max-height: 300px; overflow-y: auto;">
+                    <p style="color: var(--text-muted); font-size: 14px;">Loading...</p>
                 </div>
             </div>
         </div>
@@ -243,13 +268,13 @@
             </div>
             
             <div class="panel">
-                <div class="panel-header"><i class="fas fa-calendar-alt"></i> My Personal Training Sessions</div>
+                <div class="panel-header"><i class="fas fa-calendar-alt"></i> Session Schedules</div>
                 <div class="table-container" style="box-shadow: none;">
                     <table id="bookingsTable">
                         <thead>
                             <tr>
                                 <th>Member Name</th>
-                                <th>Assigned Trainer</th>
+                                <th class="trainer-col">Assigned Trainer</th>
                                 <th>Date</th>
                                 <th>Time</th>
                                 <th>Status</th>
@@ -311,13 +336,22 @@
                 <p style="font-size: 14px; margin-bottom: 10px;">Session: <strong id="editBookingDetails"></strong></p>
                 
                 <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Update Status:</p>
-                <select id="editBookingStatus" required>
-                    <option value="Confirmed">Confirmed</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
-                    <option value="No Show">No Show</option>
-                </select>
-                <button type="submit" style="background-color: var(--dark-black); margin-top: 15px;">Save Changes</button>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="editBookingStatus" required>
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="No Show">No Show</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Remarks / Cancellation Reason</label>
+                    <textarea id="editBookingRemarks" placeholder="Enter reason for cancellation..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary); min-height: 80px;"></textarea>
+                </div>
+                <div class="btn-row" style="margin-top: 15px;">
+                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
+                </div>
             </form>
         </div>
     </div>

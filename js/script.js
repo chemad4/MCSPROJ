@@ -309,7 +309,7 @@ window.switchTab = function (tabId, element) {
         'archivedStaff': 'Archived Staff',
         'trainers': 'Gym Trainers',
         'archivedTrainers': 'Archived Trainers',
-        'bookings': 'Booking Calendar',
+        'bookings': 'Session Schedules',
         'chats': 'Internal Messages',
         'activityLog': 'System Activity Log',
         'membershipPlans': 'Membership Plans',
@@ -542,6 +542,41 @@ window.filterGrid = function (gridId, inputId) {
         else card.style.display = "none";
     });
 }
+
+window.filterEquipment = function() {
+    const search = document.getElementById('machineSearch').value.toLowerCase();
+    const status = document.getElementById('equipFilterStatus').value;
+    const grid = document.getElementById('machinesGrid');
+    const table = document.getElementById('machinesListBody');
+    
+    // Filter Grid
+    if (grid) {
+        const cards = grid.querySelectorAll('.inventory-item-filter');
+        cards.forEach(card => {
+            const searchData = card.getAttribute('data-search') || "";
+            const cardStatus = card.getAttribute('data-status') || "";
+            const matchesSearch = searchData.includes(search);
+            const matchesStatus = (status === 'all' || cardStatus === status);
+            card.style.display = (matchesSearch && matchesStatus) ? "flex" : "none";
+        });
+    }
+    
+    // Filter List Table
+    if (table) {
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            const rowStatus = row.querySelector('.badge').innerText;
+            const matchesSearch = text.includes(search);
+            const matchesStatus = (status === 'all' || rowStatus === status);
+            row.style.display = (matchesSearch && matchesStatus) ? "" : "none";
+        });
+    }
+};
+
+window.filterProducts = function() {
+    window.filterGrid('productsGrid', 'productSearch');
+};
 
 // ==========================================
 // 5. STATE ARRAYS & COLLECTIONS
@@ -837,17 +872,27 @@ function renderInventory() {
     const equipment = [];
 
     inventoryData.forEach((item) => {
-        let isConsumable = item.itemType === 'product' || ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
+        // Strictly determine if it's a product/consumable or equipment
+        let isConsumable = item.itemType === 'product' || 
+            (!item.itemType && ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat));
+        
         let currentStatus = item.status || (isConsumable ? 'In Stock' : 'Operational');
+        
+        // Force equipment status to be valid (no 'Low Stock' or 'In Stock' for equipment)
+        if (!isConsumable && ['Low Stock', 'Out of Stock', 'In Stock'].includes(currentStatus)) {
+            currentStatus = 'Operational';
+        }
+
         let threshold = item.lowStockThreshold !== undefined ? item.lowStockThreshold : 5;
         let isProblematic = false;
 
-        if (item.qty === 0) { currentStatus = "Out of Stock"; isProblematic = true; }
-        else if (item.qty <= threshold) {
-            if (currentStatus !== 'Maintenance' && currentStatus !== 'Out of Order') { currentStatus = "Low Stock"; isProblematic = true; low++; }
+        if (isConsumable) {
+            if (item.qty === 0) { currentStatus = "Out of Stock"; isProblematic = true; }
+            else if (item.qty <= threshold) { currentStatus = "Low Stock"; isProblematic = true; low++; }
+        } else {
+            if (currentStatus === 'Maintenance') { maint++; isProblematic = true; }
+            else if (currentStatus === 'Out of Order') { isProblematic = true; }
         }
-        else if (currentStatus === 'Maintenance') { maint++; isProblematic = true; }
-        else if (currentStatus === 'Out of Order') { isProblematic = true; }
 
         if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
         if (!isConsumable) {
@@ -896,7 +941,9 @@ function renderInventory() {
         `;
 
         return `
-            <div class="inventory-card inventory-item-filter ${isSelected ? 'selected' : ''}" data-search="${item.name.toLowerCase()} ${item.cat.toLowerCase()} ${item.currentStatus.toLowerCase()}">
+            <div class="inventory-card inventory-item-filter ${isSelected ? 'selected' : ''}" 
+                 data-search="${item.name.toLowerCase()} ${item.cat.toLowerCase()} ${item.currentStatus.toLowerCase()}"
+                 data-status="${item.currentStatus}">
                 ${!isConsumable ? `<input type="checkbox" class="inventory-checkbox" onchange="toggleItemSelection('equipment', '${item.id}', this)" ${isSelected ? 'checked' : ''}>` : ''}
                 <div class="inventory-icon-box" style="${item.image ? 'padding:0;' : ''}">${imageHtml}</div>
                 <div class="inventory-details">
@@ -1703,7 +1750,9 @@ window.refreshDashboardAnalytics = function () {
     calculateFinancials();
     calculateOperationalAlerts();
     calculateEngagement();
-    calculateConversionRate();
+    calculateSecondaryKpis();
+    renderWeeklyRevenueChart();
+    renderMemberDistChart();
 
     // Auto-update expanded chart if active
     const activeItem = document.querySelector('.kpi-unified-item.active-item');
@@ -1796,7 +1845,7 @@ function calculateFinancials() {
 
 function calculateOperationalAlerts() {
     // Maintenance
-    const maintItems = inventoryData.filter(i => (i.itemType === 'equipment' || !i.itemType) && i.status !== 'Operational');
+    const maintItems = inventoryData.filter(i => (i.itemType === 'equipment' || !i.itemType) && (i.status === 'Maintenance' || i.status === 'Out of Order'));
     const maintCount = maintItems.length;
     const maintEl = document.getElementById('dashMaintCount');
     const maintText = document.getElementById('maintStatusText');
@@ -1813,7 +1862,10 @@ function calculateOperationalAlerts() {
     }
 
     // Low Stock
-    const lowStockItems = inventoryData.filter(i => i.itemType === 'product' && Number(i.qty) <= Number(i.lowStockThreshold || 5));
+    const lowStockItems = inventoryData.filter(i => {
+        const isConsumable = i.itemType === 'product' || (!i.itemType && ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(i.cat));
+        return isConsumable && Number(i.qty) <= Number(i.lowStockThreshold || 5);
+    });
     const lowStockCount = lowStockItems.length;
     const lowStockBadge = document.getElementById('dashLowStockBadge');
     const lowStockList = document.getElementById('dashLowStockList');
@@ -1833,42 +1885,201 @@ function calculateOperationalAlerts() {
 }
 
 function calculateEngagement() {
-    // Capacity progress bar removed as per quiet luxury refinements
-    // Real-time value is handled via the presentMembers element in attendance.js
+    const activeMembers = membersData.filter(m => m.status === 'Active').length;
+    const dynamicCapacity = Math.max(50, Math.floor(activeMembers * 0.15));
+    
+    const capEl = document.getElementById('dashTotalCapacity');
+    const availEl = document.getElementById('detailAvailableCount');
+    if (capEl) capEl.innerText = dynamicCapacity;
+
+    const presentStr = document.getElementById('presentMembers')?.innerText || "0";
+    const present = parseInt(presentStr, 10) || 0;
+    if (availEl) availEl.innerText = Math.max(0, dynamicCapacity - present);
+    
+    const occRateEl = document.getElementById('detailOccupancyRate');
+    if (occRateEl) {
+        occRateEl.innerText = dynamicCapacity > 0 ? `${Math.round((present / dynamicCapacity) * 100)}%` : "0%";
+    }
 }
 
-function calculateConversionRate() {
+function calculateSecondaryKpis() {
     const now = new Date();
     const todayStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-    // Count members registered today
-    const newMembersToday = membersData.filter(m => {
+    const totalMembers = membersData.filter(m => m.status !== 'Archived').length;
+    const activeMembers = membersData.filter(m => m.status === 'Active').length;
+
+    const newToday = membersData.filter(m => {
         if (!m.dateRegistered) return false;
         const regDate = new Date(m.dateRegistered).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         return regDate === todayStr;
-    });
+    }).length;
 
-    if (newMembersToday.length === 0) {
-        // Fallback to a realistic rolling average if no new registrations today
-        // In a real system, this would be a DB query over 30 days.
-        const convEl = document.getElementById('dashConversionRate');
-        if (convEl) convEl.innerText = `14.2%`;
-        return;
+    const activeTrainers = allUsersData.filter(u => u.role === 'Trainer' && u.status === 'Active').length;
+    let trainersOnDuty = 0;
+    if (typeof attendanceData !== 'undefined' && attendanceData.length > 0) {
+        const todayAtt = attendanceData.filter(a => a.date === todayStr && a.status === 'Checked In');
+        const checkedInNames = todayAtt.map(a => a.name);
+        trainersOnDuty = allUsersData.filter(u => u.role === 'Trainer' && checkedInNames.includes(u.name || `${u.givenName} ${u.familyName}`)).length;
     }
 
-    let convertedCount = 0;
-    newMembersToday.forEach(m => {
-        const hasWalkin = paymentsData.some(p =>
-            p.status !== 'Voided' &&
-            (p.name === m.name || p.name === `${m.givenName} ${m.familyName}`) &&
-            (p.items || "").includes("Walk-in")
-        );
-        if (hasWalkin) convertedCount++;
+    if (document.getElementById('dashTotalMembers')) document.getElementById('dashTotalMembers').innerText = totalMembers;
+    if (document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
+    if (document.getElementById('dashNewToday')) document.getElementById('dashNewToday').innerText = newToday;
+    if (document.getElementById('dashTrainersOnDuty')) document.getElementById('dashTrainersOnDuty').innerText = trainersOnDuty > 0 ? trainersOnDuty : activeTrainers;
+}
+
+let weeklyRevChartInst = null;
+function renderWeeklyRevenueChart() {
+    const ctx = document.getElementById('weeklyRevenueChart');
+    if (!ctx) return;
+
+    const days = [];
+    const revenues = [];
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        days.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
+        
+        const dStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        let dayRev = 0;
+        paymentsData.forEach(p => {
+            if (p.status !== 'Voided' && p.date === dStr) {
+                dayRev += Number(p.amount || 0);
+            }
+        });
+        revenues.push(dayRev);
+    }
+
+    if (weeklyRevChartInst) {
+        weeklyRevChartInst.destroy();
+    }
+
+    weeklyRevChartInst = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: days,
+            datasets: [{
+                label: 'Revenue (₱)',
+                data: revenues,
+                backgroundColor: 'rgba(99, 102, 241, 0.85)',
+                hoverBackgroundColor: 'rgba(99, 102, 241, 1)',
+                borderRadius: 6,
+                borderWidth: 0,
+                barThickness: 28
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    titleFont: { size: 13, family: "'Inter', sans-serif" },
+                    bodyFont: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
+                    padding: 12,
+                    callbacks: {
+                        label: function(context) {
+                            return '₱' + context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.04)', drawBorder: false },
+                    ticks: {
+                        font: { family: "'Inter', sans-serif", size: 11, color: '#64748b' },
+                        callback: function(value) {
+                            if (value === 0) return '₱0';
+                            return '₱' + (value >= 1000 ? (value/1000) + 'k' : value);
+                        }
+                    }
+                },
+                x: {
+                    grid: { display: false, drawBorder: false },
+                    ticks: {
+                        font: { family: "'Inter', sans-serif", size: 11, color: '#64748b' }
+                    }
+                }
+            }
+        }
+    });
+}
+
+let memberDistChartInst = null;
+function renderMemberDistChart() {
+    const ctx = document.getElementById('memberDistChart');
+    if (!ctx) return;
+
+    let gold = 0, silver = 0, walkin = 0;
+    
+    membersData.forEach(m => {
+        if (m.status !== 'Archived') {
+            const planLower = (m.plan || '').toLowerCase();
+            if (planLower.includes('gold')) gold++;
+            else if (planLower.includes('silver')) silver++;
+            else walkin++;
+        }
     });
 
-    const rate = ((convertedCount / newMembersToday.length) * 100).toFixed(1);
-    const convEl = document.getElementById('dashConversionRate');
-    if (convEl) convEl.innerText = `${rate}%`;
+    const dataVals = [gold, silver, walkin];
+    const labels = ['Gold Plan', 'Silver Plan', 'Basic / Other'];
+    const colors = ['#F59E0B', '#94A3B8', '#10B981'];
+
+    if (memberDistChartInst) {
+        memberDistChartInst.destroy();
+    }
+
+    memberDistChartInst = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: dataVals,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                hoverOffset: 4,
+                cutout: '72%'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                    bodyFont: { size: 13, family: "'Inter', sans-serif" },
+                    padding: 10
+                }
+            }
+        }
+    });
+
+    const legendEl = document.getElementById('memberDistLegend');
+    if (legendEl) {
+        const total = dataVals.reduce((a,b)=>a+b, 0);
+        legendEl.innerHTML = labels.map((label, i) => {
+            const val = dataVals[i];
+            const pct = total > 0 ? Math.round((val/total)*100) : 0;
+            return `
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px; width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 10px; height: 10px; border-radius: 50%; background: ${colors[i]}; display: inline-block;"></span>
+                        <span style="color: var(--text-muted); font-weight: 500;">${label}</span>
+                    </div>
+                    <span style="font-weight: 600; color: var(--dark-black); margin-left: auto;">${val} <span style="color: var(--text-muted); font-weight: 400; font-size: 11px;">(${pct}%)</span></span>
+                </div>
+            `;
+        }).join('');
+    }
 }
 
 function renderSparkline(canvasId, data, color) {
@@ -3116,7 +3327,26 @@ onSnapshot(lockersCol, (snapshot) => {
     lockersData = [];
     snapshot.forEach(d => lockersData.push({ id: d.id, ...d.data() }));
     renderLockers();
+    populateRegLockerDropdown();
 });
+
+function populateRegLockerDropdown() {
+    const regLockerSelect = document.getElementById('regMemberLocker');
+    if (!regLockerSelect) return;
+
+    const availableLockers = (lockersData || []).filter(l => l.status === 'Available');
+    const currentVal = regLockerSelect.value;
+    regLockerSelect.innerHTML = '<option value="">No Locker</option>';
+
+    availableLockers.forEach(l => {
+        const opt = document.createElement('option');
+        opt.value = l.id;
+        opt.textContent = `Locker #${l.number} (${l.location || 'General'})`;
+        regLockerSelect.appendChild(opt);
+    });
+
+    if (currentVal) regLockerSelect.value = currentVal;
+}
 
 function renderLockers() {
     const grid = document.getElementById('lockerGrid');
@@ -3396,7 +3626,7 @@ function renderMembers() {
         if (isArchived) {
             return `
                 <tr>
-                    <td>${m.givenName || m.name}</td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
+                    <td><a href="javascript:void(0)" onclick="window.openMemberProfile('${m.id}')" style="font-weight: 600; color: var(--text-primary); text-decoration: none; border-bottom: 1px dashed var(--border-color);">${m.givenName || m.name}</a></td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
                     <td>${m.email}</td><td><strong>${plan}</strong></td><td><span class="status-badge-solid voided">Archived</span></td>
                     <td style="text-align: right;">
                         <button type="button" class="btn-icon" style="color: #10B981;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
@@ -3427,7 +3657,7 @@ function renderMembers() {
                     <td style="display:flex; align-items:center; gap:10px; border-bottom:none;">
                         ${avatarHtml}
                         <div>
-                            <div style="font-weight: 600;">${m.givenName ? `${m.givenName} ${m.familyName || ''}`.trim() : (m.name || "User")}</div>
+                            <a href="javascript:void(0)" onclick="window.openMemberProfile('${m.id}')" style="font-weight: 600; color: var(--text-primary); text-decoration: none; border-bottom: 1px dashed var(--border-color); transition: all 0.2s;" onmouseover="this.style.color='var(--primary-red)'; this.style.borderBottomColor='var(--primary-red)';" onmouseout="this.style.color='var(--text-primary)'; this.style.borderBottomColor='var(--border-color)';">${m.givenName ? `${m.givenName} ${m.familyName || ''}`.trim() : (m.name || "User")}</a>
                             <div style="font-size: 11px; color: #94a3b8;">${m.uid ? m.uid + ' • ' : ''}${m.email}</div>
                         </div>
                     </td>
@@ -4016,6 +4246,24 @@ window.openMemberModal = () => {
         if (document.getElementById('regMemberPreview')) {
             document.getElementById('regMemberPreview').src = 'images/default-profile.png';
         }
+
+        // Auto-calculate total amount
+        const planSelect = document.getElementById('regMemberPlan');
+        const lockerSelect = document.getElementById('regMemberLocker');
+        const totalInput = document.getElementById('regMemberTotalAmount');
+
+        const calculateTotal = () => {
+            if (!planSelect || !totalInput) return;
+            const selectedPlan = (window.__membershipPlansData || []).find(p => p.name === planSelect.value);
+            let total = selectedPlan ? Number(selectedPlan.price) : 0;
+            if (lockerSelect && lockerSelect.value) {
+                total += 300; // Standard locker price
+            }
+            totalInput.value = total.toFixed(2);
+        };
+
+        if (planSelect) planSelect.onchange = calculateTotal;
+        if (lockerSelect) lockerSelect.onchange = calculateTotal;
     }
     // Reset payment method toggle to Cash
     window.__regPaymentMethod = 'Cash';
@@ -4031,7 +4279,135 @@ window.openMemberModal = () => {
         const inp = gcashWrapper.querySelector('input');
         if (inp) inp.value = '';
     }
+
+    // Reset wizard to step 1
+    window.__regWizardStep = 1;
+    regWizardGoTo(1, 'forward');
+
     document.getElementById('memberModal').style.display = 'flex';
+}
+
+// ── Registration Wizard Navigation ──
+window.__regWizardStep = 1;
+
+window.regWizardNext = function (currentStep) {
+    // Validate current step fields before proceeding
+    const currentPanel = document.querySelector(`.reg-wizard-panel[data-panel="${currentStep}"]`);
+    if (currentPanel) {
+        const requiredFields = currentPanel.querySelectorAll('input[required], select[required]');
+        let isValid = true;
+        requiredFields.forEach(f => {
+            if (!f.value || !f.value.trim()) {
+                isValid = false;
+                f.style.borderColor = '#ef4444';
+                f.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+                setTimeout(() => {
+                    f.style.borderColor = '';
+                    f.style.boxShadow = '';
+                }, 2000);
+            }
+        });
+        if (!isValid) {
+            showToast('Please fill in all required fields.', 'error');
+            return;
+        }
+    }
+
+    const nextStep = currentStep + 1;
+    if (nextStep > 3) return;
+
+    // If going to step 3, populate review summary and calculate total
+    if (nextStep === 3) {
+        populateReviewSummary();
+        // Trigger total amount calc
+        const planSelect = document.getElementById('regMemberPlan');
+        const lockerSelect = document.getElementById('regMemberLocker');
+        const totalInput = document.getElementById('regMemberTotalAmount');
+        if (planSelect && totalInput) {
+            const selectedPlan = (window.__membershipPlansData || []).find(p => p.name === planSelect.value);
+            let total = selectedPlan ? Number(selectedPlan.price) : 0;
+            if (lockerSelect && lockerSelect.value) total += 300;
+            totalInput.value = total.toFixed(2);
+        }
+    }
+
+    window.__regWizardStep = nextStep;
+    regWizardGoTo(nextStep, 'forward');
+};
+
+window.regWizardBack = function (currentStep) {
+    const prevStep = currentStep - 1;
+    if (prevStep < 1) return;
+    window.__regWizardStep = prevStep;
+    regWizardGoTo(prevStep, 'back');
+};
+
+function regWizardGoTo(step, direction) {
+    // Update panels
+    const panels = document.querySelectorAll('.reg-wizard-panel');
+    panels.forEach(p => {
+        p.classList.remove('active', 'slide-back');
+        p.style.display = 'none';
+    });
+
+    const targetPanel = document.querySelector(`.reg-wizard-panel[data-panel="${step}"]`);
+    if (targetPanel) {
+        targetPanel.classList.remove('slide-back');
+        if (direction === 'back') {
+            targetPanel.classList.add('slide-back');
+        }
+        targetPanel.classList.add('active');
+        targetPanel.style.display = 'block';
+    }
+
+    // Update step indicators
+    updateRegWizardSteps(step);
+}
+
+function updateRegWizardSteps(activeStep) {
+    const stepItems = document.querySelectorAll('.reg-step-item');
+    const connectors = document.querySelectorAll('.reg-step-connector');
+
+    stepItems.forEach(item => {
+        const s = parseInt(item.dataset.step);
+        item.classList.remove('active', 'completed');
+        if (s === activeStep) {
+            item.classList.add('active');
+        } else if (s < activeStep) {
+            item.classList.add('completed');
+        }
+    });
+
+    connectors.forEach((conn, i) => {
+        conn.classList.remove('completed');
+        if (i + 1 < activeStep) {
+            conn.classList.add('completed');
+        }
+    });
+}
+
+function populateReviewSummary() {
+    const given = (document.getElementById('regMemberGiven')?.value || '').trim();
+    const mi = (document.getElementById('regMemberMI')?.value || '').trim();
+    const family = (document.getElementById('regMemberFamily')?.value || '').trim();
+    const fullName = [given, mi ? mi + '.' : '', family].filter(Boolean).join(' ');
+
+    const email = (document.getElementById('regMemberEmail')?.value || '').trim();
+    const plan = (document.getElementById('regMemberPlan')?.value || '—');
+    const rfid = (document.getElementById('regMemberRfid')?.value || '—').trim();
+
+    const lockerSelect = document.getElementById('regMemberLocker');
+    let lockerText = 'None';
+    if (lockerSelect && lockerSelect.value) {
+        const opt = lockerSelect.options[lockerSelect.selectedIndex];
+        lockerText = opt ? opt.text : lockerSelect.value;
+    }
+
+    if (document.getElementById('reviewName')) document.getElementById('reviewName').textContent = fullName || '—';
+    if (document.getElementById('reviewEmail')) document.getElementById('reviewEmail').textContent = email || '—';
+    if (document.getElementById('reviewPlan')) document.getElementById('reviewPlan').textContent = plan;
+    if (document.getElementById('reviewLocker')) document.getElementById('reviewLocker').textContent = lockerText;
+    if (document.getElementById('reviewRfid')) document.getElementById('reviewRfid').textContent = rfid || '—';
 }
 
 const generatePassword = () => Math.random().toString(36).slice(-8);
@@ -4099,7 +4475,10 @@ if (document.getElementById('memberRegistrationForm')) {
                 plan: plan
             });
 
-            await addDoc(usersCol, {
+            const lockerId = document.getElementById('regMemberLocker') ? document.getElementById('regMemberLocker').value : "";
+            const totalAmount = document.getElementById('regMemberTotalAmount') ? parseFloat(document.getElementById('regMemberTotalAmount').value) : 0;
+
+            const memberDocRef = await addDoc(usersCol, {
                 uid: window.generateUID("Member"),
                 name: `${given} ${family}`,
                 givenName: given,
@@ -4113,12 +4492,25 @@ if (document.getElementById('memberRegistrationForm')) {
                 password: randomPassword,
                 image: imageUrl,
                 emergencyContact: emergency,
-                dateRegistered: currentTimestamp
+                dateRegistered: currentTimestamp,
+                hasLocker: !!lockerId,
+                lockerId: lockerId || null
             });
 
-            // Record membership payment — dynamic price from plans collection
-            const planObj = (window.__membershipPlansData || []).find(p => p.name.toLowerCase() === plan.toLowerCase());
-            const planPrice = planObj ? Number(planObj.price) : (plan === 'Gold Plan' ? 1500 : (plan === 'Silver Plan' ? 1000 : 800));
+            // If locker assigned, update locker status
+            if (lockerId) {
+                const locker = lockersData.find(l => l.id === lockerId);
+                const now = new Date();
+                const expiryDate = new Date(now.setMonth(now.getMonth() + 1)).getTime(); // Default 1 month
+
+                await updateDoc(doc(db, "lockers", lockerId), {
+                    status: 'Occupied',
+                    memberId: memberDocRef.id,
+                    memberName: `${given} ${family}`.trim(),
+                    expiryDate,
+                    assignedAt: Date.now()
+                });
+            }
 
             // Capture payment method + GCash ref
             const regPayMethod = window.__regPaymentMethod || 'Cash';
@@ -4134,8 +4526,8 @@ if (document.getElementById('memberRegistrationForm')) {
             const paymentData = {
                 name: `${given} ${family}`,
                 transactionRef: generateTransactionRef(),
-                amount: planPrice,
-                items: `Membership: ${plan}`,
+                amount: totalAmount,
+                items: `Membership: ${plan}${lockerId ? ' + Locker' : ''}`,
                 type: "Membership",
                 status: "Paid",
                 paymentMethod: regPayMethod,
@@ -4175,7 +4567,12 @@ window.addStaffBatchRow = function () {
         <td><input type="text" class="bs-mi" maxlength="2" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')" style="min-width: 60px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
         <td><input type="text" class="bs-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
         <td><input type="email" class="bs-email" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
-        <td><input type="text" class="bs-specialty" placeholder="Opt. (e.g. Yoga)" style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><select class="bs-specialty" style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;">
+            <option value="General Fitness">General Fitness</option>
+            <option value="Bodybuilding">Bodybuilding</option>
+            <option value="Yoga">Yoga</option>
+            <option value="HIIT">HIIT</option>
+        </select></td>
         <td><input type="text" class="bs-rfid rfid-register-input" placeholder="Tap Card..." required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
         <td>
             <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -4411,10 +4808,16 @@ function initUI() {
         const role = localStorage.getItem("userRole");
         const trainerStatus = localStorage.getItem("trainerShiftStatus");
 
+        // Update specific Trainer dashboard elements if they exist
+        const shiftStatusText = document.getElementById('shiftStatusText');
+        if (shiftStatusText) {
+            shiftStatusText.innerText = trainerStatus || "Off Floor";
+        }
+
         document.querySelectorAll('.card-black, .grid-stat-box').forEach(card => {
             const valueDiv = card.querySelector('.value');
-            if (valueDiv && (valueDiv.innerText.includes('Shift') || valueDiv.innerText.includes('Checking Status'))) {
-                valueDiv.innerText = "Shift Status";
+            if (valueDiv && (valueDiv.innerText.includes('Shift') || valueDiv.innerText.includes('Checking Status') || card.querySelector('#shiftStatusText'))) {
+                if (valueDiv && !card.querySelector('#shiftStatusText')) valueDiv.innerText = "Shift Status";
 
                 let timerSpan = card.querySelector('.shift-timer');
                 if (!timerSpan && card.classList.contains('card-black')) {
@@ -4683,6 +5086,25 @@ function renderBookings() {
                 }
             }
         }
+
+        // --- Closest Booking Logic ---
+        const now = new Date();
+        const upcoming = displayData.filter(b => b.status === "Confirmed" && new Date(`${b.date}T${b.time}`) > now);
+        upcoming.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+
+        const valEl = document.getElementById('closestBookingValue');
+        const subEl = document.getElementById('closestBookingSub');
+        if (valEl && subEl) {
+            if (upcoming.length > 0) {
+                const closest = upcoming[0];
+                const dateObj = new Date(`${closest.date}T${closest.time}`);
+                valEl.innerText = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                subEl.innerHTML = `<i class="fa-solid fa-user"></i> ${closest.memberName} <br> <i class="fa-solid fa-calendar-day"></i> ${dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+            } else {
+                valEl.innerText = "No Sessions";
+                subEl.innerText = "Check back later!";
+            }
+        }
     }
 
     const dateFilter = document.getElementById('bookingDateFilter')?.value;
@@ -4699,12 +5121,15 @@ function renderBookings() {
         const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
         if (loggedInRole === "member") {
+            const remarksHtml = (b.status === "Cancelled" || b.status === "Declined") && b.cancelRemarks 
+                ? `<div style="font-size: 11px; color: #e74c3c; margin-top: 4px; font-style: italic;"><i class="fas fa-comment-dots"></i> Reason: ${b.cancelRemarks}</div>`
+                : "";
             return `
                 <tr>
                     <td>${b.trainerName}</td>
                     <td>${dateStr}</td>
                     <td><span class="badge active" style="background: var(--primary-red); color: white; border: none;"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
-                    <td><span class="badge ${badgeClass}">${b.status}</span></td>
+                    <td><span class="badge ${badgeClass}">${b.status}</span>${remarksHtml}</td>
                 </tr>
             `;
         } else {
@@ -4725,16 +5150,23 @@ function renderBookings() {
                 `;
             }
 
+            const remarksHtml = (b.status === "Cancelled" || b.status === "Declined") && b.cancelRemarks 
+                ? `<div style="font-size: 11px; color: #e74c3c; margin-top: 4px; font-style: italic;"><i class="fas fa-comment-dots"></i> Reason: ${b.cancelRemarks}</div>`
+                : "";
+
             return `
                 <tr>
-                    <td>${loggedInRole === 'trainer' && b.memberId ? `<a href="javascript:void(0)" onclick="window.openMemberProfile('${b.memberId}')" style="color: var(--primary-red); font-weight: 600; text-decoration: none; border-bottom: 1px dashed var(--primary-red);">${b.memberName}</a>` : b.memberName}</td>
+                    <td>
+                        ${b.memberId ? `<a href="javascript:void(0)" onclick="window.openMemberProfile('${b.memberId}')" style="color: var(--primary-red); font-weight: 600; text-decoration: none; border-bottom: 1px dashed var(--primary-red);">${b.memberName}</a>` : b.memberName}
+                    </td>
                     <td>${b.trainerName}</td>
                     <td>${dateStr}</td>
                     <td><span class="badge active" style="background: var(--primary-red); color: white; border: none;"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
-                    <td><span class="badge ${badgeClass}">${b.status}</span></td>
+                    <td><span class="badge ${badgeClass}">${b.status}</span>${remarksHtml}</td>
                     <td>${actions}</td>
                 </tr>
             `;
+
         }
     };
 
@@ -4748,12 +5180,20 @@ function renderBookings() {
 window.filterBookingsByDate = () => { renderBookings(); }
 
 window.updateBookingStatus = async (id, newStatus) => {
+    let remarks = "";
+    if (newStatus === 'Cancelled') {
+        remarks = prompt("Please enter remarks for cancellation:");
+        if (remarks === null) return; 
+    }
     showConfirm(`Are you sure you want to mark this session as ${newStatus}?`, async () => {
-        await updateDoc(doc(db, "bookings", id), { status: newStatus });
+        const updateData = { status: newStatus };
+        if (remarks) updateData.cancelRemarks = remarks;
+        await updateDoc(doc(db, "bookings", id), updateData);
         showToast(`Session marked as ${newStatus}.`, "success");
-        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}.`);
+        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}. ${remarks ? 'Reason: ' + remarks : ''}`);
     });
 }
+
 
 window.openMemberBookingModal = () => {
     // Check if membership is expired before opening
@@ -4808,8 +5248,30 @@ if (document.getElementById('memberBookingForm')) {
 
         if (isBookingSessionInPast(bookDate, bookTime)) {
             showToast("Choose a date and time in the future. Past sessions cannot be booked.", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
             return;
         }
+
+        // Conflict Detection
+        try {
+            const q = query(bookingsCol, where("trainerId", "==", trainerId), where("date", "==", bookDate), where("status", "==", "Confirmed"));
+            const snap = await getDocs(q);
+            let conflict = false;
+            const [bH, bM] = bookTime.split(':').map(Number);
+            const bookMins = bH * 60 + bM;
+            snap.forEach(doc => {
+                const timeStr = doc.data().time;
+                if (timeStr) {
+                    const [eH, eM] = timeStr.split(':').map(Number);
+                    if (Math.abs(bookMins - (eH * 60 + eM)) < 60) conflict = true;
+                }
+            });
+            if (conflict) {
+                showToast("Trainer already booked within 1 hour of this time.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+        } catch (e) { console.warn("Conflict check skipped", e); }
 
         await addDoc(bookingsCol, {
             memberId, memberName,
@@ -4911,17 +5373,28 @@ window.openEditBookingModal = (id) => {
     document.getElementById('editBookingId').value = b.id;
     document.getElementById('editBookingDetails').innerText = `${b.memberName} with ${b.trainerName} on ${dateStr} at ${timeStr}`;
     document.getElementById('editBookingStatus').value = b.status;
+    if (document.getElementById('editBookingRemarks')) {
+        document.getElementById('editBookingRemarks').value = b.cancelRemarks || "";
+    }
     document.getElementById('editBookingModal').style.display = 'flex';
+
 }
 
 if (document.getElementById('editBookingForm')) {
     document.getElementById('editBookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const id = document.getElementById('editBookingId').value, status = document.getElementById('editBookingStatus').value;
-        await updateDoc(doc(db, "bookings", id), { status: status });
+        const id = document.getElementById('editBookingId').value;
+        const status = document.getElementById('editBookingStatus').value;
+        const remarks = document.getElementById('editBookingRemarks') ? document.getElementById('editBookingRemarks').value : "";
+        
+        const updateData = { status: status };
+        if (remarks) updateData.cancelRemarks = remarks;
+        
+        await updateDoc(doc(db, "bookings", id), updateData);
         window.closeModal('editBookingModal');
-        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} status changed to ${status}.`);
+        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} status changed to ${status}. ${remarks ? 'Reason: ' + remarks : ''}`);
     });
+
 }
 
 window.deleteBooking = async (id) => {
@@ -5158,7 +5631,7 @@ window.renderTodayBookings = function () {
                         <div class="booking-class">${b.sessionName || 'Personal Training'} with ${b.trainerName}</div>
                         <div style="width: 8px; height: 8px; border-radius: 50%; background: #27ae60;" title="Scheduled"></div>
                     </div>
-                    <div class="booking-member">${b.memberName}</div>
+                    <div class="booking-member">${b.memberId ? `<a href="javascript:void(0)" onclick="window.openMemberProfile('${b.memberId}')" style="color: inherit; text-decoration: none; border-bottom: 1px dashed currentColor; transition: opacity 0.2s;" onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">${b.memberName}</a>` : b.memberName}</div>
                 </div>
             </div>
         `;
@@ -5365,26 +5838,32 @@ window.openMemberProfile = async function (memberId) {
         }
 
         // --- Session History & Total Sessions ---
-        const trainerUserId = localStorage.getItem("userId");
+        const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
+        const loggedInUserId = localStorage.getItem("userId");
         const memberBookings = bookingsData.filter(b => b.memberId === memberId);
-        const trainerBookings = memberBookings.filter(b => b.trainerId === trainerUserId);
+        
+        // Admins and Staff see all member bookings. Trainers see only their own.
+        const visibleBookings = (loggedInRole === 'trainer') 
+            ? memberBookings.filter(b => b.trainerId === loggedInUserId)
+            : memberBookings;
         
         // Sort by date descending
-        trainerBookings.sort((a, b) => {
+        visibleBookings.sort((a, b) => {
             const dateA = new Date(`${a.date}T${a.time || '00:00'}`);
             const dateB = new Date(`${b.date}T${b.time || '00:00'}`);
             return dateB - dateA;
         });
 
         const totalEl = document.getElementById('mpTotalSessions');
-        if (totalEl) totalEl.innerText = trainerBookings.length;
+        if (totalEl) totalEl.innerText = visibleBookings.length;
 
         const sessionList = document.getElementById('mpSessionList');
         if (sessionList) {
-            if (trainerBookings.length === 0) {
-                sessionList.innerHTML = `<div class="mp-empty-state">No session history with you yet.</div>`;
+            if (visibleBookings.length === 0) {
+                const emptyMsg = (loggedInRole === 'trainer') ? "No session history with you yet." : "No session history yet.";
+                sessionList.innerHTML = `<div class="mp-empty-state">${emptyMsg}</div>`;
             } else {
-                const recent = trainerBookings.slice(0, 5);
+                const recent = visibleBookings.slice(0, 5);
                 sessionList.innerHTML = recent.map(s => {
                     const sDate = new Date(`${s.date}T${s.time || '00:00'}`);
                     const dateStr = sDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });

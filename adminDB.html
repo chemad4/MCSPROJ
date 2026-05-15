@@ -476,6 +476,205 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
 
+        /* ── Registration Wizard Steps ── */
+        .reg-wizard-steps {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            padding: 0 10px 20px 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .reg-step-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .reg-step-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            border: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .reg-step-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            transition: color 0.3s ease;
+        }
+
+        .reg-step-connector {
+            flex: 1;
+            height: 2px;
+            background: var(--border-color);
+            margin: 0 8px;
+            margin-bottom: 22px;
+            border-radius: 2px;
+            transition: background 0.35s ease;
+            min-width: 30px;
+        }
+
+        .reg-step-item.active .reg-step-circle {
+            background: var(--dark-black);
+            border-color: var(--dark-black);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .reg-step-item.active .reg-step-label {
+            color: var(--dark-black);
+        }
+
+        .reg-step-item.completed .reg-step-circle {
+            background: #10B981;
+            border-color: #10B981;
+            color: white;
+        }
+
+        .reg-step-item.completed .reg-step-label {
+            color: #10B981;
+        }
+
+        .reg-step-connector.completed {
+            background: #10B981;
+        }
+
+        /* ── Wizard Panel Animation ── */
+        .reg-wizard-panel {
+            display: none;
+            animation: regWizardSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .reg-wizard-panel.active {
+            display: block;
+        }
+
+        @keyframes regWizardSlideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes regWizardSlideBack {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .reg-wizard-panel.slide-back {
+            animation: regWizardSlideBack 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* ── Review Summary Card ── */
+        .reg-review-card {
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.04) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 18px;
+            margin-bottom: 4px;
+        }
+
+        .reg-review-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .reg-review-title i {
+            color: #10B981;
+        }
+
+        .reg-review-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .reg-review-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        }
+
+        .reg-review-row:last-child {
+            border-bottom: none;
+        }
+
+        .reg-review-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .reg-review-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--dark-black);
+            text-align: right;
+            max-width: 60%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Dark theme overrides */
+        body.dark-theme .reg-step-circle {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        body.dark-theme .reg-step-item.active .reg-step-circle {
+            background: var(--white);
+            border-color: var(--white);
+            color: var(--dark-black);
+        }
+
+        body.dark-theme .reg-step-item.active .reg-step-label {
+            color: var(--white);
+        }
+
+        body.dark-theme .reg-review-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.06) 100%);
+        }
+
+        body.dark-theme .reg-review-row {
+            border-bottom-color: rgba(255, 255, 255, 0.06);
+        }
+
         .process-payment-btn {
             width: 100%;
             padding: 15px;
@@ -858,7 +1057,7 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="kpi-value"><span id="presentMembers">0</span>/50</div>
+                            <div class="kpi-value"><span id="presentMembers">0</span>/<span id="dashTotalCapacity">0</span></div>
                             <div class="kpi-trend">
                                 <!-- Progress bar removed as per quiet luxury refinements -->
                             </div>
@@ -937,7 +1136,7 @@
                                         <div class="stat-detail-row">
                                             <span class="label"><i class="fa-solid fa-circle"
                                                     style="color: #E2E8F0; font-size: 8px;"></i> Available Slots</span>
-                                            <span class="value" id="detailAvailableCount">50</span>
+                                            <span class="value" id="detailAvailableCount">0</span>
                                         </div>
                                         <div class="stat-detail-row grand-total">
                                             <span class="label">Occupancy Rate</span>
@@ -945,6 +1144,33 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+
+                    <!-- ── Charts Row ── -->
+                    <div class="widgets-grid">
+                        <div class="panel">
+                            <div class="panel-header"
+                                style="background: var(--panel-bg); border-bottom: none; padding-bottom: 0;">
+                                <i class="fa-solid fa-chart-bar"></i> Weekly Revenue
+                            </div>
+                            <div class="panel-body" style="padding: 16px 20px; height: 260px;">
+                                <canvas id="weeklyRevenueChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-header"
+                                style="background: var(--panel-bg); border-bottom: none; padding-bottom: 0;">
+                                <i class="fa-solid fa-chart-pie"></i> Membership Distribution
+                            </div>
+                            <div class="panel-body" style="padding: 16px 20px; height: 260px; display: flex; align-items: center; justify-content: center;">
+                                <div style="width: 200px; height: 200px; position: relative;">
+                                    <canvas id="memberDistChart"></canvas>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 10px; margin-left: 24px;" id="memberDistLegend"></div>
                             </div>
                         </div>
                     </div>
@@ -970,6 +1196,15 @@
                     </div>
                 </div>
 
+                <!-- Right Column (1fr) -->
+                <div class="dashboard-side-col" style="display: flex; flex-direction: column; gap: 20px;">
+                    <div class="panel">
+                        <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Trainers on Floor</div>
+                        <div class="panel-body" id="dashActiveTrainersFeed" style="max-height: 800px; overflow-y: auto;">
+                            <p style="color: var(--text-muted); font-size: 14px;">Loading...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -978,7 +1213,15 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="machineSearch" placeholder="Search equipment..."
-                        onkeyup="filterGrid('machinesGrid', 'machineSearch')">
+                        onkeyup="filterEquipment()">
+                </div>
+                <div class="filter-group">
+                    <select id="equipFilterStatus" onchange="filterEquipment()">
+                        <option value="all">All Statuses</option>
+                        <option value="Operational">Operational</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Out of Order">Out of Order</option>
+                    </select>
                 </div>
                 <div class="control-cluster">
                     <div class="view-toggle-group">
@@ -1039,7 +1282,7 @@
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" id="productSearch" placeholder="Search products..."
-                        onkeyup="filterGrid('productsGrid', 'productSearch')">
+                        onkeyup="filterProducts()">
                 </div>
                 <button class="action-btn" onclick="openProductModal()"><i class="fas fa-plus"></i> Add Product</button>
             </div>
@@ -1333,11 +1576,11 @@
                         <thead>
                             <tr>
                                 <th onclick="sortMembers('name')">Member <i class="fas fa-sort"></i></th>
-                                <th onclick="sortMembers('plan')">Plan <i class="fas fa-sort"></i></th>
-                                <th onclick="sortMembers('daysLeft')">Time Left <i class="fas fa-sort"></i></th>
-                                <th onclick="sortMembers('credit')">Credit Bal. <i class="fas fa-sort"></i></th>
-                                <th>Status</th>
-                                <th style="width: 50px;"></th>
+                                <th onclick="sortMembers('plan')">Membership Plan <i class="fas fa-sort"></i></th>
+                                <th onclick="sortMembers('daysLeft')">Time Remaining <i class="fas fa-sort"></i></th>
+                                <th onclick="sortMembers('credit')">Balance <i class="fas fa-sort"></i></th>
+                                <th>Account Status</th>
+                                <th style="text-align: right;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1747,7 +1990,7 @@
             <!-- List View Panel -->
             <div class="panel" id="bkListPanel">
                 <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <span><i class="fas fa-calendar-alt" style="margin-right: 6px;"></i> Master Booking Calendar</span>
+                    <span><i class="fas fa-calendar-alt" style="margin-right: 6px;"></i> Session Schedules</span>
                     <span class="bk-record-count" id="bkRecordCount"
                         style="font-weight: 400; font-size: 12px; color: var(--text-muted);"></span>
                 </div>
@@ -2076,7 +2319,7 @@
             <div class="flex justify-between items-center mb-6">
                 <div>
                     <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i
-                            class="fa-solid fa-lock mr-2 text-slate-400"></i>Locker System</h2>
+                            class="fa-solid fa-lock mr-2 text-slate-400"></i>Locker Management</h2>
                     <p class="text-sm text-slate-500 mt-1">Manage locker assignments and availability.</p>
                 </div>
                 <div class="flex gap-2">
@@ -2089,7 +2332,7 @@
             </div>
 
             <!-- Locker Stats -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
                     <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Total Lockers</div>
                     <div class="text-2xl font-bold text-slate-900" id="totalLockersCount">0</div>
@@ -2101,10 +2344,6 @@
                 <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
                     <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Occupied</div>
                     <div class="text-2xl font-bold text-amber-600" id="occupiedLockersCount">0</div>
-                </div>
-                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Maintenance</div>
-                    <div class="text-2xl font-bold text-slate-400" id="maintLockersCount">0</div>
                 </div>
             </div>
 
@@ -2588,67 +2827,149 @@
     </div>
 
     <div id="memberModal" class="modal">
-        <div class="modal-content" style="max-width: 520px;">
-            <div class="modal-header">
-                <h3>Register Member</h3><span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
+        <div class="modal-content" style="max-width: 540px; padding: 0; overflow: hidden;">
+            <!-- Wizard Header -->
+            <div style="padding: 24px 32px 0 32px;">
+                <div class="modal-header" style="margin-bottom: 8px;">
+                    <h3><i class="fas fa-user-plus" style="margin-right: 8px; color: var(--primary-red);"></i> Register Member</h3>
+                    <span class="close-btn" onclick="closeModal('memberModal')">&times;</span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 16px 0;"><i class="fas fa-info-circle" style="margin-right: 4px;"></i> Member will be automatically emailed their login password.</p>
+                <!-- Step Progress Bar -->
+                <div class="reg-wizard-steps" id="regWizardSteps">
+                    <div class="reg-step-item active" data-step="1">
+                        <div class="reg-step-circle">1</div>
+                        <span class="reg-step-label">Personal</span>
+                    </div>
+                    <div class="reg-step-connector"></div>
+                    <div class="reg-step-item" data-step="2">
+                        <div class="reg-step-circle">2</div>
+                        <span class="reg-step-label">Plan & RFID</span>
+                    </div>
+                    <div class="reg-step-connector"></div>
+                    <div class="reg-step-item" data-step="3">
+                        <div class="reg-step-circle">3</div>
+                        <span class="reg-step-label">Payment</span>
+                    </div>
+                </div>
             </div>
-            <form class="modal-form" id="memberRegistrationForm">
-                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;"><i
-                        class="fas fa-info-circle"></i> Member will be automatically emailed their login password.</p>
 
-                <div class="profile-upload-wrapper">
-                    <img src="images/default-profile.png" id="regMemberPreview" class="profile-upload-img">
-                    <div class="profile-upload-btn" onclick="openImageChoice('regMemberPreview', 'regMemberImageFile', 'regMemberImage')">
-                        <i class="fas fa-pencil-alt"></i>
-                    </div>
-                </div>
-                <input type="file" id="regMemberImageFile" accept="image/*" style="display: none;"
-                    onchange="previewImage(this, 'regMemberPreview')">
-                <input type="hidden" id="regMemberImage">
-
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="regMemberGiven" placeholder="First Name" required style="flex: 2;"
-                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
-                    <input type="text" id="regMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2"
-                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
-                </div>
-                <input type="text" id="regMemberFamily" placeholder="Last Name" required
-                    oninput="this.value = this.value.replace(/[0-9]/g, '')">
-                <input type="email" id="regMemberEmail" placeholder="Email Address" required>
-                <input type="text" id="regMemberEmergency" placeholder="Emergency Contact Name/Number" required>
-
-                <select id="regMemberPlan" required>
-                    <option value="" disabled selected>Select Plan...</option>
-                    <option value="Gold Plan">Gold Plan</option>
-                    <option value="Silver Plan">Silver Plan</option>
-                </select>
-
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag
-                    (Tap Card or type):</p>
-                <input type="text" id="regMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card..."
-                    required>
-
-                <!-- Payment Method Selector -->
-                <div class="reg-payment-section">
-                    <div class="section-label"><i class="fa-solid fa-wallet"></i> Payment Method</div>
-                    <div class="reg-payment-toggle" id="regPaymentToggle">
-                        <div class="pay-opt selected" data-method="Cash"
-                            onclick="selectRegPayment('Cash', this, 'reg')">
-                            <i class="fa-solid fa-money-bill-wave"></i> Cash
-                        </div>
-                        <div class="pay-opt" data-method="GCash" onclick="selectRegPayment('GCash', this, 'reg')">
-                            <i class="fa-solid fa-mobile-screen-button"></i> GCash
+            <form class="modal-form" id="memberRegistrationForm" style="margin: 0;">
+                <!-- STEP 1: Personal Information -->
+                <div class="reg-wizard-panel active" data-panel="1" style="padding: 24px 32px;">
+                    <div class="profile-upload-wrapper">
+                        <img src="images/default-profile.png" id="regMemberPreview" class="profile-upload-img">
+                        <div class="profile-upload-btn" onclick="openImageChoice('regMemberPreview', 'regMemberImageFile', 'regMemberImage')">
+                            <i class="fas fa-pencil-alt"></i>
                         </div>
                     </div>
-                    <div class="gcash-ref-wrapper" id="regGcashRefWrapper">
-                        <input type="text" id="regGcashRefId" placeholder="GCash Reference ID (e.g. 1234 5678 9012)"
-                            autocomplete="off">
+                    <input type="file" id="regMemberImageFile" accept="image/*" style="display: none;"
+                        onchange="previewImage(this, 'regMemberPreview')">
+                    <input type="hidden" id="regMemberImage">
+
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="regMemberGiven" placeholder="First Name" required style="flex: 2;"
+                            oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                        <input type="text" id="regMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2"
+                            oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    </div>
+                    <input type="text" id="regMemberFamily" placeholder="Last Name" required
+                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    <input type="email" id="regMemberEmail" placeholder="Email Address" required>
+                    <input type="text" id="regMemberEmergency" placeholder="Emergency Contact Name/Number" required>
+
+                    <div class="btn-row" style="margin-top: 8px;">
+                        <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('memberModal')">Cancel</button>
+                        <button type="button" class="action-btn" onclick="regWizardNext(1)">Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i></button>
                     </div>
                 </div>
 
-                <div class="btn-row">
-                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('memberModal')">Cancel</button>
-                    <button type="submit" class="action-btn"><i class="fas fa-paper-plane"></i> Register & Send Email</button>
+                <!-- STEP 2: Plan, Locker & RFID -->
+                <div class="reg-wizard-panel" data-panel="2" style="padding: 24px 32px;">
+                    <div class="form-group">
+                        <label class="form-label">Membership Plan</label>
+                        <select id="regMemberPlan" required>
+                            <option value="" disabled selected>Select Plan...</option>
+                            <option value="Gold Plan">Gold Plan</option>
+                            <option value="Silver Plan">Silver Plan</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Assign Locker (Optional)</label>
+                        <select id="regMemberLocker" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                            <option value="">No Locker</option>
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">RFID Tag (Tap Card or Type)</label>
+                        <input type="text" id="regMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card..." required style="margin-bottom: 0;">
+                    </div>
+
+                    <div class="btn-row" style="margin-top: 16px;">
+                        <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="regWizardBack(2)"><i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
+                        <button type="button" class="action-btn" onclick="regWizardNext(2)">Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i></button>
+                    </div>
+                </div>
+
+                <!-- STEP 3: Payment & Review -->
+                <div class="reg-wizard-panel" data-panel="3" style="padding: 24px 32px;">
+                    <!-- Review Summary Card -->
+                    <div class="reg-review-card" id="regReviewCard">
+                        <div class="reg-review-title"><i class="fas fa-clipboard-check"></i> Registration Summary</div>
+                        <div class="reg-review-grid">
+                            <div class="reg-review-row">
+                                <span class="reg-review-label">Name</span>
+                                <span class="reg-review-value" id="reviewName">—</span>
+                            </div>
+                            <div class="reg-review-row">
+                                <span class="reg-review-label">Email</span>
+                                <span class="reg-review-value" id="reviewEmail">—</span>
+                            </div>
+                            <div class="reg-review-row">
+                                <span class="reg-review-label">Plan</span>
+                                <span class="reg-review-value" id="reviewPlan">—</span>
+                            </div>
+                            <div class="reg-review-row">
+                                <span class="reg-review-label">Locker</span>
+                                <span class="reg-review-value" id="reviewLocker">None</span>
+                            </div>
+                            <div class="reg-review-row">
+                                <span class="reg-review-label">RFID</span>
+                                <span class="reg-review-value" id="reviewRfid">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Section -->
+                    <div class="reg-payment-section" style="margin-top: 16px; padding-top: 0; border-top: none;">
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label class="form-label">Total Amount (₱)</label>
+                            <input type="number" id="regMemberTotalAmount" placeholder="0.00" min="0" step="0.01" required readonly 
+                                style="width: 100%; padding: 12px 14px; border: 1.5px solid var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.03); color: var(--text-primary); font-weight: 700; font-size: 18px; cursor: not-allowed; text-align: center; letter-spacing: 0.02em;">
+                        </div>
+                        <div class="section-label"><i class="fa-solid fa-wallet"></i> Payment Method</div>
+                        <div class="reg-payment-toggle" id="regPaymentToggle">
+                            <div class="pay-opt selected" data-method="Cash"
+                                onclick="selectRegPayment('Cash', this, 'reg')">
+                                <i class="fa-solid fa-money-bill-wave"></i> Cash
+                            </div>
+                            <div class="pay-opt" data-method="GCash" onclick="selectRegPayment('GCash', this, 'reg')">
+                                <i class="fa-solid fa-mobile-screen-button"></i> GCash
+                            </div>
+                        </div>
+                        <div class="gcash-ref-wrapper" id="regGcashRefWrapper">
+                            <input type="text" id="regGcashRefId" placeholder="GCash Reference ID (e.g. 1234 5678 9012)"
+                                autocomplete="off">
+                        </div>
+                    </div>
+
+                    <div class="btn-row" style="margin-top: 16px;">
+                        <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="regWizardBack(3)"><i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
+                        <button type="submit" class="action-btn" style="background: #10B981;"><i class="fas fa-check-circle" style="margin-right: 6px;"></i> Confirm & Register</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -2733,7 +3054,12 @@
                 <input type="email" id="regStaffEmail" placeholder="Email Address" required>
 
                 <div id="regSpecialtyContainer" style="display: none;">
-                    <input type="text" id="regStaffSpecialty" placeholder="Specialty (e.g. Yoga, Boxing)">
+                    <select id="regStaffSpecialty" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <option value="General Fitness">General Fitness</option>
+                        <option value="Bodybuilding">Bodybuilding</option>
+                        <option value="Yoga">Yoga</option>
+                        <option value="HIIT">HIIT</option>
+                    </select>
                 </div>
 
                 <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag
@@ -2743,7 +3069,7 @@
 
                 <div class="btn-row">
                     <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('staffModal')">Cancel</button>
-                    <button type="submit" class="action-btn"><i class="fas fa-paper-plane"></i> Register & Send Email</button>
+                    <button type="submit" class="action-btn"><i class="fas fa-user-plus"></i> Register Staff</button>
                 </div>
             </form>
         </div>
@@ -2778,7 +3104,12 @@
                     oninput="this.value = this.value.replace(/[0-9]/g, '')">
 
                 <div id="editSpecialtyContainer" style="display: none;">
-                    <input type="text" id="editStaffSpecialty" placeholder="Specialty (e.g. Yoga, Boxing)">
+                    <select id="editStaffSpecialty" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <option value="General Fitness">General Fitness</option>
+                        <option value="Bodybuilding">Bodybuilding</option>
+                        <option value="Yoga">Yoga</option>
+                        <option value="HIIT">HIIT</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
@@ -2822,6 +3153,11 @@
                         <option value="No Show">No Show</option>
                     </select>
                 </div>
+                <div class="form-group" id="cancelRemarksGroup">
+                    <label class="form-label">Remarks / Cancellation Reason</label>
+                    <textarea id="editBookingRemarks" placeholder="Enter reason for cancellation or status change..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary); min-height: 80px;"></textarea>
+                </div>
+
                 <div class="btn-row">
                     <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editBookingModal')">Cancel</button>
                     <button type="submit" class="action-btn">Save Changes</button>
@@ -2882,6 +3218,96 @@
                     <i class="fas fa-link"></i> Paste Image URL
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Member Profile Modal — Premium Redesign -->
+    <div id="memberProfileModal" class="modal">
+        <div class="modal-content mp-modal-shell">
+            <!-- Header Banner -->
+            <div class="mp-banner">
+                <button class="mp-close-btn" onclick="closeModal('memberProfileModal')" title="Close">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <div class="mp-banner-bg"></div>
+                <div class="mp-avatar-ring" id="mpAvatar">M</div>
+            </div>
+
+            <!-- Identity Block -->
+            <div class="mp-identity">
+                <h2 class="mp-name" id="mpName">Member Name</h2>
+                <p class="mp-email" id="mpEmail">member@email.com</p>
+                <div class="mp-status-pill" id="mpStatus">Active</div>
+            </div>
+
+            <!-- Quick Stats Row -->
+            <div class="mp-stats-row">
+                <div class="mp-stat-chip">
+                    <i class="fa-solid fa-id-badge"></i>
+                    <div>
+                        <span class="mp-stat-label">UID</span>
+                        <span class="mp-stat-value" id="mpUid">—</span>
+                    </div>
+                </div>
+                <div class="mp-stat-chip">
+                    <i class="fa-solid fa-crown"></i>
+                    <div>
+                        <span class="mp-stat-label">Plan</span>
+                        <span class="mp-stat-value" id="mpPlan">—</span>
+                    </div>
+                </div>
+                <div class="mp-stat-chip">
+                    <i class="fa-solid fa-calendar-plus"></i>
+                    <div>
+                        <span class="mp-stat-label">Member Since</span>
+                        <span class="mp-stat-value" id="mpSince">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fitness Goals Card -->
+            <div class="mp-section-card">
+                <div class="mp-section-title">
+                    <i class="fa-solid fa-bullseye"></i> Fitness Goals
+                </div>
+                <div class="mp-goals-text" id="mpGoals">No goals set by the member yet.</div>
+            </div>
+
+            <!-- Contact Info -->
+            <div class="mp-section-card">
+                <div class="mp-section-title">
+                    <i class="fa-solid fa-address-card"></i> Contact & Details
+                </div>
+                <div class="mp-info-grid">
+                    <div class="mp-info-row">
+                        <span class="mp-info-label"><i class="fa-solid fa-phone"></i> Emergency</span>
+                        <span class="mp-info-value" id="mpEmergency">—</span>
+                    </div>
+                    <div class="mp-info-row">
+                        <span class="mp-info-label"><i class="fa-solid fa-clock"></i> Plan Status</span>
+                        <span class="mp-info-value" id="mpPlanStatus">—</span>
+                    </div>
+                    <div class="mp-info-row">
+                        <span class="mp-info-label"><i class="fa-solid fa-dumbbell"></i> Total Sessions</span>
+                        <span class="mp-info-value" id="mpTotalSessions">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Session History -->
+            <div class="mp-section-card">
+                <div class="mp-section-title">
+                    <i class="fa-solid fa-history"></i> Recent Sessions
+                </div>
+                <div class="mp-session-list" id="mpSessionList">
+                    <div class="mp-empty-state">No session history yet.</div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <button class="mp-message-btn" id="mpMessageBtn">
+                <i class="fa-solid fa-paper-plane"></i> Send Message
+            </button>
         </div>
     </div>
 
