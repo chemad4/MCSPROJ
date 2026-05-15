@@ -2620,18 +2620,7 @@ body.dark-theme .table-footer {
     color: #92400E;
 }
 
-/* Status: Maintenance */
-.locker-card.maintenance {
-    border-left: 3px solid #94A3B8;
-    opacity: 0.75;
-}
-.locker-card.maintenance .locker-icon {
-    background: rgba(148, 163, 184, 0.12);
-    color: #64748B;
-}
-.locker-card.maintenance .locker-status-text {
-    color: #64748B;
-}
+
 
 .locker-number {
     font-weight: 700;
@@ -3566,9 +3555,7 @@ body.dark-theme .locker-card.available {
     border-left-color: #34d399;
 }
 
-body.dark-theme .locker-card.maintenance {
-    border-left-color: #64748B;
-}
+
 
 body.dark-theme .locker-card.available .locker-icon {
     background: rgba(16, 185, 129, 0.15);
@@ -3580,10 +3567,7 @@ body.dark-theme .locker-card.occupied .locker-icon {
     color: #FCD34D;
 }
 
-body.dark-theme .locker-card.maintenance .locker-icon {
-    background: rgba(148, 163, 184, 0.1);
-    color: #94A3B8;
-}
+
 
 body.dark-theme .locker-card.available .locker-status-text {
     color: #6EE7B7;
@@ -3595,10 +3579,7 @@ body.dark-theme .locker-card.occupied .locker-status-text {
     background: rgba(245, 158, 11, 0.1);
 }
 
-body.dark-theme .locker-card.maintenance .locker-status-text {
-    color: #94A3B8;
-    background: rgba(148, 163, 184, 0.08);
-}
+
 
 body.dark-theme .inventory-card.selected {
     background: rgba(239, 68, 68, 0.1);

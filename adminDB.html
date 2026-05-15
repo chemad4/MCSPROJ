@@ -2490,11 +2490,6 @@
                     <p>Occupied</p>
                     <h3 id="occupiedLockersCount" style="color: #991b1b;">0</h3>
                 </div>
-                <!-- Maintenance -->
-                <div class="grid-stat-box" style="cursor: default;">
-                    <p>Maintenance</p>
-                    <h3 id="maintLockersCount" style="color: #64748b;">0</h3>
-                </div>
             </div>
 
             <!-- Locker Grid -->
@@ -2732,27 +2727,11 @@
                             onclick="closeModal('assignLockerModal')">Cancel</button>
                         <div style="display: flex; flex-direction: column; gap: 8px; flex: 1.5;">
                             <button type="submit" class="action-btn" style="width: 100%; justify-content: center;">Assign Locker</button>
-                            <button type="button" class="text-xs font-semibold text-slate-500 hover:text-amber-600 transition-colors" onclick="toggleLockerMaintenance()">
-                                <i class="fa-solid fa-tools mr-1"></i> Put in Maintenance
-                            </button>
                         </div>
                     </div>
                 </form>
 
-                <!-- Maintenance Status Info -->
-                <div id="lockerMaintenanceInfo" style="display: none; text-align: center; padding: 20px 0;">
-                    <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-2xl mx-auto mb-4">
-                        <i class="fa-solid fa-tools"></i>
-                    </div>
-                    <h4 class="font-bold text-slate-900">Under Maintenance</h4>
-                    <p class="text-sm text-slate-500 mb-6">This locker is currently unavailable for assignment.</p>
-                    <div class="flex gap-3">
-                        <button type="button" class="btn-cancel" style="flex: 1;" onclick="closeModal('assignLockerModal')">Close</button>
-                        <button type="button" class="action-btn" style="flex: 1.5; background: #10B981; color: white;" onclick="toggleLockerMaintenance()">
-                            <i class="fa-solid fa-check mr-2"></i> Set to Available
-                        </button>
-                    </div>
-                </div>
+
 
                 <div id="activeAssignmentInfo" style="display: none;">
                     <div class="divider my-4" style="height: 1px; background: var(--border-color); margin: 20px 0;">

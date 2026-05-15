@@ -3562,20 +3562,18 @@ function renderLockers() {
     // Stats
     const total = lockersData.length;
     const occupied = lockersData.filter(l => l.status === 'Occupied').length;
-    const maintenance = lockersData.filter(l => l.status === 'Maintenance').length;
-    const available = total - occupied - maintenance;
+    const available = total - occupied;
 
     if (document.getElementById('totalLockersCount')) document.getElementById('totalLockersCount').innerText = total;
     if (document.getElementById('availableLockersCount')) document.getElementById('availableLockersCount').innerText = available;
     if (document.getElementById('occupiedLockersCount')) document.getElementById('occupiedLockersCount').innerText = occupied;
-    if (document.getElementById('maintLockersCount')) document.getElementById('maintLockersCount').innerText = maintenance;
 
     if (total === 0) {
         grid.innerHTML = '<div style="grid-column: 1 / -1; text-align:center; padding:40px; color:var(--text-muted);">No lockers added yet. Click "Add Locker" to begin.</div>';
         return;
     }
 
-    const statusPriority = { 'Available': 0, 'Occupied': 1, 'Maintenance': 2 };
+    const statusPriority = { 'Available': 0, 'Occupied': 1 };
 
     grid.innerHTML = lockersData
         .sort((a, b) => {
@@ -3586,10 +3584,9 @@ function renderLockers() {
         })
         .map(l => {
         const isOccupied = l.status === 'Occupied';
-        const isMaint = l.status === 'Maintenance';
-        const statusClass = isOccupied ? 'occupied' : (isMaint ? 'maintenance' : 'available');
-        const icon = isOccupied ? 'fa-lock' : (isMaint ? 'fa-tools' : 'fa-lock-open');
-        const statusLabel = isOccupied ? 'Occupied' : (isMaint ? 'Maintenance' : 'Available');
+        const statusClass = isOccupied ? 'occupied' : 'available';
+        const icon = isOccupied ? 'fa-lock' : 'fa-lock-open';
+        const statusLabel = isOccupied ? 'Occupied' : 'Available';
 
         return `
             <div class="locker-card ${statusClass}" onclick="openAssignLockerModal('${l.id}')">
@@ -3638,15 +3635,12 @@ window.openAssignLockerModal = function (id) {
     document.getElementById('assignLockerLocationText').innerText = locker.location || 'General Section';
 
     const isOccupied = locker.status === 'Occupied';
-    const isMaint = locker.status === 'Maintenance';
     const form = document.getElementById('assignLockerForm');
     const info = document.getElementById('activeAssignmentInfo');
-    const maint = document.getElementById('lockerMaintenanceInfo');
 
     // Reset displays
     if (form) form.style.display = 'none';
     if (info) info.style.display = 'none';
-    if (maint) maint.style.display = 'none';
 
     if (isOccupied) {
         if (info) {
@@ -3660,8 +3654,6 @@ window.openAssignLockerModal = function (id) {
                 document.getElementById('assignmentExpiry').innerText = 'Expires: N/A';
             }
         }
-    } else if (isMaint) {
-        if (maint) maint.style.display = 'block';
     } else {
         if (form) {
             form.style.display = 'block';
@@ -3672,31 +3664,7 @@ window.openAssignLockerModal = function (id) {
     document.getElementById('assignLockerModal').style.display = 'flex';
 };
 
-window.toggleLockerMaintenance = async function () {
-    const id = document.getElementById('assignLockerId').value;
-    const locker = lockersData.find(l => l.id === id);
-    if (!locker) return;
 
-    const newStatus = locker.status === 'Maintenance' ? 'Available' : 'Maintenance';
-    const confirmMsg = newStatus === 'Maintenance' 
-        ? `Are you sure you want to put Locker #${locker.number} into maintenance? It will be unavailable for assignment.`
-        : `Bring Locker #${locker.number} back to Available status?`;
-
-    showConfirm(confirmMsg, async () => {
-        try {
-            await updateDoc(doc(db, "lockers", id), {
-                status: newStatus,
-                updatedAt: Date.now()
-            });
-            window.closeModal('assignLockerModal');
-            showToast(`Locker ${locker.number} is now ${newStatus}.`, "success");
-            if (window.logActivity) window.logActivity("Locker Updated", `Locker ${locker.number} status changed to ${newStatus}`);
-        } catch (err) {
-            console.error(err);
-            showToast("Failed to update locker status.", "error");
-        }
-    });
-};
 
 function populateAssignMemberSelect() {
     const select = document.getElementById('assignMemberSelect');
