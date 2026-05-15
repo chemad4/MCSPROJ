@@ -545,7 +545,8 @@ window.filterGrid = function (gridId, inputId) {
 
 window.filterEquipment = function() {
     const search = document.getElementById('machineSearch').value.toLowerCase();
-    const status = document.getElementById('equipFilterStatus').value;
+    const equipFilterStatus = document.getElementById('equipFilterStatus');
+    const status = equipFilterStatus ? equipFilterStatus.value : 'all';
     const grid = document.getElementById('machinesGrid');
     const table = document.getElementById('machinesListBody');
     
@@ -572,6 +573,37 @@ window.filterEquipment = function() {
             row.style.display = (matchesSearch && matchesStatus) ? "" : "none";
         });
     }
+};
+
+let currentEquipSortField = 'name';
+let currentEquipSortOrder = 'asc';
+
+window.sortEquipment = function(field) {
+    if (currentEquipSortField === field) {
+        currentEquipSortOrder = currentEquipSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentEquipSortField = field;
+        currentEquipSortOrder = 'asc';
+    }
+
+    // Update sort icons in headers
+    const table = document.getElementById('machinesListTable');
+    if (table) {
+        table.querySelectorAll('th i').forEach(icon => {
+            icon.className = 'fas fa-sort bk-sort-icon';
+        });
+        const ths = table.querySelectorAll('th');
+        ths.forEach(th => {
+            if (th.getAttribute('onclick') && th.getAttribute('onclick').includes(`('${field}')`)) {
+                const icon = th.querySelector('i');
+                if (icon) {
+                    icon.className = `fas fa-sort-${currentEquipSortOrder === 'asc' ? 'up' : 'down'} bk-sort-icon`;
+                }
+            }
+        });
+    }
+
+    renderInventory();
 };
 
 window.filterProducts = function() {
@@ -739,9 +771,13 @@ function renderChatUserList() {
 
             targetUsers.forEach(u => {
                 let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
+                let avatarContent = `${u.name.charAt(0).toUpperCase()}`;
+                if ((u.role || "").toLowerCase() === 'member') {
+                    avatarContent = `<i class="fa-solid fa-user" style="font-size: 14px;"></i>`;
+                }
                 html += `
                     <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
-                        <div class="chat-avatar">${u.name.charAt(0).toUpperCase()}</div>
+                        <div class="chat-avatar">${avatarContent}</div>
                         <div>
                             <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
                             <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
@@ -912,8 +948,25 @@ function renderInventory() {
         }
     });
 
+    equipment.sort((a, b) => {
+        let valA = String(a[currentEquipSortField] || "").toLowerCase();
+        let valB = String(b[currentEquipSortField] || "").toLowerCase();
+        
+        if (currentEquipSortField === 'qty') {
+            valA = Number(a.qty || 0);
+            valB = Number(b.qty || 0);
+            if (valA < valB) return currentEquipSortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return currentEquipSortOrder === 'asc' ? 1 : -1;
+            return 0;
+        }
+
+        if (valA < valB) return currentEquipSortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return currentEquipSortOrder === 'asc' ? 1 : -1;
+        return 0;
+    });
+
     const renderCard = (item) => {
-        const isConsumable = item.itemType === 'product';
+        const isConsumable = item.itemType === 'product' || (!item.itemType && ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat));
         let badge = 'operational';
         if (item.currentStatus === 'Out of Stock' || item.currentStatus === 'Out of Order') badge = 'broken';
         else if (item.currentStatus === 'Low Stock') badge = 'stock-low';
@@ -1023,8 +1076,9 @@ function renderInventory() {
     const dashAlerts = document.getElementById('dashInventoryAlerts');
     if (dashAlerts) dashAlerts.innerHTML = alertsHtmlArr.join('') || '<p style="color: green; font-size: 14px;">All systems operational!</p>';
 
-    // Render equipment category quantity counter
+    // Render inventory category summaries
     if (window.renderEquipmentCategorySummary) window.renderEquipmentCategorySummary();
+    if (window.renderProductCategorySummary) window.renderProductCategorySummary();
 }
 
 window.migrateInventoryDatabase = async function () {
@@ -2120,6 +2174,15 @@ function renderSparkline(canvasId, data, color) {
 let currentPaymentSortField = 'timestamp';
 let currentPaymentSortOrder = 'desc';
 
+let currentMemberSortField = 'name';
+let currentMemberSortOrder = 'asc';
+
+let currentStaffSortField = 'name';
+let currentStaffSortOrder = 'asc';
+
+let currentTrainerSortField = 'name';
+let currentTrainerSortOrder = 'asc';
+
 onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
     snapshot.forEach(doc => paymentsData.push({ id: doc.id, ...doc.data() }));
@@ -2503,7 +2566,7 @@ window.renderEquipmentCategorySummary = function () {
         'Cardio Machine': 'fa-person-running',
         'Strength Machine': 'fa-dumbbell',
         'Free Weights': 'fa-weight-hanging',
-        'Accessories / Mats': 'fa-mat-pilates'
+        'Accessories / Mats': 'fa-rug'
     };
 
     inventoryData.forEach(item => {
@@ -2521,14 +2584,14 @@ window.renderEquipmentCategorySummary = function () {
     const entries = Object.entries(categoryMap).sort((a, b) => b[1].qty - a[1].qty);
 
     if (entries.length === 0) {
-        container.innerHTML = '';
+        container.innerHTML = '<p style="padding: 20px; color: var(--text-muted); font-size: 14px;">No equipment categories found.</p>';
         return;
     }
 
     container.innerHTML = entries.map(([cat, data]) => `
         <div class="equip-cat-card">
             <div class="equip-cat-icon">
-                <i class="fa-solid ${categoryIcons[cat] || 'fa-box'}"></i>
+                <i class="fa-solid ${categoryIcons[cat] || 'fa-box-open'}"></i>
             </div>
             <div class="equip-cat-info">
                 <div class="equip-cat-name">${cat}</div>
@@ -2537,6 +2600,108 @@ window.renderEquipmentCategorySummary = function () {
         </div>
     `).join('');
 };
+
+// Product Category Quantity Counter
+window.renderProductCategorySummary = function () {
+    const container = document.getElementById('productCategorySummary');
+    if (!container) return;
+
+    const categoryMap = {};
+    const categoryIcons = {
+        'Supplements (Powder/Capsules)': 'fa-capsules',
+        'Beverages (Bottled Drinks)': 'fa-bottle-water',
+        'Apparel / Merchandise': 'fa-shirt',
+        'Supplements': 'fa-capsules',
+        'Beverages': 'fa-bottle-water',
+        'Merch': 'fa-shirt'
+    };
+
+    let totalValue = 0;
+    let activeSkus = 0;
+    let lowStockCount = 0;
+    let outOfStockCount = 0;
+
+    inventoryData.forEach(item => {
+        let isProduct = item.itemType === 'product' || ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
+        if (item.itemType === 'equipment') isProduct = false;
+
+        if (isProduct) {
+            const cat = item.cat || 'General Goods';
+            const price = Number(item.price || 0);
+            const qty = Number(item.qty || 0);
+            const threshold = Number(item.lowStockThreshold || 5);
+
+            if (!categoryMap[cat]) categoryMap[cat] = { count: 0, qty: 0, lowStock: 0, value: 0 };
+            
+            categoryMap[cat].count++;
+            categoryMap[cat].qty += qty;
+            categoryMap[cat].value += (qty * price);
+            
+            totalValue += (qty * price);
+            if (qty > 0) activeSkus++;
+            if (qty === 0) outOfStockCount++;
+            else if (qty <= threshold) {
+                categoryMap[cat].lowStock++;
+                lowStockCount++;
+            }
+        }
+    });
+
+    const entries = Object.entries(categoryMap).sort((a, b) => b[1].value - a[1].value);
+
+    if (entries.length === 0) {
+        container.innerHTML = '<p style="padding: 20px; color: var(--text-muted); font-size: 14px;">No product categories found.</p>';
+        return;
+    }
+
+    // 1. Health Dashboard Row
+    let html = `
+        <div class="inventory-health-row">
+            <div class="health-stat-card">
+                <div class="health-stat-label">Portfolio Value</div>
+                <div class="health-stat-value">₱${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                <div class="health-stat-meta text-success"><i class="fas fa-arrow-up"></i> Asset Worth</div>
+            </div>
+            <div class="health-stat-card">
+                <div class="health-stat-label">Active SKUs</div>
+                <div class="health-stat-value">${activeSkus}</div>
+                <div class="health-stat-meta ${outOfStockCount > 0 ? 'text-danger' : 'text-success'}">
+                    ${outOfStockCount > 0 ? `<i class="fas fa-exclamation-circle"></i> ${outOfStockCount} Out of Stock` : '<i class="fas fa-check-circle"></i> All in Stock'}
+                </div>
+            </div>
+            <div class="health-stat-card">
+                <div class="health-stat-label">Critical Alerts</div>
+                <div class="health-stat-value" style="color: ${lowStockCount > 0 ? 'var(--primary-red)' : 'var(--text-primary)'}">${lowStockCount}</div>
+                <div class="health-stat-meta ${lowStockCount > 0 ? 'text-warning' : 'text-success'}">
+                    ${lowStockCount > 0 ? '<i class="fas fa-truck-loading"></i> Restock Advised' : '<i class="fas fa-check-circle"></i> Levels Healthy'}
+                </div>
+            </div>
+        </div>
+        <div class="equip-category-summary">
+    `;
+
+    // 2. Category Grid
+    html += entries.map(([cat, data]) => {
+        const hasLowStock = data.lowStock > 0;
+        return `
+            <div class="equip-cat-card ${hasLowStock ? 'low-stock-warning' : ''}">
+                <div class="equip-cat-icon" style="${hasLowStock ? 'background: rgba(153, 27, 27, 0.1); color: var(--primary-red);' : ''}">
+                    <i class="fa-solid ${categoryIcons[cat] || 'fa-boxes-stacked'}"></i>
+                </div>
+                <div class="equip-cat-info">
+                    <div class="equip-cat-name">${cat}</div>
+                    <div class="equip-cat-count">${data.qty} <span class="equip-cat-units">units</span></div>
+                    <div class="cat-value-badge">₱${data.value.toLocaleString(undefined, { minimumFractionDigits: 0 })} Value</div>
+                    ${hasLowStock ? `<div style="font-size: 10px; color: var(--primary-red); font-weight: 700; margin-top: 6px;"><i class="fas fa-exclamation-triangle"></i> ${data.lowStock} CRITICAL</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    html += `</div>`;
+    container.innerHTML = html;
+};
+
 
 // Clear date range filter
 window.clearFinDateRange = function () {
@@ -2657,85 +2822,127 @@ window.generateWeeklyPDF = function () {
     document.getElementById('pdfCompletionDate').innerText = formatShortDate(today);
 
     let productSales = {};
+    let totalMembershipRevenue = 0;
+    let totalPOSRevenue = 0;
+    let totalWalkinRevenue = 0;
 
-    // Ignore voided transactions in the report
-    paymentsData.filter(p => p.status !== 'Voided').forEach(payment => {
-        if (!payment.date) return;
-        const payDate = new Date(payment.date);
+    // Filter payments for the selected week and ignore voided ones
+    const weeklyPayments = paymentsData.filter(p => {
+        if (p.status === 'Voided') return false;
+        if (!p.date && !p.timestamp) return false;
+        const payDate = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
+        return payDate >= monday && payDate <= sunday;
+    });
 
-        if (payDate >= monday && payDate <= sunday) {
-            let dayIndex = payDate.getDay() === 0 ? 6 : payDate.getDay() - 1;
+    weeklyPayments.forEach(payment => {
+        const amount = Number(payment.amount || 0);
+        const type = payment.type || "";
 
-            if (payment.lineItems && payment.lineItems.length > 0) {
-                payment.lineItems.forEach(item => {
-                    let qty = item.qty;
-                    let name = item.name;
+        // Revenue Classification
+        if (type.includes("Membership") || type.includes("Plan") || type.includes("Annual") || type.includes("Monthly")) {
+            totalMembershipRevenue += amount;
+        } else if (type.includes("Walk-in") || type.includes("Pass")) {
+            totalWalkinRevenue += amount;
+        } else {
+            totalPOSRevenue += amount;
+        }
+
+        // Product Consumption Tracking
+        const payDate = payment.timestamp ? new Date(payment.timestamp) : new Date(payment.date);
+        let dayIndex = payDate.getDay() === 0 ? 6 : payDate.getDay() - 1;
+
+        if (payment.lineItems && payment.lineItems.length > 0) {
+            payment.lineItems.forEach(item => {
+                let qty = item.qty;
+                let name = item.name;
+                if (!productSales[name]) productSales[name] = [0, 0, 0, 0, 0, 0, 0];
+                productSales[name][dayIndex] += qty;
+            });
+        } else if (payment.items) {
+            let itemsList = payment.items.split(', ');
+            itemsList.forEach(itemStr => {
+                let match = itemStr.match(/^(\d+)x\s+(.+)$/);
+                if (match) {
+                    let qty = parseInt(match[1]);
+                    let name = match[2];
                     if (!productSales[name]) productSales[name] = [0, 0, 0, 0, 0, 0, 0];
                     productSales[name][dayIndex] += qty;
-                });
-            } else if (payment.items) {
-                let itemsList = payment.items.split(', ');
-                itemsList.forEach(itemStr => {
-                    let match = itemStr.match(/^(\d+)x\s+(.+)$/);
-                    if (match) {
-                        let qty = parseInt(match[1]);
-                        let name = match[2];
-
-                        if (!productSales[name]) productSales[name] = [0, 0, 0, 0, 0, 0, 0];
-                        productSales[name][dayIndex] += qty;
-                    }
-                });
-            }
+                }
+            });
         }
     });
 
+    const grossRevenue = totalMembershipRevenue + totalPOSRevenue + totalWalkinRevenue;
+    const vatAmount = grossRevenue * 0.107142857; // 12% VAT (if 1.12 is the multiplier) or gross * 0.12 if it's on top. 
+    // In many PH systems, Price is VAT inclusive. Net = Gross / 1.12. VAT = Gross - Net.
+    const netRevenue = grossRevenue / 1.12;
+    const calculatedVAT = grossRevenue - netRevenue;
+
+    document.getElementById('pdfGrossRevenue').innerText = `₱${grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    document.getElementById('pdfVATAmount').innerText = `₱${calculatedVAT.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    document.getElementById('pdfNetRevenue').innerText = `₱${netRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+
+    // Populate Revenue Sources Table
+    const sourcesBody = document.getElementById('pdfRevenueSourcesBody');
+    const categories = [
+        { name: "Membership Fees", amount: totalMembershipRevenue },
+        { name: "POS Product Sales", amount: totalPOSRevenue },
+        { name: "Walk-in Gym Fees", amount: totalWalkinRevenue }
+    ];
+
+    sourcesBody.innerHTML = categories.map(cat => `
+        <tr>
+            <td>${cat.name}</td>
+            <td style="text-align: right;">₱${cat.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+            <td style="text-align: right;">${grossRevenue > 0 ? ((cat.amount / grossRevenue) * 100).toFixed(1) : 0}%</td>
+        </tr>
+    `).join('') + `
+        <tr class="total-row">
+            <td>TOTAL GROSS REVENUE</td>
+            <td style="text-align: right;">₱${grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+            <td style="text-align: right;">100%</td>
+        </tr>
+    `;
+
+    // Populate Product Consumption Table
     const tbody = document.getElementById('pdfSalesBody');
     tbody.innerHTML = "";
 
-    let rowCount = 0;
-    for (let [prodName, days] of Object.entries(productSales)) {
+    const sortedProducts = Object.entries(productSales).sort((a, b) => {
+        const totalA = a[1].reduce((sum, val) => sum + val, 0);
+        const totalB = b[1].reduce((sum, val) => sum + val, 0);
+        return totalB - totalA;
+    });
+
+    sortedProducts.forEach(([prodName, days]) => {
         let total = days.reduce((a, b) => a + b, 0);
         tbody.innerHTML += `
             <tr>
-                <td style="border: 1px solid #000; padding: 10px; text-align: left; height: 35px;">${prodName}</td>
-                <td style="border: 1px solid #000; padding: 10px;">${days[0] || ''}</td>
-                <td style="border: 1px solid #000; padding: 10px;">${days[1] || ''}</td>
-                <td style="border: 1px solid #000; padding: 10px;">${days[2] || ''}</td>
-                <td style="border: 1px solid #000; padding: 10px;">${days[3] || ''}</td>
-                <td style="border: 1px solid #000; padding: 10px;">${days[4] || ''}</td>
-                <td style="border: 1px solid #000; padding: 10px;">${days[5] || ''}</td>
-                <td style="border: 1px solid #000; padding: 10px;">${days[6] || ''}</td>
-                <td style="border: 1px solid #000; padding: 10px; font-weight: bold;">${total}</td>
+                <td style="text-align: left; font-weight: 500;">${prodName}</td>
+                <td style="text-align: center;">${days[0] || '-'}</td>
+                <td style="text-align: center;">${days[1] || '-'}</td>
+                <td style="text-align: center;">${days[2] || '-'}</td>
+                <td style="text-align: center;">${days[3] || '-'}</td>
+                <td style="text-align: center;">${days[4] || '-'}</td>
+                <td style="text-align: center;">${days[5] || '-'}</td>
+                <td style="text-align: center;">${days[6] || '-'}</td>
+                <td style="text-align: right; font-weight: 700;">${total}</td>
             </tr>
         `;
-        rowCount++;
-    }
+    });
 
-    while (rowCount < 15) {
-        tbody.innerHTML += `
-            <tr>
-                <td style="border: 1px solid #000; padding: 10px; height: 35px;"></td>
-                <td style="border: 1px solid #000; padding: 10px;"></td>
-                <td style="border: 1px solid #000; padding: 10px;"></td>
-                <td style="border: 1px solid #000; padding: 10px;"></td>
-                <td style="border: 1px solid #000; padding: 10px;"></td>
-                <td style="border: 1px solid #000; padding: 10px;"></td>
-                <td style="border: 1px solid #000; padding: 10px;"></td>
-                <td style="border: 1px solid #000; padding: 10px;"></td>
-                <td style="border: 1px solid #000; padding: 10px;"></td>
-            </tr>
-        `;
-        rowCount++;
+    if (sortedProducts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 20px;">No item consumption recorded for this period.</td></tr>';
     }
 
     const element = document.getElementById('weekly-sales-report');
     document.getElementById('pdf-report-container').style.display = 'block';
 
     let opt = {
-        margin: 0.5,
-        filename: `Weekly_Sales_${formatShortDate(monday).replace(/\//g, '-')}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
+        margin: 0,
+        filename: `Financial_Report_${formatShortDate(monday).replace(/\//g, '-')}.pdf`,
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { scale: 3, useCORS: true, letterRendering: true },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
 
@@ -3431,27 +3638,64 @@ window.openAssignLockerModal = function (id) {
     document.getElementById('assignLockerLocationText').innerText = locker.location || 'General Section';
 
     const isOccupied = locker.status === 'Occupied';
+    const isMaint = locker.status === 'Maintenance';
     const form = document.getElementById('assignLockerForm');
     const info = document.getElementById('activeAssignmentInfo');
+    const maint = document.getElementById('lockerMaintenanceInfo');
+
+    // Reset displays
+    if (form) form.style.display = 'none';
+    if (info) info.style.display = 'none';
+    if (maint) maint.style.display = 'none';
 
     if (isOccupied) {
-        form.style.display = 'none';
-        info.style.display = 'block';
-        document.getElementById('assigneeName').innerText = locker.memberName || 'Unknown Member';
-        document.getElementById('assigneeInitial').innerText = (locker.memberName || '?')[0];
-        if (locker.expiryDate) {
-            const exp = new Date(locker.expiryDate);
-            document.getElementById('assignmentExpiry').innerText = `Expires: ${exp.toLocaleDateString()}`;
-        } else {
-            document.getElementById('assignmentExpiry').innerText = 'Expires: N/A';
+        if (info) {
+            info.style.display = 'block';
+            document.getElementById('assigneeName').innerText = locker.memberName || 'Unknown Member';
+            document.getElementById('assigneeInitial').innerText = (locker.memberName || '?')[0];
+            if (locker.expiryDate) {
+                const exp = new Date(locker.expiryDate);
+                document.getElementById('assignmentExpiry').innerText = `Expires: ${exp.toLocaleDateString()}`;
+            } else {
+                document.getElementById('assignmentExpiry').innerText = 'Expires: N/A';
+            }
         }
+    } else if (isMaint) {
+        if (maint) maint.style.display = 'block';
     } else {
-        form.style.display = 'block';
-        info.style.display = 'none';
-        populateAssignMemberSelect();
+        if (form) {
+            form.style.display = 'block';
+            populateAssignMemberSelect();
+        }
     }
 
     document.getElementById('assignLockerModal').style.display = 'flex';
+};
+
+window.toggleLockerMaintenance = async function () {
+    const id = document.getElementById('assignLockerId').value;
+    const locker = lockersData.find(l => l.id === id);
+    if (!locker) return;
+
+    const newStatus = locker.status === 'Maintenance' ? 'Available' : 'Maintenance';
+    const confirmMsg = newStatus === 'Maintenance' 
+        ? `Are you sure you want to put Locker #${locker.number} into maintenance? It will be unavailable for assignment.`
+        : `Bring Locker #${locker.number} back to Available status?`;
+
+    showConfirm(confirmMsg, async () => {
+        try {
+            await updateDoc(doc(db, "lockers", id), {
+                status: newStatus,
+                updatedAt: Date.now()
+            });
+            window.closeModal('assignLockerModal');
+            showToast(`Locker ${locker.number} is now ${newStatus}.`, "success");
+            if (window.logActivity) window.logActivity("Locker Updated", `Locker ${locker.number} status changed to ${newStatus}`);
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to update locker status.", "error");
+        }
+    });
 };
 
 function populateAssignMemberSelect() {
@@ -3640,7 +3884,7 @@ function renderMembers() {
 
             const avatarHtml = m.image
                 ? `<img src="${m.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">`
-                : `<div class="initial-avatar" style="width:32px; height:32px; font-size:11px;">${(m.givenName || m.name || "?")[0]}${(m.familyName || "")[0] || ""}</div>`;
+                : `<div class="chat-avatar" style="width:32px; height:32px;"><i class="fa-solid fa-user" style="font-size: 12px;"></i></div>`;
 
             // Inline Action Buttons (Similar to Staff/Trainers)
             const actionHtml = `
@@ -3671,6 +3915,37 @@ function renderMembers() {
         }
     };
 
+    // 3. Sort Lists
+    const sortMemberList = (list) => {
+        list.sort((a, b) => {
+            let valA, valB;
+            if (currentMemberSortField === 'name') {
+                valA = (a.givenName ? `${a.givenName} ${a.familyName || ''}` : (a.name || "")).trim().toLowerCase();
+                valB = (b.givenName ? `${b.givenName} ${b.familyName || ''}` : (b.name || "")).trim().toLowerCase();
+            } else if (currentMemberSortField === 'plan') {
+                valA = (a.plan || 'Standard Member').toLowerCase();
+                valB = (b.plan || 'Standard Member').toLowerCase();
+            } else if (currentMemberSortField === 'daysLeft') {
+                const planA = window.getPlanDays(a.plan || 'Standard Member');
+                const planB = window.getPlanDays(b.plan || 'Standard Member');
+                valA = a.dateRegistered ? Math.ceil((a.dateRegistered + (planA * 24 * 60 * 60 * 1000) - now) / (1000 * 60 * 60 * 24)) : planA;
+                valB = b.dateRegistered ? Math.ceil((b.dateRegistered + (planB * 24 * 60 * 60 * 1000) - now) / (1000 * 60 * 60 * 24)) : planB;
+            } else if (currentMemberSortField === 'credit') {
+                valA = a.creditBalance || 0;
+                valB = b.creditBalance || 0;
+            } else {
+                valA = ""; valB = "";
+            }
+
+            if (valA < valB) return currentMemberSortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return currentMemberSortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    sortMemberList(activeList);
+    sortMemberList(archivedList);
+
     if (memTbody) window.syncDOM(memTbody, activeList, (m) => renderMemberRow(m, false), 'mem-row');
     if (arcTbody) window.syncDOM(arcTbody, archivedList, (m) => renderMemberRow(m, true), 'arc-row');
 
@@ -3694,7 +3969,28 @@ window.filterMembers = function () {
 };
 
 window.sortMembers = function (field) {
-    showToast("Sorting members by " + field, "info");
+    if (currentMemberSortField === field) {
+        currentMemberSortOrder = currentMemberSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentMemberSortField = field;
+        currentMemberSortOrder = 'asc';
+    }
+
+    const table = document.getElementById('membersTable');
+    if (table) {
+        const headers = table.querySelectorAll('th');
+        headers.forEach(th => {
+            const icon = th.querySelector('i');
+            if (icon) icon.className = 'fas fa-sort';
+        });
+        const activeHeader = Array.from(headers).find(th => th.getAttribute('onclick')?.includes(`'${field}'`));
+        if (activeHeader) {
+            const icon = activeHeader.querySelector('i');
+            if (icon) icon.className = `fas fa-sort-${currentMemberSortOrder === 'asc' ? 'up' : 'down'}`;
+        }
+    }
+    
+    renderMembers();
 };
 
 window.changeMemberPagination = function () {
@@ -3943,6 +4239,57 @@ function renderStaff() {
         }
     };
 
+    // 3. Sort Staff and Trainer Lists
+    const sortStaffList = (list) => {
+        list.sort((a, b) => {
+            let valA, valB;
+            if (currentStaffSortField === 'name') {
+                valA = (a.givenName ? `${a.givenName} ${a.familyName || ''}` : (a.name || "")).trim().toLowerCase();
+                valB = (b.givenName ? `${b.givenName} ${b.familyName || ''}` : (b.name || "")).trim().toLowerCase();
+            } else if (currentStaffSortField === 'role') {
+                valA = (a.role || "").toLowerCase();
+                valB = (b.role || "").toLowerCase();
+            } else if (currentStaffSortField === 'email') {
+                valA = (a.email || "").toLowerCase();
+                valB = (b.email || "").toLowerCase();
+            } else {
+                valA = ""; valB = "";
+            }
+
+            if (valA < valB) return currentStaffSortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return currentStaffSortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    sortStaffList(staffList);
+    sortStaffList(arcStaffList);
+
+    const sortTrainerList = (list) => {
+        list.sort((a, b) => {
+            let valA, valB;
+            if (currentTrainerSortField === 'name') {
+                valA = (a.givenName ? `${a.givenName} ${a.familyName || ''}` : (a.name || "")).trim().toLowerCase();
+                valB = (b.givenName ? `${b.givenName} ${b.familyName || ''}` : (b.name || "")).trim().toLowerCase();
+            } else if (currentTrainerSortField === 'specialty') {
+                valA = (a.specialty || "General Fitness").toLowerCase();
+                valB = (b.specialty || "General Fitness").toLowerCase();
+            } else if (currentTrainerSortField === 'role') {
+                valA = (a.role || "").toLowerCase();
+                valB = (b.role || "").toLowerCase();
+            } else {
+                valA = ""; valB = "";
+            }
+
+            if (valA < valB) return currentTrainerSortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return currentTrainerSortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    };
+
+    sortTrainerList(trainerList);
+    sortTrainerList(arcTrainerList);
+
     if (staffTbody) window.syncDOM(staffTbody, staffList, (u) => renderStaffRow(u, false), 'staff-row');
     if (trainerTbody) window.syncDOM(trainerTbody, trainerList, (u) => renderStaffRow(u, false), 'trainer-row');
     if (arcStaffTbody) window.syncDOM(arcStaffTbody, arcStaffList, (u) => renderStaffRow(u, true), 'arc-staff-row');
@@ -3980,8 +4327,55 @@ function renderStaff() {
 // Staff & Trainer UI Helpers
 window.filterStaff = function () { renderStaff(); };
 window.filterTrainers = function () { renderStaff(); };
-window.sortStaff = function (field) { showToast("Sorting staff by " + field, "info"); };
-window.sortTrainers = function (field) { showToast("Sorting trainers by " + field, "info"); };
+window.sortStaff = function (field) {
+    if (currentStaffSortField === field) {
+        currentStaffSortOrder = currentStaffSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentStaffSortField = field;
+        currentStaffSortOrder = 'asc';
+    }
+
+    const table = document.getElementById('staffTable');
+    if (table) {
+        const headers = table.querySelectorAll('th');
+        headers.forEach(th => {
+            const icon = th.querySelector('i');
+            if (icon) icon.className = 'fas fa-sort';
+        });
+        const activeHeader = Array.from(headers).find(th => th.getAttribute('onclick')?.includes(`'${field}'`));
+        if (activeHeader) {
+            const icon = activeHeader.querySelector('i');
+            if (icon) icon.className = `fas fa-sort-${currentStaffSortOrder === 'asc' ? 'up' : 'down'}`;
+        }
+    }
+    
+    renderStaff();
+};
+
+window.sortTrainers = function (field) {
+    if (currentTrainerSortField === field) {
+        currentTrainerSortOrder = currentTrainerSortOrder === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentTrainerSortField = field;
+        currentTrainerSortOrder = 'asc';
+    }
+
+    const table = document.getElementById('trainerTable');
+    if (table) {
+        const headers = table.querySelectorAll('th');
+        headers.forEach(th => {
+            const icon = th.querySelector('i');
+            if (icon) icon.className = 'fas fa-sort';
+        });
+        const activeHeader = Array.from(headers).find(th => th.getAttribute('onclick')?.includes(`'${field}'`));
+        if (activeHeader) {
+            const icon = activeHeader.querySelector('i');
+            if (icon) icon.className = `fas fa-sort-${currentTrainerSortOrder === 'asc' ? 'up' : 'down'}`;
+        }
+    }
+    
+    renderStaff();
+};
 
 function renderMemberTrainers() {
     const grid = document.getElementById('memberTrainerGrid');
@@ -5408,6 +5802,14 @@ window.deleteBooking = async (id) => {
 // ==========================================
 // 15. SYSTEM ACTIVITY LOGS
 // ==========================================
+let activityCurrentPage = 1;
+const activityItemsPerPage = 10;
+
+window.changeActivityPage = function (dir) {
+    activityCurrentPage += dir;
+    renderActivityLogs();
+};
+
 onSnapshot(activityLogsCol, (snapshot) => {
     activityData = [];
     snapshot.forEach(doc => activityData.push({ id: doc.id, ...doc.data() }));
@@ -5425,7 +5827,9 @@ function renderActivityLogs() {
     // Filters
     const roleFilter = document.getElementById('activityRoleFilter');
     const dateFilter = document.getElementById('activityDateFilter');
+    const searchInput = document.getElementById('activitySearch');
     const selectedRole = roleFilter ? roleFilter.value : 'all';
+    const searchQuery = searchInput ? searchInput.value.toLowerCase() : '';
 
     let selectedDateStr = '';
     if (dateFilter && dateFilter.value) {
@@ -5440,6 +5844,14 @@ function renderActivityLogs() {
     }
     if (selectedDateStr) {
         filtered = filtered.filter(l => l.date === selectedDateStr);
+    }
+    if (searchQuery) {
+        filtered = filtered.filter(l => 
+            (l.userName || '').toLowerCase().includes(searchQuery) ||
+            (l.action || '').toLowerCase().includes(searchQuery) ||
+            (l.details || '').toLowerCase().includes(searchQuery) ||
+            (l.date || '').toLowerCase().includes(searchQuery)
+        );
     }
 
     // Stat cards
@@ -5462,8 +5874,33 @@ function renderActivityLogs() {
         el.style.fontSize = topAction.length > 12 ? '16px' : '28px';
     }
 
-    const countEl = document.getElementById('activityRecordCount');
-    if (countEl) countEl.innerText = `Showing ${Math.min(filtered.length, 200)} of ${filtered.length} records`;
+    // Pagination logic
+    const totalRecords = filtered.length;
+    const totalPages = Math.ceil(totalRecords / activityItemsPerPage);
+    if (activityCurrentPage > totalPages && totalPages > 0) activityCurrentPage = totalPages;
+    if (activityCurrentPage < 1) activityCurrentPage = 1;
+
+    const showCountEl = document.getElementById('activityShowingCount');
+    const totalCountEl = document.getElementById('activityTotalCount');
+    const paginationContainer = document.getElementById('activityPagination');
+
+    const startIdx = (activityCurrentPage - 1) * activityItemsPerPage;
+    const endIdx = Math.min(startIdx + activityItemsPerPage, totalRecords);
+
+    if (showCountEl) showCountEl.innerText = totalRecords === 0 ? '0-0' : `${startIdx + 1}-${endIdx}`;
+    if (totalCountEl) totalCountEl.innerText = totalRecords;
+    if (document.getElementById('activityRecordCount')) {
+        document.getElementById('activityRecordCount').innerText = `Showing ${endIdx - startIdx} of ${totalRecords} records`;
+    }
+
+    if (paginationContainer) {
+        let pagHtml = `
+            <button class="page-btn" onclick="changeActivityPage(-1)" ${activityCurrentPage <= 1 || totalRecords === 0 ? 'disabled' : ''}><i class="fas fa-chevron-left"></i></button>
+            <button class="page-btn active">${activityCurrentPage}</button>
+            <button class="page-btn" onclick="changeActivityPage(1)" ${activityCurrentPage >= totalPages || totalRecords === 0 ? 'disabled' : ''}><i class="fas fa-chevron-right"></i></button>
+        `;
+        paginationContainer.innerHTML = pagHtml;
+    }
 
     if (filtered.length === 0) {
         const emptyRow = document.getElementById('activityEmptyState');
@@ -5508,7 +5945,7 @@ function renderActivityLogs() {
         'Plan Deleted': 'fa-tag',
     };
 
-    const displayData = filtered.slice(0, 200);
+    const displayData = filtered.slice(startIdx, endIdx);
 
     let html = '';
     displayData.forEach(log => {
@@ -5764,7 +6201,7 @@ window.openMemberProfile = async function (memberId) {
             if (m.image) {
                 avatar.innerHTML = `<img src="${m.image}" alt="${fullName}">`;
             } else {
-                avatar.innerHTML = fullName.charAt(0).toUpperCase();
+                avatar.innerHTML = `<i class="fa-solid fa-user"></i>`;
             }
         }
 

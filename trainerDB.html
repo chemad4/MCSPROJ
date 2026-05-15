@@ -260,8 +260,8 @@
             <div class="table-controls">
                 <div class="search-box" style="display: flex; gap: 10px; flex-grow: 1;">
                     <div style="position: relative; flex-grow: 1;">
-                        <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #999;"></i>
-                        <input type="text" id="bookingSearch" placeholder="Search by member name..." onkeyup="filterTable('bookingsTable', 'bookingSearch')" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px;">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="bookingSearch" placeholder="Search by member name..." onkeyup="filterTable('bookingsTable', 'bookingSearch')">
                     </div>
                     <input type="date" id="bookingDateFilter" onchange="filterBookingsByDate()" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; outline: none; background: white;">
                 </div>
@@ -296,8 +296,8 @@
                     </div>
                     <div style="padding: 10px; border-bottom: 1px solid var(--border-color); background: #fafafa;">
                         <div class="search-box" style="width: 100%;">
-                            <i class="fas fa-search" style="left: 10px;"></i>
-                            <input type="text" id="chatSearch" placeholder="Search users..." onkeyup="filterChatUsers()" style="width: 100%; padding: 8px 10px 8px 30px; border: 1px solid var(--border-color); border-radius: 4px; outline: none;">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="chatSearch" placeholder="Search users..." onkeyup="filterChatUsers()">
                         </div>
                     </div>
                     <div id="chatUserList" style="overflow-y: auto; flex-grow: 1;">

@@ -652,21 +652,25 @@ body.dark-theme .badge.pending {
 
 .search-box i {
     position: absolute;
-    left: 10px;
+    left: 14px;
     top: 50%;
     transform: translateY(-50%);
-    color: #999;
+    color: var(--text-muted);
+    font-size: 14px;
+    pointer-events: none;
+    z-index: 5;
 }
 
 .search-box input {
     width: 100%;
-    padding: 10px 15px 10px 35px;
+    padding: 10px 15px 10px 42px !important;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 10px;
     outline: none;
     background-color: rgba(255, 255, 255, 0.5);
     color: var(--text-primary);
-    transition: all 0.3s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 14px;
 }
 
 .search-box input:focus {
@@ -856,8 +860,8 @@ body.dark-theme .badge.pending {
 /* Dashboard Refactor - SaaS Layout */
 
 .dashboard-layout {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 24px;
     margin-top: 10px;
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2326,6 +2330,10 @@ body.dark-theme .dense-control-bar {
     outline: none;
 }
 
+.dense-control-bar .search-box input {
+    padding-left: 42px !important;
+}
+
 .dense-control-bar select {
     padding-right: 32px;
     appearance: none;
@@ -2340,6 +2348,7 @@ body.dark-theme .dense-control-bar {
 .dense-control-bar select:focus,
 .dense-control-bar input:focus {
     border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .dense-table th,
@@ -2836,12 +2845,68 @@ body.dark-theme .table-footer {
     box-shadow: 0 4px 12px rgba(153, 27, 27, 0.3);
 }
 
+.bk-manu.action-btn-danger:hover {
+    background: #7f1d1d;
+    box-shadow: 0 4px 12px rgba(153, 27, 27, 0.4);
+}
+
+/* Dashboard Stats Component */
+.grid-stat-box {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.grid-stat-box:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+    border-color: #991b1b;
+}
+
+.grid-stat-box h3 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.grid-stat-box p {
+    margin: 5px 0 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #64748b;
+    letter-spacing: 0.05em;
+}
+
+body.dark-theme .grid-stat-box {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+body.dark-theme .grid-stat-box h3 {
+    color: #f1f5f9;
+}
+
+body.dark-theme .grid-stat-box p {
+    color: #94a3b8;
+}
+
 /* --- Sortable Table Headers --- */
 .bk-sortable {
     cursor: pointer;
     user-select: none;
     position: relative;
     transition: color 0.2s;
+    white-space: nowrap;
 }
 
 .bk-sortable:hover {
@@ -2849,8 +2914,8 @@ body.dark-theme .table-footer {
 }
 
 .bk-sort-icon {
-    font-size: 10px;
-    margin-left: 4px;
+    font-size: 11px;
+    margin-left: 8px;
     opacity: 0.4;
     transition: opacity 0.2s;
 }
@@ -4328,35 +4393,39 @@ body.dark-theme .weekly-day-card.is-today {
    ============================================ */
 .equip-category-summary {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 12px;
-    margin-bottom: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+    width: 100%;
 }
 
 .equip-cat-card {
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
-    border-radius: 10px;
-    padding: 16px;
+    border-radius: 16px;
+    padding: 20px 24px;
     display: flex;
     align-items: center;
-    gap: 12px;
-    transition: all 0.2s ease;
+    gap: 20px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    min-height: 90px;
 }
 
 .equip-cat-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+    border-color: var(--primary-red);
 }
 
 .equip-cat-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 20px;
     background: rgba(0, 0, 0, 0.04);
     color: var(--text-primary);
     flex-shrink: 0;
@@ -4372,26 +4441,93 @@ body.dark-theme .equip-cat-icon {
 }
 
 .equip-cat-name {
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 700;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin-bottom: 2px;
 }
 
 .equip-cat-count {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 26px;
+    font-weight: 800;
     color: var(--text-primary);
-    line-height: 1.2;
+    line-height: 1.1;
 }
 
 .equip-cat-units {
-    font-size: 11px;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--text-muted);
+    margin-left: 4px;
+}
+
+/* ============================================
+   INVENTORY ANALYTICS & HEALTH DASHBOARD
+   ============================================ */
+.inventory-health-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.health-stat-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.health-stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.health-stat-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text-primary);
+}
+
+.health-stat-meta {
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.text-success { color: #10B981; }
+.text-warning { color: #F59E0B; }
+.text-danger { color: #EF4444; }
+
+.cat-value-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.03);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+    display: inline-block;
+}
+
+body.dark-theme .cat-value-badge {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.low-stock-warning {
+    border-color: rgba(239, 68, 68, 0.3) !important;
+    background: linear-gradient(to right, var(--panel-bg), rgba(239, 68, 68, 0.02)) !important;
 }
 
 /* ============================================
