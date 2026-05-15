@@ -134,10 +134,10 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDat
         </tr>
       `;
 
-      // Detail Rows (hidden by default, sorted oldest-first)
+      // Detail Rows (hidden by default, sorted newest-first)
       if (hasMultiple) {
         let detailRows = "";
-        const sorted = [...g.records].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        const sorted = [...g.records].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         sorted.forEach((rec, i) => {
           const recTimeIn = rec.timeIn || rec.time || "-";
           const recTimeOut = rec.timeOut

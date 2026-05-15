@@ -1882,6 +1882,9 @@ function calculateFinancials() {
         }
     });
 
+    // Sort by soonest expiring first (most recent attention needed)
+    expiringList.sort((a, b) => a.daysLeft - b.daysLeft);
+
     if (document.getElementById('dashExpiringBadge')) document.getElementById('dashExpiringBadge').innerText = expiringList.length;
     const listEl = document.getElementById('dashExpiringList');
     if (listEl) {
@@ -2174,14 +2177,14 @@ function renderSparkline(canvasId, data, color) {
 let currentPaymentSortField = 'timestamp';
 let currentPaymentSortOrder = 'desc';
 
-let currentMemberSortField = 'name';
-let currentMemberSortOrder = 'asc';
+let currentMemberSortField = 'dateRegistered';
+let currentMemberSortOrder = 'desc';
 
-let currentStaffSortField = 'name';
-let currentStaffSortOrder = 'asc';
+let currentStaffSortField = 'dateRegistered';
+let currentStaffSortOrder = 'desc';
 
-let currentTrainerSortField = 'name';
-let currentTrainerSortOrder = 'asc';
+let currentTrainerSortField = 'dateRegistered';
+let currentTrainerSortOrder = 'desc';
 
 onSnapshot(paymentsCol, (snapshot) => {
     paymentsData = [];
@@ -3293,6 +3296,7 @@ window.__membershipPlansData = [];
 onSnapshot(membershipPlansCol, (snapshot) => {
     window.__membershipPlansData = [];
     snapshot.forEach(d => window.__membershipPlansData.push({ id: d.id, ...d.data() }));
+    window.__membershipPlansData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     renderMembershipPlans();
     populatePlanDropdowns();
 });
@@ -3940,6 +3944,9 @@ function renderMembers() {
             } else if (currentMemberSortField === 'credit') {
                 valA = a.creditBalance || 0;
                 valB = b.creditBalance || 0;
+            } else if (currentMemberSortField === 'dateRegistered') {
+                valA = a.dateRegistered || a.timestamp || 0;
+                valB = b.dateRegistered || b.timestamp || 0;
             } else {
                 valA = ""; valB = "";
             }
@@ -4259,6 +4266,9 @@ function renderStaff() {
             } else if (currentStaffSortField === 'email') {
                 valA = (a.email || "").toLowerCase();
                 valB = (b.email || "").toLowerCase();
+            } else if (currentStaffSortField === 'dateRegistered') {
+                valA = a.dateRegistered || a.timestamp || 0;
+                valB = b.dateRegistered || b.timestamp || 0;
             } else {
                 valA = ""; valB = "";
             }
@@ -4284,6 +4294,9 @@ function renderStaff() {
             } else if (currentTrainerSortField === 'role') {
                 valA = (a.role || "").toLowerCase();
                 valB = (b.role || "").toLowerCase();
+            } else if (currentTrainerSortField === 'dateRegistered') {
+                valA = a.dateRegistered || a.timestamp || 0;
+                valB = b.dateRegistered || b.timestamp || 0;
             } else {
                 valA = ""; valB = "";
             }
