@@ -199,6 +199,351 @@
             .chat-container.mobile-chat-open .chat-main { display: flex !important; flex-direction: column; flex-grow: 1; }
             .mobile-only-btn { display: block !important; }
         }
+
+        /* PREMIUM INTERACTIVE BOOKING LAYOUT */
+        .booking-modal-content {
+            max-width: 900px !important;
+            width: 95% !important;
+            border-radius: 12px !important;
+            background: var(--panel-bg) !important;
+            color: var(--text-primary) !important;
+            border: 1px solid var(--border-color) !important;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15) !important;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 0 !important;
+        }
+        .booking-modal-content .modal-header {
+            padding: 20px 25px !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            background: var(--panel-bg);
+        }
+        .booking-layout-wrapper {
+            display: grid;
+            grid-template-columns: 1.6fr 1fr;
+            min-height: 480px;
+        }
+        .booking-steps-section {
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            border-right: 1px solid var(--border-color);
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .booking-details-sidebar {
+            padding: 25px;
+            background: rgba(0,0,0,0.01);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        body.dark-theme .booking-details-sidebar {
+            background: rgba(255,255,255,0.02);
+        }
+        .booking-step-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px 20px;
+            box-shadow: var(--card-shadow);
+        }
+        .booking-step-label {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .step-badge {
+            background: var(--accent-blue);
+            color: white;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .booking-select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--panel-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            outline: none;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .booking-select:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+        .booking-datetime-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 20px;
+        }
+        .custom-cal-container {
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            background: var(--panel-bg);
+            box-shadow: var(--card-shadow);
+        }
+        .custom-cal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .cal-month-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .cal-nav-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+        .cal-nav-btn:hover {
+            background: rgba(0,0,0,0.03);
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+        body.dark-theme .cal-nav-btn:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .custom-cal-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            text-align: center;
+            margin-bottom: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .custom-cal-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+        .cal-day-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text-primary);
+            transition: 0.2s;
+            position: relative;
+        }
+        .cal-day-cell:hover:not(:disabled) {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+        }
+        .cal-day-cell.selected {
+            background: var(--accent-blue) !important;
+            color: white !important;
+            font-weight: 700;
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+        }
+        .cal-day-cell:disabled {
+            color: var(--text-muted);
+            opacity: 0.25;
+            cursor: not-allowed;
+        }
+        .cal-day-cell.has-dot::after {
+            content: '';
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+        }
+        .cal-day-cell.selected.has-dot::after {
+            background: white;
+        }
+        .selected-date-header {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .time-slots-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .time-slot-btn {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--panel-bg);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+        .time-slot-btn:hover:not(:disabled) {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.03);
+        }
+        .time-slot-btn.selected {
+            background: rgba(59, 130, 246, 0.08) !important;
+            border-color: var(--accent-blue) !important;
+            color: var(--accent-blue) !important;
+            box-shadow: 0 0 0 1px var(--accent-blue);
+        }
+        .time-slot-btn:disabled {
+            opacity: 0.35;
+            background: rgba(0,0,0,0.02);
+            border-style: dashed;
+            cursor: not-allowed;
+            color: var(--text-muted);
+        }
+        body.dark-theme .time-slot-btn:disabled {
+            background: rgba(255,255,255,0.01);
+        }
+        .sidebar-header {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.75px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+        .sidebar-body {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex-grow: 1;
+        }
+        .service-title {
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+        .details-item {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+        .details-item i {
+            font-size: 16px;
+            color: var(--text-muted);
+            margin-top: 2px;
+            width: 20px;
+            text-align: center;
+        }
+        .details-item strong {
+            display: block;
+            font-size: 14px;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        .details-item .sub-detail {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: block;
+            margin-top: 2px;
+        }
+        .sidebar-footer {
+            margin-top: 30px;
+        }
+        .sidebar-footer .next-btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            border-radius: 8px;
+            background: var(--accent-blue) !important;
+            color: white !important;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sidebar-footer .next-btn:hover:not(:disabled) {
+            background: #2563eb !important;
+            transform: translateY(-1px);
+        }
+        .sidebar-footer .next-btn:disabled {
+            background: var(--border-color) !important;
+            color: var(--text-muted) !important;
+            box-shadow: none;
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Responsive Layout Overrides */
+        @media (max-width: 768px) {
+            .booking-layout-wrapper {
+                grid-template-columns: 1fr;
+            }
+            .booking-steps-section {
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                max-height: none;
+                overflow: visible;
+                padding: 15px;
+            }
+            .booking-details-sidebar {
+                max-height: none;
+                overflow: visible;
+                padding: 20px 15px;
+            }
+            .booking-datetime-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -217,6 +562,10 @@
 
             <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)">
                 <i class="fa-solid fa-calendar-check"></i> <span class="menu-text">Bookings</span>
+            </li>
+
+            <li class="nav-item nav-clickable" onclick="switchTab('myProgram', this)">
+                <i class="fa-solid fa-dumbbell"></i> <span class="menu-text">My Program</span>
             </li>
 
             <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Gym Directory')">
@@ -375,6 +724,7 @@
                                 <th>Date</th>
                                 <th>Time</th>
                                 <th>Status</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="myBookingsBody"></tbody>
@@ -422,38 +772,113 @@
             </div>
         </div>
 
+        <!-- MY PROGRAM SECTION -->
+        <div id="myProgram" class="content-section">
+            <div class="panel">
+                <div class="panel-header"><i class="fas fa-dumbbell"></i> My Workout Program</div>
+                <div id="myCurrentProgram" style="padding:20px;"></div>
+            </div>
+            <div class="panel" style="margin-top:20px;">
+                <div class="panel-header"><i class="fas fa-list"></i> Available Programs</div>
+                <div id="memberProgramsList" style="padding:16px;display:flex;flex-wrap:wrap;gap:14px;">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <div id="memberBookingModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content booking-modal-content">
             <div class="modal-header">
                 <h3>Request a Training Session</h3>
                 <span class="close-btn" onclick="closeModal('memberBookingModal')">&times;</span>
             </div>
-            <form class="modal-form" id="memberBookingForm">
-                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
-                    <i class="fas fa-info-circle"></i> Your request will be sent to the trainer. Check your bookings tab to see if they approve it!
-                </p>
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Select Trainer <span class="required-asterisk">*</span></p>
-                <select id="memberBookTrainer" required>
-                    </select>
-                
-                <div style="display: flex; gap: 10px; margin-top: 10px;">
-                    <div style="flex: 1;">
-                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Preferred Date <span class="required-asterisk">*</span></p>
-                        <input type="date" id="memberBookDate" required style="width: 100%;">
+            <div class="booking-layout-wrapper">
+                <!-- Left/Main Column: Selection Steps -->
+                <div class="booking-steps-section">
+                    <!-- Step 1: Select Trainer -->
+                    <div class="booking-step-card">
+                        <label class="booking-step-label"><span class="step-badge">1</span> Select a Trainer</label>
+                        <select id="memberBookTrainer" required class="booking-select">
+                        </select>
                     </div>
-                    <div style="flex: 1;">
-                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Preferred Time <span class="required-asterisk">*</span></p>
-                        <input type="time" id="memberBookTime" required style="width: 100%;">
+
+                    <!-- Step 2 & 3: Calendar & Time Grid wrapper -->
+                    <div class="booking-datetime-grid" style="display: none;" id="bookingDateTimeGrid">
+                        <!-- Step 2: Custom Calendar Picker -->
+                        <div class="custom-cal-container">
+                            <label class="booking-step-label"><span class="step-badge">2</span> Select Date</label>
+                            <div class="custom-cal-header">
+                                <button type="button" class="cal-nav-btn" id="calPrevMonthBtn">&lt;</button>
+                                <span class="cal-month-title" id="calMonthTitle">May 2026</span>
+                                <button type="button" class="cal-nav-btn" id="calNextMonthBtn">&gt;</button>
+                            </div>
+                            <div class="custom-cal-weekdays">
+                                <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                            </div>
+                            <div class="custom-cal-days" id="calDaysGrid">
+                                <!-- Days dynamically populated -->
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Time Slot Picker -->
+                        <div class="booking-step-card" style="padding: 15px;">
+                            <label class="booking-step-label"><span class="step-badge">3</span> Select Time Slot</label>
+                            <div class="selected-date-header" id="selectedDateHeader">Select a date first</div>
+                            <div class="time-slots-grid" id="timeSlotsGrid">
+                                <!-- Time slots dynamically populated -->
+                            </div>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="btn-row" style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="button" class="action-btn" style="flex: 1; background: var(--body-bg); color: var(--text-primary); box-shadow: none; justify-content: center;" onclick="closeModal('memberBookingModal')">Cancel</button>
-                    <button type="submit" class="action-btn" style="flex: 1; justify-content: center;"><i class="fas fa-paper-plane"></i> Send Request</button>
+
+                <!-- Right Column: Service/Booking Details Summary -->
+                <div class="booking-details-sidebar" id="bookingDetailsSidebar" style="display: none;">
+                    <div class="sidebar-header">Service Details</div>
+                    <div class="sidebar-body">
+                        <h4 class="service-title">PERSONAL TRAINING</h4>
+                        
+                        <div class="details-item">
+                            <i class="fa-regular fa-clock"></i>
+                            <div>
+                                <strong id="summaryDateTime">Choose Date & Time</strong>
+                                <span class="sub-detail">Duration: 1 hr</span>
+                            </div>
+                        </div>
+
+                        <div class="details-item">
+                            <i class="fa-solid fa-dumbbell"></i>
+                            <div>
+                                <strong id="summaryTrainer">Trainer Not Selected</strong>
+                                <span class="sub-detail">Assigned Specialist</span>
+                            </div>
+                        </div>
+
+                        <div class="details-item">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <div>
+                                <strong>XFit Track Main Floor</strong>
+                                <span class="sub-detail">PT Zone</span>
+                            </div>
+                        </div>
+
+                        <div class="details-item">
+                            <i class="fa-solid fa-ticket"></i>
+                            <div>
+                                <strong>1 Session Credit</strong>
+                                <span class="sub-detail" id="memberCreditsDisplay">Deducted from plan</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-footer">
+                        <button type="button" id="confirmBookingBtn" class="action-btn next-btn" disabled>
+                            <i class="fas fa-paper-plane"></i> Send Request
+                        </button>
+                    </div>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 

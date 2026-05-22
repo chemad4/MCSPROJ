@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDocs, query, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { addDoc, collection, doc, getDocs, query, updateDoc, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 export function initRfid({ db, usersCol, attendanceCol, onShiftLogout } = {}) {
   if (!db || !usersCol || !attendanceCol) return;
@@ -10,12 +10,26 @@ export function initRfid({ db, usersCol, attendanceCol, onShiftLogout } = {}) {
 
   document.addEventListener("keydown", (e) => {
     const currentTime = Date.now();
-    if (currentTime - lastKeyTime > 50) rfidBuffer = "";
+    const activeEl = document.activeElement;
+    const isRegistrationBox = activeEl && activeEl.classList.contains("rfid-register-input");
+    if (!isRegistrationBox && (currentTime - lastKeyTime > 50)) rfidBuffer = "";
 
     if (e.key === "Enter" && rfidBuffer.length > 5) {
-      e.preventDefault();
       const activeEl = document.activeElement;
       const isRegistrationBox = activeEl && activeEl.classList.contains("rfid-register-input");
+      const isTextInput = activeEl && (
+        activeEl.tagName === "INPUT" ||
+        activeEl.tagName === "TEXTAREA" ||
+        activeEl.isContentEditable
+      );
+
+      // Focus Guard Check: Skip global scanner capture if actively typing in normal inputs (TC-1)
+      if (isTextInput && !isRegistrationBox) {
+        rfidBuffer = "";
+        return;
+      }
+
+      e.preventDefault();
 
       if (activeEl && activeEl.tagName === "INPUT" && !isRegistrationBox) {
         const currentVal = activeEl.value;
@@ -52,13 +66,34 @@ export function initRfid({ db, usersCol, attendanceCol, onShiftLogout } = {}) {
   });
 }
 
+function playRfidBuzzer(frequency = 150, duration = 300) {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.type = "sawtooth";
+    oscillator.frequency.value = frequency;
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration / 1000);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + duration / 1000);
+  } catch (e) {
+    // ignore
+  }
+}
+
 async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }) {
   const q = query(usersCol, where("rfid", "==", scannedTag));
   const snapshot = await getDocs(q);
 
   if (snapshot.empty) {
     // Walk-in guest card handling (reusable cards issued by POS after payment).
-    const now = new Date();
+    const offset = window.serverTimeOffsetMs || 0;
+    const now = new Date(Date.now() + offset);
     const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
@@ -67,7 +102,12 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
     const guestSnap = await getDocs(guestQ);
 
     if (guestSnap.empty) {
-      console.warn(`Unrecognized Card Scanned (ID: ${scannedTag}).`);
+      playRfidBuzzer(120, 400);
+      if (typeof showToast === "function") {
+        showToast(`Unrecognized card scanned (${scannedTag}). Access Denied.`, "error");
+      } else {
+        console.warn(`Unrecognized Card Scanned (ID: ${scannedTag}).`);
+      }
       return;
     }
 
@@ -76,7 +116,10 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
 
     // Only allow guest card tap-out for cards issued today.
     if (guest.status !== "Issued" || guest.issuedForDate !== dateStr) {
-      showToast("Guest card is not issued for today. Please ask staff to issue a day pass first.", "error");
+      playRfidBuzzer(120, 400);
+      if (typeof showToast === "function") {
+        showToast("Guest card is not issued for today. Please ask staff to issue a day pass first.", "error");
+      }
       return;
     }
 
@@ -84,7 +127,10 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
     const attSnapshot = await getDocs(attQuery);
 
     if (attSnapshot.empty) {
-      showToast("No active walk-in session found for this guest card.", "error");
+      playRfidBuzzer(120, 400);
+      if (typeof showToast === "function") {
+        showToast("No active walk-in session found for this guest card.", "error");
+      }
       return;
     }
 
@@ -118,50 +164,149 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
   }
 
   const userDoc = snapshot.docs[0];
-  const user = userDoc.data();
-
-  if (user.status === "Archived") {
-    console.warn(`Access Denied. ${(user.name || user.givenName) || "Member"}'s account is archived.`);
-    return;
-  }
-
-  // Auto-deny expired memberships on tap-in.
-  if ((user.role || "").toLowerCase() === "member" && typeof user.dateRegistered === "number") {
-    const planDays = (typeof window.getPlanDays === 'function') ? window.getPlanDays(user.plan) : 30;
-    const expiryAt = user.dateRegistered + planDays * 24 * 60 * 60 * 1000;
-    if (Date.now() > expiryAt) {
-      user.__isExpired = true;
-    }
-  }
-
-  const now = new Date();
+  const userId = userDoc.id;
+  const offset = window.serverTimeOffsetMs || 0;
+  const now = new Date(Date.now() + offset);
   const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-  const userName = user.name || `${user.givenName} ${user.familyName}`;
-  const isTrainer = (user.role || "").toLowerCase() === "trainer";
 
-  const attQuery = query(attendanceCol, where("name", "==", userName), where("date", "==", dateStr), where("status", "==", "Checked In"));
+  // 1. Pre-query for legacy active check-in record for today (since queries aren't allowed inside a transaction)
+  const attQuery = query(attendanceCol, where("rfid", "==", scannedTag), where("date", "==", dateStr), where("status", "==", "Checked In"));
   const attSnapshot = await getDocs(attQuery);
+  const legacyActiveId = !attSnapshot.empty ? attSnapshot.docs[0].id : null;
 
-  if (!attSnapshot.empty) {
-    const attDoc = attSnapshot.docs[0];
-    const recordId = attDoc.id;
-    const record = attDoc.data() || {};
+  try {
+    const checkinResult = await runTransaction(db, async (transaction) => {
+      const userRef = doc(db, "users", userId);
+      const userSnap = await transaction.get(userRef);
+      if (!userSnap.exists()) {
+        throw new Error("User record no longer exists.");
+      }
+      const user = userSnap.data();
 
-    const THIRTY_MIN_MS = 30 * 60 * 1000;
-    const checkInAt = typeof record.timestamp === "number" ? record.timestamp : null;
-    const msSinceIn = checkInAt !== null ? now.getTime() - checkInAt : null;
+      if (user.status === "Archived") {
+        throw new Error("ACCESS_DENIED: Account is archived or suspended.");
+      }
 
-    const operatorRole = (localStorage.getItem("userRole") || "").toLowerCase();
-    const canOverride = operatorRole === "admin" || operatorRole === "staff";
+      // Check membership expiration authoritatively
+      let isExpired = false;
+      if ((user.role || "").toLowerCase() === "member" && typeof user.dateRegistered === "number") {
+        const planDays = (typeof window.getPlanDays === 'function') ? window.getPlanDays(user.plan) : 30;
+        const expiryAt = user.dateRegistered + planDays * 24 * 60 * 60 * 1000;
+        if (Date.now() + offset > expiryAt) {
+          isExpired = true;
+        }
+      }
 
-    if (msSinceIn !== null && msSinceIn >= 0 && msSinceIn < THIRTY_MIN_MS) {
+      const freshNow = new Date(Date.now() + offset);
+      const freshTimeStr = freshNow.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+      const userName = user.name || `${user.givenName || ''} ${user.familyName || ''}`.trim() || "Member";
+      const isTrainer = (user.role || "").toLowerCase() === "trainer";
+
+      // Authoritatively determine check-in status (prioritizing transaction-synchronized fields, falling back to legacy pre-query)
+      const isAlreadyCheckedIn = (user.attendanceStatus === "Checked In" && user.activeAttendanceId) || legacyActiveId;
+      const activeAttId = user.activeAttendanceId || legacyActiveId;
+
+      if (isAlreadyCheckedIn) {
+        // TAP-OUT logic
+        const attRef = doc(db, "attendance", activeAttId);
+        const attSnap = await transaction.get(attRef);
+        
+        let record = {};
+        if (attSnap.exists()) {
+          record = attSnap.data();
+        }
+
+        const THIRTY_MIN_MS = 30 * 60 * 1000;
+        const checkInAt = typeof record.timestamp === "number" ? record.timestamp : null;
+        const msSinceIn = checkInAt !== null ? freshNow.getTime() - checkInAt : null;
+
+        const operatorRole = (localStorage.getItem("userRole") || "").toLowerCase();
+        const canOverride = operatorRole === "admin" || operatorRole === "staff";
+
+        if (msSinceIn !== null && msSinceIn >= 0 && msSinceIn < THIRTY_MIN_MS) {
+          // Inside a transaction, we cannot prompt the user. We throw a custom error,
+          // which will be caught in the outer catch block to trigger the UI prompt and retry.
+          throw new Error(`TAP_OUT_EARLY:${activeAttId}:${msSinceIn}`);
+        }
+
+        transaction.update(attRef, {
+          timeOut: freshTimeStr,
+          status: "Checked Out",
+        });
+
+        const userUpdates = {
+          attendanceStatus: "Checked Out",
+          activeAttendanceId: null
+        };
+        if (isTrainer) {
+          userUpdates.shiftStatus = "Off Floor";
+        }
+        transaction.update(userRef, userUpdates);
+
+        return { action: "Checked Out", userName, isTrainer };
+
+      } else {
+        // TAP-IN logic
+        if (isExpired) {
+          throw new Error("ACCESS_DENIED: Membership is expired.");
+        }
+
+        const newAttRef = doc(collection(db, "attendance"));
+        const newAttData = {
+          name: userName,
+          type: user.plan || user.role || "Member",
+          date: dateStr,
+          timeIn: freshTimeStr,
+          timeOut: "",
+          status: "Checked In",
+          timestamp: freshNow.getTime(),
+          userId: userId,
+          rfid: scannedTag,
+        };
+        transaction.set(newAttRef, newAttData);
+
+        const userUpdates = {
+          attendanceStatus: "Checked In",
+          activeAttendanceId: newAttRef.id
+        };
+        if (isTrainer) {
+          userUpdates.shiftStatus = "On Floor";
+        }
+        transaction.update(userRef, userUpdates);
+
+        return { action: "Checked In", userName, isTrainer };
+      }
+    });
+
+    if (checkinResult.action === "Checked Out") {
+      playRfidBuzzer(150, 300);
+      showToast(`${checkinResult.userName} successfully checked out.`, "info");
+    } else {
+      playRfidBuzzer(250, 200);
+      showToast(`${checkinResult.userName} successfully checked in! Welcome!`, "success");
+    }
+
+  } catch (err) {
+    const errMsg = err.message || "";
+    if (errMsg.startsWith("ACCESS_DENIED:")) {
+      playRfidBuzzer(90, 600);
+      showToast(errMsg.replace("ACCESS_DENIED:", "").trim(), "error");
+    } else if (errMsg.startsWith("TAP_OUT_EARLY:")) {
+      const parts = errMsg.split(":");
+      const activeAttId = parts[1];
+      const msSinceIn = parseInt(parts[2]);
+      const THIRTY_MIN_MS = 30 * 60 * 1000;
+      const minsLeft = Math.ceil((THIRTY_MIN_MS - msSinceIn) / 60000);
+
+      const operatorRole = (localStorage.getItem("userRole") || "").toLowerCase();
+      const canOverride = operatorRole === "admin" || operatorRole === "staff";
+
       if (!canOverride) {
+        playRfidBuzzer(90, 600);
         showToast("Tap-out denied: you can only tap out 30 minutes after tapping in. Please ask staff for an override.", "error");
         return;
       }
 
-      const minsLeft = Math.ceil((THIRTY_MIN_MS - msSinceIn) / 60000);
       showConfirm(
         `Tap-out is blocked for 30 minutes after tap-in.\n\nOverride and allow tap-out anyway? (${minsLeft} minute(s) remaining)`,
         async () => {
@@ -171,49 +316,47 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
             return;
           }
 
-          await updateDoc(doc(db, "attendance", recordId), {
-            timeOut: timeStr,
-            status: "Checked Out",
-            overrideTapOut: true,
-            overrideByRole: localStorage.getItem("userRole") || "",
-            overrideBy: localStorage.getItem("loggedInUser") || "",
-            overrideReason: reason,
-            overrideTimestamp: now.getTime(),
-          });
-          if (isTrainer) {
-            await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "Off Floor" });
+          const freshOffset = window.serverTimeOffsetMs || 0;
+          const freshNow = new Date(Date.now() + freshOffset);
+          const freshTimeStr = freshNow.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+          try {
+            await runTransaction(db, async (t) => {
+              const userRef = doc(db, "users", userId);
+              const userSnap = await t.get(userRef);
+              const user = userSnap.data();
+              const isTrainer = (user.role || "").toLowerCase() === "trainer";
+
+              t.update(doc(db, "attendance", activeAttId), {
+                timeOut: freshTimeStr,
+                status: "Checked Out",
+                overrideTapOut: true,
+                overrideByRole: localStorage.getItem("userRole") || "",
+                overrideBy: localStorage.getItem("loggedInUser") || "",
+                overrideReason: reason,
+                overrideTimestamp: freshNow.getTime(),
+              });
+
+              const userUpdates = {
+                attendanceStatus: "Checked Out",
+                activeAttendanceId: null
+              };
+              if (isTrainer) {
+                userUpdates.shiftStatus = "Off Floor";
+              }
+              t.update(userRef, userUpdates);
+            });
+            playRfidBuzzer(150, 300);
+            showToast("Early tap-out override successful.", "success");
+          } catch (e) {
+            console.error(e);
+            showToast("Failed to perform override check-out.", "error");
           }
         }
       );
-      return;
     } else {
-      await updateDoc(doc(db, "attendance", recordId), {
-        timeOut: timeStr,
-        status: "Checked Out",
-      });
-      if (isTrainer) {
-        await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "Off Floor" });
-      }
-    }
-  } else {
-    if (user.__isExpired) {
-      showToast("Access denied: membership is expired.", "error");
-      return;
-    }
-    await addDoc(attendanceCol, {
-      name: userName,
-      type: user.plan || user.role || "Member",
-      date: dateStr,
-      timeIn: timeStr,
-      timeOut: "",
-      status: "Checked In",
-      timestamp: now.getTime(),
-      userId: userDoc.id,
-      rfid: scannedTag,
-    });
-
-    if (isTrainer) {
-      await updateDoc(doc(db, "users", userDoc.id), { shiftStatus: "On Floor" });
+      console.error("Checkin/Out transaction failed: ", err);
+      showToast(err.message || "An error occurred during check-in.", "error");
     }
   }
 }

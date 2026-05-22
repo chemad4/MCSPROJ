@@ -2,8 +2,8 @@
 // 1. IMPORT FIREBASE DEPENDENCIES
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where, getDocs, getDoc, increment } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where, getDocs, getDoc, increment, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+// Firebase Storage removed — images stored as Base64 in Firestore (free tier compatible)
 import { initAttendance } from "./attendance.js";
 import { initRfid } from "./rfid.js";
 import { escapeHtml, formatCurrency } from "./utils.js";
@@ -11,6 +11,30 @@ import { escapeHtml, formatCurrency } from "./utils.js";
 // Expose utilities globally for inline handlers & other scripts
 window.escapeHtml = escapeHtml;
 window.formatCurrency = formatCurrency;
+
+// ==========================================
+// SECURITY: Secure Server Time Synchronization
+// ==========================================
+window.serverTimeOffsetMs = 0;
+async function syncServerTimeOffset() {
+    const start = Date.now();
+    try {
+        const response = await fetch(window.location.href, { method: 'HEAD', cache: 'no-cache' });
+        const end = Date.now();
+        const serverDateStr = response.headers.get('Date');
+        if (serverDateStr) {
+            const serverTime = new Date(serverDateStr).getTime();
+            const latency = (end - start) / 2;
+            const correctedServerTime = serverTime + latency;
+            window.serverTimeOffsetMs = correctedServerTime - end;
+            console.log(`[TimeSync] Server time synchronized. Offset: ${window.serverTimeOffsetMs}ms`);
+        }
+    } catch (err) {
+        console.warn('[TimeSync] Failed to fetch server date header, defaulting to local clock.', err);
+    }
+}
+syncServerTimeOffset();
+setInterval(syncServerTimeOffset, 5 * 60 * 1000);
 
 // ==========================================
 // UTILITY: Transaction Reference ID Generator
@@ -98,20 +122,31 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const storage = getStorage(app);
 
-// Helper function to upload images
-window.uploadImage = async function (file, folder = "images") {
-    if (!file) return null;
-    try {
-        const storageRef = ref(storage, `${folder}/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        return downloadURL;
-    } catch (error) {
-        console.error("Upload failed:", error);
-        showToast("Image upload failed.", "error");
-    }
+// Resize an image file to max 250x250 and return as Base64 data URL (Firestore-compatible, no Firebase Storage needed)
+window.uploadImage = function (file, _folder) {
+    return new Promise((resolve, reject) => {
+        if (!file) { resolve(null); return; }
+        const MAX = 250;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+                const w = Math.round(img.width * scale);
+                const h = Math.round(img.height * scale);
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', 0.75));
+            };
+            img.onerror = () => { showToast("Image load failed.", "error"); reject(new Error("img load")); };
+            img.src = e.target.result;
+        };
+        reader.onerror = () => { showToast("Image read failed.", "error"); reject(new Error("file read")); };
+        reader.readAsDataURL(file);
+    });
 };
 
 // Image preview utility
@@ -141,14 +176,21 @@ window.chooseImageUpload = function() {
 };
 
 window.chooseImageUrl = function() {
-    const url = prompt("Please enter the image URL:");
-    if (url) {
-        const preview = document.getElementById(currentImageTarget.preview);
-        const urlInput = document.getElementById(currentImageTarget.url);
-        if (preview) preview.src = url;
-        if (urlInput) urlInput.value = url;
-    }
     closeModal('imageSourceModal');
+    showPrompt({
+        title: 'Enter Image URL',
+        message: 'Paste the direct URL of the image:',
+        placeholder: 'https://example.com/image.jpg',
+        onConfirm: (url) => {
+            if (!url.startsWith('https://') && !url.startsWith('http://')) {
+                return showToast('Please enter a valid URL starting with https://', 'error');
+            }
+            const preview = document.getElementById(currentImageTarget.preview);
+            const urlInput = document.getElementById(currentImageTarget.url);
+            if (preview) preview.src = url;
+            if (urlInput) urlInput.value = url;
+        }
+    });
 };
 
 // Initialize EmailJS
@@ -213,6 +255,36 @@ if (currentUserId && currentSessionId) {
                         document.getElementById('myPlanDays').innerHTML = `<i class="fa-regular fa-clock"></i> ${diffDays > 0 ? diffDays + ' Days Left' : 'Expired'}`;
                     }
                     
+                    window.membershipDiffDays = diffDays;
+                    if (typeof window.renderBookings === 'function') {
+                        window.renderBookings();
+                    }
+
+                    // Sync enrolled program ID for member
+                    if (userData.enrolledProgramId) {
+                        window.__enrolledProgramId = userData.enrolledProgramId;
+                        localStorage.setItem("enrolledProgramId", userData.enrolledProgramId);
+                    } else {
+                        window.__enrolledProgramId = null;
+                        localStorage.removeItem("enrolledProgramId");
+                    }
+                    if (typeof renderMemberPrograms === 'function') renderMemberPrograms();
+
+                    // Send expiry reminder email once when ≤7 days remain
+                    if (diffDays > 0 && diffDays <= 7 && !userData.expirySentNotification) {
+                        const memberEmail = userData.email || '';
+                        const memberName = userData.name || userData.givenName || 'Member';
+                        if (memberEmail && typeof emailjs !== 'undefined') {
+                            emailjs.send("service_x90mti6", "template_nda1wjc", {
+                                to_name: memberName,
+                                to_email: memberEmail,
+                                generated_password: '',
+                                plan: `Your ${planName} membership expires in ${diffDays} day${diffDays > 1 ? 's' : ''}. Please renew at the front desk.`
+                            }).catch(() => {});
+                            updateDoc(doc(db, "users", localStorage.getItem("userId")), { expirySentNotification: true }).catch(() => {});
+                        }
+                    }
+
                     // BLOCKING LOGIC: If expired, show renewal modal
                     if (diffDays <= 0) {
                         const expiredModal = document.getElementById('membershipExpiredModal');
@@ -277,8 +349,9 @@ window.handleLogout = async function () {
     window.location.replace("index.html");
 };
 
-window.switchTab = function (tabId, element) {
-    if (event) event.stopPropagation();
+window.switchTab = function (tabId, element, evt) {
+    if (evt) evt.stopPropagation();
+    else if (typeof event !== 'undefined' && event) event.stopPropagation();
 
     document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active-section'));
     if (document.getElementById(tabId)) document.getElementById(tabId).classList.add('active-section');
@@ -457,8 +530,8 @@ function renderMaintenanceChart() {
 
 function renderCapacityChart() {
     const present = Number(document.getElementById('presentMembers')?.innerText || 0);
-    const total = 50;
-    const available = total - present;
+    const total = Math.max(50, membersData.length || 50);
+    const available = Math.max(0, total - present);
 
     // Circle chart visual removed from HTML for Capacity as per user request
 
@@ -872,14 +945,16 @@ function renderChatUserList() {
             html += `<div class="chat-category">Admins</div>`;
             admins.forEach(u => {
                 let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
+                let escapedName = escapeHtml(u.name);
+                let escapedNameClick = u.name.replace(/'/g, "\\'");
                 html += `
-                    <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
+                    <div class="chat-user chat-user-item" data-name="${escapedName.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${escapedNameClick}')">
                         <div class="chat-avatar" style="background: var(--primary-red);">
                             <i class="fa-solid fa-crown" style="font-size: 14px;"></i>
                         </div>
                         <div>
-                            <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
-                            <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
+                            <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${escapedName}</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">${escapeHtml(u.role)}</div>
                         </div>
                     </div>
                 `;
@@ -894,16 +969,18 @@ function renderChatUserList() {
 
             targetUsers.forEach(u => {
                 let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
-                let avatarContent = `${u.name.charAt(0).toUpperCase()}`;
+                let escapedName = escapeHtml(u.name);
+                let escapedNameClick = u.name.replace(/'/g, "\\'");
+                let avatarContent = `${escapedName.charAt(0).toUpperCase()}`;
                 if ((u.role || "").toLowerCase() === 'member') {
                     avatarContent = `<i class="fa-solid fa-user" style="font-size: 14px;"></i>`;
                 }
                 html += `
-                    <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.name}')">
+                    <div class="chat-user chat-user-item" data-name="${escapedName.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${escapedNameClick}')">
                         <div class="chat-avatar">${avatarContent}</div>
                         <div>
-                            <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${u.name}</div>
-                            <div style="font-size: 12px; color: var(--text-muted);">${u.role}</div>
+                            <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${escapedName}</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">${escapeHtml(u.role)}</div>
                         </div>
                     </div>
                 `;
@@ -954,7 +1031,7 @@ function renderChatHistory() {
         const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         return `
             <div class="msg-bubble ${isMe ? 'msg-sent' : 'msg-received'}">
-                <div>${m.text}</div>
+                <div>${escapeHtml(m.text)}</div>
                 <div class="msg-time">${time}</div>
             </div>
         `;
@@ -994,20 +1071,30 @@ function getCategoryIcon(catName) {
     return '<i class="fa-solid fa-box"></i>';
 }
 
-window.quickRestock = async function (id, name) {
-    const qtyStr = prompt(`How many units of ${name} are you receiving?`);
-    if (!qtyStr) return;
-    const qty = parseInt(qtyStr);
-    if (isNaN(qty) || qty <= 0) return showToast("Invalid quantity.", "error");
+window.quickRestock = async function (id) {
+    const item = inventoryData.find(i => i.id === id);
+    if (!item) return;
+    const name = item.name;
 
-    try {
-        await updateDoc(doc(db, "inventory", id), { qty: increment(qty) });
-        await logStockMovement(id, name, qty, "Quick Restock");
-        showToast(`Successfully added ${qty} units to ${name}.`, "success");
-    } catch (e) {
-        console.error(e);
-        showToast("Failed to restock item.", "error");
-    }
+    showPrompt({
+        title: 'Quick Restock',
+        message: `How many units of ${escapeHtml(name)} are you receiving?`,
+        placeholder: 'Enter quantity (e.g. 50)',
+        onConfirm: async (qtyStr) => {
+            const qty = parseInt(qtyStr);
+            if (isNaN(qty) || qty <= 0) return showToast("Invalid quantity. Enter a positive number.", "error");
+            if (qty > 10000) return showToast("Maximum restock is 10,000 units per entry.", "error");
+
+            try {
+                await updateDoc(doc(db, "inventory", id), { qty: increment(qty) });
+                await logStockMovement(id, name, qty, "Quick Restock");
+                showToast(`Successfully added ${qty} units to ${escapeHtml(name)}.`, "success");
+            } catch (e) {
+                console.error(e);
+                showToast("Failed to restock item.", "error");
+            }
+        }
+    });
 }
 
 let currentInventoryView = 'grid'; // 'grid' or 'list'
@@ -1066,7 +1153,7 @@ function renderInventory() {
             alertsHtmlArr.push(`
                 <div class="list-item">
                     <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                    <div class="list-content"><h4>Status: ${currentStatus}</h4><p><strong>${item.name}</strong> requires attention.</p></div>
+                    <div class="list-content"><h4>Status: ${escapeHtml(currentStatus)}</h4><p><strong>${escapeHtml(item.name)}</strong> requires attention.</p></div>
                 </div>
             `);
         }
@@ -1115,40 +1202,40 @@ function renderInventory() {
         if (isConsumable && item.expiry) {
             let expDate = new Date(item.expiry);
             let daysLeft = (expDate - new Date()) / (1000 * 60 * 60 * 24);
-            if (daysLeft <= 30 && daysLeft >= 0) expiryHtml = ` <span class="badge pending" style="font-size: 10px;">Expiring Soon</span>`;
+            if (daysLeft <= 7 && daysLeft >= 0) expiryHtml = ` <span class="badge pending" style="font-size: 10px;">Expiring Soon</span>`;
             else if (daysLeft < 0) expiryHtml = ` <span class="badge broken" style="font-size: 10px;">Expired</span>`;
         }
 
         const iconHtml = getCategoryIcon(item.cat);
         const isSelected = !isConsumable && selectedEquipItems.has(item.id);
-        const imageHtml = item.image ? `<img src="${item.image}" alt="${item.name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">` : iconHtml;
+        const imageHtml = item.image ? `<img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">` : iconHtml;
 
         let actionButtons = !isConsumable ? `
             <button type="button" class="btn-icon btn-edit" title="Edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
             <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
         ` : `
-            <button type="button" class="btn-icon" style="color: #27ae60;" title="Quick Restock" onclick="quickRestock('${item.id}', '${item.name.replace(/'/g, "\\'")}')"><i class="fas fa-plus-circle"></i></button>
+            <button type="button" class="btn-icon" style="color: #27ae60;" title="Quick Restock" onclick="quickRestock('${item.id}')"><i class="fas fa-plus-circle"></i></button>
             <button type="button" class="btn-icon btn-edit" title="Edit" onclick="openEditProductModal('${item.id}')"><i class="fas fa-edit"></i></button>
             <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
         `;
 
         return `
             <div class="inventory-card inventory-item-filter ${isSelected ? 'selected' : ''}" 
-                 data-search="${item.name.toLowerCase()} ${item.cat.toLowerCase()} ${item.currentStatus.toLowerCase()}"
-                 data-status="${item.currentStatus}">
+                 data-search="${escapeHtml(item.name.toLowerCase())} ${escapeHtml(item.cat.toLowerCase())} ${escapeHtml(item.currentStatus.toLowerCase())}"
+                 data-status="${escapeHtml(item.currentStatus)}">
                 ${!isConsumable ? `<input type="checkbox" class="inventory-checkbox" onchange="toggleItemSelection('equipment', '${item.id}', this)" ${isSelected ? 'checked' : ''}>` : ''}
                 <div class="inventory-icon-box" style="${item.image ? 'padding:0;' : ''}">${imageHtml}</div>
                 <div class="inventory-details">
-                    <div class="inventory-title">${item.name}</div>
-                    <div class="inventory-category">${item.cat}</div>
+                    <div class="inventory-title">${escapeHtml(item.name)}</div>
+                    <div class="inventory-category">${escapeHtml(item.cat)}</div>
                     <div class="inventory-desc">
-                        ${(item.assetTag && item.assetTag !== 'undefined') ? `Tag: <strong>${item.assetTag}</strong><br>` : ''}
-                        ${(item.serialNumber && item.serialNumber !== 'undefined') ? `S/N: <strong>${item.serialNumber}</strong><br>` : ''}
-                        ${(item.size && item.size !== 'undefined') ? `Size/Vol: <strong>${item.size}</strong><br>` : ''}
-                        ${isConsumable && item.expiry ? `Expiry: <strong>${item.expiry}</strong>${expiryHtml}<br>` : ''}
+                        ${(item.assetTag && item.assetTag !== 'undefined') ? `Tag: <strong>${escapeHtml(item.assetTag)}</strong><br>` : ''}
+                        ${(item.serialNumber && item.serialNumber !== 'undefined') ? `S/N: <strong>${escapeHtml(item.serialNumber)}</strong><br>` : ''}
+                        ${(item.size && item.size !== 'undefined') ? `Size/Vol: <strong>${escapeHtml(item.size)}</strong><br>` : ''}
+                        ${isConsumable && item.expiry ? `Expiry: <strong>${escapeHtml(item.expiry)}</strong>${expiryHtml}<br>` : ''}
                         Qty: <strong>${item.qty} units</strong>
                     </div>
-                    <div class="inventory-meta"><span class="badge ${badge}">${item.currentStatus}</span></div>
+                    <div class="inventory-meta"><span class="badge ${badge}">${escapeHtml(item.currentStatus)}</span></div>
                 </div>
                 <div class="card-actions">${actionButtons}</div>
             </div>
@@ -1165,12 +1252,12 @@ function renderInventory() {
         return `
             <tr class="${isSelected ? 'selected' : ''}">
                 <td><input type="checkbox" onchange="toggleItemSelection('equipment', '${item.id}', this)" ${isSelected ? 'checked' : ''}></td>
-                <td><div style="font-weight:600;">${item.name}</div></td>
-                <td><span class="inventory-category" style="margin:0;">${item.cat}</span></td>
-                <td><code>${(item.assetTag && item.assetTag !== 'undefined') ? item.assetTag : '-'}</code></td>
-                <td>${(item.size && item.size !== 'undefined') ? item.size : '-'}</td>
+                <td><div style="font-weight:600;">${escapeHtml(item.name)}</div></td>
+                <td><span class="inventory-category" style="margin:0;">${escapeHtml(item.cat)}</span></td>
+                <td><code>${(item.assetTag && item.assetTag !== 'undefined') ? escapeHtml(item.assetTag) : '-'}</code></td>
+                <td>${(item.size && item.size !== 'undefined') ? escapeHtml(item.size) : '-'}</td>
                 <td><strong>${item.qty}</strong></td>
-                <td><span class="badge ${badge}">${item.currentStatus}</span></td>
+                <td><span class="badge ${badge}">${escapeHtml(item.currentStatus)}</span></td>
                 <td>
                     <div style="display:flex; gap:8px;">
                         <button type="button" class="btn-icon" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
@@ -1315,26 +1402,54 @@ if (document.getElementById('editEquipForm')) {
         const id = document.getElementById('editEquipId').value;
         const oldEquip = inventoryData.find(i => i.id === id);
 
-        const imageFile = document.getElementById('editEquipImageFile').files[0];
-        let imageUrl = document.getElementById('editEquipImage').value.trim();
-
-        if (imageFile) {
-            imageUrl = await window.uploadImage(imageFile, 'equipment');
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
         }
 
-        const updatedData = {
-            name: document.getElementById('editEquipName').value.trim(),
-            cat: document.getElementById('editEquipCategory').value,
-            size: document.getElementById('editEquipSize').value.trim() || '',
-            qty: Number(document.getElementById('editEquipQty').value),
-            status: document.getElementById('editEquipStatus').value,
-            assetTag: document.getElementById('editEquipAssetTag').value.trim() || '',
-            image: imageUrl || ''
-        };
-
-        const qtyDiff = updatedData.qty - (oldEquip ? oldEquip.qty : 0);
-
         try {
+            const nameStr = document.getElementById('editEquipName').value.trim();
+            if (!nameStr) {
+                showToast("Equipment name is required.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+
+            const qtyVal = parseInt(document.getElementById('editEquipQty').value, 10);
+            if (isNaN(qtyVal) || qtyVal < 0) {
+                showToast("Quantity must be a non-negative integer.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+
+            const assetTagVal = document.getElementById('editEquipAssetTag').value.trim();
+            if (assetTagVal && inventoryData.some(i => i.id !== id && i.assetTag && i.assetTag.toLowerCase() === assetTagVal.toLowerCase())) {
+                showToast("Asset tag must be unique! This tag is already assigned to another item.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+
+            const imageFile = document.getElementById('editEquipImageFile').files[0];
+            let imageUrl = document.getElementById('editEquipImage').value.trim();
+
+            if (imageFile) {
+                imageUrl = await window.uploadImage(imageFile, 'equipment');
+            }
+
+            const updatedData = {
+                name: nameStr,
+                cat: document.getElementById('editEquipCategory').value,
+                size: document.getElementById('editEquipSize').value.trim() || '',
+                qty: qtyVal,
+                status: document.getElementById('editEquipStatus').value,
+                assetTag: assetTagVal,
+                image: imageUrl || ''
+            };
+
+            const qtyDiff = updatedData.qty - (oldEquip ? oldEquip.qty : 0);
+
             await updateDoc(doc(db, "inventory", id), updatedData);
             if (qtyDiff !== 0) await logStockMovement(id, updatedData.name, qtyDiff, "Manual Edit");
             window.closeModal('editEquipModal');
@@ -1343,6 +1458,11 @@ if (document.getElementById('editEquipForm')) {
         } catch (error) {
             console.error("Equipment update failed:", error);
             showToast("Failed to update equipment. Please try again.", "error");
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
         }
     });
 }
@@ -1361,7 +1481,10 @@ window.openEditProductModal = function (id) {
         document.getElementById('editProdPreview').src = item.image || 'images/default-product.png';
     }
     if (document.getElementById('editProdExpiry')) {
-        document.getElementById('editProdExpiry').value = item.expiry || '';
+        const expiryEl = document.getElementById('editProdExpiry');
+        const today = new Date().toISOString().split('T')[0];
+        expiryEl.min = today;
+        expiryEl.value = item.expiry || '';
     }
     if (document.getElementById('editProdSerialNumber')) {
         document.getElementById('editProdSerialNumber').value = item.serialNumber || '';
@@ -1375,27 +1498,55 @@ if (document.getElementById('editProductForm')) {
         const id = document.getElementById('editProdId').value;
         const oldProd = inventoryData.find(i => i.id === id);
 
-        const imageFile = document.getElementById('editProdImageFile').files[0];
-        let imageUrl = document.getElementById('editProdImage').value.trim();
-
-        if (imageFile) {
-            imageUrl = await window.uploadImage(imageFile, 'products');
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
         }
 
-        const updatedData = {
-            name: document.getElementById('editProdName').value.trim(),
-            cat: document.getElementById('editProdCategory').value,
-            price: Number(document.getElementById('editProdPrice').value),
-            qty: Number(document.getElementById('editProdQty').value),
-            size: document.getElementById('editProdVol').value,
-            image: imageUrl || '',
-            expiry: document.getElementById('editProdExpiry') ? document.getElementById('editProdExpiry').value : (oldProd?.expiry || null),
-            serialNumber: document.getElementById('editProdSerialNumber') ? document.getElementById('editProdSerialNumber').value.trim() : (oldProd?.serialNumber || '')
-        };
-
-        const qtyDiff = updatedData.qty - (oldProd ? oldProd.qty : 0);
-
         try {
+            const nameStr = document.getElementById('editProdName').value.trim();
+            if (!nameStr) {
+                showToast("Product name is required.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+
+            const priceVal = Number(document.getElementById('editProdPrice').value);
+            if (isNaN(priceVal) || priceVal <= 0) {
+                showToast("Product price must be a positive number.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+
+            const qtyVal = parseInt(document.getElementById('editProdQty').value, 10);
+            if (isNaN(qtyVal) || qtyVal < 0) {
+                showToast("Quantity must be a non-negative integer.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+
+            const imageFile = document.getElementById('editProdImageFile').files[0];
+            let imageUrl = document.getElementById('editProdImage').value.trim();
+
+            if (imageFile) {
+                imageUrl = await window.uploadImage(imageFile, 'products');
+            }
+
+            const updatedData = {
+                name: nameStr,
+                cat: document.getElementById('editProdCategory').value,
+                price: priceVal,
+                qty: qtyVal,
+                size: document.getElementById('editProdVol').value,
+                image: imageUrl || '',
+                expiry: document.getElementById('editProdExpiry') ? document.getElementById('editProdExpiry').value : (oldProd?.expiry || null),
+                serialNumber: document.getElementById('editProdSerialNumber') ? document.getElementById('editProdSerialNumber').value.trim() : (oldProd?.serialNumber || '')
+            };
+
+            const qtyDiff = updatedData.qty - (oldProd ? oldProd.qty : 0);
+
             await updateDoc(doc(db, "inventory", id), updatedData);
             if (qtyDiff !== 0) await logStockMovement(id, updatedData.name, qtyDiff, "Manual Edit");
             window.closeModal('editProductModal');
@@ -1404,6 +1555,11 @@ if (document.getElementById('editProductForm')) {
         } catch (error) {
             console.error("Product update failed:", error);
             showToast("Failed to update product. Please try again.", "error");
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
         }
     });
 }
@@ -1416,40 +1572,78 @@ async function handleInventorySubmit(e, isProduct) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     }
-    const nameStr = document.getElementById(isProduct ? 'prodName' : 'equipName').value.trim();
-    const addQty = Number(document.getElementById(isProduct ? 'prodQty' : 'equipQty').value);
-    const existingItem = inventoryData.find(i => i.name.toLowerCase() === nameStr.toLowerCase());
 
-    if (existingItem) {
-        await updateDoc(doc(db, "inventory", existingItem.id), { qty: increment(addQty) });
-        await logStockMovement(existingItem.id, existingItem.name, addQty, "Automated Restock");
-        showToast(`Automated Update: Added ${addQty} units to existing stock. New Total: ${existingItem.qty + addQty} units.`, "info");
-    } else {
-        const imageFile = document.getElementById(isProduct ? 'prodImageFile' : 'equipImageFile').files[0];
-        let imageUrl = document.getElementById(isProduct ? 'prodImage' : 'equipImage').value.trim();
-
-        if (imageFile) {
-            imageUrl = await window.uploadImage(imageFile, isProduct ? 'products' : 'equipment');
+    try {
+        const nameStr = document.getElementById(isProduct ? 'prodName' : 'equipName').value.trim();
+        if (!nameStr) {
+            showToast("Item name is required.", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
         }
 
-        const newItem = {
-            name: nameStr, cat: document.getElementById(isProduct ? 'prodCategory' : 'equipCategory').value, size: document.getElementById(isProduct ? 'prodVol' : 'equipSize').value,
-            qty: addQty, status: isProduct ? 'In Stock' : 'Operational', price: isProduct ? Number(document.getElementById('prodPrice').value) : 0, expiry: isProduct ? document.getElementById('prodExpiry').value : null,
-            itemType: isProduct ? 'product' : 'equipment', lowStockThreshold: isProduct ? 5 : 0,
-            assetTag: !isProduct ? (document.getElementById('equipAssetTag').value.trim() || '') : '',
-            serialNumber: isProduct ? (document.getElementById('prodSerialNumber') ? document.getElementById('prodSerialNumber').value.trim() : '') : '',
-            image: imageUrl || ''
-        };
-        const addedRef = await addDoc(inventoryCol, newItem);
-        if (isProduct && addQty > 0) await logStockMovement(addedRef.id, nameStr, addQty, "Initial Stock");
-        showToast(`New ${isProduct ? 'product' : 'equipment'} registered successfully!`, "success");
-        if (window.logActivity) window.logActivity("Item Registered", `Registered new ${isProduct ? 'product' : 'equipment'}: ${nameStr} (Qty: ${addQty})`);
+        const addQty = parseInt(document.getElementById(isProduct ? 'prodQty' : 'equipQty').value, 10);
+        if (isNaN(addQty) || addQty < 0) {
+            showToast("Quantity must be a non-negative integer.", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
+
+        if (!isProduct) {
+            const assetTagVal = document.getElementById('equipAssetTag').value.trim();
+            if (assetTagVal && inventoryData.some(i => i.assetTag && i.assetTag.toLowerCase() === assetTagVal.toLowerCase())) {
+                showToast("Asset tag must be unique! This tag is already assigned to another item.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+        }
+
+        const existingItem = inventoryData.find(i => i.name.toLowerCase() === nameStr.toLowerCase());
+
+        if (existingItem) {
+            await updateDoc(doc(db, "inventory", existingItem.id), { qty: increment(addQty) });
+            await logStockMovement(existingItem.id, existingItem.name, addQty, "Automated Restock");
+            showToast(`Automated Update: Added ${addQty} units to existing stock. New Total: ${existingItem.qty + addQty} units.`, "info");
+        } else {
+            const imageFile = document.getElementById(isProduct ? 'prodImageFile' : 'equipImageFile').files[0];
+            let imageUrl = document.getElementById(isProduct ? 'prodImage' : 'equipImage').value.trim();
+
+            if (imageFile) {
+                imageUrl = await window.uploadImage(imageFile, isProduct ? 'products' : 'equipment');
+            }
+
+            const newItem = {
+                name: nameStr, cat: document.getElementById(isProduct ? 'prodCategory' : 'equipCategory').value, size: document.getElementById(isProduct ? 'prodVol' : 'equipSize').value,
+                qty: addQty, status: isProduct ? 'In Stock' : 'Operational', price: isProduct ? Number(document.getElementById('prodPrice').value) : 0, expiry: isProduct ? document.getElementById('prodExpiry').value : null,
+                itemType: isProduct ? 'product' : 'equipment', lowStockThreshold: isProduct ? 5 : 0,
+                assetTag: !isProduct ? (document.getElementById('equipAssetTag').value.trim() || '') : '',
+                serialNumber: isProduct ? (document.getElementById('prodSerialNumber') ? document.getElementById('prodSerialNumber').value.trim() : '') : '',
+                image: imageUrl || ''
+            };
+
+            // Validate product price
+            if (isProduct) {
+                if (isNaN(newItem.price) || newItem.price <= 0) {
+                    showToast("Product price must be a positive number.", "error");
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                    return;
+                }
+            }
+
+            const addedRef = await addDoc(inventoryCol, newItem);
+            if (isProduct && addQty > 0) await logStockMovement(addedRef.id, nameStr, addQty, "Initial Stock");
+            showToast(`New ${isProduct ? 'product' : 'equipment'} registered successfully!`, "success");
+            if (window.logActivity) window.logActivity("Item Registered", `Registered new ${isProduct ? 'product' : 'equipment'}: ${nameStr} (Qty: ${addQty})`);
+        }
+        window.closeModal(isProduct ? 'productModal' : 'equipmentModal');
+    } catch (e) {
+        console.error("Inventory submission failed: ", e);
+        showToast("An error occurred. Please try again.", "error");
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
     }
-    if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnText;
-    }
-    window.closeModal(isProduct ? 'productModal' : 'equipmentModal');
 }
 
 if (document.getElementById('equipmentForm')) document.getElementById('equipmentForm').addEventListener('submit', (e) => handleInventorySubmit(e, false));
@@ -1628,7 +1822,16 @@ function renderPOSProducts() {
 
     inventoryData.forEach(item => {
         let isConsumable = item.itemType === 'product' || ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
-        if (isConsumable && item.qty > 0) {
+        let isExpired = false;
+        if (item.expiry) {
+            const expDate = new Date(item.expiry + 'T00:00:00');
+            const today = new Date(Date.now() + (window.serverTimeOffsetMs || 0));
+            today.setHours(0, 0, 0, 0);
+            if (!isNaN(expDate.getTime()) && expDate < today) {
+                isExpired = true;
+            }
+        }
+        if (isConsumable && item.qty > 0 && !isExpired) {
             allItems.push({
                 id: item.id,
                 name: item.name,
@@ -1682,6 +1885,24 @@ function renderPOSProducts() {
 }
 
 window.addToCart = function (id, name, price, maxQty, image) {
+    const itemObj = inventoryData.find(i => i.id === id);
+    if (itemObj && itemObj.expiry) {
+        const expDate = new Date(itemObj.expiry + 'T00:00:00');
+        const today = new Date(Date.now() + (window.serverTimeOffsetMs || 0));
+        today.setHours(0, 0, 0, 0);
+
+        if (!isNaN(expDate.getTime()) && expDate < today) {
+            showToast(`Error: "${name}" has expired (Expiry: ${itemObj.expiry}) and cannot be sold.`, "error");
+            return;
+        }
+
+        const daysLeft = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysLeft <= 7 && daysLeft >= 0) {
+            const confirmed = confirm(`⚠️ Warning: "${name}" is expiring soon (in ${daysLeft} days, on ${itemObj.expiry}). Are you sure you want to add this to the cart?`);
+            if (!confirmed) return;
+        }
+    }
+
     let existing = posCart.find(i => i.id === id);
     if (existing) { if (existing.qty < maxQty) existing.qty++; else showToast("Not enough stock available!", "error"); }
     else { posCart.push({ id, name, price, qty: 1, maxQty, image: image || 'images/default-product.png' }); }
@@ -1717,10 +1938,10 @@ function renderCart() {
     const renderCartItem = (item) => `
         <div class="pos-cart-item">
             <div class="pos-cart-thumb">
-                <img src="${item.image || 'images/default-product.png'}" onerror="this.src='images/default-product.png'">
+                <img src="${escapeHtml(item.image || 'images/default-product.png')}" onerror="this.src='images/default-product.png'">
             </div>
             <div class="pos-cart-detail" style="max-width: 140px;">
-                <div class="pos-cart-item-name" title="${item.name}">${item.name}</div>
+                <div class="pos-cart-item-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
                 <div style="font-size: 11px; color: var(--text-muted);">₱${item.price.toFixed(2)} each</div>
             </div>
             <div class="pos-cart-qty">
@@ -1755,184 +1976,351 @@ window.selectPaymentMethod = function (method, btn) {
     selectedPaymentMethod = method;
     document.querySelectorAll('.payment-method-btn').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
+
+    const posGcashRefWrapper = document.getElementById('posGcashRefWrapper');
+    if (posGcashRefWrapper) {
+        if (method === 'GCash') {
+            posGcashRefWrapper.classList.add('visible');
+            const inp = posGcashRefWrapper.querySelector('input');
+            if (inp) setTimeout(() => inp.focus(), 300);
+        } else {
+            posGcashRefWrapper.classList.remove('visible');
+            const inp = posGcashRefWrapper.querySelector('input');
+            if (inp) inp.value = '';
+        }
+    }
 }
 
 window.processPayment = async function () {
     if (posCart.length === 0) return showToast("Cart is empty!", "error");
 
-    let subtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    let vat = subtotal * 0.12;
-    let discount = 0;
-    let grandTotal = subtotal + vat - discount;
+    // Double check soon-to-expire items at checkout to confirm before proceeding
+    let expiringSoonItem = null;
+    let expiringSoonDays = 0;
+    for (const cartItem of posCart) {
+        const itemObj = inventoryData.find(i => i.id === cartItem.id);
+        if (itemObj && itemObj.expiry) {
+            const expDate = new Date(itemObj.expiry + 'T00:00:00');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const daysLeft = Math.ceil((expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysLeft <= 7 && daysLeft >= 0) {
+                expiringSoonItem = cartItem;
+                expiringSoonDays = daysLeft;
+                break;
+            }
+        }
+    }
+    if (expiringSoonItem) {
+        const checkoutConfirmed = confirm(`⚠️ Checkout Warning: The item "${expiringSoonItem.name}" in your cart is expiring soon (in ${expiringSoonDays} days, on ${inventoryData.find(i => i.id === expiringSoonItem.id).expiry}). Do you still want to proceed with the purchase?`);
+        if (!checkoutConfirmed) {
+            return;
+        }
+    }
+
+    if (window.isPOSProcessing) return;
+    window.isPOSProcessing = true;
+
+    const payBtn = document.querySelector('.pos-pay-btn') || document.getElementById('posPayBtn');
+    const originalBtnText = payBtn ? payBtn.innerHTML : '';
+    if (payBtn) {
+        payBtn.disabled = true;
+        payBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    }
 
     const customerNameInput = document.getElementById('posCustomerName');
-    let customerName = (customerNameInput && customerNameInput.value.trim() !== '') ? customerNameInput.value.trim() : "Walk-in POS Customer";
+    const posGcashRefInput = document.getElementById('posGcashRefId');
+    const posGcashRefWrapper = document.getElementById('posGcashRefWrapper');
 
-    let memberIdForCredit = null;
+    try {
+        const posGcashRef = (posGcashRefInput ? posGcashRefInput.value.trim() : '');
+        if (selectedPaymentMethod === 'GCash') {
+            if (!posGcashRef) {
+                showToast('Please enter the GCash Reference ID.', 'error');
+                resetProcessingState();
+                return;
+            }
+            if (posGcashRef.replace(/\s/g, '').length !== 12) {
+                showToast('GCash Reference ID must be exactly 12 digits.', 'error');
+                resetProcessingState();
+                return;
+            }
+        }
 
-    if (selectedPaymentMethod === 'RFID') {
-        const modal = document.getElementById('rfidPaymentModal');
-        const input = document.getElementById('posRfidInput');
-        const statusEl = document.getElementById('rfidPaymentStatus');
+        let customerName = (customerNameInput && customerNameInput.value.trim() !== '') ? customerNameInput.value.trim() : "Walk-in POS Customer";
 
-        statusEl.innerHTML = `Amount Due: ₱${grandTotal.toFixed(2)}`;
-        statusEl.style.color = "var(--dark-black)";
-        modal.style.display = 'flex';
-        input.value = '';
-        setTimeout(() => input.focus(), 100);
+        let memberIdForCredit = null;
 
-        const rfidData = await new Promise(resolve => {
-            let lastVal = '';
-            // Close modal detection
-            const closeBtn = modal.querySelector('.close-btn');
-            const handleClose = () => {
-                clearInterval(checkInterval);
-                resolve(null);
-            };
-            closeBtn.addEventListener('click', handleClose, { once: true });
+        if (selectedPaymentMethod === 'RFID') {
+            const modal = document.getElementById('rfidPaymentModal');
+            const input = document.getElementById('posRfidInput');
+            const statusEl = document.getElementById('rfidPaymentStatus');
 
-            // Search manually
-            let debounceTimer;
-            const inputHandler = (e) => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(async () => {
-                    const q = e.target.value.trim().toLowerCase();
-                    if (q.length > 0) {
-                        const searchRes = membersData.filter(m => (m.name && m.name.toLowerCase().includes(q)) || (m.uid && m.uid.toLowerCase().includes(q)) || (m.givenName && m.givenName.toLowerCase().includes(q)) || (m.familyName && m.familyName.toLowerCase().includes(q)) || (m.rfid && m.rfid === q));
-                        const dropdown = document.getElementById('posRfidSearchDropdown');
-                        if (searchRes.length > 0) {
-                            dropdown.innerHTML = searchRes.map(m => `
-                                <div style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;" onclick="window.selectMemberForPayment('${m.id}', '${m.rfid || ''}', '${m.name || (m.givenName + ' ' + m.familyName)}')">
-                                    <div style="font-weight: 600;">${m.name || (m.givenName + ' ' + m.familyName)}</div>
-                                    <div style="font-size: 11px; color: var(--text-muted);">${m.uid ? m.uid + ' | ' : ''}RFID: ${m.rfid || 'None'} | Bal: ₱${(m.creditBalance || 0).toFixed(2)}</div>
-                                </div>
-                            `).join('');
-                            dropdown.style.display = 'block';
+            // Set dynamic price label based on current cart estimation
+            let subtotalEstimate = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            let vatEstimate = subtotalEstimate * 0.12;
+            let grandTotalEstimate = subtotalEstimate + vatEstimate;
+            statusEl.innerHTML = `Amount Due (Estimate): ₱${grandTotalEstimate.toFixed(2)}`;
+            statusEl.style.color = "var(--dark-black)";
+            modal.style.display = 'flex';
+            input.value = '';
+            setTimeout(() => input.focus(), 100);
+
+            const rfidData = await new Promise(resolve => {
+                let lastVal = '';
+                const closeBtn = modal.querySelector('.close-btn');
+                const handleClose = () => {
+                    clearInterval(checkInterval);
+                    resolve(null);
+                };
+                closeBtn.addEventListener('click', handleClose, { once: true });
+
+                let debounceTimer;
+                const inputHandler = (e) => {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(async () => {
+                        const q = e.target.value.trim().toLowerCase();
+                        if (q.length > 0) {
+                            const searchRes = membersData.filter(m => (m.name && m.name.toLowerCase().includes(q)) || (m.uid && m.uid.toLowerCase().includes(q)) || (m.givenName && m.givenName.toLowerCase().includes(q)) || (m.familyName && m.familyName.toLowerCase().includes(q)) || (m.rfid && m.rfid === q));
+                            const dropdown = document.getElementById('posRfidSearchDropdown');
+                            if (searchRes.length > 0) {
+                                dropdown.innerHTML = searchRes.map(m => `
+                                    <div style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;" onclick="window.selectMemberForPayment('${m.id}', '${m.rfid || ''}', '${m.name || (m.givenName + ' ' + m.familyName)}')">
+                                        <div style="font-weight: 600;">${m.name || (m.givenName + ' ' + m.familyName)}</div>
+                                        <div style="font-size: 11px; color: var(--text-muted);">${m.uid ? m.uid + ' | ' : ''}RFID: ${m.rfid || 'None'} | Bal: ₱${(m.creditBalance || 0).toFixed(2)}</div>
+                                    </div>
+                                `).join('');
+                                dropdown.style.display = 'block';
+                            } else {
+                                dropdown.style.display = 'none';
+                            }
                         } else {
-                            dropdown.style.display = 'none';
+                            document.getElementById('posRfidSearchDropdown').style.display = 'none';
                         }
-                    } else {
-                        document.getElementById('posRfidSearchDropdown').style.display = 'none';
-                    }
-                }, 300);
-            };
-            input.addEventListener('input', inputHandler);
+                    }, 300);
+                };
+                input.addEventListener('input', inputHandler);
 
-            window.selectMemberForPayment = (id, rfid, name) => {
-                document.getElementById('posRfidSearchDropdown').style.display = 'none';
-                clearInterval(checkInterval);
-                closeBtn.removeEventListener('click', handleClose);
-                input.removeEventListener('input', inputHandler);
-                resolve({ id, rfid, name });
-            };
-
-            const checkInterval = setInterval(async () => {
-                if (modal.style.display === 'none') {
+                window.selectMemberForPayment = (id, rfid, name) => {
+                    document.getElementById('posRfidSearchDropdown').style.display = 'none';
                     clearInterval(checkInterval);
                     closeBtn.removeEventListener('click', handleClose);
                     input.removeEventListener('input', inputHandler);
-                    resolve(null);
-                    return;
-                }
-                const val = input.value.trim();
-                // If it's a full RFID scan
-                if (val && val !== lastVal && val.length >= 8 && !val.includes(' ')) {
-                    const memberMatch = membersData.find(m => m.rfid === val);
-                    if (memberMatch) {
+                    resolve({ id, rfid, name });
+                };
+
+                const checkInterval = setInterval(async () => {
+                    if (modal.style.display === 'none') {
                         clearInterval(checkInterval);
                         closeBtn.removeEventListener('click', handleClose);
                         input.removeEventListener('input', inputHandler);
-                        resolve({ id: memberMatch.id, rfid: memberMatch.rfid, name: memberMatch.name || (memberMatch.givenName + ' ' + memberMatch.familyName) });
+                        resolve(null);
+                        return;
+                    }
+                    const val = input.value.trim();
+                    if (val && val !== lastVal && val.length >= 8 && !val.includes(' ')) {
+                        const memberMatch = membersData.find(m => m.rfid === val);
+                        if (memberMatch) {
+                            clearInterval(checkInterval);
+                            closeBtn.removeEventListener('click', handleClose);
+                            input.removeEventListener('input', inputHandler);
+                            resolve({ id: memberMatch.id, rfid: memberMatch.rfid, name: memberMatch.name || (memberMatch.givenName + ' ' + memberMatch.familyName) });
+                        }
+                    }
+                    lastVal = val;
+                }, 500);
+            });
+
+            if (!rfidData) {
+                closeModal('rfidPaymentModal');
+                resetProcessingState();
+                return;
+            }
+
+            memberIdForCredit = rfidData.id;
+            customerName = rfidData.name;
+            if (customerNameInput) customerNameInput.value = customerName;
+        }
+
+        const transactionResult = await runTransaction(db, async (transaction) => {
+            const inventoryDocRefs = [];
+            const inventorySnaps = [];
+
+            // 1. Fetch real-time products to check quantity and compute untampered price
+            for (let item of posCart) {
+                if (item.id === 'WALKIN' || item.isPlan) continue;
+                const invRef = doc(db, "inventory", item.id);
+                inventoryDocRefs.push({ ref: invRef, cartItem: item });
+                inventorySnaps.push(await transaction.get(invRef));
+            }
+
+            let computedSubtotal = 0;
+
+            for (let i = 0; i < inventorySnaps.length; i++) {
+                const snap = inventorySnaps[i];
+                const cartItem = inventoryDocRefs[i].cartItem;
+                if (!snap.exists()) {
+                    throw new Error(`Product "${cartItem.name}" no longer exists in inventory.`);
+                }
+                const dbQty = snap.data().qty || 0;
+                if (dbQty < cartItem.qty) {
+                    throw new Error(`Insufficient stock for "${cartItem.name}"! Real-time Stock: ${dbQty}, Requested: ${cartItem.qty}`);
+                }
+                
+                // Authoritative Database Expiration Check
+                const dbExpiry = snap.data().expiry;
+                if (dbExpiry) {
+                    const dbExpDate = new Date(dbExpiry + 'T00:00:00');
+                    const dbToday = new Date(Date.now() + (window.serverTimeOffsetMs || 0));
+                    dbToday.setHours(0, 0, 0, 0);
+                    if (!isNaN(dbExpDate.getTime()) && dbExpDate < dbToday) {
+                        throw new Error(`Product "${cartItem.name}" has expired (Expiry: ${dbExpiry}) and cannot be sold.`);
                     }
                 }
-                lastVal = val;
-            }, 500);
+                
+                const dbPrice = Number(snap.data().price || 0);
+                if (isNaN(dbPrice) || dbPrice <= 0) {
+                    throw new Error(`Product "${cartItem.name}" has an invalid price (₱${dbPrice}) in the database.`);
+                }
+                
+                computedSubtotal += dbPrice * cartItem.qty;
+                // Force client-side record to match absolute database truth
+                cartItem.price = dbPrice;
+            }
+
+            // 2. Add pass items
+            for (let item of posCart) {
+                if (item.id === 'WALKIN' || item.isPlan) {
+                    if (item.price <= 0) {
+                        throw new Error("Walk-in Gym Access has an invalid price.");
+                    }
+                    computedSubtotal += item.price * item.qty;
+                }
+            }
+
+            let computedVat = computedSubtotal * 0.12;
+            let computedDiscount = 0;
+            let computedGrandTotal = computedSubtotal + computedVat - computedDiscount;
+
+            // 3. Process RFID top-up validation using fresh computed total
+            let balanceBefore = 0;
+            let balanceAfter = 0;
+
+            if (selectedPaymentMethod === 'RFID' && memberIdForCredit) {
+                const memberDocRef = doc(db, "users", memberIdForCredit);
+                const memberSnap = await transaction.get(memberDocRef);
+                if (!memberSnap.exists()) {
+                    throw new Error("Member account does not exist.");
+                }
+                const balance = memberSnap.data().creditBalance || 0;
+                if (balance < computedGrandTotal) {
+                    throw new Error(`Insufficient RFID Balance! (Bal: ₱${balance.toFixed(2)}, Needed: ₱${computedGrandTotal.toFixed(2)})`);
+                }
+                balanceBefore = balance;
+                balanceAfter = balance - computedGrandTotal;
+
+                transaction.update(memberDocRef, {
+                    creditBalance: balanceAfter
+                });
+
+                const itemsStrForLog = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
+                const creditTxRef = doc(collection(db, "creditTransactions"));
+                transaction.set(creditTxRef, {
+                    memberId: memberIdForCredit,
+                    memberName: customerName,
+                    type: "purchase",
+                    amount: -computedGrandTotal,
+                    balanceBefore: balanceBefore,
+                    balanceAfter: balanceAfter,
+                    note: `POS Purchase: ${itemsStrForLog}`,
+                    processedBy: localStorage.getItem("userId") || "System",
+                    timestamp: Date.now()
+                });
+            }
+
+            // 4. Update inventory stock quantities
+            for (let i = 0; i < inventorySnaps.length; i++) {
+                const snap = inventorySnaps[i];
+                const itemRef = inventoryDocRefs[i].ref;
+                const cartItem = inventoryDocRefs[i].cartItem;
+                const currentQty = snap.data().qty || 0;
+
+                transaction.update(itemRef, { qty: currentQty - cartItem.qty });
+
+                const movementRef = doc(collection(db, "stockMovements"));
+                const now = new Date();
+                transaction.set(movementRef, {
+                    productId: cartItem.id,
+                    productName: cartItem.name,
+                    changeAmount: -cartItem.qty,
+                    reason: `POS Sale (${selectedPaymentMethod})`,
+                    userId: localStorage.getItem("userId") || "System",
+                    userName: localStorage.getItem("loggedInUser") || "Unknown",
+                    date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: now.getTime()
+                });
+            }
+
+            // 5. Save payment document
+            const paymentDocRef = doc(collection(db, "payments"));
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
+            const txnRef = generateTransactionRef();
+
+            const paymentData = {
+                name: customerName,
+                transactionRef: txnRef,
+                type: "POS Sale",
+                items: itemsStr,
+                lineItems: posCart,
+                subtotal: computedSubtotal,
+                vat: computedVat,
+                discount: computedDiscount,
+                amount: computedGrandTotal,
+                paymentMethod: selectedPaymentMethod,
+                status: "Paid",
+                date: dateStr,
+                time: timeStr,
+                timestamp: now.getTime(),
+            };
+
+            if (selectedPaymentMethod === 'GCash' && posGcashRef) {
+                paymentData.gcashRefId = posGcashRef;
+            }
+
+            transaction.set(paymentDocRef, paymentData);
+
+            return {
+                paymentId: paymentDocRef.id,
+                dateStr,
+                timeStr,
+                grandTotal: computedGrandTotal
+            };
         });
 
-        if (!rfidData) {
-            closeModal('rfidPaymentModal');
-            return; // cancelled
+        const { paymentId, dateStr, timeStr, grandTotal } = transactionResult;
+
+        if (window.logActivity) {
+            window.logActivity("POS Sale", `Processed ${selectedPaymentMethod} payment for ${customerName} totaling ₱${grandTotal.toFixed(2)}`);
         }
 
-        memberIdForCredit = rfidData.id;
-        customerName = rfidData.name;
-        if (customerNameInput) customerNameInput.value = customerName;
+        const issuedBy = {
+            userId: localStorage.getItem("userId") || "",
+            name: localStorage.getItem("loggedInUser") || "",
+            role: localStorage.getItem("userRole") || "",
+        };
 
-        const memberDoc = await getDoc(doc(db, "users", memberIdForCredit));
-        const currentBalance = memberDoc.data().creditBalance || 0;
+        const walkinItem = posCart.find((x) => x.id === "WALKIN" || x.isPlan);
+        const walkinQty = walkinItem ? Number(walkinItem.qty || 0) : 0;
+        let issuedCount = 0;
+        let issuanceCancelled = false;
 
-        if (currentBalance < grandTotal) {
-            statusEl.innerHTML = `Insufficient Balance! (Bal: ₱${currentBalance.toFixed(2)})`;
-            statusEl.style.color = "var(--primary-red)";
-            await new Promise(r => setTimeout(r, 2000));
-            return;
-        }
-
-        closeModal('rfidPaymentModal');
-        showToast("Payment processing with Credit...", "info");
-
-        // Deduct balance
-        await updateDoc(doc(db, "users", memberIdForCredit), {
-            creditBalance: increment(-grandTotal)
-        });
-
-        const itemsStrForLog = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
-        await addDoc(creditTransactionsCol, {
-            memberId: memberIdForCredit,
-            memberName: customerName,
-            type: "purchase",
-            amount: -grandTotal,
-            balanceBefore: currentBalance,
-            balanceAfter: currentBalance - grandTotal,
-            note: `POS Purchase: ${itemsStrForLog}`,
-            processedBy: localStorage.getItem("userId"),
-            timestamp: Date.now()
-        });
-    }
-
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    let itemsStr = posCart.map(i => `${i.qty}x ${i.name}`).join(', ');
-
-    const txnRef = generateTransactionRef();
-
-    const paymentRef = await addDoc(paymentsCol, {
-        name: customerName,
-        transactionRef: txnRef,
-        type: "POS Sale",
-        items: itemsStr,
-        lineItems: posCart,
-        subtotal: subtotal,
-        vat: vat,
-        discount: discount,
-        amount: grandTotal,
-        paymentMethod: selectedPaymentMethod,
-        status: "Paid",
-        date: dateStr,
-        time: timeStr,
-        timestamp: now.getTime(),
-    });
-
-    if (window.logActivity) window.logActivity("POS Sale", `Processed ${selectedPaymentMethod} payment for ${customerName} totaling ₱${grandTotal.toFixed(2)}`);
-
-    const paymentId = paymentRef.id;
-
-    const issuedBy = {
-        userId: localStorage.getItem("userId") || "",
-        name: localStorage.getItem("loggedInUser") || "",
-        role: localStorage.getItem("userRole") || "",
-    };
-
-    const walkinItem = posCart.find((x) => x.id === "WALKIN" || x.isPlan);
-    const walkinQty = walkinItem ? Number(walkinItem.qty || 0) : 0;
-    let issuedCount = 0;
-    let issuanceCancelled = false;
-
-    for (let item of posCart) {
-        if (item.id === 'WALKIN' || item.isPlan) {
-            for (let w = 0; w < item.qty; w++) {
-                openWalkinIssueModal({ current: w + 1, total: item.qty });
+        if (walkinQty > 0) {
+            for (let w = 0; w < walkinQty; w++) {
+                openWalkinIssueModal({ current: w + 1, total: walkinQty });
 
                 let tag = await waitForWalkinRfidTap({ timeoutMs: 60000 });
                 if (!tag) {
@@ -1944,7 +2332,7 @@ window.processPayment = async function () {
 
                 while (await isGuestCardIssuedToday(tag, dateStr)) {
                     showToast("That guest card is already issued for today. Please tap a different guest RFID card.", "error");
-                    openWalkinIssueModal({ current: w + 1, total: item.qty });
+                    openWalkinIssueModal({ current: w + 1, total: walkinQty });
                     const retryTag = await waitForWalkinRfidTap({ timeoutMs: 60000 });
                     if (!retryTag) {
                         issuanceCancelled = true;
@@ -1958,29 +2346,44 @@ window.processPayment = async function () {
                 }
 
                 await upsertGuestCardIssued({ rfidTag: tag, dateStr, paymentId, issuedBy });
-                await issueWalkinPassAndCheckIn({ rfidTag: tag, paymentId, dateStr, timeStr, amount: Number(item.price || 0), issuedBy });
+                await issueWalkinPassAndCheckIn({ rfidTag: tag, paymentId, dateStr, timeStr, amount: Number(walkinItem.price || 0), issuedBy });
                 issuedCount++;
                 closeWalkinIssueModal();
             }
-            continue;
         }
-        await updateDoc(doc(db, "inventory", item.id), { qty: increment(-item.qty) });
-        await logStockMovement(item.id, item.name, -item.qty, `POS Sale (${selectedPaymentMethod})`);
+
+        if (walkinQty > 0 && (issuanceCancelled || issuedCount < walkinQty)) {
+            await updateDoc(doc(db, "payments", paymentId), {
+                walkinIssuanceIncomplete: true,
+                walkinExpectedQty: walkinQty,
+                walkinIssuedQty: issuedCount,
+            });
+            showToast(`Payment processed, but walk-in issuance was not completed.\nIssued: ${issuedCount} of ${walkinQty}`, "error");
+        } else {
+            showToast("Payment Processed Successfully!", "success");
+        }
+
+        posCart = [];
+        renderCart();
+        if (customerNameInput) customerNameInput.value = '';
+        if (posGcashRefInput) posGcashRefInput.value = '';
+        if (posGcashRefWrapper) posGcashRefWrapper.classList.remove('visible');
+
+    } catch (e) {
+        console.error("Checkout transaction failed: ", e);
+        showToast(e.message || "Checkout failed. Please try again.", "error");
+    } finally {
+        resetProcessingState();
     }
 
-    if (walkinQty > 0 && (issuanceCancelled || issuedCount < walkinQty)) {
-        await updateDoc(doc(db, "payments", paymentId), {
-            walkinIssuanceIncomplete: true,
-            walkinExpectedQty: walkinQty,
-            walkinIssuedQty: issuedCount,
-        });
-        showToast(`Payment processed, but walk-in issuance was not completed.\nIssued: ${issuedCount} of ${walkinQty}`, "error");
-    } else {
-        showToast("Payment Processed Successfully!", "success");
+    function resetProcessingState() {
+        window.isPOSProcessing = false;
+        if (payBtn) {
+            payBtn.disabled = false;
+            payBtn.innerHTML = originalBtnText;
+        }
     }
-    posCart = []; renderCart();
-    if (customerNameInput) customerNameInput.value = '';
-}
+};
 
 // ==========================================
 // 8.5 DASHBOARD ANALYTICS & KPIS
@@ -2818,114 +3221,54 @@ window.renderProductCategorySummary = function () {
     const container = document.getElementById('productCategorySummary');
     if (!container) return;
 
-    const categoryMap = {};
-    const categoryIcons = {
-        'Supplements (Powder/Capsules)': 'fa-capsules',
-        'Beverages (Bottled Drinks)': 'fa-bottle-water',
-        'Apparel / Merchandise': 'fa-shirt',
-        'Supplements': 'fa-capsules',
-        'Beverages': 'fa-bottle-water',
-        'Merch': 'fa-shirt'
-    };
-
-    let totalValue = 0;
-    let activeSkus = 0;
     let lowStockCount = 0;
     let criticalStockCount = 0;
-    let outOfStockCount = 0;
+    let nearExpiryCount = 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDaysLater = new Date(today);
+    sevenDaysLater.setDate(today.getDate() + 7);
 
     inventoryData.forEach(item => {
         let isProduct = item.itemType === 'product' || ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat);
         if (item.itemType === 'equipment') isProduct = false;
+        if (!isProduct) return;
 
-        if (isProduct) {
-            const cat = item.cat || 'General Goods';
-            const price = Number(item.price || 0);
-            const qty = Number(item.qty || 0);
-            const threshold = Number(item.lowStockThreshold || 5);
+        const qty = Number(item.qty || 0);
+        const threshold = Number(item.lowStockThreshold || 5);
 
-            if (!categoryMap[cat]) categoryMap[cat] = { count: 0, qty: 0, lowStock: 0, criticalStock: 0, value: 0 };
-            
-            categoryMap[cat].count++;
-            categoryMap[cat].qty += qty;
-            categoryMap[cat].value += (qty * price);
-            
-            totalValue += (qty * price);
-            if (qty > 0) activeSkus++;
-            
-            if (qty === 0) {
-                outOfStockCount++;
-            } else if (qty <= 2) {
-                categoryMap[cat].criticalStock++;
-                criticalStockCount++;
-            } else if (qty <= threshold) {
-                categoryMap[cat].lowStock++;
-                lowStockCount++;
-            }
+        if (qty <= 2) {
+            criticalStockCount++;
+        } else if (qty <= threshold) {
+            lowStockCount++;
+        }
+
+        if (item.expiry) {
+            const expDate = new Date(item.expiry + 'T00:00:00');
+            if (expDate >= today && expDate <= sevenDaysLater) nearExpiryCount++;
         }
     });
 
-    const entries = Object.entries(categoryMap).sort((a, b) => b[1].value - a[1].value);
+    const chips = [
+        { label: 'Low Stock', count: lowStockCount, icon: 'fa-box-open', color: '#d97706', bg: '#fef3c7', border: '#fcd34d' },
+        { label: 'Critical Stock', count: criticalStockCount, icon: 'fa-triangle-exclamation', color: '#991b1b', bg: '#fee2e2', border: '#fca5a5' },
+        { label: 'Near Expiry', count: nearExpiryCount, icon: 'fa-calendar-xmark', color: '#c2410c', bg: '#ffedd5', border: '#fdba74' }
+    ];
 
-    if (entries.length === 0) {
-        container.innerHTML = '<p style="padding: 20px; color: var(--text-muted); font-size: 14px;">No product categories found.</p>';
-        return;
-    }
-
-    const alertSeverityCount = criticalStockCount + outOfStockCount;
-
-    // 1. Health Dashboard Row
-    let html = `
-        <div class="inventory-health-row">
-            <div class="health-stat-card">
-                <div class="health-stat-label">Portfolio Value</div>
-                <div class="health-stat-value">₱${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-                <div class="health-stat-meta text-success"><i class="fas fa-arrow-up"></i> Asset Worth</div>
-            </div>
-            <div class="health-stat-card">
-                <div class="health-stat-label">Active SKUs</div>
-                <div class="health-stat-value">${activeSkus}</div>
-                <div class="health-stat-meta ${outOfStockCount > 0 ? 'text-danger' : 'text-success'}">
-                    ${outOfStockCount > 0 ? `<i class="fas fa-exclamation-circle"></i> ${outOfStockCount} Out of Stock` : '<i class="fas fa-check-circle"></i> All in Stock'}
-                </div>
-            </div>
-            <div class="health-stat-card">
-                <div class="health-stat-label">Critical Alerts</div>
-                <div class="health-stat-value" style="color: ${alertSeverityCount > 0 ? 'var(--primary-red)' : 'var(--text-primary)'}">${alertSeverityCount}</div>
-                <div class="health-stat-meta ${alertSeverityCount > 0 ? 'text-danger' : (lowStockCount > 0 ? 'text-warning' : 'text-success')}">
-                    ${alertSeverityCount > 0 ? `<i class="fas fa-triangle-exclamation"></i> ${criticalStockCount} Critical / ${outOfStockCount} Out` : (lowStockCount > 0 ? `<i class="fas fa-truck-loading"></i> ${lowStockCount} Low Stock` : '<i class="fas fa-check-circle"></i> Levels Healthy')}
-                </div>
-            </div>
-        </div>
-        <div class="equip-category-summary">
-    `;
-
-    // 2. Category Grid
-    html += entries.map(([cat, data]) => {
-        const hasCritical = data.criticalStock > 0;
-        const hasLowStock = data.lowStock > 0;
-        const isWarning = hasCritical || hasLowStock;
-        
-        return `
-            <div class="equip-cat-card ${hasCritical ? 'low-stock-warning' : (hasLowStock ? 'low-stock-warning' : '')}" style="${hasCritical ? 'border-color: var(--primary-red);' : ''}">
-                <div class="equip-cat-icon" style="${hasCritical ? 'background: rgba(239, 68, 68, 0.1); color: var(--primary-red);' : (hasLowStock ? 'background: rgba(245, 158, 11, 0.1); color: #d97706;' : '')}">
-                    <i class="fa-solid ${categoryIcons[cat] || 'fa-boxes-stacked'}"></i>
-                </div>
-                <div class="equip-cat-info">
-                    <div class="equip-cat-name">${cat}</div>
-                    <div class="equip-cat-count">${data.qty} <span class="equip-cat-units">units</span></div>
-                    <div class="cat-value-badge">₱${data.value.toLocaleString(undefined, { minimumFractionDigits: 0 })} Value</div>
-                    <div style="display: flex; gap: 6px; flex-direction: column; margin-top: 6px;">
-                        ${hasCritical ? `<div style="font-size: 10px; color: var(--primary-red); font-weight: 700;"><i class="fas fa-triangle-exclamation"></i> ${data.criticalStock} CRITICAL</div>` : ''}
-                        ${hasLowStock ? `<div style="font-size: 10px; color: #d97706; font-weight: 600;"><i class="fas fa-circle-exclamation"></i> ${data.lowStock} LOW STOCK</div>` : ''}
+    container.innerHTML = `
+        <div style="display:flex;gap:14px;flex-wrap:wrap;padding:4px 0 18px;">
+            ${chips.map(c => `
+                <div style="display:flex;align-items:center;gap:10px;background:${c.bg};border:1px solid ${c.border};border-radius:10px;padding:10px 18px;min-width:160px;">
+                    <i class="fas ${c.icon}" style="font-size:20px;color:${c.color};"></i>
+                    <div>
+                        <div style="font-size:22px;font-weight:700;color:${c.color};line-height:1;">${c.count}</div>
+                        <div style="font-size:12px;color:${c.color};font-weight:600;margin-top:2px;">${c.label}</div>
                     </div>
                 </div>
-            </div>
-        `;
-    }).join('');
-
-    html += `</div>`;
-    container.innerHTML = html;
+            `).join('')}
+        </div>
+    `;
 };
 
 
@@ -2940,87 +3283,153 @@ window.clearFinDateRange = function () {
 
 // Void Transaction & Restock Inventory (also handles Refunds)
 window.voidTransaction = async function (id, isRefund = false) {
+    if (window.isPOSProcessingVoid === id) return;
+    
     const tx = paymentsData.find(p => p.id === id);
     if (!tx) return;
     if (tx.status === "Voided") return showToast("This transaction is already voided.", "error");
 
     const actionName = isRefund ? "REFUND" : "VOID";
 
-    // Prompt for cancellation remarks
-    const cancelRemarks = prompt(`Please enter a reason for this ${actionName.toLowerCase()} (optional):`) || '';
+    showPrompt({
+        title: `${actionName} Transaction`,
+        message: `Please enter a reason for this ${actionName.toLowerCase()} (optional):`,
+        placeholder: 'e.g. Incorrect order, customer request...',
+        onConfirm: (cancelRemarks) => {
+            showConfirm(`Are you sure you want to ${actionName} this transaction? This will void the transaction, return purchased items to inventory, and refund credit if applicable.`, async () => {
+                if (window.isPOSProcessingVoid === id) return;
+                window.isPOSProcessingVoid = id;
+                
+                try {
+                    await runTransaction(db, async (transaction) => {
+                        const paymentRef = doc(db, "payments", id);
+                        const paymentSnap = await transaction.get(paymentRef);
+                        
+                        if (!paymentSnap.exists()) {
+                            throw new Error("Transaction record no longer exists.");
+                        }
+                        
+                        const paymentDbData = paymentSnap.data();
+                        if (paymentDbData.status === "Voided") {
+                            throw new Error("This transaction has already been voided.");
+                        }
+                        
+                        // 1. Process inventory restocking
+                        if (paymentDbData.type === "POS Sale") {
+                            if (paymentDbData.lineItems && paymentDbData.lineItems.length > 0) {
+                                for (let item of paymentDbData.lineItems) {
+                                    if (item.id === "WALKIN") continue;
+                                    
+                                    const invRef = doc(db, "inventory", item.id);
+                                    const invSnap = await transaction.get(invRef);
+                                    if (invSnap.exists()) {
+                                        const currentQty = invSnap.data().qty || 0;
+                                        transaction.update(invRef, { qty: currentQty + item.qty });
+                                        
+                                        const movementRef = doc(collection(db, "stockMovements"));
+                                        const now = new Date();
+                                        transaction.set(movementRef, {
+                                            productId: item.id,
+                                            productName: item.name,
+                                            changeAmount: item.qty,
+                                            reason: `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`,
+                                            userId: localStorage.getItem("userId") || "System",
+                                            userName: localStorage.getItem("loggedInUser") || "Unknown",
+                                            date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                            time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                                            timestamp: now.getTime()
+                                        });
+                                    }
+                                }
+                            } else if (paymentDbData.items) {
+                                const itemList = paymentDbData.items.split(', ');
+                                for (let itemStr of itemList) {
+                                    const match = itemStr.match(/^(\d+)x\s+(.+)$/);
+                                    if (match) {
+                                        const qtyRefunded = parseInt(match[1]);
+                                        const itemName = match[2];
+                                        if (itemName.includes("Walk-in Gym Access")) continue;
 
-    showConfirm(`Are you sure you want to ${actionName} this transaction? This will void the transaction, return purchased items to inventory, and refund credit if applicable.`, async () => {
-        try {
-            if (tx.type === "POS Sale") {
-                if (tx.lineItems && tx.lineItems.length > 0) {
-                    for (let item of tx.lineItems) {
-                        if (item.id === "WALKIN") continue;
-                        await updateDoc(doc(db, "inventory", item.id), { qty: increment(item.qty) });
-                        await logStockMovement(item.id, item.name, item.qty, `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`);
-                    }
-                } else if (tx.items) {
-                    const itemList = tx.items.split(', ');
-                    for (let itemStr of itemList) {
-                        const match = itemStr.match(/^(\d+)x\s+(.+)$/);
-                        if (match) {
-                            const qtyRefunded = parseInt(match[1]);
-                            const itemName = match[2];
-                            if (itemName.includes("Walk-in Gym Access")) continue;
-
-                            const invItem = inventoryData.find(i => i.name.toLowerCase() === itemName.toLowerCase());
-                            if (invItem) {
-                                await updateDoc(doc(db, "inventory", invItem.id), {
-                                    qty: increment(qtyRefunded)
-                                });
-                                await logStockMovement(invItem.id, invItem.name, qtyRefunded, `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"} (Legacy)`);
+                                        const invItem = inventoryData.find(i => i.name.toLowerCase() === itemName.toLowerCase());
+                                        if (invItem) {
+                                            const invRef = doc(db, "inventory", invItem.id);
+                                            const invSnap = await transaction.get(invRef);
+                                            if (invSnap.exists()) {
+                                                const currentQty = invSnap.data().qty || 0;
+                                                transaction.update(invRef, { qty: currentQty + qtyRefunded });
+                                                
+                                                const movementRef = doc(collection(db, "stockMovements"));
+                                                const now = new Date();
+                                                transaction.set(movementRef, {
+                                                    productId: invItem.id,
+                                                    productName: invItem.name,
+                                                    changeAmount: qtyRefunded,
+                                                    reason: `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"} (Legacy)`,
+                                                    userId: localStorage.getItem("userId") || "System",
+                                                    userName: localStorage.getItem("loggedInUser") || "Unknown",
+                                                    date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                                    time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                                                    timestamp: now.getTime()
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-            }
 
-            // Refund credit if paid via RFID
-            if (tx.paymentMethod === 'RFID' || tx.paymentMethod === 'RFID Card' || tx.paymentMethod === 'RFID Credit') {
-                const member = membersData.find(m => 
-                    m.name === tx.name || 
-                    `${m.givenName || ''} ${m.familyName || ''}`.trim() === tx.name
-                );
-                if (member) {
-                    await updateDoc(doc(db, "users", member.id), {
-                        creditBalance: increment(tx.amount)
+                        // 2. Refund credit if paid via RFID
+                        if ((paymentDbData.paymentMethod === 'RFID' || paymentDbData.paymentMethod === 'RFID Card' || paymentDbData.paymentMethod === 'RFID Credit') && paymentDbData.amount > 0) {
+                            const member = membersData.find(m => 
+                                m.name === paymentDbData.name || 
+                                `${m.givenName || ''} ${m.familyName || ''}`.trim() === paymentDbData.name
+                            );
+                            if (member) {
+                                const memberRef = doc(db, "users", member.id);
+                                const memberSnap = await transaction.get(memberRef);
+                                if (memberSnap.exists()) {
+                                    const currentBalance = memberSnap.data().creditBalance || 0;
+                                    transaction.update(memberRef, {
+                                        creditBalance: currentBalance + paymentDbData.amount
+                                    });
+                                    
+                                    const creditTxRef = doc(collection(db, "creditTransactions"));
+                                    transaction.set(creditTxRef, {
+                                        memberId: member.id,
+                                        memberName: paymentDbData.name,
+                                        type: "refund",
+                                        amount: paymentDbData.amount,
+                                        balanceBefore: currentBalance,
+                                        balanceAfter: currentBalance + paymentDbData.amount,
+                                        note: `Refunded POS Transaction: ${id}`,
+                                        processedBy: localStorage.getItem("userId") || "System",
+                                        timestamp: Date.now()
+                                    });
+                                }
+                            }
+                        }
+
+                        // 3. Mark transaction as Voided
+                        const voidUpdate = { status: "Voided" };
+                        if (cancelRemarks.trim()) voidUpdate.cancelRemarks = cancelRemarks.trim();
+                        voidUpdate.voidedAt = Date.now();
+                        voidUpdate.voidedBy = localStorage.getItem("userId") || "";
+                        
+                        transaction.update(paymentRef, voidUpdate);
                     });
                     
-                    const currentBalance = member.creditBalance || 0;
-                    await addDoc(creditTransactionsCol, {
-                        memberId: member.id,
-                        memberName: tx.name,
-                        type: "refund",
-                        amount: tx.amount,
-                        balanceBefore: currentBalance,
-                        balanceAfter: currentBalance + tx.amount,
-                        note: `Refunded POS Transaction: ${tx.id}`,
-                        processedBy: localStorage.getItem("userId") || "",
-                        timestamp: Date.now()
-                    });
-                } else {
-                    showToast("Warning: Could not find member to refund credit.", "error");
+                    showToast(`Transaction successfully ${actionName === "REFUND" ? "refunded" : "voided"}!`, "success");
+                    if (window.logActivity) window.logActivity(`Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`, `${actionName === "REFUND" ? "Refunded" : "Voided"} transaction ${id} for ${tx.name || 'Unknown'} (₱${tx.amount})${cancelRemarks ? ' — Reason: ' + cancelRemarks : ''}`);
+                } catch (e) {
+                    console.error("Void transaction failed: ", e);
+                    showToast(e.message || `Error ${actionName === "REFUND" ? "refunding" : "voiding"} transaction.`, "error");
+                } finally {
+                    delete window.isPOSProcessingVoid;
                 }
-            }
-
-            const voidUpdate = { status: "Voided" };
-            if (cancelRemarks.trim()) voidUpdate.cancelRemarks = cancelRemarks.trim();
-            voidUpdate.voidedAt = Date.now();
-            voidUpdate.voidedBy = localStorage.getItem("userId") || "";
-
-            await updateDoc(doc(db, "payments", id), voidUpdate);
-            showToast(`Transaction successfully ${actionName === "REFUND" ? "refunded" : "voided"}!`, "success");
-            if (window.logActivity) window.logActivity(`Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`, `${actionName === "REFUND" ? "Refunded" : "Voided"} transaction ${id} for ${tx.name || 'Unknown'} (₱${tx.amount})${cancelRemarks ? ' — Reason: ' + cancelRemarks : ''}`);
-        } catch (e) {
-            console.error(e);
-            showToast(`Error ${actionName === "REFUND" ? "refunding" : "voiding"} transaction.`, "error");
+            });
         }
     });
-}
+};
 
 window.generateWeeklyPDF = function () {
     if (typeof html2pdf === 'undefined') {
@@ -3130,37 +3539,6 @@ window.generateWeeklyPDF = function () {
         </tr>
     `;
 
-    // Populate Product Consumption Table
-    const tbody = document.getElementById('pdfSalesBody');
-    tbody.innerHTML = "";
-
-    const sortedProducts = Object.entries(productSales).sort((a, b) => {
-        const totalA = a[1].reduce((sum, val) => sum + val, 0);
-        const totalB = b[1].reduce((sum, val) => sum + val, 0);
-        return totalB - totalA;
-    });
-
-    sortedProducts.forEach(([prodName, days]) => {
-        let total = days.reduce((a, b) => a + b, 0);
-        tbody.innerHTML += `
-            <tr>
-                <td style="text-align: left; font-weight: 500;">${prodName}</td>
-                <td style="text-align: center;">${days[0] || '-'}</td>
-                <td style="text-align: center;">${days[1] || '-'}</td>
-                <td style="text-align: center;">${days[2] || '-'}</td>
-                <td style="text-align: center;">${days[3] || '-'}</td>
-                <td style="text-align: center;">${days[4] || '-'}</td>
-                <td style="text-align: center;">${days[5] || '-'}</td>
-                <td style="text-align: center;">${days[6] || '-'}</td>
-                <td style="text-align: right; font-weight: 700;">${total}</td>
-            </tr>
-        `;
-    });
-
-    if (sortedProducts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; color: #94a3b8; padding: 20px;">No item consumption recorded for this period.</td></tr>';
-    }
-
     const element = document.getElementById('weekly-sales-report');
     document.getElementById('pdf-report-container').style.display = 'block';
 
@@ -3209,6 +3587,7 @@ onSnapshot(usersCol, (snapshot) => {
 if (document.getElementById('changePasswordForm')) {
     document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        const currentPass = document.getElementById('currentPasswordInput') ? document.getElementById('currentPasswordInput').value.trim() : '';
         const newPass = document.getElementById('newPasswordInput').value.trim();
         if (newPass.length < 6) return showToast("Password must be at least 6 characters.", "error");
 
@@ -3216,6 +3595,11 @@ if (document.getElementById('changePasswordForm')) {
         if (!userId) return;
 
         try {
+            // Verify current password
+            const userDoc = await getDoc(doc(db, "users", userId));
+            if (!userDoc.exists() || userDoc.data().password !== currentPass) {
+                return showToast("Current password is incorrect.", "error");
+            }
             await updateDoc(doc(db, "users", userId), { password: newPass });
             document.getElementById('changePasswordModal').style.display = 'none';
             showToast("Password updated successfully!", "success");
@@ -3239,6 +3623,7 @@ window.openProfileSettingsModal = async function () {
             document.getElementById('userProfileEmail').value = userData.email || '';
             document.getElementById('userProfileEmergency').value = userData.emergencyContact || '';
             document.getElementById('userProfilePreview').src = userData.image || 'images/default-profile.png';
+            document.getElementById('userProfileCurrentPassword').value = '';
             document.getElementById('userProfilePassword').value = '';
         }
     } catch (err) {
@@ -3262,9 +3647,33 @@ document.addEventListener('submit', async (e) => {
 
         try {
             const name = document.getElementById('userProfileName').value.trim();
+            const currentPassword = document.getElementById('userProfileCurrentPassword').value;
             const newPassword = document.getElementById('userProfilePassword').value;
             const imageFile = document.getElementById('userProfileFile').files[0];
             let imageUrl = document.getElementById('userProfilePreview').src;
+
+            // Verify current password before allowing password change
+            if (newPassword) {
+                if (!currentPassword) {
+                    showToast("Please enter your current password to change it.", "error");
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = originalText;
+                    return;
+                }
+                const userDoc = await getDoc(doc(db, "users", userId));
+                if (!userDoc.exists() || userDoc.data().password !== currentPassword) {
+                    showToast("Current password is incorrect.", "error");
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = originalText;
+                    return;
+                }
+                if (newPassword.length < 6) {
+                    showToast("New password must be at least 6 characters.", "error");
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = originalText;
+                    return;
+                }
+            }
 
             if (imageFile) {
                 imageUrl = await window.uploadImage(imageFile, 'profiles');
@@ -3470,6 +3879,10 @@ window.confirmRenewal = async function () {
                 showToast('Please enter the GCash Reference ID.', 'error');
                 return;
             }
+            if (renewPayMethod === 'GCash' && renewGcashRef.replace(/\s/g, '').length !== 12) {
+                showToast('GCash Reference ID must be exactly 12 digits.', 'error');
+                return;
+            }
 
             const currentTimestamp = new Date().getTime();
             let updates = {
@@ -3616,6 +4029,9 @@ function renderMembershipPlans() {
                     <div class="flex gap-2">
                         <button type="button" class="text-sm font-semibold text-[#991b1b] hover:bg-red-50 px-4 py-2 rounded transition-colors border-solid border border-transparent hover:border-red-200 flex items-center gap-2 bg-white shadow-sm" onclick="openEditPlanModal('${p.id}')">
                             <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button type="button" class="text-sm font-semibold text-red-700 hover:bg-red-100 px-3 py-2 rounded transition-colors border-solid border border-red-200 flex items-center gap-2 bg-white shadow-sm" onclick="deletePlan('${p.id}', '${escapeHtml(p.name)}')" title="Delete Plan">
+                            <i class="fas fa-trash"></i>
                         </button>
                     </div>
                 </div>
@@ -3794,6 +4210,213 @@ window.addPlanFeatureInput = function(val = "") {
 };
 
 // ==========================================
+// 10.4 PROGRAMS MODULE
+// ==========================================
+let programsData = [];
+const programsCol = collection(db, "programs");
+
+onSnapshot(programsCol, (snapshot) => {
+    programsData = [];
+    snapshot.forEach(d => programsData.push({ id: d.id, ...d.data() }));
+    renderPrograms();
+    renderMemberPrograms();
+});
+
+function renderPrograms() {
+    const grid = document.getElementById('programsGrid');
+    if (!grid) return;
+
+    if (programsData.length === 0) {
+        grid.innerHTML = '<p style="color:var(--text-muted);font-size:14px;padding:20px;">No programs yet. Click "Add Program" to create one.</p>';
+        return;
+    }
+
+    grid.innerHTML = programsData.map(p => `
+        <div class="bg-white border border-gray-200 rounded shadow-sm p-5 flex flex-col gap-3">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">${escapeHtml(p.name)}</h3>
+                    <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#fee2e2;color:#991b1b;">${escapeHtml(p.category || '')}</span>
+                </div>
+                <div class="flex gap-2">
+                    <button class="btn-icon btn-edit" title="Edit" onclick="openEditProgramModal('${p.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="btn-icon btn-delete" title="Delete" onclick="deleteProgram('${p.id}','${escapeHtml(p.name)}')"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+            <p style="font-size:13px;color:var(--text-muted);">${p.description ? escapeHtml(p.description) : 'No description.'}</p>
+            <div style="display:flex;gap:12px;font-size:12px;color:var(--text-primary);font-weight:600;">
+                <span><i class="fas fa-clock" style="color:#991b1b;"></i> ${p.durationHours || 1} hr${p.durationHours > 1 ? 's' : ''}/day</span>
+                <span><i class="fas fa-calendar-days" style="color:#991b1b;"></i> ${p.daysPerWeek || 3} day${p.daysPerWeek > 1 ? 's' : ''}/week</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+window.openAddProgramModal = function () {
+    document.getElementById('programModalTitle').innerHTML = '<i class="fa-solid fa-dumbbell"></i> Add Program';
+    document.getElementById('programId').value = '';
+    document.getElementById('programForm').reset();
+    document.getElementById('programModal').style.display = 'flex';
+};
+
+window.openEditProgramModal = function (id) {
+    const p = programsData.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('programModalTitle').innerHTML = '<i class="fa-solid fa-dumbbell"></i> Edit Program';
+    document.getElementById('programId').value = p.id;
+    document.getElementById('programName').value = p.name || '';
+    document.getElementById('programCategory').value = p.category || '';
+    document.getElementById('programDuration').value = p.durationHours || '';
+    document.getElementById('programDaysPerWeek').value = p.daysPerWeek || '';
+    document.getElementById('programDescription').value = p.description || '';
+    document.getElementById('programModal').style.display = 'flex';
+};
+
+window.deleteProgram = function (id, name) {
+    showConfirm(`Delete program "${name}"? Members currently enrolled will lose their program assignment.`, async () => {
+        try {
+            await deleteDoc(doc(db, "programs", id));
+            showToast(`Program "${name}" deleted.`, "success");
+            if (window.logActivity) window.logActivity("Program Deleted", `Deleted program: ${name}`);
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to delete program.", "error");
+        }
+    });
+};
+
+window.submitProgramForm = async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById('programSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const id = document.getElementById('programId').value;
+    const data = {
+        name: document.getElementById('programName').value.trim(),
+        category: document.getElementById('programCategory').value,
+        durationHours: Number(document.getElementById('programDuration').value),
+        daysPerWeek: Number(document.getElementById('programDaysPerWeek').value),
+        description: document.getElementById('programDescription').value.trim()
+    };
+
+    try {
+        if (id) {
+            await updateDoc(doc(db, "programs", id), data);
+            showToast("Program updated.", "success");
+        } else {
+            await addDoc(programsCol, data);
+            showToast("Program created.", "success");
+        }
+        closeModal('programModal');
+        if (window.logActivity) window.logActivity(id ? "Program Updated" : "Program Created", `Program: ${data.name}`);
+    } catch (err) {
+        console.error(err);
+        showToast("Failed to save program.", "error");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Program';
+    }
+};
+
+function renderMemberPrograms() {
+    const listEl = document.getElementById('memberProgramsList');
+    const currentEl = document.getElementById('myCurrentProgram');
+    if (!listEl && !currentEl) return;
+
+    const role = (localStorage.getItem("userRole") || "").toLowerCase();
+    if (role !== "member") return;
+
+    const enrolledProgramId = localStorage.getItem("enrolledProgramId") || window.__enrolledProgramId || null;
+
+    if (currentEl) {
+        if (enrolledProgramId) {
+            const prog = programsData.find(p => p.id === enrolledProgramId);
+            if (prog) {
+                currentEl.innerHTML = `
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+                        <div>
+                            <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">${escapeHtml(prog.name)}</h3>
+                            <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#fee2e2;color:#991b1b;">${escapeHtml(prog.category || '')}</span>
+                            <p style="margin-top:10px;font-size:13px;color:var(--text-muted);">${prog.description ? escapeHtml(prog.description) : ''}</p>
+                            <div style="margin-top:10px;display:flex;gap:14px;font-size:13px;font-weight:600;">
+                                <span><i class="fas fa-clock" style="color:#991b1b;"></i> ${prog.durationHours} hr${prog.durationHours > 1 ? 's' : ''}/day</span>
+                                <span><i class="fas fa-calendar-days" style="color:#991b1b;"></i> ${prog.daysPerWeek} day${prog.daysPerWeek > 1 ? 's' : ''}/week</span>
+                            </div>
+                        </div>
+                        <button class="action-btn" style="background:#f1f5f9;color:var(--text-primary);white-space:nowrap;" onclick="unenrollProgram()">
+                            <i class="fas fa-times-circle"></i> Leave Program
+                        </button>
+                    </div>
+                `;
+            } else {
+                currentEl.innerHTML = '<p style="color:var(--text-muted);font-size:14px;">Your enrolled program is no longer available.</p>';
+            }
+        } else {
+            currentEl.innerHTML = '<p style="color:var(--text-muted);font-size:14px;">You are not enrolled in any program. Browse available programs below and click Enroll.</p>';
+        }
+    }
+
+    if (listEl) {
+        if (programsData.length === 0) {
+            listEl.innerHTML = '<p style="color:var(--text-muted);font-size:14px;">No programs available at the moment.</p>';
+            return;
+        }
+        listEl.innerHTML = programsData.map(p => {
+            const isEnrolled = p.id === enrolledProgramId;
+            return `
+                <div style="background:var(--white);border:1px solid var(--border-color);border-radius:12px;padding:16px;width:280px;flex-shrink:0;${isEnrolled ? 'border-color:#991b1b;' : ''}">
+                    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+                        <h4 style="font-size:14px;font-weight:700;color:var(--text-primary);">${escapeHtml(p.name)}</h4>
+                        ${isEnrolled ? '<span style="font-size:10px;font-weight:700;color:#991b1b;"><i class="fas fa-check-circle"></i> Enrolled</span>' : ''}
+                    </div>
+                    <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#fee2e2;color:#991b1b;">${escapeHtml(p.category || '')}</span>
+                    <p style="font-size:12px;color:var(--text-muted);margin:8px 0;">${p.description ? escapeHtml(p.description) : 'No description.'}</p>
+                    <div style="display:flex;gap:12px;font-size:11px;font-weight:600;margin-bottom:12px;">
+                        <span><i class="fas fa-clock" style="color:#991b1b;"></i> ${p.durationHours} hr/day</span>
+                        <span><i class="fas fa-calendar-days" style="color:#991b1b;"></i> ${p.daysPerWeek} days/wk</span>
+                    </div>
+                    ${isEnrolled
+                        ? `<button class="action-btn" style="width:100%;background:#f1f5f9;color:var(--text-primary);" onclick="unenrollProgram()">Leave</button>`
+                        : `<button class="action-btn" style="width:100%;background:var(--primary-red);color:white;" onclick="enrollInProgram('${p.id}')">Enroll</button>`
+                    }
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+window.enrollInProgram = async function (programId) {
+    const userId = localStorage.getItem("userId");
+    if (!userId) return;
+    try {
+        await updateDoc(doc(db, "users", userId), { enrolledProgramId: programId });
+        window.__enrolledProgramId = programId;
+        localStorage.setItem("enrolledProgramId", programId);
+        showToast("Enrolled in program!", "success");
+        renderMemberPrograms();
+    } catch (err) {
+        console.error(err);
+        showToast("Failed to enroll.", "error");
+    }
+};
+
+window.unenrollProgram = async function () {
+    const userId = localStorage.getItem("userId");
+    if (!userId) return;
+    try {
+        await updateDoc(doc(db, "users", userId), { enrolledProgramId: null });
+        window.__enrolledProgramId = null;
+        localStorage.removeItem("enrolledProgramId");
+        showToast("Left program.", "info");
+        renderMemberPrograms();
+    } catch (err) {
+        console.error(err);
+        showToast("Failed to leave program.", "error");
+    }
+};
+
+// ==========================================
 // 10.5 LOCKER SYSTEM MODULE
 // ==========================================
 onSnapshot(lockersCol, (snapshot) => {
@@ -3850,12 +4473,33 @@ function renderLockers() {
         })
         .map(l => {
         const isOccupied = l.status === 'Occupied';
-        const statusClass = isOccupied ? 'occupied' : 'available';
         const icon = isOccupied ? 'fa-lock' : 'fa-lock-open';
-        const statusLabel = isOccupied ? 'Occupied' : 'Available';
+        let statusClass = isOccupied ? 'occupied' : 'available';
+        let statusLabel = isOccupied ? 'Occupied' : 'Available';
+        let alertBadgeHtml = '';
+        let pulseClass = '';
+
+        if (isOccupied && l.memberId) {
+            const member = (window.membersData || []).find(m => m.id === l.memberId);
+            if (member) {
+                const isArchived = (member.status || "").toLowerCase() === 'archived';
+                const isExpired = window.isMemberPlanExpired && window.isMemberPlanExpired(member);
+                if (isArchived) {
+                    alertBadgeHtml = `<div class="locker-alert-badge archived"><i class="fa-solid fa-user-slash"></i> Archived</div>`;
+                    pulseClass = 'alert-pulse-red';
+                } else if (isExpired) {
+                    alertBadgeHtml = `<div class="locker-alert-badge expired"><i class="fa-solid fa-hourglass-end"></i> Expired</div>`;
+                    pulseClass = 'alert-pulse-orange';
+                }
+            } else {
+                alertBadgeHtml = `<div class="locker-alert-badge deleted"><i class="fa-solid fa-user-xmark"></i> Missing</div>`;
+                pulseClass = 'alert-pulse-red';
+            }
+        }
 
         return `
-            <div class="locker-card ${statusClass}" onclick="openAssignLockerModal('${l.id}')">
+            <div class="locker-card ${statusClass} ${pulseClass}" onclick="openAssignLockerModal('${l.id}')">
+                ${alertBadgeHtml}
                 <div class="locker-icon"><i class="fa-solid ${icon}"></i></div>
                 <div class="locker-number">${l.number}</div>
                 <div class="locker-status-text">${statusLabel}</div>
@@ -3911,7 +4555,17 @@ window.openAssignLockerModal = function (id) {
     if (isOccupied) {
         if (info) {
             info.style.display = 'block';
-            document.getElementById('assigneeName').innerText = locker.memberName || 'Unknown Member';
+            let statusText = '';
+            const member = (window.membersData || []).find(m => m.id === locker.memberId);
+            if (member) {
+                const isArchived = (member.status || "").toLowerCase() === 'archived';
+                const isExpired = window.isMemberPlanExpired && window.isMemberPlanExpired(member);
+                if (isArchived) statusText = ' ⚠️ (Archived)';
+                else if (isExpired) statusText = ' ⚠️ (Expired Plan)';
+            } else {
+                statusText = ' ⚠️ (Missing Member)';
+            }
+            document.getElementById('assigneeName').innerText = (locker.memberName || 'Unknown Member') + statusText;
             document.getElementById('assigneeInitial').innerText = (locker.memberName || '?')[0];
             if (locker.expiryDate) {
                 const exp = new Date(locker.expiryDate);
@@ -3937,7 +4591,11 @@ function populateAssignMemberSelect() {
     if (!select) return;
 
     select.innerHTML = '<option value="" disabled selected>Search for a member...</option>';
-    membersData.filter(m => (m.status || "").toLowerCase() !== 'archived').forEach(m => {
+    membersData.filter(m => {
+        const isArchived = (m.status || "").toLowerCase() === 'archived';
+        const isExpired = window.isMemberPlanExpired && window.isMemberPlanExpired(m);
+        return !isArchived && !isExpired;
+    }).forEach(m => {
         const opt = document.createElement('option');
         opt.value = m.id;
         opt.setAttribute('data-name', `${m.givenName || m.name} ${m.familyName || ''}`.trim());
@@ -3960,23 +4618,57 @@ if (document.getElementById('assignLockerForm')) {
         const expiryDate = new Date(now.setMonth(now.getMonth() + duration)).getTime();
 
         try {
-            await updateDoc(doc(db, "lockers", lockerId), {
-                status: 'Occupied',
-                memberId,
-                memberName,
-                expiryDate,
-                assignedAt: Date.now()
-            });
+            await runTransaction(db, async (transaction) => {
+                const lockerRef = doc(db, "lockers", lockerId);
+                const memberRef = doc(db, "users", memberId);
 
-            // Also update member profile
-            await updateDoc(doc(db, "users", memberId), { hasLocker: true, lockerId: lockerId });
+                const lockerSnap = await transaction.get(lockerRef);
+                const memberSnap = await transaction.get(memberRef);
+
+                if (!lockerSnap.exists()) {
+                    throw new Error("Locker record does not exist.");
+                }
+                if (!memberSnap.exists()) {
+                    throw new Error("Member record does not exist.");
+                }
+
+                const lockerData = lockerSnap.data();
+                const memberData = memberSnap.data();
+
+                if (lockerData.status === 'Occupied') {
+                    throw new Error("This locker is already occupied by someone else.");
+                }
+
+                if ((memberData.status || "").toLowerCase() === 'archived') {
+                    throw new Error("Cannot assign locker to an archived member.");
+                }
+
+                if (window.isMemberPlanExpired && window.isMemberPlanExpired(memberData)) {
+                    throw new Error("Cannot assign locker to a member with an expired plan.");
+                }
+
+                // Update locker atomic status
+                transaction.update(lockerRef, {
+                    status: 'Occupied',
+                    memberId,
+                    memberName,
+                    expiryDate,
+                    assignedAt: Date.now()
+                });
+
+                // Update member atomic status
+                transaction.update(memberRef, {
+                    hasLocker: true,
+                    lockerId: lockerId
+                });
+            });
 
             window.closeModal('assignLockerModal');
             showToast(`Locker assigned to ${memberName} for ${duration} month(s).`, "success");
             if (window.logActivity) window.logActivity("Locker Assigned", `Assigned locker to ${memberName}`);
         } catch (err) {
             console.error(err);
-            showToast("Failed to assign locker.", "error");
+            showToast(err.message || "Failed to assign locker.", "error");
         }
     });
 }
@@ -3988,23 +4680,37 @@ window.releaseLocker = async function () {
 
     showConfirm(`Are you sure you want to release Locker #${locker.number}?`, async () => {
         try {
-            // Remove from member profile if exists
-            if (locker.memberId) {
-                await updateDoc(doc(db, "users", locker.memberId), { hasLocker: false, lockerId: null });
-            }
+            await runTransaction(db, async (transaction) => {
+                const lockerRef = doc(db, "lockers", lockerId);
+                const lockerSnap = await transaction.get(lockerRef);
+                if (!lockerSnap.exists()) {
+                    throw new Error("Locker record does not exist.");
+                }
+                const currentLocker = lockerSnap.data();
 
-            await updateDoc(doc(db, "lockers", lockerId), {
-                status: 'Available',
-                memberId: null,
-                memberName: null,
-                expiryDate: null,
-                assignedAt: null
+                if (currentLocker.memberId) {
+                    const memberRef = doc(db, "users", currentLocker.memberId);
+                    const memberSnap = await transaction.get(memberRef);
+                    if (memberSnap.exists()) {
+                        transaction.update(memberRef, { hasLocker: false, lockerId: null });
+                    }
+                }
+
+                transaction.update(lockerRef, {
+                    status: 'Available',
+                    memberId: null,
+                    memberName: null,
+                    expiryDate: null,
+                    assignedAt: null
+                });
             });
+
             window.closeModal('assignLockerModal');
             showToast("Locker released successfully.", "success");
+            if (window.logActivity) window.logActivity("Locker Released", `Released Locker #${locker.number}`);
         } catch (err) {
             console.error(err);
-            showToast("Failed to release locker.", "error");
+            showToast(err.message || "Failed to release locker.", "error");
         }
     });
 };
@@ -4104,8 +4810,8 @@ function renderMembers() {
         if (isArchived) {
             return `
                 <tr>
-                    <td><a href="javascript:void(0)" onclick="window.openMemberProfile('${m.id}')" style="font-weight: 600; color: var(--text-primary); text-decoration: none; border-bottom: 1px dashed var(--border-color);">${m.givenName || m.name}</a></td><td>${m.mi || ''}</td><td>${m.familyName || ''}</td>
-                    <td>${m.email}</td><td><strong>${plan}</strong></td><td><span class="status-badge-solid voided">Archived</span></td>
+                    <td><a href="javascript:void(0)" onclick="window.openMemberProfile('${m.id}')" style="font-weight: 600; color: var(--text-primary); text-decoration: none; border-bottom: 1px dashed var(--border-color);">${escapeHtml(m.givenName || m.name)}</a></td><td>${escapeHtml(m.mi || '')}</td><td>${escapeHtml(m.familyName || '')}</td>
+                    <td>${escapeHtml(m.email)}</td><td><strong>${escapeHtml(plan)}</strong></td><td><span class="status-badge-solid voided">Archived</span></td>
                     <td style="text-align: right;">
                         <button type="button" class="btn-icon" style="color: #10B981;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
                         <button type="button" class="btn-icon" style="color: #EF4444;" title="Permanently Delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
@@ -4135,8 +4841,8 @@ function renderMembers() {
                     <td style="display:flex; align-items:center; gap:10px; border-bottom:none;">
                         ${avatarHtml}
                         <div>
-                            <a href="javascript:void(0)" onclick="window.openMemberProfile('${m.id}')" style="font-weight: 600; color: var(--text-primary); text-decoration: none; border-bottom: 1px dashed var(--border-color); transition: all 0.2s;" onmouseover="this.style.color='var(--primary-red)'; this.style.borderBottomColor='var(--primary-red)';" onmouseout="this.style.color='var(--text-primary)'; this.style.borderBottomColor='var(--border-color)';">${m.givenName ? `${m.givenName} ${m.familyName || ''}`.trim() : (m.name || "User")}</a>
-                            <div style="font-size: 11px; color: #94a3b8;">${m.uid ? m.uid + ' • ' : ''}${m.email}</div>
+                            <a href="javascript:void(0)" onclick="window.openMemberProfile('${m.id}')" style="font-weight: 600; color: var(--text-primary); text-decoration: none; border-bottom: 1px dashed var(--border-color); transition: all 0.2s;" onmouseover="this.style.color='var(--primary-red)'; this.style.borderBottomColor='var(--primary-red)';" onmouseout="this.style.color='var(--text-primary)'; this.style.borderBottomColor='var(--border-color)';">${escapeHtml(m.givenName ? `${m.givenName} ${m.familyName || ''}`.trim() : (m.name || "User"))}</a>
+                            <div style="font-size: 11px; color: #94a3b8;">${m.uid ? escapeHtml(m.uid) + ' • ' : ''}${escapeHtml(m.email)}</div>
                         </div>
                     </td>
                     <td style="font-weight: 500;">${plan}</td>
@@ -4216,12 +4922,12 @@ function renderMembers() {
         window.renderPaginationControls('arcMemberPagination', arcMemCurrentPage, totalPages, totalRecords, 'changeArcMemPage');
 
         window.syncDOM(arcTbody, displayData, (m) => renderMemberRow(m, true), 'arc-row');
+        // M-08 Fix: Show empty state for archived members
+        if (archivedList.length === 0 && arcTbody.children.length === 0) {
+            arcTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:40px; color:var(--text-muted);"><i class="fas fa-box-open" style="font-size:2rem; opacity:0.15; display:block; margin-bottom:10px;"></i>No archived members.</td></tr>';
+        }
     }
 
-
-    // Update pagination counts
-    if (document.getElementById('memberTotalCount')) document.getElementById('memberTotalCount').innerText = activeList.length;
-    if (document.getElementById('memberShowingCount')) document.getElementById('memberShowingCount').innerText = activeList.length > 0 ? `1-${activeList.length}` : '0-0';
 
     if (document.getElementById('dashActiveMembers')) document.getElementById('dashActiveMembers').innerText = activeMembers;
     if (document.getElementById('gridMembers')) document.getElementById('gridMembers').innerText = activeList.length;
@@ -4317,12 +5023,25 @@ if (document.getElementById('editMemberForm')) {
         const mi = document.getElementById('editMemberMI').value.trim();
         const family = document.getElementById('editMemberFamily').value.trim();
 
+        // Validation (C-02 Fix)
+        const nameRegex = /^[A-Za-z\s\-\u00f1\u00d1]{2,}$/;
+        if (!given || !nameRegex.test(given)) {
+            return showToast("First Name must contain at least 2 letters (no numbers or special characters).", "error");
+        }
+        if (!family || !nameRegex.test(family)) {
+            return showToast("Last Name must contain at least 2 letters (no numbers or special characters).", "error");
+        }
+        const emergencyVal = document.getElementById('editMemberEmergency') ? document.getElementById('editMemberEmergency').value.trim() : "";
+        if (emergencyVal && !/^\+?[0-9]{7,15}$/.test(emergencyVal)) {
+            return showToast("Emergency contact must be a valid phone number (7-15 digits).", "error");
+        }
+
         const updatedData = {
             givenName: given,
             mi: mi,
             familyName: family,
             name: `${given} ${family}`.trim(),
-            emergencyContact: document.getElementById('editMemberEmergency') ? document.getElementById('editMemberEmergency').value.trim() : ""
+            emergencyContact: emergencyVal
         };
 
         if (document.getElementById('editMemberPlan')) {
@@ -4334,11 +5053,15 @@ if (document.getElementById('editMemberForm')) {
         }
 
         if (document.getElementById('editMemberSessionsRemaining')) {
-            updatedData.sessionsRemaining = Number(document.getElementById('editMemberSessionsRemaining').value || 0);
+            const sessVal = Number(document.getElementById('editMemberSessionsRemaining').value || 0);
+            if (sessVal < 0) return showToast("Sessions remaining cannot be negative.", "error");
+            updatedData.sessionsRemaining = sessVal;
         }
 
         if (document.getElementById('editMemberSessionsTotal')) {
-            updatedData.sessionsTotal = Number(document.getElementById('editMemberSessionsTotal').value || 0);
+            const sessVal = Number(document.getElementById('editMemberSessionsTotal').value || 0);
+            if (sessVal < 0) return showToast("Total sessions cannot be negative.", "error");
+            updatedData.sessionsTotal = sessVal;
         }
 
         if (document.getElementById('editMemberImageFile')) {
@@ -4458,8 +5181,8 @@ function renderStaff() {
         const roleLower = roleStr.toLowerCase();
         const statusStr = (u.status || "Active").trim();
         const statusLower = statusStr.toLowerCase();
-        let fullName = u.givenName ? `${u.givenName} ${u.familyName || ''}`.trim() : (u.name || "User");
-        let specialty = u.specialty || 'General Fitness';
+        let fullName = escapeHtml(u.givenName ? `${u.givenName} ${u.familyName || ''}`.trim() : (u.name || "User"));
+        let specialty = escapeHtml(u.specialty || 'General Fitness');
 
         const avatarHtml = u.image
             ? `<img src="${u.image}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">`
@@ -4496,7 +5219,7 @@ function renderStaff() {
                         ${avatarHtml}
                         <div>
                             <div style="font-weight: 600;">${fullName}</div>
-                            <div style="font-size: 11px; color: #94a3b8;">${u.uid ? u.uid + ' • ' : ''}${u.email}</div>
+                            <div style="font-size: 11px; color: #94a3b8;">${u.uid ? escapeHtml(u.uid) + ' • ' : ''}${escapeHtml(u.email)}</div>
                         </div>
                     </td>
                     <td style="font-weight: 500;">${specialty}</td>
@@ -4516,7 +5239,6 @@ function renderStaff() {
                         </div>
                     </td>
                     <td style="font-weight: 500;">${roleStr}</td>
-                    <td>${u.email}</td>
                     <td>${statusHtml}</td>
                     <td style="text-align: right;">${actionBtns}</td>
                 </tr>
@@ -4632,6 +5354,10 @@ function renderStaff() {
 
         window.renderPaginationControls('arcStaffPagination', arcStaffCurrentPage, totalPages, totalRecords, 'changeArcStaffPage');
         window.syncDOM(arcStaffTbody, displayData, (u) => renderStaffRow(u, true), 'arc-staff-row');
+        // M-08 Fix: Show empty state for archived staff
+        if (arcStaffList.length === 0 && arcStaffTbody.children.length === 0) {
+            arcStaffTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted);"><i class="fas fa-box-open" style="font-size:2rem; opacity:0.15; display:block; margin-bottom:10px;"></i>No archived staff members.</td></tr>';
+        }
     }
 
     if (arcTrainerTbody) {
@@ -4648,35 +5374,16 @@ function renderStaff() {
 
         window.renderPaginationControls('arcTrainerPagination', arcTrainerCurrentPage, totalPages, totalRecords, 'changeArcTrainerPage');
         window.syncDOM(arcTrainerTbody, displayData, (u) => renderStaffRow(u, true), 'arc-trainer-row');
+        // M-08 Fix: Show empty state for archived trainers
+        if (arcTrainerList.length === 0 && arcTrainerTbody.children.length === 0) {
+            arcTrainerTbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--text-muted);"><i class="fas fa-box-open" style="font-size:2rem; opacity:0.15; display:block; margin-bottom:10px;"></i>No archived trainers.</td></tr>';
+        }
     }
 
-    // Update Pagination Counts
-    if (document.getElementById('staffTotalCount')) document.getElementById('staffTotalCount').innerText = staffList.length;
-    if (document.getElementById('staffShowingCount')) document.getElementById('staffShowingCount').innerText = staffList.length > 0 ? `1-${staffList.length}` : '0-0';
-    if (document.getElementById('trainerTotalCount')) document.getElementById('trainerTotalCount').innerText = trainerList.length;
-    if (document.getElementById('trainerShowingCount')) document.getElementById('trainerShowingCount').innerText = trainerList.length > 0 ? `1-${trainerList.length}` : '0-0';
-
-    // Dashboard Stats Feed
-    let trainersFeed = "";
-    allUsersData.forEach(u => {
-        if ((u.role || "").toLowerCase() === 'trainer' && (u.status || 'Active') === 'Active' && u.shiftStatus === 'On Floor') {
-            let fullName = `${u.givenName || u.name} ${u.familyName || ''}`.trim();
-            trainersFeed += `
-                <div class="list-item">
-                    <div class="list-icon" style="background-color: var(--dark-black);"><i class="fa-solid fa-user"></i></div>
-                    <div class="list-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <div><div class="trainer-name">${fullName}</div><p style="font-size: 12px; color: var(--text-muted);">${u.specialty || 'Trainer'} | ${u.email}</p></div>
-                        <span class="status-badge status-progress" style="background: #3B82F6; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px;">On Floor</span>
-                    </div>
-                </div>
-            `;
-        }
-    });
 
     if (document.getElementById('dashStaffTotal')) document.getElementById('dashStaffTotal').innerText = staffActive;
     if (document.getElementById('gridTrainers')) document.getElementById('gridTrainers').innerText = trainerActive;
-    const dashTrainers = document.getElementById('dashActiveTrainersFeed');
-    if (dashTrainers) { dashTrainers.innerHTML = trainersFeed || '<p style="color: var(--text-muted); font-size: 14px;">No active trainers right now.</p>'; }
+    // L-03 Fix: Trainers feed now only rendered from renderMemberTrainers() to avoid double rendering
 }
 
 // Staff & Trainer UI Helpers
@@ -4863,6 +5570,15 @@ if (document.getElementById('editStaffForm')) {
         const mi = document.getElementById('editStaffMI').value.trim();
         const family = document.getElementById('editStaffFamily').value.trim();
 
+        // Validation (C-03 Fix)
+        const nameRegex = /^[A-Za-z\s\-\u00f1\u00d1]{2,}$/;
+        if (!given || !nameRegex.test(given)) {
+            return showToast("First Name must contain at least 2 letters (no numbers or special characters).", "error");
+        }
+        if (!family || !nameRegex.test(family)) {
+            return showToast("Last Name must contain at least 2 letters (no numbers or special characters).", "error");
+        }
+
         const updatedData = {
             givenName: given,
             mi: mi,
@@ -4874,7 +5590,9 @@ if (document.getElementById('editStaffForm')) {
         const specialtyEl = document.getElementById('editStaffSpecialty');
 
         if (specialtyContainer && specialtyContainer.style.display === 'block' && specialtyEl) {
-            updatedData.specialty = specialtyEl.value.trim();
+            const spec = specialtyEl.value.trim();
+            if (!spec) return showToast("Specialty field cannot be empty for trainers.", "error");
+            updatedData.specialty = spec;
         }
 
         const statusEl = document.getElementById('editStaffStatus');
@@ -4924,10 +5642,18 @@ window.archiveUser = async (id, currentStatus) => {
 
 window.deleteUser = async (id) => {
     if (localStorage.getItem("userRole") !== "Admin") { showToast("Action Denied: You do not have permission to delete accounts.", "error"); return; }
-    showConfirm("Remove this account completely? This action cannot be undone.", async () => {
-        await deleteDoc(doc(db, "users", id));
-        showToast("Account deleted.", "info");
-        if (window.logActivity) window.logActivity("Account Deleted", `Permanently deleted user ID: ${id}`);
+    // L-06 Fix: Show user name in confirmation
+    const user = [...membersData, ...allUsersData].find(u => u.id === id);
+    const userName = user ? (user.givenName ? `${user.givenName} ${user.familyName || ''}`.trim() : (user.name || 'this user')) : 'this user';
+    showConfirm(`Remove ${userName}'s account completely? This action cannot be undone.`, async () => {
+        try {
+            await deleteDoc(doc(db, "users", id));
+            showToast("Account deleted.", "info");
+            if (window.logActivity) window.logActivity("Account Deleted", `Permanently deleted ${userName} (ID: ${id})`);
+        } catch (error) {
+            console.error("Delete failed:", error);
+            showToast("Failed to delete account. Please try again.", "error");
+        }
     });
 }
 
@@ -4942,10 +5668,10 @@ window.addBatchRow = function () {
     const tbody = document.getElementById('batchMemberBody');
     const tr = document.createElement('tr');
     tr.innerHTML = `
-        <td><input type="text" class="bm-first" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
-        <td><input type="text" class="bm-mi" maxlength="2" placeholder="Opt." oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')" style="min-width: 60px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
-        <td><input type="text" class="bm-last" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
-        <td><input type="email" class="bm-email" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="text" class="bm-first" placeholder="First Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="text" class="bm-mi" maxlength="2" placeholder="MI" oninput="this.value=this.value.replace(/[^a-zA-Z]/g, '')" style="min-width: 60px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="text" class="bm-last" placeholder="Last Name" oninput="this.value=this.value.replace(/[^a-zA-ZñÑ\\s\\-]/g, '')" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
+        <td><input type="email" class="bm-email" placeholder="email@example.com" required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
         <td><select class="bm-plan" style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"><option value="Gold Plan">Gold</option><option value="Silver Plan">Silver</option></select></td>
         <td><input type="text" class="bm-rfid rfid-register-input" placeholder="Tap Card..." required style="min-width: 130px; width: 100%; padding: 10px; box-sizing: border-box;"></td>
         <td>
@@ -5251,6 +5977,20 @@ if (document.getElementById('memberRegistrationForm')) {
             return;
         }
 
+        // C-05 Fix: Validate GCash BEFORE any writes
+        const regPayMethod = window.__regPaymentMethod || 'Cash';
+        const regGcashRef = (document.getElementById('regGcashRefId') ? document.getElementById('regGcashRefId').value.trim() : '');
+        if (regPayMethod === 'GCash' && !regGcashRef) {
+            showToast('Please enter the GCash Reference ID.', 'error');
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
+        if (regPayMethod === 'GCash' && regGcashRef.replace(/\s/g, '').length !== 12) {
+            showToast('GCash Reference ID must be exactly 12 digits.', 'error');
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
+
         try {
             // EmailJS
             await emailjs.send("service_x90mti6", "template_nda1wjc", {
@@ -5301,16 +6041,7 @@ if (document.getElementById('memberRegistrationForm')) {
                 });
             }
 
-            // Capture payment method + GCash ref
-            const regPayMethod = window.__regPaymentMethod || 'Cash';
-            const regGcashRef = (document.getElementById('regGcashRefId') ? document.getElementById('regGcashRefId').value.trim() : '');
-
-            // Validate GCash ref when GCash is selected
-            if (regPayMethod === 'GCash' && !regGcashRef) {
-                showToast('Please enter the GCash Reference ID.', 'error');
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
-                return;
-            }
+            // regPayMethod and regGcashRef already validated before try block
 
             const paymentData = {
                 name: `${given} ${family}`,
@@ -5474,9 +6205,144 @@ if (document.getElementById('batchStaffForm')) {
 
 
 // ==========================================
+// 11.5 DYNAMIC UI VALIDATIONS (QA-UX-06)
+// ==========================================
+window.setupDynamicUIFormValidations = function () {
+    const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    const nameRegex = /^[A-Za-z\s]{2,}$/;
+    const phoneRegex = /^\+?[0-9]{7,15}$/;
+
+    // Injects a premium dynamic helper label below an input field if it doesn't exist
+    const ensureValidationMessageEl = (input) => {
+        let msgEl = input.nextElementSibling;
+        if (msgEl && msgEl.classList.contains('form-validation-msg')) {
+            return msgEl;
+        }
+        msgEl = document.createElement('span');
+        msgEl.className = 'form-validation-msg';
+        input.parentNode.insertBefore(msgEl, input.nextSibling);
+        return msgEl;
+    };
+
+    const registerDynamicFieldValidation = ({ inputId, validateFn, errorMsg }) => {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        const checkValidation = () => {
+            const val = input.value.trim();
+            const msgEl = ensureValidationMessageEl(input);
+
+            if (val === '') {
+                // If it is empty and required, it's invalid. If not required, clear styles.
+                if (input.hasAttribute('required')) {
+                    input.classList.add('ui-invalid');
+                    input.classList.remove('ui-valid');
+                    msgEl.innerText = "This field is required";
+                    msgEl.className = 'form-validation-msg ui-invalid';
+                } else {
+                    input.classList.remove('ui-invalid', 'ui-valid');
+                    msgEl.innerText = '';
+                    msgEl.className = 'form-validation-msg';
+                }
+            } else {
+                const isValid = validateFn(val);
+                if (isValid) {
+                    input.classList.add('ui-valid');
+                    input.classList.remove('ui-invalid');
+                    msgEl.innerText = "Looks good!";
+                    msgEl.className = 'form-validation-msg ui-valid';
+                } else {
+                    input.classList.add('ui-invalid');
+                    input.classList.remove('ui-valid');
+                    msgEl.innerText = errorMsg;
+                    msgEl.className = 'form-validation-msg ui-invalid';
+                }
+            }
+        };
+
+        input.addEventListener('input', checkValidation);
+        input.addEventListener('blur', checkValidation);
+    };
+
+    // --- Format and Validate GCash Reference IDs ---
+    const setupGcashFormatter = (inputId) => {
+        const gcashInput = document.getElementById(inputId);
+        if (gcashInput) {
+            gcashInput.addEventListener('input', (e) => {
+                let val = e.target.value.replace(/\D/g, '');
+                if (val.length > 12) {
+                    val = val.slice(0, 12);
+                }
+                let formatted = '';
+                for (let i = 0; i < val.length; i++) {
+                    if (i > 0 && i % 4 === 0) {
+                        formatted += ' ';
+                    }
+                    formatted += val[i];
+                }
+                e.target.value = formatted;
+            });
+
+            registerDynamicFieldValidation({
+                inputId: inputId,
+                validateFn: (val) => val.replace(/\s/g, '').length === 12,
+                errorMsg: "Must be exactly 12 digits"
+            });
+        }
+    };
+
+    setupGcashFormatter('regGcashRefId');
+    setupGcashFormatter('renewGcashRefId');
+    setupGcashFormatter('addCreditGcashRefId');
+    setupGcashFormatter('posGcashRefId');
+
+    // --- Member Registration Form ---
+    registerDynamicFieldValidation({
+        inputId: 'regMemberGiven',
+        validateFn: (val) => nameRegex.test(val),
+        errorMsg: "First Name must contain at least 2 letters (no numbers)"
+    });
+    registerDynamicFieldValidation({
+        inputId: 'regMemberFamily',
+        validateFn: (val) => nameRegex.test(val),
+        errorMsg: "Last Name must contain at least 2 letters (no numbers)"
+    });
+    registerDynamicFieldValidation({
+        inputId: 'regMemberEmail',
+        validateFn: (val) => emailRegex.test(val),
+        errorMsg: "Please enter a valid email address"
+    });
+    registerDynamicFieldValidation({
+        inputId: 'regMemberEmergency',
+        validateFn: (val) => phoneRegex.test(val),
+        errorMsg: "Emergency number must be 7 to 15 digits"
+    });
+
+    // --- Staff Registration Form ---
+    registerDynamicFieldValidation({
+        inputId: 'regStaffGiven',
+        validateFn: (val) => nameRegex.test(val),
+        errorMsg: "First Name must contain at least 2 letters (no numbers)"
+    });
+    registerDynamicFieldValidation({
+        inputId: 'regStaffFamily',
+        validateFn: (val) => nameRegex.test(val),
+        errorMsg: "Last Name must contain at least 2 letters (no numbers)"
+    });
+    registerDynamicFieldValidation({
+        inputId: 'regStaffEmail',
+        validateFn: (val) => emailRegex.test(val),
+        errorMsg: "Please enter a valid email address"
+    });
+};
+
+// ==========================================
 // 12. UI INITIALIZATION & SHIFT TIMER
 // ==========================================
 function initUI() {
+    if (window.setupDynamicUIFormValidations) {
+        window.setupDynamicUIFormValidations();
+    }
     function updateClock() {
         const clockElement = document.getElementById('liveClock');
         if (clockElement) {
@@ -5541,6 +6407,7 @@ function initUI() {
         onSnapshot(doc(db, "users", localStorage.getItem("userId")), (docSnap) => {
             if (docSnap.exists()) {
                 const userData = docSnap.data();
+                window.currentUserData = userData;
                 const fullName = userData.name || `${userData.givenName || ''} ${userData.familyName || ''}`.trim();
                 localStorage.setItem("loggedInUser", fullName);
                 
@@ -5586,11 +6453,19 @@ function initUI() {
 
                 // Sync Shift Status
                 if (userData.shiftStatus) {
-                    if (userData.role === 'Trainer') {
+                    const uRole = (userData.role || "").trim().toLowerCase();
+                    if (uRole === 'trainer' || uRole === 'staff') {
                         localStorage.setItem("trainerShiftStatus", userData.shiftStatus);
                     }
                     if (userData.shiftStart) {
                         localStorage.setItem("shiftStart", userData.shiftStart);
+                    } else {
+                        if (userData.shiftStatus.trim().toLowerCase() !== 'on floor') {
+                            localStorage.removeItem("shiftStart");
+                        }
+                    }
+                    if (typeof window.updateShiftTimer === 'function') {
+                        window.updateShiftTimer();
                     }
                 }
                 
@@ -5607,14 +6482,15 @@ function initUI() {
 
 
 
-    function updateShiftTimer() {
-        const role = localStorage.getItem("userRole");
-        const trainerStatus = localStorage.getItem("trainerShiftStatus");
+    window.updateShiftTimer = function () {
+        const role = (localStorage.getItem("userRole") || "").trim().toLowerCase();
+        const trainerStatus = localStorage.getItem("trainerShiftStatus") || "Off Floor";
+        const shiftStatus = trainerStatus.trim().toLowerCase();
 
-        // Update specific Trainer dashboard elements if they exist
+        // Update specific Trainer/Staff dashboard elements if they exist
         const shiftStatusText = document.getElementById('shiftStatusText');
         if (shiftStatusText) {
-            shiftStatusText.innerText = trainerStatus || "Off Floor";
+            shiftStatusText.innerText = trainerStatus;
         }
 
         document.querySelectorAll('.card-black, .grid-stat-box').forEach(card => {
@@ -5624,12 +6500,15 @@ function initUI() {
 
                 let timerSpan = card.querySelector('.shift-timer');
                 if (!timerSpan && card.classList.contains('card-black')) {
-                    card.innerHTML += `<span class="shift-timer" style="position: absolute; top: 10px; right: 15px; font-size: 14px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">--:--:--</span>`;
-                    timerSpan = card.querySelector('.shift-timer');
+                    timerSpan = document.createElement('span');
+                    timerSpan.className = 'shift-timer';
+                    timerSpan.style.cssText = 'position: absolute; top: 10px; right: 15px; font-size: 14px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);';
+                    timerSpan.textContent = '--:--:--';
+                    card.appendChild(timerSpan);
                 }
 
                 if (timerSpan) {
-                    if (role === "Trainer" && trainerStatus !== "On Floor") {
+                    if ((role === "trainer" || role === "staff") && shiftStatus !== "on floor") {
                         timerSpan.innerText = "Off Floor";
                         if (card.classList.contains('card-black')) {
                             timerSpan.style.background = "#eee";
@@ -5657,7 +6536,7 @@ function initUI() {
             }
         });
     }
-    let shiftTimerId = setInterval(updateShiftTimer, 1000); updateShiftTimer();
+    let shiftTimerId = setInterval(window.updateShiftTimer, 1000); window.updateShiftTimer();
 
     document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
@@ -5665,9 +6544,9 @@ function initUI() {
             clearInterval(shiftTimerId);
         } else {
             clockTimerId = setInterval(updateClock, 1000);
-            shiftTimerId = setInterval(updateShiftTimer, 1000);
+            shiftTimerId = setInterval(window.updateShiftTimer, 1000);
             updateClock();
-            updateShiftTimer();
+            window.updateShiftTimer();
         }
     });
 
@@ -5823,6 +6702,19 @@ function renderBookings() {
 
             let html = "";
 
+            // Proactive membership expiration countdown warning banner
+            if (typeof window.membershipDiffDays !== 'undefined') {
+                const diffDays = window.membershipDiffDays;
+                if (diffDays > 0 && diffDays <= 7) {
+                    html += `
+                        <div class="notification-banner" style="background-color: #fff3cd; color: #856404; border-left: 5px solid #ffc107; margin-bottom: 20px;">
+                            <div><i class="fas fa-triangle-exclamation" style="font-size: 20px; margin-right: 10px; color: #ffc107;"></i> <strong>Membership Expiring Soon!</strong> You have only <strong>${diffDays} day${diffDays > 1 ? 's' : ''} remaining</strong> before your membership plan expires. Please renew at the front desk.</div>
+                            <button type="button" onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:inherit; cursor:pointer; font-size: 16px;"><i class="fas fa-times"></i></button>
+                        </div>
+                    `;
+                }
+            }
+
             if (confirmed.length > 0) {
                 let nextSession = confirmed[0];
                 const dateObj = new Date(`${nextSession.date}T${nextSession.time}`);
@@ -5921,15 +6813,19 @@ function renderBookings() {
             const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
             if (loggedInRole === "member") {
-                const remarksHtml = (b.status === "Cancelled" || b.status === "Declined") && b.cancelRemarks 
-                    ? `<div style="font-size: 11px; color: #e74c3c; margin-top: 10px; font-weight: 500; font-style: italic;"><i class="fas fa-comment-dots"></i> Reason: ${b.cancelRemarks}</div>`
+                const remarksHtml = (b.status === "Cancelled" || b.status === "Declined") && b.cancelRemarks
+                    ? `<div style="font-size: 11px; color: #e74c3c; margin-top: 10px; font-weight: 500; font-style: italic;"><i class="fas fa-comment-dots"></i> Reason: ${escapeHtml(b.cancelRemarks)}</div>`
                     : "";
+                const cancelBtn = b.status === "Pending"
+                    ? `<td><button type="button" class="btn-icon btn-delete" title="Cancel Booking" onclick="cancelMemberBooking('${b.id}','${b.memberId}')"><i class="fas fa-times-circle"></i> Cancel</button></td>`
+                    : `<td></td>`;
                 return `
                     <tr>
-                        <td>${b.trainerName}</td>
+                        <td>${escapeHtml(b.trainerName)}</td>
                         <td>${dateStr}</td>
                         <td><span class="badge confirmed" style="background: var(--primary-red); color: white; border: none;"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
                         <td><span class="badge ${badgeClass}">${b.status}</span>${remarksHtml}</td>
+                        ${cancelBtn}
                     </tr>
                 `;
             } else {
@@ -5951,15 +6847,15 @@ function renderBookings() {
             }
 
             const remarksHtml = (b.status === "Cancelled" || b.status === "Declined") && b.cancelRemarks 
-                ? `<div style="font-size: 11px; color: #e74c3c; margin-top: 4px; font-style: italic;"><i class="fas fa-comment-dots"></i> Reason: ${b.cancelRemarks}</div>`
+                ? `<div style="font-size: 11px; color: #e74c3c; margin-top: 4px; font-style: italic;"><i class="fas fa-comment-dots"></i> Reason: ${escapeHtml(b.cancelRemarks)}</div>`
                 : "";
 
             return `
                 <tr>
                     <td>
-                        ${b.memberId ? `<a href="javascript:void(0)" onclick="window.openMemberProfile('${b.memberId}')" style="color: var(--primary-red); font-weight: 600; text-decoration: none; border-bottom: 1px dashed var(--primary-red);">${b.memberName}</a>` : b.memberName}
+                        ${b.memberId ? `<a href="javascript:void(0)" onclick="window.openMemberProfile('${b.memberId}')" style="color: var(--primary-red); font-weight: 600; text-decoration: none; border-bottom: 1px dashed var(--primary-red);">${escapeHtml(b.memberName)}</a>` : escapeHtml(b.memberName)}
                     </td>
-                    <td>${b.trainerName}</td>
+                    <td>${escapeHtml(b.trainerName)}</td>
                     <td>${dateStr}</td>
                     <td><span class="badge active" style="background: var(--primary-red); color: white; border: none;"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
                     <td><span class="badge ${badgeClass}">${b.status}</span>${remarksHtml}</td>
@@ -6066,6 +6962,15 @@ window.updateBookingStatus = async (id, newStatus) => {
 }
 
 
+window.isMemberPlanExpired = function (member) {
+    if (!member) return false;
+    if (typeof member.dateRegistered !== 'number') return false;
+    const planDays = (typeof window.getPlanDays === 'function') ? window.getPlanDays(member.plan) : 30;
+    const expiryAt = member.dateRegistered + planDays * 24 * 60 * 60 * 1000;
+    const offset = window.serverTimeOffsetMs || 0;
+    return (Date.now() + offset) > expiryAt;
+}
+
 window.openMemberBookingModal = () => {
     // Check if membership is expired before opening
     const daysText = document.getElementById('myPlanDays')?.innerText || "";
@@ -6080,105 +6985,434 @@ window.openMemberBookingModal = () => {
     }
 
     const trainerSelect = document.getElementById('memberBookTrainer');
-    const trainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer' && u.status !== 'Archived');
+    if (trainerSelect) {
+        const trainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer' && u.status !== 'Archived');
+        trainerSelect.innerHTML = '<option value="" disabled selected>Select a Trainer...</option>' +
+            trainers.map(t => `<option value="${t.id}">${t.name || t.givenName + ' ' + t.familyName}</option>`).join('');
+    }
 
-    trainerSelect.innerHTML = '<option value="" disabled selected>Select a Trainer...</option>' +
-        trainers.map(t => `<option value="${t.id}">${t.name || t.givenName + ' ' + t.familyName}</option>`).join('');
+    // Reset layout elements
+    const gridEl = document.getElementById('bookingDateTimeGrid');
+    const sidebarEl = document.getElementById('bookingDetailsSidebar');
+    if (gridEl) gridEl.style.display = 'none';
+    if (sidebarEl) sidebarEl.style.display = 'none';
+    
+    // Clear and disable confirm button
+    const confirmBtn = document.getElementById('confirmBookingBtn');
+    if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Request';
+    }
 
-    document.getElementById('memberBookingForm').reset();
-    const md = document.getElementById('memberBookDate');
-    const mt = document.getElementById('memberBookTime');
-    setBookingDateMin(md);
-    updateBookingTimeMinForToday(md, mt);
+    // Setup initial bookingState
+    const now = new Date();
+    window.bookingState = {
+        trainerId: '',
+        trainerName: '',
+        month: now.getMonth(),
+        year: now.getFullYear(),
+        date: '', 
+        time: ''  
+    };
+
+    // Open Modal
     document.getElementById('memberBookingModal').style.display = 'flex';
+
+    // Auto-setup listeners exactly once
+    if (!window.bookingListenersInitialized) {
+        window.setupBookingModalListeners();
+        window.bookingListenersInitialized = true;
+    }
 }
 
-if (document.getElementById('memberBookingForm')) {
-    document.getElementById('memberBookingForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+window.renderBookingCalendar = () => {
+    const daysGrid = document.getElementById('calDaysGrid');
+    const monthTitle = document.getElementById('calMonthTitle');
+    if (!daysGrid || !monthTitle || !window.bookingState) return;
+
+    const { month, year, date: selectedDate } = window.bookingState;
+    
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    monthTitle.innerText = `${monthNames[month]} ${year}`;
+
+    daysGrid.innerHTML = '';
+
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < firstDayIndex; i++) {
+        const blank = document.createElement('div');
+        blank.className = 'cal-day-cell';
+        blank.style.pointerEvents = 'none';
+        daysGrid.appendChild(blank);
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'cal-day-cell';
+        cell.innerText = day;
+
+        const currentMonthString = String(month + 1).padStart(2, '0');
+        const currentDayString = String(day).padStart(2, '0');
+        const dateStr = `${year}-${currentMonthString}-${currentDayString}`;
+
+        const cellDate = new Date(year, month, day);
+        cellDate.setHours(0, 0, 0, 0);
+
+        if (cellDate < today) {
+            cell.disabled = true;
         }
-        const trainerSelect = document.getElementById('memberBookTrainer');
-        const trainerId = trainerSelect.value;
-        const dateEl = document.getElementById('memberBookDate');
-        const timeEl = document.getElementById('memberBookTime');
-        setBookingDateMin(dateEl);
-        updateBookingTimeMinForToday(dateEl, timeEl);
-        if (!dateEl.checkValidity()) { dateEl.reportValidity(); return; }
-        if (!timeEl.checkValidity()) { timeEl.reportValidity(); return; }
-        const bookDate = dateEl.value;
-        const bookTime = timeEl.value;
 
-        const trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
-        const memberId = localStorage.getItem("userId");
-        const memberName = localStorage.getItem("loggedInUser");
-
-        if (isBookingSessionInPast(bookDate, bookTime)) {
-            showToast("Choose a date and time in the future. Past sessions cannot be booked.", "error");
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
-            return;
+        if (dateStr === selectedDate) {
+            cell.classList.add('selected');
         }
 
-        // Conflict Detection
-        try {
+        const hasBooking = (window.bookingsData || []).some(b => {
+            return b.date === dateStr && 
+                   b.memberId === localStorage.getItem("userId") && 
+                   ["Confirmed", "Pending"].includes(b.status);
+        });
+        if (hasBooking) {
+            cell.classList.add('has-dot');
+        }
+
+        cell.addEventListener('click', () => {
+            window.bookingState.date = dateStr;
+            window.bookingState.time = ''; 
+            
+            const selectedCell = daysGrid.querySelector('.cal-day-cell.selected');
+            if (selectedCell) selectedCell.classList.remove('selected');
+            cell.classList.add('selected');
+
+            window.renderBookingTimeSlots(dateStr);
+            window.updateBookingSummary();
+        });
+
+        daysGrid.appendChild(cell);
+    }
+}
+
+window.renderBookingTimeSlots = (dateStr) => {
+    const slotsGrid = document.getElementById('timeSlotsGrid');
+    const selectedDateHeader = document.getElementById('selectedDateHeader');
+    if (!slotsGrid || !selectedDateHeader || !window.bookingState) return;
+
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const options = { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' };
+    selectedDateHeader.innerText = dateObj.toLocaleDateString('en-US', options);
+
+    slotsGrid.innerHTML = '';
+
+    const startHour = 8;
+    const endHour = 20;
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const bookings = window.bookingsData || [];
+    const trainerBookings = bookings.filter(b => b.date === dateStr && b.trainerId === window.bookingState.trainerId && ["Confirmed", "Pending"].includes(b.status));
+    const memberBookings = bookings.filter(b => b.date === dateStr && b.memberId === localStorage.getItem("userId") && ["Confirmed", "Pending"].includes(b.status));
+
+    for (let h = startHour; h <= endHour; h++) {
+        const timeStr = `${String(h).padStart(2, '0')}:00`;
+        const period = h >= 12 ? 'PM' : 'AM';
+        const displayHour = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+        const displayTime = `${displayHour}:00 ${period}`;
+
+        const slotBtn = document.createElement('button');
+        slotBtn.type = 'button';
+        slotBtn.className = 'time-slot-btn';
+        slotBtn.innerText = displayTime;
+
+        let disabled = false;
+        let reason = '';
+
+        if (dateStr === todayStr) {
+            const currentHour = today.getHours();
+            if (h <= currentHour) {
+                disabled = true;
+                reason = 'Past';
+            }
+        }
+
+        const slotMins = h * 60;
+        const hasTrainerConflict = trainerBookings.some(tb => {
+            const [tbH, tbM] = tb.time.split(':').map(Number);
+            const tbMins = tbH * 60 + tbM;
+            return Math.abs(slotMins - tbMins) < 60; 
+        });
+
+        if (hasTrainerConflict) {
+            disabled = true;
+            reason = 'Trainer Booked';
+        }
+
+        const hasMemberConflict = memberBookings.some(mb => {
+            const [mbH, mbM] = mb.time.split(':').map(Number);
+            const mbMins = mbH * 60 + mbM;
+            return Math.abs(slotMins - mbMins) < 60; 
+        });
+
+        if (hasMemberConflict) {
+            disabled = true;
+            reason = 'Conflict';
+        }
+
+        if (disabled) {
+            slotBtn.disabled = true;
+            slotBtn.innerText = `${displayTime} (${reason})`;
+        } else {
+            if (timeStr === window.bookingState.time) {
+                slotBtn.classList.add('selected');
+            }
+
+            slotBtn.addEventListener('click', () => {
+                window.bookingState.time = timeStr;
+
+                const selectedBtn = slotsGrid.querySelector('.time-slot-btn.selected');
+                if (selectedBtn) selectedBtn.classList.remove('selected');
+                slotBtn.classList.add('selected');
+
+                window.updateBookingSummary();
+            });
+        }
+
+        slotsGrid.appendChild(slotBtn);
+    }
+}
+
+window.updateBookingSummary = () => {
+    const summaryDateTime = document.getElementById('summaryDateTime');
+    const summaryTrainer = document.getElementById('summaryTrainer');
+    const memberCreditsDisplay = document.getElementById('memberCreditsDisplay');
+    const confirmBtn = document.getElementById('confirmBookingBtn');
+    if (!summaryDateTime || !summaryTrainer || !confirmBtn || !window.bookingState) return;
+
+    const { trainerId, trainerName, date, time } = window.bookingState;
+
+    if (trainerId) {
+        summaryTrainer.innerText = trainerName;
+    } else {
+        summaryTrainer.innerText = "Trainer Not Selected";
+    }
+
+    if (date && time) {
+        const [y, m, d] = date.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        const options = { month: 'short', day: 'numeric', year: 'numeric' };
+        const readableDate = dateObj.toLocaleDateString('en-US', options);
+
+        const [h, min] = time.split(':').map(Number);
+        const period = h >= 12 ? 'PM' : 'AM';
+        const displayHour = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+        const readableTime = `${displayHour}:00 ${period}`;
+
+        summaryDateTime.innerText = `${readableDate} at ${readableTime}`;
+    } else if (date) {
+        const [y, m, d] = date.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        summaryDateTime.innerText = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + " (Choose Time)";
+    } else {
+        summaryDateTime.innerText = "Choose Date & Time";
+    }
+
+    const sessionsRemaining = window.currentUserData?.sessionsRemaining !== undefined ? Number(window.currentUserData.sessionsRemaining) : 0;
+    const sessionsTotal = window.currentUserData?.sessionsTotal !== undefined ? Number(window.currentUserData.sessionsTotal) : 0;
+    
+    if (memberCreditsDisplay) {
+        memberCreditsDisplay.innerText = `${sessionsRemaining} of ${sessionsTotal} Remaining Sessions`;
+        if (sessionsRemaining <= 0) {
+            memberCreditsDisplay.style.color = '#ef4444';
+            memberCreditsDisplay.style.fontWeight = 'bold';
+        } else {
+            memberCreditsDisplay.style.color = '';
+            memberCreditsDisplay.style.fontWeight = '';
+        }
+    }
+
+    if (trainerId && date && time && sessionsRemaining > 0) {
+        confirmBtn.disabled = false;
+    } else {
+        confirmBtn.disabled = true;
+    }
+}
+
+window.setupBookingModalListeners = () => {
+    const trainerSelect = document.getElementById('memberBookTrainer');
+    const calPrevMonthBtn = document.getElementById('calPrevMonthBtn');
+    const calNextMonthBtn = document.getElementById('calNextMonthBtn');
+    const confirmBookingBtn = document.getElementById('confirmBookingBtn');
+
+    if (trainerSelect) {
+        trainerSelect.addEventListener('change', (e) => {
+            const trainerId = e.target.value;
+            const trainerName = e.target.options[e.target.selectedIndex].text;
+            window.bookingState.trainerId = trainerId;
+            window.bookingState.trainerName = trainerName;
+
+            window.bookingState.date = '';
+            window.bookingState.time = '';
+
+            const gridEl = document.getElementById('bookingDateTimeGrid');
+            const sidebarEl = document.getElementById('bookingDetailsSidebar');
+            if (gridEl) gridEl.style.display = 'grid';
+            if (sidebarEl) sidebarEl.style.display = 'flex';
+
+            window.renderBookingCalendar();
+            window.updateBookingSummary();
+        });
+    }
+
+    if (calPrevMonthBtn) {
+        calPrevMonthBtn.addEventListener('click', () => {
+            if (!window.bookingState) return;
+            window.bookingState.month--;
+            if (window.bookingState.month < 0) {
+                window.bookingState.month = 11;
+                window.bookingState.year--;
+            }
+            window.renderBookingCalendar();
+        });
+    }
+
+    if (calNextMonthBtn) {
+        calNextMonthBtn.addEventListener('click', () => {
+            if (!window.bookingState) return;
+            window.bookingState.month++;
+            if (window.bookingState.month > 11) {
+                window.bookingState.month = 0;
+                window.bookingState.year++;
+            }
+            window.renderBookingCalendar();
+        });
+    }
+
+    if (confirmBookingBtn) {
+        confirmBookingBtn.addEventListener('click', async () => {
+            if (!window.bookingState) return;
+            const { trainerId, trainerName, date: bookDate, time: bookTime } = window.bookingState;
+            const memberId = localStorage.getItem("userId");
+            const memberName = localStorage.getItem("loggedInUser");
+
+            if (!trainerId || !bookDate || !bookTime) {
+                showToast("Please choose trainer, date, and time before booking.", "error");
+                return;
+            }
+
+            confirmBookingBtn.disabled = true;
+            confirmBookingBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+
             const [bH, bM] = bookTime.split(':').map(Number);
             const bookMins = bH * 60 + bM;
 
-            // 1. Trainer Conflict Check
-            const q = query(bookingsCol, where("trainerId", "==", trainerId), where("date", "==", bookDate), where("status", "==", "Confirmed"));
-            const snap = await getDocs(q);
-            let conflict = false;
-            snap.forEach(doc => {
-                const timeStr = doc.data().time;
-                if (timeStr) {
-                    const [eH, eM] = timeStr.split(':').map(Number);
-                    if (Math.abs(bookMins - (eH * 60 + eM)) < 60) conflict = true;
-                }
-            });
-            if (conflict) {
-                showToast("Trainer already booked within 1 hour of this time.", "error");
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
-                return;
-            }
-
-            // 2. Member Conflict Check
-            const memberQ = query(bookingsCol, where("memberId", "==", memberId), where("date", "==", bookDate), where("status", "==", "Confirmed"));
-            const memberSnap = await getDocs(memberQ);
+            // 1. Conflict Detection Pre-queries
+            let trainerConflict = false;
             let memberConflict = false;
-            memberSnap.forEach(doc => {
-                const timeStr = doc.data().time;
-                if (timeStr) {
-                    const [eH, eM] = timeStr.split(':').map(Number);
-                    if (Math.abs(bookMins - (eH * 60 + eM)) < 60) memberConflict = true;
-                }
-            });
-            if (memberConflict) {
-                showToast("You are already booked for a confirmed session within 1 hour of this time.", "error");
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+
+            try {
+                const trainerQ = query(bookingsCol, where("trainerId", "==", trainerId), where("date", "==", bookDate), where("status", "in", ["Confirmed", "Pending"]));
+                const trainerSnap = await getDocs(trainerQ);
+                trainerSnap.forEach(docSnap => {
+                    const timeStr = docSnap.data().time;
+                    if (timeStr) {
+                        const [eH, eM] = timeStr.split(':').map(Number);
+                        if (Math.abs(bookMins - (eH * 60 + eM)) < 60) trainerConflict = true;
+                    }
+                });
+
+                const memberQ = query(bookingsCol, where("memberId", "==", memberId), where("date", "==", bookDate), where("status", "in", ["Confirmed", "Pending"]));
+                const memberSnap = await getDocs(memberQ);
+                memberSnap.forEach(docSnap => {
+                    const timeStr = docSnap.data().time;
+                    if (timeStr) {
+                        const [eH, eM] = timeStr.split(':').map(Number);
+                        if (Math.abs(bookMins - (eH * 60 + eM)) < 60) memberConflict = true;
+                    }
+                });
+            } catch (err) {
+                console.error("Conflict pre-queries failed:", err);
+                showToast("Failed to verify trainer and scheduling conflicts.", "error");
+                confirmBookingBtn.disabled = false;
+                confirmBookingBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Request';
                 return;
             }
-        } catch (e) { console.warn("Conflict check skipped", e); }
 
-        await addDoc(bookingsCol, {
-            memberId, memberName,
-            trainerId, trainerName,
-            date: bookDate, time: bookTime,
-            status: "Pending",
-            timestamp: new Date().getTime()
+            if (trainerConflict) {
+                showToast("Trainer was just booked by another member! Please choose another time.", "error");
+                confirmBookingBtn.disabled = false;
+                confirmBookingBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Request';
+                if (window.renderBookingTimeSlots) window.renderBookingTimeSlots(bookDate);
+                return;
+            }
+
+            if (memberConflict) {
+                showToast("You already have a booking at this time. You cannot book two trainers at the same hour.", "error");
+                confirmBookingBtn.disabled = false;
+                confirmBookingBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Request';
+                return;
+            }
+
+            // 2. Transaction Enforced Booking validation
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const memberRef = doc(db, "users", memberId);
+                    const memberSnap = await transaction.get(memberRef);
+                    if (!memberSnap.exists()) {
+                        throw new Error("Member record does not exist.");
+                    }
+                    const mData = memberSnap.data();
+
+                    // Expiration Check
+                    if (window.isMemberPlanExpired && window.isMemberPlanExpired(mData)) {
+                        throw new Error("Your membership has expired. Please renew to book sessions.");
+                    }
+
+                    // Credit Check
+                    const sessionsRemaining = mData.sessionsRemaining !== undefined ? Number(mData.sessionsRemaining) : 0;
+                    if (sessionsRemaining <= 0) {
+                        throw new Error("You have 0 session credits remaining. Please buy more credits at the desk.");
+                    }
+
+                    // Time-Tampering / Future Date check using server offset
+                    const offset = window.serverTimeOffsetMs || 0;
+                    const freshNow = new Date(Date.now() + offset);
+                    const bookDateTime = new Date(`${bookDate}T${bookTime}`);
+                    if (bookDateTime.getTime() < freshNow.getTime()) {
+                        throw new Error("Choose a date and time in the future. Past sessions cannot be booked.");
+                    }
+
+                    // Create the pending booking document atomically
+                    const newBookingRef = doc(collection(db, "bookings"));
+                    transaction.set(newBookingRef, {
+                        memberId,
+                        memberName,
+                        trainerId,
+                        trainerName,
+                        date: bookDate,
+                        time: bookTime,
+                        status: "Pending",
+                        timestamp: freshNow.getTime()
+                    });
+                });
+
+                window.closeModal('memberBookingModal');
+                showToast("Request sent successfully! Waiting for trainer approval.", "success");
+                if (window.logActivity) window.logActivity("Booking Created", `Requested a PT session on ${bookDate} at ${bookTime} with ${trainerName}.`);
+
+            } catch (err) {
+                console.error("Booking failed:", err);
+                showToast(err.message || "Failed to submit booking request.", "error");
+            } finally {
+                confirmBookingBtn.disabled = false;
+                confirmBookingBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Request';
+            }
         });
-
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
-        }
-        window.closeModal('memberBookingModal');
-        showToast("Request sent! Waiting for trainer approval.", "success");
-        if (window.logActivity) window.logActivity("Booking Created", `Member requested a training session.`);
-    });
+    }
 }
 
 window.openBookingModal = () => {
@@ -6214,21 +7448,24 @@ if (document.getElementById('bookingForm')) {
         const memberId = memberSelect.value, trainerId = trainerSelect.value, bookDate = dateEl.value, bookTime = timeEl.value;
         const memberName = memberSelect.options[memberSelect.selectedIndex].text, trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
 
-        if (isBookingSessionInPast(bookDate, bookTime)) {
-            showToast("Choose a date and time in the future. Past sessions cannot be booked.", "error");
+        // 1. Conflict Detection Pre-query (queries are not supported inside transactions)
+        const q = query(bookingsCol, where("trainerId", "==", trainerId), where("date", "==", bookDate), where("status", "in", ["Confirmed", "Pending"]));
+        let snap;
+        try {
+            snap = await getDocs(q);
+        } catch (err) {
+            console.error("Conflict pre-query failed:", err);
+            showToast("Failed to check schedule conflicts.", "error");
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
             return;
         }
 
-        // Conflict Detection
-        const q = query(bookingsCol, where("trainerId", "==", trainerId), where("date", "==", bookDate), where("status", "==", "Confirmed"));
-        const snap = await getDocs(q);
         let conflict = false;
         const [bH, bM] = bookTime.split(':').map(Number);
         const bookMins = bH * 60 + bM;
 
-        snap.forEach(doc => {
-            const timeStr = doc.data().time;
+        snap.forEach(docSnap => {
+            const timeStr = docSnap.data().time;
             if (timeStr) {
                 const [eH, eM] = timeStr.split(':').map(Number);
                 const existingMins = eH * 60 + eM;
@@ -6244,13 +7481,64 @@ if (document.getElementById('bookingForm')) {
             return;
         }
 
-        await addDoc(bookingsCol, { memberId, memberName, trainerId, trainerName, date: bookDate, time: bookTime, status: "Confirmed", timestamp: new Date().getTime() });
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
+        // 2. Transaction Enforced Booking validation
+        try {
+            await runTransaction(db, async (transaction) => {
+                const memberRef = doc(db, "users", memberId);
+                const memberSnap = await transaction.get(memberRef);
+                if (!memberSnap.exists()) {
+                    throw new Error("Member record does not exist.");
+                }
+                const mData = memberSnap.data();
+
+                // Expiration Check
+                if (window.isMemberPlanExpired && window.isMemberPlanExpired(mData)) {
+                    throw new Error(`Cannot book session: ${memberName}'s membership has expired.`);
+                }
+
+                // Credit Check
+                const sessionsRemaining = mData.sessionsRemaining !== undefined ? Number(mData.sessionsRemaining) : 0;
+                if (sessionsRemaining <= 0) {
+                    throw new Error(`Cannot book session: ${memberName} has 0 session credits remaining. Please purchase more credits.`);
+                }
+
+                // Time-Tampering / Future Date check using server offset
+                const offset = window.serverTimeOffsetMs || 0;
+                const freshNow = new Date(Date.now() + offset);
+                const bookDateTime = new Date(`${bookDate}T${bookTime}`);
+                if (bookDateTime.getTime() < freshNow.getTime()) {
+                    throw new Error("Choose a date and time in the future. Past sessions cannot be booked.");
+                }
+
+                // Create the booking document atomically
+                const newBookingRef = doc(collection(db, "bookings"));
+                transaction.set(newBookingRef, {
+                    memberId,
+                    memberName,
+                    trainerId,
+                    trainerName,
+                    date: bookDate,
+                    time: bookTime,
+                    status: "Confirmed",
+                    timestamp: freshNow.getTime()
+                });
+            });
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+            window.closeModal('bookingModal');
+            showToast("Personal Training Session booked successfully!", "success");
+            if (window.logActivity) window.logActivity("Booking Created", `Admin/Staff booked a training session.`);
+        } catch (err) {
+            console.error("Booking transaction failed:", err);
+            showToast(err.message || "Failed to book training session.", "error");
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
         }
-        window.closeModal('bookingModal'); showToast("Personal Training Session booked successfully!", "success");
-        if (window.logActivity) window.logActivity("Booking Created", `Admin/Staff booked a training session.`);
     });
 }
 
@@ -6312,11 +7600,38 @@ if (document.getElementById('editBookingForm')) {
 
 window.deleteBooking = async (id) => {
     showConfirm("Are you sure you want to delete this booking record?", async () => {
-        await deleteDoc(doc(db, "bookings", id));
-        showToast("Booking deleted.", "info");
-        if (window.logActivity) window.logActivity("Booking Deleted", `Deleted booking ID: ${id}.`);
+        try {
+            await deleteDoc(doc(db, "bookings", id));
+            showToast("Booking deleted.", "info");
+            if (window.logActivity) window.logActivity("Booking Deleted", `Deleted booking ID: ${id}.`);
+        } catch (error) {
+            console.error("Booking delete failed:", error);
+            showToast("Failed to delete booking.", "error");
+        }
     });
 }
+
+window.cancelMemberBooking = function (bookingId, memberId) {
+    showConfirm("Cancel this booking request? Your session credit will be refunded.", async () => {
+        try {
+            const bookingRef = doc(db, "bookings", bookingId);
+            const bookingSnap = await getDoc(bookingRef);
+            if (!bookingSnap.exists() || bookingSnap.data().status !== "Pending") {
+                showToast("This booking can no longer be cancelled.", "error");
+                return;
+            }
+            await updateDoc(bookingRef, { status: "Cancelled", cancelRemarks: "Cancelled by member." });
+            if (memberId) {
+                await updateDoc(doc(db, "users", memberId), { sessionsRemaining: increment(1) });
+            }
+            showToast("Booking cancelled and session credit restored.", "success");
+            if (window.logActivity) window.logActivity("Booking Cancelled", `Member cancelled booking ID: ${bookingId}.`);
+        } catch (err) {
+            console.error("Cancel booking failed:", err);
+            showToast("Failed to cancel booking.", "error");
+        }
+    });
+};
 
 // ==========================================
 // 15. SYSTEM ACTIVITY LOGS
@@ -6340,7 +7655,6 @@ onSnapshot(activityLogsCol, (snapshot) => {
 function renderActivityLogs() {
     const actTbody = document.querySelector('#activityTable tbody');
     if (!actTbody) return;
-    actTbody.innerHTML = "";
 
     const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
@@ -6416,17 +7730,14 @@ function renderActivityLogs() {
     window.renderPaginationControls('activityPagination', activityCurrentPage, totalPages, totalRecords, 'changeActivityPage');
 
     if (filtered.length === 0) {
-        const emptyRow = document.getElementById('activityEmptyState');
-        if (emptyRow) {
-            actTbody.innerHTML = `
-                <tr>
-                    <td colspan="5" style="text-align: center; padding: 60px 20px;">
-                        <i class="fa-solid fa-clock-rotate-left" style="font-size: 3rem; opacity: 0.15; margin-bottom: 15px; display: block;"></i>
-                        <p style="color: var(--text-muted); font-size: 14px; margin: 0;">No activity logs found for the selected filters.</p>
-                    </td>
-                </tr>
-            `;
-        }
+        actTbody.innerHTML = `
+            <tr id="activityEmptyState">
+                <td colspan="5" style="text-align: center; padding: 60px 20px;">
+                    <i class="fa-solid fa-clock-rotate-left" style="font-size: 3rem; opacity: 0.15; margin-bottom: 15px; display: block;"></i>
+                    <p style="color: var(--text-muted); font-size: 14px; margin: 0;">No activity logs found for the selected filters.</p>
+                </td>
+            </tr>
+        `;
         return;
     }
 
@@ -6460,8 +7771,7 @@ function renderActivityLogs() {
 
     const displayData = filtered.slice(startIdx, endIdx);
 
-    let html = '';
-    displayData.forEach(log => {
+    const renderLogRow = (log) => {
         const icon = actionIcons[log.action] || 'fa-circle-info';
         const roleBadge = log.role === 'Admin'
             ? '<span class="badge active" style="background: var(--primary-red);">Admin</span>'
@@ -6469,19 +7779,20 @@ function renderActivityLogs() {
                 ? '<span class="badge active" style="background: #2980b9;">Staff</span>'
                 : log.role === 'Trainer'
                     ? '<span class="badge active" style="background: #27ae60;">Trainer</span>'
-                    : `<span class="badge active" style="background: var(--dark-black);">${log.role || 'System'}</span>`;
+                    : `<span class="badge active" style="background: var(--dark-black);">${escapeHtml(log.role || 'System')}</span>`;
 
-        html += `
+        return `
             <tr>
-                <td style="white-space: nowrap;"><strong>${log.date}</strong><br><small style="color: var(--text-muted);">${log.time}</small></td>
-                <td>${log.userName || 'System'}</td>
+                <td style="white-space: nowrap;"><strong>${escapeHtml(log.date)}</strong><br><small style="color: var(--text-muted);">${escapeHtml(log.time)}</small></td>
+                <td>${escapeHtml(log.userName || 'System')}</td>
                 <td>${roleBadge}</td>
-                <td><span style="display: inline-flex; align-items: center; gap: 6px;"><i class="fa-solid ${icon}" style="font-size: 12px; color: var(--text-muted);"></i> <strong>${log.action}</strong></span></td>
-                <td style="font-size: 13px; color: var(--text-muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${log.details || '-'}</td>
+                <td><span style="display: inline-flex; align-items: center; gap: 6px;"><i class="fa-solid ${icon}" style="font-size: 12px; color: var(--text-muted);"></i> <strong>${escapeHtml(log.action)}</strong></span></td>
+                <td style="font-size: 13px; color: var(--text-muted); max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(log.details || '-')}</td>
             </tr>
         `;
-    });
-    actTbody.innerHTML = html;
+    };
+
+    window.syncDOM(actTbody, displayData, renderLogRow, 'act-row');
 }
 window.renderActivityLogs = renderActivityLogs;
 
@@ -6607,6 +7918,14 @@ if (document.getElementById('addCreditForm')) {
         const amount = Number(document.getElementById('addCreditAmount').value);
         const paymentMethod = document.getElementById('addCreditPaymentMethod').value;
         const note = document.getElementById('addCreditNote').value.trim();
+
+        // Validation (C-04 Fix)
+        if (!amount || amount <= 0) {
+            return showToast("Amount must be greater than ₱0.", "error");
+        }
+        if (amount > 100000) {
+            return showToast("Maximum top-up amount is ₱100,000.", "error");
+        }
 
         const member = membersData.find(m => m.id === memberId);
         if (!member) return;
@@ -6844,6 +8163,8 @@ window.openMemberProfile = async function (memberId) {
                 if (window.openChat) {
                     window.openChatTab('all', null, 'Internal Messages');
                     setTimeout(() => { window.openChat(fullName); }, 300);
+                } else {
+                    showToast("Chat is not available on this dashboard.", "info");
                 }
             };
         }

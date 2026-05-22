@@ -1027,6 +1027,8 @@
             <ul class="submenu">
                 <li class="nav-item sub-item nav-clickable" onclick="switchTab('membershipPlans', this)"><span
                         class="menu-text">Plans & Pricing</span></li>
+                <li class="nav-item sub-item nav-clickable" onclick="switchTab('programs', this)"><span
+                        class="menu-text">Programs</span></li>
                 <li class="nav-item sub-item nav-clickable" onclick="switchTab('lockers', this)"><span
                         class="menu-text">Locker Management</span></li>
             </ul>
@@ -1528,6 +1530,9 @@
                                 <i class="fa-solid fa-mobile-screen-button"></i>
                                 <span>GCash</span>
                             </button>
+                        </div>
+                        <div class="gcash-ref-wrapper" id="posGcashRefWrapper">
+                            <input type="text" id="posGcashRefId" placeholder="GCash Reference ID (e.g. 1234 5678 9012)" autocomplete="off">
                         </div>
                     </div>
                     <button class="process-payment-btn" onclick="processPayment()">
@@ -2191,21 +2196,21 @@
             <div class="bk-drawer-body">
                 <form id="bookingForm" class="bk-drawer-form">
                     <div class="bk-form-group">
-                        <label for="bookMember" class="bk-form-label">Member</label>
+                        <label for="bookMember" class="bk-form-label">Member <span class="required-asterisk">*</span></label>
                         <select id="bookMember" required></select>
                     </div>
                     <div class="bk-form-group">
-                        <label for="bookTrainer" class="bk-form-label">Trainer</label>
+                        <label for="bookTrainer" class="bk-form-label">Trainer <span class="required-asterisk">*</span></label>
                         <select id="bookTrainer" required></select>
                     </div>
                     <div class="bk-form-row">
                         <div class="bk-form-group" style="flex: 1;">
-                            <label for="bookDate" class="bk-form-label">Date</label>
+                            <label for="bookDate" class="bk-form-label">Date <span class="required-asterisk">*</span></label>
                             <input type="date" id="bookDate" required>
                         </div>
                         <div class="bk-form-group" style="flex: 1;">
-                            <label for="bookTime" class="bk-form-label">Time</label>
-                            <input type="time" id="bookTime" required>
+                            <label for="bookTime" class="bk-form-label">Time <span class="required-asterisk">*</span></label>
+                            <input type="time" id="bookTime" required step="3600">
                         </div>
                     </div>
                     <button type="submit" class="bk-drawer-submit">
@@ -2427,6 +2432,24 @@
 
             <div id="plansTableBody" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Dynamic Plans will be rendered here by renderMembershipPlans() -->
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════ -->
+        <!-- PROGRAMS SECTION                          -->
+        <!-- ═══════════════════════════════════════════ -->
+        <div id="programs" class="content-section bg-slate-50" style="padding: 32px;">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i class="fa-solid fa-dumbbell mr-2 text-slate-400"></i>Workout Programs</h2>
+                    <p class="text-sm text-slate-500 mt-1">Create and manage fitness programs that members can enroll in.</p>
+                </div>
+                <button class="bg-[#991b1b] hover:bg-red-800 text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-2" onclick="openAddProgramModal()">
+                    <i class="fas fa-plus"></i> Add Program
+                </button>
+            </div>
+            <div id="programsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                <!-- Rendered by JS -->
             </div>
         </div>
 
@@ -3361,12 +3384,15 @@
     <div id="pdf-report-container">
         <div id="weekly-sales-report">
             <div class="report-header-premium">
-                <div class="brand-info">
-                    <h1>XFIT TRACK</h1>
-                    <p>Financial Management Systems</p>
+                <div class="brand-info" style="display:flex;align-items:center;gap:14px;">
+                    <img src="images/icon-192.png" alt="XFit Track Logo" style="width:56px;height:56px;border-radius:10px;">
+                    <div>
+                        <h1 style="margin:0;">XFIT TRACK</h1>
+                        <p style="margin:2px 0 0;">Financial Management Systems</p>
+                    </div>
                 </div>
                 <div class="report-title">
-                    <h2>Weekly Financial Summary</h2>
+                    <h2>Weekly Financial Report</h2>
                     <p>Period: <strong id="pdfWeekOf">--/--/-- to --/--/--</strong></p>
                 </div>
             </div>
@@ -3397,26 +3423,6 @@
                     </tr>
                 </thead>
                 <tbody id="pdfRevenueSourcesBody">
-                    <!-- Populated by JS -->
-                </tbody>
-            </table>
-
-            <div class="report-section-title">Weekly Item Consumption</div>
-            <table class="report-table">
-                <thead>
-                    <tr>
-                        <th>Item Name</th>
-                        <th style="text-align: center;">M</th>
-                        <th style="text-align: center;">T</th>
-                        <th style="text-align: center;">W</th>
-                        <th style="text-align: center;">T</th>
-                        <th style="text-align: center;">F</th>
-                        <th style="text-align: center;">S</th>
-                        <th style="text-align: center;">S</th>
-                        <th style="text-align: right;">Qty</th>
-                    </tr>
-                </thead>
-                <tbody id="pdfSalesBody">
                     <!-- Populated by JS -->
                 </tbody>
             </table>
@@ -3630,6 +3636,10 @@
                         </select>
                     </div>
 
+                    <div class="gcash-ref-wrapper" id="addCreditGcashRefWrapper">
+                        <input type="text" id="addCreditGcashRefId" placeholder="GCash Reference ID (e.g. 1234 5678 9012)" autocomplete="off">
+                    </div>
+
                     <div class="form-group">
                         <label>Note (Optional)</label>
                         <input type="text" id="addCreditNote" placeholder="e.g. Counter top-up">
@@ -3755,6 +3765,54 @@
                     Done
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- ADD / EDIT PROGRAM MODAL                   -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div id="programModal" class="modal">
+        <div class="modal-content" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 id="programModalTitle"><i class="fa-solid fa-dumbbell"></i> Add Program</h3>
+                <span class="close-btn" onclick="closeModal('programModal')">&times;</span>
+            </div>
+            <form id="programForm" onsubmit="submitProgramForm(event)">
+                <input type="hidden" id="programId">
+                <div class="form-group">
+                    <label class="form-label">Program Name <span class="required-asterisk">*</span></label>
+                    <input type="text" id="programName" placeholder="e.g. 12-Week Fat Loss" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category <span class="required-asterisk">*</span></label>
+                    <select id="programCategory" required>
+                        <option value="" disabled selected>Select category...</option>
+                        <option>Weight Loss</option>
+                        <option>Muscle Gain</option>
+                        <option>Endurance</option>
+                        <option>Flexibility & Mobility</option>
+                        <option>General Fitness</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Duration (hrs/day) <span class="required-asterisk">*</span></label>
+                        <input type="number" id="programDuration" placeholder="1" min="1" max="8" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Days per Week <span class="required-asterisk">*</span></label>
+                        <input type="number" id="programDaysPerWeek" placeholder="3" min="1" max="7" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea id="programDescription" rows="3" placeholder="Brief description of this program..." style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:6px;font-family:inherit;font-size:14px;resize:vertical;background:rgba(255,255,255,0.5);color:var(--text-primary);"></textarea>
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="btn-cancel" onclick="closeModal('programModal')">Cancel</button>
+                    <button type="submit" class="btn-submit" id="programSubmitBtn">Save Program</button>
+                </div>
+            </form>
         </div>
     </div>
 

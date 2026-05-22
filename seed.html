@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>XFitTrack — Seed Dummy Data</title>
+    <style>
+        body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 20px; }
+        h1 { color: #991b1b; }
+        button { background: #991b1b; color: white; border: none; padding: 14px 28px; border-radius: 8px; font-size: 16px; cursor: pointer; margin-right: 10px; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #log { margin-top: 20px; background: #111; color: #0f0; padding: 16px; border-radius: 8px; font-size: 13px; height: 400px; overflow-y: auto; white-space: pre-wrap; }
+        .warn { color: #fbbf24; }
+        .err  { color: #f87171; }
+    </style>
+</head>
+<body>
+<h1>XFitTrack — Seed Dummy Data</h1>
+<p>This will add: <strong>1 Admin, 3 Staff, 5 Trainers, 5 Members</strong> with realistic Filipino names and sample plans/bookings.<br>
+   Safe to run multiple times — checks for existing emails before inserting.</p>
+<button id="seedBtn" onclick="runSeed()">Seed All Data</button>
+<button onclick="document.getElementById('log').textContent=''">Clear Log</button>
+<div id="log"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, query, where, setDoc, doc, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
+    authDomain: "fit-track-ca8d1.firebaseapp.com",
+    projectId: "fit-track-ca8d1",
+    storageBucket: "fit-track-ca8d1.firebasestorage.app",
+    messagingSenderId: "157593985795",
+    appId: "1:157593985795:web:c66490e91f0bd44e0f53eb",
+    measurementId: "G-NYGGEMMJMC"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const usersCol = collection(db, "users");
+const bookingsCol = collection(db, "bookings");
+const membershipPlansCol = collection(db, "membershipPlans");
+
+const log = document.getElementById('log');
+function print(msg, cls) {
+    const line = document.createElement('div');
+    if (cls) line.className = cls;
+    line.textContent = msg;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+}
+
+async function emailExists(email) {
+    const q = query(usersCol, where("email", "==", email));
+    const snap = await getDocs(q);
+    return !snap.empty;
+}
+
+function uid(role) {
+    return role.toUpperCase().slice(0, 3) + '-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+}
+
+const NOW = Date.now();
+const DAY = 86400000;
+
+const plans = [
+    { name: "Silver", price: 1200, duration: 30, status: "Active", description: "Monthly access, basic amenities", features: ["Gym floor access", "Locker use", "Group classes"] },
+    { name: "Gold", price: 2500, duration: 30, status: "Active", description: "Premium monthly with trainer sessions", features: ["Gym floor access", "5 PT sessions", "Locker use", "Group classes"] },
+    { name: "Annual", price: 12000, duration: 365, status: "Active", description: "Full-year access, best value", features: ["All Gold benefits", "12 months access", "Priority booking"] }
+];
+
+const users = [
+    // Admin
+    { name: "Maria Santos", givenName: "Maria", familyName: "Santos", email: "admin@xfittrack.com", password: "Test1234!", role: "admin", status: "Active" },
+    // Staff
+    { name: "Juan dela Cruz", givenName: "Juan", familyName: "dela Cruz", email: "staff1@xfittrack.com", password: "Test1234!", role: "staff", status: "Active" },
+    { name: "Ana Reyes", givenName: "Ana", familyName: "Reyes", email: "staff2@xfittrack.com", password: "Test1234!", role: "staff", status: "Active" },
+    { name: "Carlo Bautista", givenName: "Carlo", familyName: "Bautista", email: "staff3@xfittrack.com", password: "Test1234!", role: "staff", status: "Active" },
+    // Trainers
+    { name: "Miguel Torres", givenName: "Miguel", familyName: "Torres", email: "trainer1@xfittrack.com", password: "Test1234!", role: "trainer", status: "Active", specialization: "Strength & Conditioning", onFloor: false },
+    { name: "Jasmine Lim", givenName: "Jasmine", familyName: "Lim", email: "trainer2@xfittrack.com", password: "Test1234!", role: "trainer", status: "Active", specialization: "Weight Loss", onFloor: false },
+    { name: "Rico Mendoza", givenName: "Rico", familyName: "Mendoza", email: "trainer3@xfittrack.com", password: "Test1234!", role: "trainer", status: "Active", specialization: "Functional Fitness", onFloor: false },
+    { name: "Christine Ocampo", givenName: "Christine", familyName: "Ocampo", email: "trainer4@xfittrack.com", password: "Test1234!", role: "trainer", status: "Active", specialization: "Cardio & Endurance", onFloor: false },
+    { name: "Dante Villanueva", givenName: "Dante", familyName: "Villanueva", email: "trainer5@xfittrack.com", password: "Test1234!", role: "trainer", status: "Active", specialization: "Yoga & Flexibility", onFloor: false },
+    // Members
+    { name: "Rosa Garcia", givenName: "Rosa", familyName: "Garcia", email: "member1@xfittrack.com", password: "Test1234!", role: "member", status: "Active", plan: "Gold", sessionsTotal: 5, sessionsRemaining: 3, dateRegistered: NOW - 10 * DAY },
+    { name: "Paolo Fernandez", givenName: "Paolo", familyName: "Fernandez", email: "member2@xfittrack.com", password: "Test1234!", role: "member", status: "Active", plan: "Silver", sessionsTotal: 0, sessionsRemaining: 0, dateRegistered: NOW - 5 * DAY },
+    { name: "Lena Cruz", givenName: "Lena", familyName: "Cruz", email: "member3@xfittrack.com", password: "Test1234!", role: "member", status: "Active", plan: "Annual", sessionsTotal: 12, sessionsRemaining: 10, dateRegistered: NOW - 2 * DAY },
+    { name: "Ben Aquino", givenName: "Ben", familyName: "Aquino", email: "member4@xfittrack.com", password: "Test1234!", role: "member", status: "Active", plan: "Gold", sessionsTotal: 5, sessionsRemaining: 5, dateRegistered: NOW - 25 * DAY },
+    { name: "Claire Ramos", givenName: "Claire", familyName: "Ramos", email: "member5@xfittrack.com", password: "Test1234!", role: "member", status: "Active", plan: "Silver", sessionsTotal: 0, sessionsRemaining: 0, dateRegistered: NOW - 28 * DAY }
+];
+
+async function seedPlans() {
+    print("— Seeding membership plans...");
+    const snap = await getDocs(membershipPlansCol);
+    if (!snap.empty) { print("  Plans already exist, skipping.", "warn"); return; }
+    for (const plan of plans) {
+        await addDoc(membershipPlansCol, plan);
+        print(`  ✓ Plan: ${plan.name}`);
+    }
+}
+
+async function seedUsers() {
+    print("— Seeding users...");
+    const created = {};
+    for (const user of users) {
+        const exists = await emailExists(user.email);
+        if (exists) { print(`  Skipping existing: ${user.email}`, "warn"); continue; }
+        const docData = { ...user, uid: uid(user.role), photoURL: "", emergencyContact: "", fitnessGoals: "" };
+        const ref = await addDoc(usersCol, docData);
+        created[user.email] = { id: ref.id, ...docData };
+        print(`  ✓ ${user.role.padEnd(8)} ${user.name} <${user.email}>`);
+    }
+    return created;
+}
+
+async function seedBookings(createdUsers) {
+    print("— Seeding sample bookings...");
+    const allUsers = await getDocs(usersCol);
+    const userMap = {};
+    allUsers.forEach(d => { userMap[d.data().email] = { id: d.id, ...d.data() }; });
+
+    const member1 = userMap["member1@xfittrack.com"];
+    const member2 = userMap["member2@xfittrack.com"];
+    const trainer1 = userMap["trainer1@xfittrack.com"];
+    const trainer2 = userMap["trainer2@xfittrack.com"];
+
+    if (!member1 || !trainer1) { print("  Members/trainers not found, skipping bookings.", "warn"); return; }
+
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const bookings = [
+        { memberId: member1.id, memberName: member1.name, trainerId: trainer1.id, trainerName: trainer1.name, date: tomorrowStr, time: "09:00", status: "Confirmed" },
+        { memberId: member1.id, memberName: member1.name, trainerId: trainer2 ? trainer2.id : trainer1.id, trainerName: trainer2 ? trainer2.name : trainer1.name, date: tomorrowStr, time: "14:00", status: "Pending" },
+        { memberId: member2 ? member2.id : member1.id, memberName: member2 ? member2.name : member1.name, trainerId: trainer1.id, trainerName: trainer1.name, date: yesterdayStr, time: "10:00", status: "Completed" },
+    ];
+
+    for (const b of bookings) {
+        await addDoc(bookingsCol, { ...b, timestamp: NOW });
+        print(`  ✓ Booking: ${b.memberName} → ${b.trainerName} on ${b.date} ${b.time} [${b.status}]`);
+    }
+}
+
+window.runSeed = async function () {
+    const btn = document.getElementById('seedBtn');
+    btn.disabled = true;
+    btn.textContent = 'Seeding...';
+    log.textContent = '';
+    print("XFitTrack Dummy Data Seeder");
+    print("================================");
+    try {
+        await seedPlans();
+        const created = await seedUsers();
+        await seedBookings(created);
+        print("================================");
+        print("✅ Seeding complete! All accounts use password: Test1234!");
+        print("Login via index.html?bypass=admin (or staff/trainer/member)");
+    } catch (err) {
+        print("ERROR: " + err.message, "err");
+        console.error(err);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Seed All Data';
+    }
+};
+</script>
+</body>
+</html>

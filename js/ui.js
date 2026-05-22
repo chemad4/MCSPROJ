@@ -82,6 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <input type="text" id="userProfileEmergency" placeholder="e.g. 09123456789" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                     <div class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Current Password (Required to change password)</label>
+                        <input type="password" id="userProfileCurrentPassword" placeholder="********" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" style="font-size: 12px; font-weight: 600;">New Password (Leave blank to keep current)</label>
                         <input type="password" id="userProfilePassword" placeholder="********" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
@@ -117,11 +121,21 @@ window.showToast = function(message, type = 'info') {
     if (type === 'success') iconClass = 'fa-check-circle';
     if (type === 'error') iconClass = 'fa-exclamation-circle';
 
-    toast.innerHTML = `
-        <i class="fas ${iconClass} toast-icon"></i>
-        <span>${message}</span>
-        <button class="toast-close" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
-    `;
+    // Build toast safely — icon via innerHTML, message via textContent (M-03 XSS Fix)
+    const iconEl = document.createElement('i');
+    iconEl.className = `fas ${iconClass} toast-icon`;
+
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = message;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.onclick = () => toast.remove();
+
+    toast.appendChild(iconEl);
+    toast.appendChild(msgSpan);
+    toast.appendChild(closeBtn);
 
     container.appendChild(toast);
     
@@ -143,6 +157,7 @@ window.showConfirm = function(message, onConfirm) {
     if (!modal) return;
 
     document.getElementById('customConfirmMessage').innerText = message;
+    document.getElementById('customConfirmMessage').style.whiteSpace = 'pre-line';
     
     const cancelBtn = document.getElementById('customConfirmCancel');
     const okBtn = document.getElementById('customConfirmOk');
@@ -155,9 +170,23 @@ window.showConfirm = function(message, onConfirm) {
 
     cancelBtn.onclick = closeModal;
     
-    okBtn.onclick = () => {
-        closeModal();
-        if (typeof onConfirm === 'function') onConfirm();
+    okBtn.onclick = async () => {
+        const originalText = okBtn.innerHTML;
+        okBtn.disabled = true;
+        cancelBtn.disabled = true;
+        okBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        try {
+            if (typeof onConfirm === 'function') {
+                await onConfirm();
+            }
+        } catch (error) {
+            console.error("Confirmation action failed:", error);
+        } finally {
+            okBtn.disabled = false;
+            cancelBtn.disabled = false;
+            okBtn.innerHTML = originalText;
+            closeModal();
+        }
     };
 
     modal.style.display = 'flex';
@@ -186,15 +215,29 @@ window.showPrompt = function({ title, message, placeholder, onConfirm }) {
 
     cancelBtn.onclick = closeModal;
     
-    okBtn.onclick = () => {
+    okBtn.onclick = async () => {
         const val = input.value.trim();
         if (!val) {
             input.style.borderColor = 'var(--primary-red)';
             setTimeout(() => input.style.borderColor = '', 2000);
             return;
         }
-        closeModal();
-        if (typeof onConfirm === 'function') onConfirm(val);
+        const originalText = okBtn.innerHTML;
+        okBtn.disabled = true;
+        cancelBtn.disabled = true;
+        okBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        try {
+            if (typeof onConfirm === 'function') {
+                await onConfirm(val);
+            }
+        } catch (error) {
+            console.error("Prompt action failed:", error);
+        } finally {
+            okBtn.disabled = false;
+            cancelBtn.disabled = false;
+            okBtn.innerHTML = originalText;
+            closeModal();
+        }
     };
 
     modal.style.display = 'flex';

@@ -2735,6 +2735,26 @@ body.dark-theme .table-footer {
     color: #92400E;
 }
 
+/* Status: Expired Lease */
+.locker-card.expired {
+    border-left: 3px solid #EF4444;
+    background-color: rgba(254, 242, 242, 0.6);
+    animation: lockerPulse 2s infinite alternate;
+}
+.locker-card.expired .locker-icon {
+    background: rgba(239, 68, 68, 0.12);
+    color: #991B1B;
+}
+.locker-card.expired .locker-status-text {
+    color: #991B1B;
+    font-weight: 700;
+}
+
+@keyframes lockerPulse {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
+    100% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.4); }
+}
+
 
 
 .locker-number {
@@ -3106,15 +3126,13 @@ body.dark-theme .grid-stat-box p {
 }
 
 .bk-status-dropdown {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
+    position: fixed;
     background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     min-width: 150px;
-    z-index: 100;
+    z-index: 9999;
     display: none;
     padding: 4px;
     animation: bkDropIn 0.15s ease-out;
@@ -3711,6 +3729,19 @@ body.dark-theme .locker-card.available .locker-status-text {
 body.dark-theme .locker-card.occupied .locker-status-text {
     color: #FCD34D;
     background: rgba(245, 158, 11, 0.1);
+}
+
+body.dark-theme .locker-card.expired {
+    background-color: rgba(239, 68, 68, 0.08);
+    border-color: #B91C1C;
+}
+body.dark-theme .locker-card.expired .locker-icon {
+    background: rgba(239, 68, 68, 0.15);
+    color: #FCA5A5;
+}
+body.dark-theme .locker-card.expired .locker-status-text {
+    color: #FCA5A5;
+    background: rgba(239, 68, 68, 0.1);
 }
 
 
@@ -4808,7 +4839,6 @@ body.dark-theme .reg-receipt-container {
     background: rgba(255, 255, 255, 0.02);
 }
 
-/* --- Visual Validation Indicators --- */
 .required-asterisk {
     color: var(--primary-red);
     margin-left: 2px;
@@ -4822,4 +4852,101 @@ body.dark-theme .reg-receipt-container {
     text-transform: none;
     letter-spacing: 0;
     opacity: 0.85;
+}
+
+/* --- Dynamic UI Form Validations Styling (QA-UX-06) --- */
+.modal-form input.ui-invalid,
+.modal-form select.ui-invalid {
+    border-color: #EF4444 !important;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+    background-color: rgba(254, 242, 242, 0.5) !important;
+}
+
+.modal-form input.ui-valid,
+.modal-form select.ui-valid {
+    border-color: #10B981 !important;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+    background-color: rgba(240, 253, 250, 0.5) !important;
+}
+
+.form-validation-msg {
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: -12px;
+    margin-bottom: 12px;
+    display: none;
+    transition: all 0.2s ease;
+}
+
+.form-validation-msg.ui-invalid {
+    color: #EF4444;
+    display: block;
+}
+
+.form-validation-msg.ui-valid {
+    color: #10B981;
+    display: block;
+}
+
+/* --- Premium Locker Alert Badges and Pulses --- */
+.locker-card {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.locker-card.alert-pulse-red {
+    border: 2px solid #ef4444 !important;
+    animation: lockerRedPulse 2s infinite alternate;
+}
+
+.locker-card.alert-pulse-orange {
+    border: 2px solid #f97316 !important;
+    animation: lockerOrangePulse 2s infinite alternate;
+}
+
+@keyframes lockerRedPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    100% {
+        box-shadow: 0 0 12px 4px rgba(239, 68, 68, 0.2);
+    }
+}
+
+@keyframes lockerOrangePulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4);
+    }
+    100% {
+        box-shadow: 0 0 12px 4px rgba(249, 115, 22, 0.2);
+    }
+}
+
+.locker-alert-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #ffffff;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.locker-alert-badge.archived {
+    background-color: #ef4444;
+}
+
+.locker-alert-badge.expired {
+    background-color: #f97316;
+}
+
+.locker-alert-badge.deleted {
+    background-color: #6b7280;
 }

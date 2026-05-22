@@ -184,7 +184,85 @@
         <button id="installAppBtn">
             <i class="fa-solid fa-download"></i> Install Fit Track App
         </button>
+
+        <!-- Developer & QA Test Console -->
+        <div id="devTestConsole" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255, 255, 255, 0.2); text-align: center;">
+            <p style="color: #FFB300; font-size: 13px; font-weight: 600; margin: 0 0 10px 0;">
+                <i class="fas fa-terminal"></i> Dev/QA Quick Auto-Login
+            </p>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                <button type="button" onclick="window.location.replace('index.html?bypass=admin')" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">Admin</button>
+                <button type="button" onclick="window.location.replace('index.html?bypass=staff')" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">Staff</button>
+                <button type="button" onclick="window.location.replace('index.html?bypass=trainer')" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">Trainer</button>
+                <button type="button" onclick="window.location.replace('index.html?bypass=member')" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">Member</button>
+            </div>
+        </div>
     </div>
+
+    <script>
+        // DEVELOPER & QA TEST BYPASS HOOK
+        // Allows testing tools (like Puppeteer, Playwright, or AI agents) to bypass the login screen and test dashboards instantly
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const bypassRole = urlParams.get('bypass');
+            if (bypassRole) {
+                const roleLower = bypassRole.toLowerCase();
+                let role = "";
+                let redirectPage = "";
+                let userId = "test-user-id";
+                let name = "Test User";
+
+                if (roleLower === 'admin') {
+                    role = 'Admin';
+                    name = 'Test Admin';
+                    redirectPage = 'adminDB.html';
+                    userId = 'test-admin-id';
+                } else if (roleLower === 'staff') {
+                    role = 'Staff';
+                    name = 'Test Staff';
+                    redirectPage = 'staffDB.html';
+                    userId = 'test-staff-id';
+                } else if (roleLower === 'trainer') {
+                    role = 'Trainer';
+                    name = 'Test Trainer';
+                    redirectPage = 'trainerDB.html';
+                    userId = 'test-trainer-id';
+                } else if (roleLower === 'member') {
+                    role = 'Member';
+                    name = 'Test Member';
+                    redirectPage = 'memberDB.html';
+                    userId = 'test-member-id';
+                }
+
+                if (role && redirectPage) {
+                    console.log(`Bypassing login for testing role: ${role}`);
+                    localStorage.setItem("userId", userId);
+                    localStorage.setItem("loggedInUser", name);
+                    localStorage.setItem("userRole", role);
+                    localStorage.setItem("sessionId", "test-session-" + Math.random().toString(36).substring(2, 10));
+                    if (role === 'Admin' || role === 'Staff' || role === 'Trainer') {
+                        localStorage.setItem("shiftStart", Date.now());
+                        if (role === 'Trainer') {
+                            localStorage.setItem("trainerShiftStatus", "On Floor");
+                        }
+                    }
+                    window.location.replace(redirectPage);
+                }
+            }
+
+            // Check if we are running in local dev / test environment
+            window.addEventListener('DOMContentLoaded', () => {
+                const isLocal = window.location.hostname === 'localhost' || 
+                                window.location.hostname === '127.0.0.1' || 
+                                window.location.protocol === 'file:' || 
+                                new URLSearchParams(window.location.search).has('dev');
+                if (isLocal) {
+                    const devConsole = document.getElementById('devTestConsole');
+                    if (devConsole) devConsole.style.display = 'block';
+                }
+            });
+        })();
+    </script>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -216,8 +294,18 @@
             if (currentTime - lastKeyTime > 50) rfidBuffer = ""; 
 
             if (e.key === 'Enter' && rfidBuffer.length > 5) {
-                e.preventDefault();
                 const activeEl = document.activeElement;
+                const isTextInput = activeEl && (
+                    activeEl.tagName === 'INPUT' || 
+                    activeEl.tagName === 'TEXTAREA' || 
+                    activeEl.isContentEditable
+                );
+                if (isTextInput) {
+                    rfidBuffer = "";
+                    return;
+                }
+
+                e.preventDefault();
                 if (activeEl && activeEl.tagName === 'INPUT') {
                     let currentVal = activeEl.value;
                     if (currentVal.endsWith(rfidBuffer)) activeEl.value = currentVal.slice(0, -rfidBuffer.length);
@@ -241,9 +329,29 @@
 
         document.getElementById('forgotPasswordBtn').addEventListener('click', (e) => {
             e.preventDefault();
-            const email = prompt("Enter your email address to reset your password:");
-            if (!email) return;
-            resetPasswordFlow(email.trim());
+            showPrompt({
+                title: 'Reset Password',
+                message: 'Enter your email address to receive a new password:',
+                placeholder: 'your.email@example.com',
+                onConfirm: (email) => {
+                    const trimmedEmail = email.trim();
+                    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+                        return showToast('Please enter a valid email address.', 'error');
+                    }
+                    resetPasswordFlow(trimmedEmail);
+                }
+            });
+        });
+
+        // L-08 Fix: Clear error message when user starts typing
+        ['loginEmail', 'loginPassword'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', () => {
+                    const errorMsg = document.getElementById('errorMsg');
+                    if (errorMsg) errorMsg.style.display = 'none';
+                });
+            }
         });
 
         async function resetPasswordFlow(email) {
@@ -273,6 +381,20 @@
         async function authenticateUser(dbQuery) {
             const errorMsg = document.getElementById('errorMsg');
             const submitBtn = document.getElementById('loginSubmitBtn');
+            const emailInput = document.getElementById('loginEmail');
+            const email = emailInput ? emailInput.value.trim().toLowerCase() : 'unknown';
+
+            // Check global lockout
+            const lockoutUntil = Number(localStorage.getItem("loginLockoutUntil") || 0);
+            if (Date.now() < lockoutUntil) {
+                const secondsLeft = Math.ceil((lockoutUntil - Date.now()) / 1000);
+                errorMsg.innerText = `Too many failed login attempts. Please try again in ${secondsLeft} seconds.`;
+                errorMsg.style.display = "block";
+                submitBtn.innerText = "Log In";
+                submitBtn.disabled = false;
+                return;
+            }
+
             submitBtn.innerText = "Authenticating...";
             submitBtn.disabled = true;
             errorMsg.style.display = "none";
@@ -280,13 +402,45 @@
             try {
                 const querySnapshot = await getDocs(dbQuery);
                 if (querySnapshot.empty) {
-                    errorMsg.innerText = "Invalid credentials or unrecognized ID Card.";
+                    // Record failed attempt
+                    let failedCount = Number(localStorage.getItem("loginFailedAttempts") || 0) + 1;
+                    localStorage.setItem("loginFailedAttempts", failedCount);
+
+                    if (failedCount >= 5) {
+                        const lockTime = Date.now() + 30000; // 30 seconds lockout
+                        localStorage.setItem("loginLockoutUntil", lockTime);
+                        localStorage.setItem("loginFailedAttempts", 0);
+                        errorMsg.innerText = "Too many failed attempts. Access temporarily locked for 30 seconds.";
+                    } else {
+                        errorMsg.innerText = `Invalid credentials or unrecognized ID Card. (${5 - failedCount} attempts remaining)`;
+                    }
+
                     errorMsg.style.display = "block";
                     submitBtn.innerText = "Log In";
                     submitBtn.disabled = false;
+
+                    // Log failed attempt to activityLogs
+                    try {
+                        const now = new Date();
+                        await addDoc(collection(db, "activityLogs"), {
+                            userId: "system-auth",
+                            userName: email || "RFID Visitor",
+                            role: "Visitor",
+                            action: "Failed Login",
+                            details: `Failed login attempt for ${email || 'RFID Scanner'}.`,
+                            date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                            time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                            timestamp: now.getTime()
+                        });
+                    } catch(e) { console.error("Failed login log failed:", e); }
+
                     return;
                 } 
                 
+                // Reset failed attempts upon successful login
+                localStorage.removeItem("loginFailedAttempts");
+                localStorage.removeItem("loginLockoutUntil");
+
                 const userDoc = querySnapshot.docs[0];
                 const userData = userDoc.data();
                 const userId = userDoc.id;

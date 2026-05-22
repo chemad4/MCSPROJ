@@ -64,9 +64,18 @@ window.toggleBkStatusDropdown = function (e, bookingId) {
     e.stopPropagation();
     const wrapper = e.currentTarget.closest('.bk-status-wrapper');
     const wasOpen = wrapper.classList.contains('open');
-    // Close all
     document.querySelectorAll('.bk-status-wrapper.open').forEach(w => w.classList.remove('open'));
-    if (!wasOpen) wrapper.classList.add('open');
+    if (!wasOpen) {
+        wrapper.classList.add('open');
+        // Position the fixed dropdown below the trigger button
+        const trigger = e.currentTarget;
+        const rect = trigger.getBoundingClientRect();
+        const dropdown = wrapper.querySelector('.bk-status-dropdown');
+        if (dropdown) {
+            dropdown.style.top = (rect.bottom + 4) + 'px';
+            dropdown.style.left = rect.left + 'px';
+        }
+    }
 };
 
 window.quickUpdateStatus = function (e, bookingId, newStatus) {
@@ -447,9 +456,16 @@ function renderBookingCalendar() {
                 return;
             }
 
+
+
             // Conflict check
             try {
                 const fb = window._fb;
+                if (!bookTime || !bookTime.includes(':')) {
+                    showToast("Invalid booking time selected.", "error");
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; }
+                    return;
+                }
                 const [bH, bM] = bookTime.split(':').map(Number);
                 const bookMins = bH * 60 + bM;
 
@@ -459,7 +475,14 @@ function renderBookingCalendar() {
                 let conflict = false;
                 snap.forEach(d => {
                     const ts = d.data().time;
-                    if (ts) { const [eH, eM] = ts.split(':').map(Number); if (Math.abs(bookMins - (eH * 60 + eM)) < 60) conflict = true; }
+                    if (ts && typeof ts === 'string' && ts.includes(':')) {
+                        const parts = ts.split(':');
+                        const eH = parseInt(parts[0], 10);
+                        const eM = parseInt(parts[1], 10);
+                        if (!isNaN(eH) && !isNaN(eM)) {
+                            if (Math.abs(bookMins - (eH * 60 + eM)) < 60) conflict = true;
+                        }
+                    }
                 });
                 if (conflict) {
                     showToast("Trainer already booked within 1 hour of this time.", "error");
@@ -473,7 +496,14 @@ function renderBookingCalendar() {
                 let memberConflict = false;
                 memberSnap.forEach(d => {
                     const ts = d.data().time;
-                    if (ts) { const [eH, eM] = ts.split(':').map(Number); if (Math.abs(bookMins - (eH * 60 + eM)) < 60) memberConflict = true; }
+                    if (ts && typeof ts === 'string' && ts.includes(':')) {
+                        const parts = ts.split(':');
+                        const eH = parseInt(parts[0], 10);
+                        const eM = parseInt(parts[1], 10);
+                        if (!isNaN(eH) && !isNaN(eM)) {
+                            if (Math.abs(bookMins - (eH * 60 + eM)) < 60) memberConflict = true;
+                        }
+                    }
                 });
                 if (memberConflict) {
                     showToast("Member is already booked for a confirmed session within 1 hour of this time.", "error");
