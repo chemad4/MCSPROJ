@@ -2875,11 +2875,11 @@
                     onchange="previewImage(this, 'editProdPreview')">
                 <input type="hidden" id="editProdImage">
                 <div class="form-group">
-                    <label class="form-label">Product Name</label>
+                    <label class="form-label">Product Name <span class="required-asterisk">*</span></label>
                     <input type="text" id="editProdName" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Category</label>
+                    <label class="form-label">Category <span class="required-asterisk">*</span></label>
                     <select id="editProdCategory" required>
                         <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
                         <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
@@ -2888,17 +2888,25 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Price (₱)</label>
+                        <label class="form-label">Price (₱) <span class="required-asterisk">*</span></label>
                         <input type="number" id="editProdPrice" min="1" step="0.01" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Quantity</label>
+                        <label class="form-label">Quantity <span class="required-asterisk">*</span></label>
                         <input type="number" id="editProdQty" min="0" required>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Volume / Size</label>
+                    <label class="form-label">Volume / Size <span class="optional-indicator">(Optional)</span></label>
                     <input type="text" id="editProdVol" placeholder="e.g. 500ml">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Expiration Date <span class="optional-indicator">(Optional)</span></label>
+                    <input type="date" id="editProdExpiry">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Serial Number / Asset ID <span class="optional-indicator">(Optional)</span></label>
+                    <input type="text" id="editProdSerialNumber" placeholder="e.g. SN-998877">
                 </div>
                 <div class="btn-row">
                     <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editProductModal')">Cancel</button>
@@ -2924,11 +2932,11 @@
                 <input type="hidden" id="prodImage">
 
                 <div class="form-group">
-                    <label class="form-label">Product Name</label>
+                    <label class="form-label">Product Name <span class="required-asterisk">*</span></label>
                     <input type="text" id="prodName" placeholder="Product Name" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Category</label>
+                    <label class="form-label">Category <span class="required-asterisk">*</span></label>
                     <select id="prodCategory" required>
                         <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
                         <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
@@ -2937,21 +2945,25 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Price (₱)</label>
+                        <label class="form-label">Price (₱) <span class="required-asterisk">*</span></label>
                         <input type="number" id="prodPrice" placeholder="Selling Price (₱)" min="1" step="0.01" required>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Quantity</label>
+                        <label class="form-label">Quantity <span class="required-asterisk">*</span></label>
                         <input type="number" id="prodQty" placeholder="Quantity" min="1" required>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Volume/Size (e.g. 500ml)</label>
+                    <label class="form-label">Volume/Size (e.g. 500ml) <span class="optional-indicator">(Optional)</span></label>
                     <input type="text" id="prodVol" placeholder="Optional">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Expiration Date (Optional)</label>
+                    <label class="form-label">Expiration Date <span class="optional-indicator">(Optional)</span></label>
                     <input type="date" id="prodExpiry">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Serial Number / Asset ID <span class="optional-indicator">(Optional)</span></label>
+                    <input type="text" id="prodSerialNumber" placeholder="e.g. SN-998877">
                 </div>
                 <div class="btn-row">
                     <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('productModal')">Cancel</button>
@@ -3022,7 +3034,7 @@
                 <!-- STEP 2: Plan, Locker & RFID -->
                 <div class="reg-wizard-panel" data-panel="2" style="padding: 24px 32px;">
                     <div class="form-group">
-                        <label class="form-label">Membership Plan</label>
+                        <label class="form-label">Membership Plan <span class="required-asterisk">*</span></label>
                         <select id="regMemberPlan" required>
                             <option value="" disabled selected>Select Plan...</option>
                             <option value="Gold Plan">Gold Plan</option>
@@ -3031,7 +3043,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Assign Locker (Optional)</label>
+                        <label class="form-label">Assign Locker <span class="optional-indicator">(Optional)</span></label>
                         <select id="regMemberLocker" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                             <option value="">No Locker</option>
                             <!-- Populated by JS -->
@@ -3039,7 +3051,12 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">RFID Tag (Tap Card or Type)</label>
+                        <label class="form-label">Personal Training Sessions <span class="optional-indicator">(Optional)</span></label>
+                        <input type="number" id="regMemberSessionsTotal" placeholder="e.g. 10" min="0" value="0" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">RFID Tag (Tap Card or Type) <span class="required-asterisk">*</span></label>
                         <input type="text" id="regMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card..." required style="margin-bottom: 0;">
                     </div>
 
@@ -3148,24 +3165,45 @@
                     onchange="previewImage(this, 'editMemberPreview')">
                 <input type="hidden" id="editMemberImage">
 
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;"
-                        oninput="this.value = this.value.replace(/[0-9]/g, '')">
-                    <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2"
+                <div class="form-group">
+                    <label class="form-label">Full Name <span class="required-asterisk">*</span></label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;"
+                            oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                        <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2"
+                            oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Last Name <span class="required-asterisk">*</span></label>
+                    <input type="text" id="editMemberFamily" placeholder="Last Name" required
                         oninput="this.value = this.value.replace(/[0-9]/g, '')">
                 </div>
-                <input type="text" id="editMemberFamily" placeholder="Last Name" required
-                    oninput="this.value = this.value.replace(/[0-9]/g, '')">
-                <input type="text" id="editMemberEmergency" placeholder="Emergency Contact Number" required>
-
-                <select id="editMemberPlan" required>
-                    <option value="Gold Plan">Gold Plan</option>
-                    <option value="Silver Plan">Silver Plan</option>
-                </select>
-
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">RFID Tag:
-                </p>
-                <input type="text" id="editMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card...">
+                <div class="form-group">
+                    <label class="form-label">Emergency Contact Number <span class="required-asterisk">*</span></label>
+                    <input type="text" id="editMemberEmergency" placeholder="Emergency Contact Number" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Membership Plan <span class="required-asterisk">*</span></label>
+                    <select id="editMemberPlan" required>
+                        <option value="Gold Plan">Gold Plan</option>
+                        <option value="Silver Plan">Silver Plan</option>
+                    </select>
+                </div>
+                <div class="form-row" style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">PT Sessions Remaining <span class="optional-indicator">(Optional)</span></label>
+                        <input type="number" id="editMemberSessionsRemaining" min="0" value="0" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:6px; background:var(--panel-bg); color:var(--text-primary);">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">PT Sessions Total <span class="optional-indicator">(Optional)</span></label>
+                        <input type="number" id="editMemberSessionsTotal" min="0" value="0" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:6px; background:var(--panel-bg); color:var(--text-primary);">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label class="form-label">RFID Tag <span class="optional-indicator">(Optional)</span></label>
+                    <input type="text" id="editMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card...">
+                </div>
 
                 <div class="btn-row">
                     <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editMemberModal')">Cancel</button>

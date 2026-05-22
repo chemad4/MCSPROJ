@@ -425,6 +425,32 @@
             font-weight: bold;
         }
 
+        .report-footer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 30px;
+        }
+
+        .signature-block {
+            width: 200px;
+        }
+
+        .signature-line {
+            border-top: 1px solid #111;
+            margin-top: 40px;
+            padding-top: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .signature-block p {
+            font-size: 11px;
+            color: #64748b;
+            margin: 0;
+        }
+
         /* Master Mobile Overrides */
         .mobile-only-btn {
             display: none;
@@ -1403,7 +1429,7 @@
         </div>
     </div>
     <div id="editProductModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 480px;">
             <div class="modal-header">
                 <h3>Edit Product</h3><span class="close-btn" onclick="closeModal('editProductModal')">&times;</span>
             </div>
@@ -1411,44 +1437,106 @@
                 <input type="hidden" id="editProdId">
                 <div class="profile-upload-wrapper">
                     <img src="images/default-product.png" id="editProdPreview" class="profile-upload-img">
-                    <label for="editProdImageFile" class="profile-upload-btn">
+                    <div class="profile-upload-btn" onclick="openImageChoice('editProdPreview', 'editProdImageFile', 'editProdImage')">
                         <i class="fas fa-pencil-alt"></i>
-                    </label>
+                    </div>
                 </div>
                 <input type="file" id="editProdImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editProdPreview')">
-                <input type="url" id="editProdImage" placeholder="Product Image URL" style="margin-bottom: 15px;">
-                <input type="hidden" id="editProdId">
-                <input type="text" id="editProdName" required>
-                <select id="editProdCategory" required>
-                    <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
-                    <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
-                    <option value="Apparel / Merchandise">Apparel / Merchandise</option>
-                </select>
-                <input type="number" id="editProdPrice" min="1" step="0.01" required>
-                <input type="number" id="editProdQty" min="0" required>
-                <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
+                <input type="hidden" id="editProdImage">
+                <div class="form-group">
+                    <label class="form-label">Product Name <span class="required-asterisk">*</span></label>
+                    <input type="text" id="editProdName" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category <span class="required-asterisk">*</span></label>
+                    <select id="editProdCategory" required>
+                        <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
+                        <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
+                        <option value="Apparel / Merchandise">Apparel / Merchandise</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Price (₱) <span class="required-asterisk">*</span></label>
+                        <input type="number" id="editProdPrice" min="1" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quantity <span class="required-asterisk">*</span></label>
+                        <input type="number" id="editProdQty" min="0" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Volume / Size <span class="optional-indicator">(Optional)</span></label>
+                    <input type="text" id="editProdVol" placeholder="e.g. 500ml">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Expiration Date <span class="optional-indicator">(Optional)</span></label>
+                    <input type="date" id="editProdExpiry">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Serial Number / Asset ID <span class="optional-indicator">(Optional)</span></label>
+                    <input type="text" id="editProdSerialNumber" placeholder="e.g. SN-998877">
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editProductModal')">Cancel</button>
+                    <button type="submit" class="action-btn">Save Changes</button>
+                </div>
             </form>
         </div>
     </div>
     <div id="productModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 480px;">
             <div class="modal-header">
                 <h3>Register New Product</h3><span class="close-btn" onclick="closeModal('productModal')">&times;</span>
             </div>
             <form class="modal-form" id="productForm">
-                <input type="text" id="prodName" placeholder="Product Name" required>
-                <select id="prodCategory" required>
-                    <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
-                    <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
-                    <option value="Apparel / Merchandise">Apparel / Merchandise</option>
-                </select>
-                <input type="number" id="prodPrice" placeholder="Selling Price (₱)" min="1" step="0.01" required>
-                <input type="text" id="prodVol" placeholder="Volume/Size (e.g. 500ml) - Optional">
-                <input type="date" id="prodExpiry">
-                <input type="number" id="prodQty" placeholder="Quantity" min="1" required>
-                <input type="file" id="prodImageFile" accept="image/*">
-                <input type="url" id="prodImage" placeholder="Product Image URL">
-                <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Register Product</button>
+                <div class="profile-upload-wrapper">
+                    <img src="images/default-product.png" id="regProdPreview" class="profile-upload-img">
+                    <div class="profile-upload-btn" onclick="openImageChoice('regProdPreview', 'prodImageFile', 'prodImage')">
+                        <i class="fas fa-pencil-alt"></i>
+                    </div>
+                </div>
+                <input type="file" id="prodImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'regProdPreview')">
+                <input type="hidden" id="prodImage">
+
+                <div class="form-group">
+                    <label class="form-label">Product Name <span class="required-asterisk">*</span></label>
+                    <input type="text" id="prodName" placeholder="Product Name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category <span class="required-asterisk">*</span></label>
+                    <select id="prodCategory" required>
+                        <option value="Supplements (Powder/Capsules)">Supplements (Powder/Capsules)</option>
+                        <option value="Beverages (Bottled Drinks)">Beverages (Bottled Drinks)</option>
+                        <option value="Apparel / Merchandise">Apparel / Merchandise</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Price (₱) <span class="required-asterisk">*</span></label>
+                        <input type="number" id="prodPrice" placeholder="Selling Price (₱)" min="1" step="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quantity <span class="required-asterisk">*</span></label>
+                        <input type="number" id="prodQty" placeholder="Quantity" min="1" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Volume/Size (e.g. 500ml) <span class="optional-indicator">(Optional)</span></label>
+                    <input type="text" id="prodVol" placeholder="Optional">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Expiration Date <span class="optional-indicator">(Optional)</span></label>
+                    <input type="date" id="prodExpiry">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Serial Number / Asset ID <span class="optional-indicator">(Optional)</span></label>
+                    <input type="text" id="prodSerialNumber" placeholder="e.g. SN-998877">
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('productModal')">Cancel</button>
+                    <button type="submit" class="action-btn">Register Product</button>
+                </div>
             </form>
         </div>
     </div>
@@ -1514,7 +1602,7 @@
                 <!-- STEP 2: Plan & RFID -->
                 <div class="reg-wizard-panel" data-panel="2" style="padding: 24px 32px;">
                     <div class="form-group">
-                        <label class="form-label">Membership Plan</label>
+                        <label class="form-label">Membership Plan <span class="required-asterisk">*</span></label>
                         <select id="regMemberPlan" required>
                             <option value="" disabled selected>Select Plan...</option>
                             <option value="Gold Plan">Gold Plan</option>
@@ -1523,7 +1611,7 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">Assign Locker (Optional)</label>
+                        <label class="form-label">Assign Locker <span class="optional-indicator">(Optional)</span></label>
                         <select id="regMemberLocker" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                             <option value="">No Locker</option>
                             <!-- Populated by JS -->
@@ -1531,7 +1619,12 @@
                     </div>
 
                     <div class="form-group">
-                        <label class="form-label">RFID Tag (Tap Card or Type)</label>
+                        <label class="form-label">Personal Training Sessions <span class="optional-indicator">(Optional)</span></label>
+                        <input type="number" id="regMemberSessionsTotal" placeholder="e.g. 10" min="0" value="0" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">RFID Tag (Tap Card or Type) <span class="required-asterisk">*</span></label>
                         <input type="text" id="regMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card..." required style="margin-bottom: 0;">
                     </div>
 
@@ -1622,39 +1715,63 @@
     </div>
 
     <div id="editMemberModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 520px;">
             <div class="modal-header">
                 <h3>Edit Member Details</h3><span class="close-btn"
                     onclick="closeModal('editMemberModal')">&times;</span>
             </div>
             <form class="modal-form" id="editMemberForm">
+                <input type="hidden" id="editMemberId">
+
                 <div class="profile-upload-wrapper">
                     <img src="images/default-profile.png" id="editMemberPreview" class="profile-upload-img">
-                    <label for="editMemberImageFile" class="profile-upload-btn">
+                    <div class="profile-upload-btn" onclick="openImageChoice('editMemberPreview', 'editMemberImageFile', 'editMemberImage')">
                         <i class="fas fa-pencil-alt"></i>
-                    </label>
+                    </div>
                 </div>
                 <input type="file" id="editMemberImageFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'editMemberPreview')">
-                <input type="url" id="editMemberImage" placeholder="...or paste Photo URL" style="margin-bottom: 15px;">
+                <input type="hidden" id="editMemberImage">
 
-                <input type="hidden" id="editMemberId">
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;" oninput="this.value = this.value.replace(/[0-9]/g, '')">
-                    <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2" oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                <div class="form-group">
+                    <label class="form-label">Full Name <span class="required-asterisk">*</span></label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="editMemberGiven" placeholder="First Name" required style="flex: 2;" oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                        <input type="text" id="editMemberMI" placeholder="M.I." style="flex: 1;" maxlength="2" oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                    </div>
                 </div>
-                <input type="text" id="editMemberFamily" placeholder="Last Name" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
-                <select id="editMemberPlan" required>
-                    <option value="Gold Plan">Gold Plan</option>
-                    <option value="Silver Plan">Silver Plan</option>
-                </select>
-
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px; margin-bottom: 5px;">Update RFID
-                    Tag (Tap Card or type):</p>
-                <input type="text" id="editMemberRfid" class="rfid-register-input"
-                    placeholder="Leave blank to keep current tag">
+                <div class="form-group">
+                    <label class="form-label">Last Name <span class="required-asterisk">*</span></label>
+                    <input type="text" id="editMemberFamily" placeholder="Last Name" required oninput="this.value = this.value.replace(/[0-9]/g, '')">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Emergency Contact Number <span class="required-asterisk">*</span></label>
+                    <input type="text" id="editMemberEmergency" placeholder="Emergency Contact Number" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Membership Plan <span class="required-asterisk">*</span></label>
+                    <select id="editMemberPlan" required>
+                        <option value="Gold Plan">Gold Plan</option>
+                        <option value="Silver Plan">Silver Plan</option>
+                    </select>
+                </div>
+                <div class="form-row" style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">PT Sessions Remaining <span class="optional-indicator">(Optional)</span></label>
+                        <input type="number" id="editMemberSessionsRemaining" min="0" value="0" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:6px; background:var(--panel-bg); color:var(--text-primary);">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">PT Sessions Total <span class="optional-indicator">(Optional)</span></label>
+                        <input type="number" id="editMemberSessionsTotal" min="0" value="0" style="width:100%; padding:10px; border:1px solid var(--border-color); border-radius:6px; background:var(--panel-bg); color:var(--text-primary);">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label class="form-label">RFID Tag <span class="optional-indicator">(Optional)</span></label>
+                    <input type="text" id="editMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card...">
+                </div>
                 
-                <div class="btn-row" style="margin-top: 15px;">
-                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
+                <div class="btn-row">
+                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editMemberModal')">Cancel</button>
+                    <button type="submit" class="action-btn"><i class="fas fa-save"></i> Save Changes</button>
                 </div>
             </form>
         </div>
@@ -1819,16 +1936,14 @@
                 </thead>
                 <tbody id="pdfSalesBody"></tbody>
             </table>
-            <div style="margin-top: 40px; display: flex; justify-content: space-between;">
-                <div>
-                    <p>Prepared By:</p>
-                    <p style="margin-top: 30px; border-top: 1px solid black; padding-top: 5px;"><strong
-                            id="pdfAssociateName">Staff Member</strong></p>
+            <div class="report-footer">
+                <div class="signature-block">
+                    <div class="signature-line" id="pdfAssociateName">Staff Member</div>
+                    <p>Prepared By</p>
                 </div>
-                <div>
-                    <p>Date Generated:</p>
-                    <p style="margin-top: 30px; border-top: 1px solid black; padding-top: 5px;"><strong
-                            id="pdfCompletionDate">--/--/--</strong></p>
+                <div class="signature-block" style="text-align: right;">
+                    <div class="signature-line" id="pdfCompletionDate">--/--/--</div>
+                    <p>Report Date</p>
                 </div>
             </div>
         </div>

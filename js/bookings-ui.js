@@ -450,17 +450,33 @@ function renderBookingCalendar() {
             // Conflict check
             try {
                 const fb = window._fb;
+                const [bH, bM] = bookTime.split(':').map(Number);
+                const bookMins = bH * 60 + bM;
+
+                // 1. Trainer Conflict Check
                 const q = fb.query(fb.bookingsCol, fb.where("trainerId", "==", trainerId), fb.where("date", "==", bookDate), fb.where("status", "==", "Confirmed"));
                 const snap = await fb.getDocs(q);
                 let conflict = false;
-                const [bH, bM] = bookTime.split(':').map(Number);
-                const bookMins = bH * 60 + bM;
                 snap.forEach(d => {
                     const ts = d.data().time;
                     if (ts) { const [eH, eM] = ts.split(':').map(Number); if (Math.abs(bookMins - (eH * 60 + eM)) < 60) conflict = true; }
                 });
                 if (conflict) {
                     showToast("Trainer already booked within 1 hour of this time.", "error");
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; }
+                    return;
+                }
+
+                // 2. Member Conflict Check
+                const memberQ = fb.query(fb.bookingsCol, fb.where("memberId", "==", memberId), fb.where("date", "==", bookDate), fb.where("status", "==", "Confirmed"));
+                const memberSnap = await fb.getDocs(memberQ);
+                let memberConflict = false;
+                memberSnap.forEach(d => {
+                    const ts = d.data().time;
+                    if (ts) { const [eH, eM] = ts.split(':').map(Number); if (Math.abs(bookMins - (eH * 60 + eM)) < 60) memberConflict = true; }
+                });
+                if (memberConflict) {
+                    showToast("Member is already booked for a confirmed session within 1 hour of this time.", "error");
                     if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; }
                     return;
                 }

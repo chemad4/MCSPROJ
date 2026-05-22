@@ -266,15 +266,29 @@
             <div id="memberNotificationArea"></div>
 
             <div class="panel" style="border: none; background: transparent; box-shadow: none; margin-bottom: 25px; padding: 0;">
-                <div class="panel-body" style="padding: 10px 5px; display: flex; justify-content: space-between; align-items: center;">
+                <div class="panel-body" style="padding: 10px 5px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
                     <div>
                         <h2 id="greetingText" style="margin-bottom: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--text-primary);">Overview</h2>
                         <p style="color: var(--text-muted); font-size: 15px;">Ready to crush your goals today?</p>
                     </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;">Current Plan</div>
-                        <div id="myPlanName" style="font-size: 20px; font-weight: 700; color: var(--primary-red); line-height: 1;">Loading...</div>
-                        <div id="myPlanDays" style="font-size: 13px; margin-top: 6px; color: var(--text-muted);"><i class="fa-regular fa-clock"></i> Checking...</div>
+                    <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                        <div style="background: var(--panel-bg); padding: 15px 20px; border-radius: 8px; border: 1px solid var(--border-color); text-align: left; min-width: 150px;">
+                            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;">Current Plan</div>
+                            <div id="myPlanName" style="font-size: 18px; font-weight: 700; color: var(--primary-red); line-height: 1.2;">Loading...</div>
+                            <div id="myPlanDays" style="font-size: 13px; margin-top: 5px; color: var(--text-muted);"><i class="fa-regular fa-clock"></i> Checking...</div>
+                        </div>
+                        <div style="background: var(--panel-bg); padding: 15px 20px; border-radius: 8px; border: 1px solid var(--border-color); text-align: left; min-width: 180px;">
+                            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;">Personal Training</div>
+                            <div style="display: flex; align-items: baseline; gap: 4px;">
+                                <span id="mySessionsRemaining" style="font-size: 24px; font-weight: 800; color: var(--text-primary);">--</span>
+                                <span style="font-size: 13px; color: var(--text-muted);">/</span>
+                                <span id="mySessionsTotal" style="font-size: 14px; color: var(--text-muted); font-weight: 600;">--</span>
+                                <span style="font-size: 12px; color: var(--text-muted); margin-left: 5px;">Remaining</span>
+                            </div>
+                            <div style="width: 100%; height: 6px; background: var(--border-color); border-radius: 3px; margin-top: 8px; overflow: hidden;">
+                                <div id="mySessionsBar" style="width: 0%; height: 100%; background: var(--primary-red); transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -420,17 +434,17 @@
                 <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 15px;">
                     <i class="fas fa-info-circle"></i> Your request will be sent to the trainer. Check your bookings tab to see if they approve it!
                 </p>
-                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Select Trainer:</p>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Select Trainer <span class="required-asterisk">*</span></p>
                 <select id="memberBookTrainer" required>
                     </select>
                 
                 <div style="display: flex; gap: 10px; margin-top: 10px;">
                     <div style="flex: 1;">
-                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Preferred Date:</p>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Preferred Date <span class="required-asterisk">*</span></p>
                         <input type="date" id="memberBookDate" required style="width: 100%;">
                     </div>
                     <div style="flex: 1;">
-                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Preferred Time:</p>
+                        <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 5px;">Preferred Time <span class="required-asterisk">*</span></p>
                         <input type="time" id="memberBookTime" required style="width: 100%;">
                     </div>
                 </div>

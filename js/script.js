@@ -1047,6 +1047,7 @@ function renderInventory() {
 
         if (isConsumable) {
             if (item.qty === 0) { currentStatus = "Out of Stock"; isProblematic = true; }
+            else if (item.qty <= 2) { currentStatus = "Critical Stock"; isProblematic = true; low++; }
             else if (item.qty <= threshold) { currentStatus = "Low Stock"; isProblematic = true; low++; }
         } else {
             if (currentStatus === 'Maintenance') { maint++; isProblematic = true; }
@@ -1106,6 +1107,7 @@ function renderInventory() {
         const isConsumable = item.itemType === 'product' || (!item.itemType && ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(item.cat));
         let badge = 'operational';
         if (item.currentStatus === 'Out of Stock' || item.currentStatus === 'Out of Order') badge = 'broken';
+        else if (item.currentStatus === 'Critical Stock') badge = 'stock-critical';
         else if (item.currentStatus === 'Low Stock') badge = 'stock-low';
         else if (item.currentStatus === 'Maintenance') badge = 'maintenance';
 
@@ -1141,6 +1143,7 @@ function renderInventory() {
                     <div class="inventory-category">${item.cat}</div>
                     <div class="inventory-desc">
                         ${(item.assetTag && item.assetTag !== 'undefined') ? `Tag: <strong>${item.assetTag}</strong><br>` : ''}
+                        ${(item.serialNumber && item.serialNumber !== 'undefined') ? `S/N: <strong>${item.serialNumber}</strong><br>` : ''}
                         ${(item.size && item.size !== 'undefined') ? `Size/Vol: <strong>${item.size}</strong><br>` : ''}
                         ${isConsumable && item.expiry ? `Expiry: <strong>${item.expiry}</strong>${expiryHtml}<br>` : ''}
                         Qty: <strong>${item.qty} units</strong>
@@ -1357,6 +1360,12 @@ window.openEditProductModal = function (id) {
     if (document.getElementById('editProdPreview')) {
         document.getElementById('editProdPreview').src = item.image || 'images/default-product.png';
     }
+    if (document.getElementById('editProdExpiry')) {
+        document.getElementById('editProdExpiry').value = item.expiry || '';
+    }
+    if (document.getElementById('editProdSerialNumber')) {
+        document.getElementById('editProdSerialNumber').value = item.serialNumber || '';
+    }
     document.getElementById('editProductModal').style.display = 'flex';
 }
 
@@ -1379,7 +1388,9 @@ if (document.getElementById('editProductForm')) {
             price: Number(document.getElementById('editProdPrice').value),
             qty: Number(document.getElementById('editProdQty').value),
             size: document.getElementById('editProdVol').value,
-            image: imageUrl || ''
+            image: imageUrl || '',
+            expiry: document.getElementById('editProdExpiry') ? document.getElementById('editProdExpiry').value : (oldProd?.expiry || null),
+            serialNumber: document.getElementById('editProdSerialNumber') ? document.getElementById('editProdSerialNumber').value.trim() : (oldProd?.serialNumber || '')
         };
 
         const qtyDiff = updatedData.qty - (oldProd ? oldProd.qty : 0);
@@ -1426,6 +1437,7 @@ async function handleInventorySubmit(e, isProduct) {
             qty: addQty, status: isProduct ? 'In Stock' : 'Operational', price: isProduct ? Number(document.getElementById('prodPrice').value) : 0, expiry: isProduct ? document.getElementById('prodExpiry').value : null,
             itemType: isProduct ? 'product' : 'equipment', lowStockThreshold: isProduct ? 5 : 0,
             assetTag: !isProduct ? (document.getElementById('equipAssetTag').value.trim() || '') : '',
+            serialNumber: isProduct ? (document.getElementById('prodSerialNumber') ? document.getElementById('prodSerialNumber').value.trim() : '') : '',
             image: imageUrl || ''
         };
         const addedRef = await addDoc(inventoryCol, newItem);
@@ -2819,6 +2831,7 @@ window.renderProductCategorySummary = function () {
     let totalValue = 0;
     let activeSkus = 0;
     let lowStockCount = 0;
+    let criticalStockCount = 0;
     let outOfStockCount = 0;
 
     inventoryData.forEach(item => {
@@ -2831,7 +2844,7 @@ window.renderProductCategorySummary = function () {
             const qty = Number(item.qty || 0);
             const threshold = Number(item.lowStockThreshold || 5);
 
-            if (!categoryMap[cat]) categoryMap[cat] = { count: 0, qty: 0, lowStock: 0, value: 0 };
+            if (!categoryMap[cat]) categoryMap[cat] = { count: 0, qty: 0, lowStock: 0, criticalStock: 0, value: 0 };
             
             categoryMap[cat].count++;
             categoryMap[cat].qty += qty;
@@ -2839,8 +2852,13 @@ window.renderProductCategorySummary = function () {
             
             totalValue += (qty * price);
             if (qty > 0) activeSkus++;
-            if (qty === 0) outOfStockCount++;
-            else if (qty <= threshold) {
+            
+            if (qty === 0) {
+                outOfStockCount++;
+            } else if (qty <= 2) {
+                categoryMap[cat].criticalStock++;
+                criticalStockCount++;
+            } else if (qty <= threshold) {
                 categoryMap[cat].lowStock++;
                 lowStockCount++;
             }
@@ -2853,6 +2871,8 @@ window.renderProductCategorySummary = function () {
         container.innerHTML = '<p style="padding: 20px; color: var(--text-muted); font-size: 14px;">No product categories found.</p>';
         return;
     }
+
+    const alertSeverityCount = criticalStockCount + outOfStockCount;
 
     // 1. Health Dashboard Row
     let html = `
@@ -2871,9 +2891,9 @@ window.renderProductCategorySummary = function () {
             </div>
             <div class="health-stat-card">
                 <div class="health-stat-label">Critical Alerts</div>
-                <div class="health-stat-value" style="color: ${lowStockCount > 0 ? 'var(--primary-red)' : 'var(--text-primary)'}">${lowStockCount}</div>
-                <div class="health-stat-meta ${lowStockCount > 0 ? 'text-warning' : 'text-success'}">
-                    ${lowStockCount > 0 ? '<i class="fas fa-truck-loading"></i> Restock Advised' : '<i class="fas fa-check-circle"></i> Levels Healthy'}
+                <div class="health-stat-value" style="color: ${alertSeverityCount > 0 ? 'var(--primary-red)' : 'var(--text-primary)'}">${alertSeverityCount}</div>
+                <div class="health-stat-meta ${alertSeverityCount > 0 ? 'text-danger' : (lowStockCount > 0 ? 'text-warning' : 'text-success')}">
+                    ${alertSeverityCount > 0 ? `<i class="fas fa-triangle-exclamation"></i> ${criticalStockCount} Critical / ${outOfStockCount} Out` : (lowStockCount > 0 ? `<i class="fas fa-truck-loading"></i> ${lowStockCount} Low Stock` : '<i class="fas fa-check-circle"></i> Levels Healthy')}
                 </div>
             </div>
         </div>
@@ -2882,17 +2902,23 @@ window.renderProductCategorySummary = function () {
 
     // 2. Category Grid
     html += entries.map(([cat, data]) => {
+        const hasCritical = data.criticalStock > 0;
         const hasLowStock = data.lowStock > 0;
+        const isWarning = hasCritical || hasLowStock;
+        
         return `
-            <div class="equip-cat-card ${hasLowStock ? 'low-stock-warning' : ''}">
-                <div class="equip-cat-icon" style="${hasLowStock ? 'background: rgba(153, 27, 27, 0.1); color: var(--primary-red);' : ''}">
+            <div class="equip-cat-card ${hasCritical ? 'low-stock-warning' : (hasLowStock ? 'low-stock-warning' : '')}" style="${hasCritical ? 'border-color: var(--primary-red);' : ''}">
+                <div class="equip-cat-icon" style="${hasCritical ? 'background: rgba(239, 68, 68, 0.1); color: var(--primary-red);' : (hasLowStock ? 'background: rgba(245, 158, 11, 0.1); color: #d97706;' : '')}">
                     <i class="fa-solid ${categoryIcons[cat] || 'fa-boxes-stacked'}"></i>
                 </div>
                 <div class="equip-cat-info">
                     <div class="equip-cat-name">${cat}</div>
                     <div class="equip-cat-count">${data.qty} <span class="equip-cat-units">units</span></div>
                     <div class="cat-value-badge">₱${data.value.toLocaleString(undefined, { minimumFractionDigits: 0 })} Value</div>
-                    ${hasLowStock ? `<div style="font-size: 10px; color: var(--primary-red); font-weight: 700; margin-top: 6px;"><i class="fas fa-exclamation-triangle"></i> ${data.lowStock} CRITICAL</div>` : ''}
+                    <div style="display: flex; gap: 6px; flex-direction: column; margin-top: 6px;">
+                        ${hasCritical ? `<div style="font-size: 10px; color: var(--primary-red); font-weight: 700;"><i class="fas fa-triangle-exclamation"></i> ${data.criticalStock} CRITICAL</div>` : ''}
+                        ${hasLowStock ? `<div style="font-size: 10px; color: #d97706; font-weight: 600;"><i class="fas fa-circle-exclamation"></i> ${data.lowStock} LOW STOCK</div>` : ''}
+                    </div>
                 </div>
             </div>
         `;
@@ -4273,6 +4299,12 @@ window.openEditMemberModal = function (id) {
     if (document.getElementById('editMemberEmergency')) {
         document.getElementById('editMemberEmergency').value = member.emergencyContact || '';
     }
+    if (document.getElementById('editMemberSessionsRemaining')) {
+        document.getElementById('editMemberSessionsRemaining').value = member.sessionsRemaining !== undefined ? member.sessionsRemaining : 0;
+    }
+    if (document.getElementById('editMemberSessionsTotal')) {
+        document.getElementById('editMemberSessionsTotal').value = member.sessionsTotal !== undefined ? member.sessionsTotal : 0;
+    }
 
     document.getElementById('editMemberModal').style.display = 'flex';
 }
@@ -4299,6 +4331,14 @@ if (document.getElementById('editMemberForm')) {
 
         if (document.getElementById('editMemberRfid')) {
             updatedData.rfid = document.getElementById('editMemberRfid').value.trim();
+        }
+
+        if (document.getElementById('editMemberSessionsRemaining')) {
+            updatedData.sessionsRemaining = Number(document.getElementById('editMemberSessionsRemaining').value || 0);
+        }
+
+        if (document.getElementById('editMemberSessionsTotal')) {
+            updatedData.sessionsTotal = Number(document.getElementById('editMemberSessionsTotal').value || 0);
         }
 
         if (document.getElementById('editMemberImageFile')) {
@@ -5222,6 +5262,8 @@ if (document.getElementById('memberRegistrationForm')) {
 
             const lockerId = document.getElementById('regMemberLocker') ? document.getElementById('regMemberLocker').value : "";
             const totalAmount = document.getElementById('regMemberTotalAmount') ? parseFloat(document.getElementById('regMemberTotalAmount').value) : 0;
+            const sessionsTotalInput = document.getElementById('regMemberSessionsTotal');
+            const ptSessionsTotal = sessionsTotalInput ? Number(sessionsTotalInput.value || 0) : 0;
 
             const memberDocRef = await addDoc(usersCol, {
                 uid: window.generateUID("Member"),
@@ -5239,7 +5281,9 @@ if (document.getElementById('memberRegistrationForm')) {
                 emergencyContact: emergency,
                 dateRegistered: currentTimestamp,
                 hasLocker: !!lockerId,
-                lockerId: lockerId || null
+                lockerId: lockerId || null,
+                sessionsTotal: ptSessionsTotal,
+                sessionsRemaining: ptSessionsTotal
             });
 
             // If locker assigned, update locker status
@@ -5524,6 +5568,20 @@ function initUI() {
                 // Update Member Dashboard specific elements
                 if (document.getElementById('myPlanName')) {
                     document.getElementById('myPlanName').innerText = userData.plan || 'No Plan';
+                }
+
+                const sessionsRemaining = userData.sessionsRemaining !== undefined ? Number(userData.sessionsRemaining) : 0;
+                const sessionsTotal = userData.sessionsTotal !== undefined ? Number(userData.sessionsTotal) : 0;
+                
+                if (document.getElementById('mySessionsRemaining')) {
+                    document.getElementById('mySessionsRemaining').innerText = sessionsRemaining;
+                }
+                if (document.getElementById('mySessionsTotal')) {
+                    document.getElementById('mySessionsTotal').innerText = sessionsTotal;
+                }
+                if (document.getElementById('mySessionsBar')) {
+                    const percent = sessionsTotal > 0 ? Math.max(0, Math.min(100, (sessionsRemaining / sessionsTotal) * 100)) : 0;
+                    document.getElementById('mySessionsBar').style.width = `${percent}%`;
                 }
 
                 // Sync Shift Status
@@ -5988,6 +6046,20 @@ window.updateBookingStatus = async (id, newStatus) => {
     showConfirm(`Are you sure you want to mark this session as ${newStatus}?`, async () => {
         const updateData = { status: newStatus };
         await updateDoc(doc(db, "bookings", id), updateData);
+        
+        if (newStatus === 'Completed') {
+            const b = (window.bookingsData || []).find(x => x.id === id);
+            if (b && b.memberId) {
+                try {
+                    await updateDoc(doc(db, "users", b.memberId), {
+                        sessionsRemaining: increment(-1)
+                    });
+                } catch (err) {
+                    console.error("Failed to decrement member sessions:", err);
+                }
+            }
+        }
+
         showToast(`Session marked as ${newStatus}.`, "success");
         if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}.`);
     });
@@ -6053,11 +6125,13 @@ if (document.getElementById('memberBookingForm')) {
 
         // Conflict Detection
         try {
+            const [bH, bM] = bookTime.split(':').map(Number);
+            const bookMins = bH * 60 + bM;
+
+            // 1. Trainer Conflict Check
             const q = query(bookingsCol, where("trainerId", "==", trainerId), where("date", "==", bookDate), where("status", "==", "Confirmed"));
             const snap = await getDocs(q);
             let conflict = false;
-            const [bH, bM] = bookTime.split(':').map(Number);
-            const bookMins = bH * 60 + bM;
             snap.forEach(doc => {
                 const timeStr = doc.data().time;
                 if (timeStr) {
@@ -6067,6 +6141,23 @@ if (document.getElementById('memberBookingForm')) {
             });
             if (conflict) {
                 showToast("Trainer already booked within 1 hour of this time.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
+
+            // 2. Member Conflict Check
+            const memberQ = query(bookingsCol, where("memberId", "==", memberId), where("date", "==", bookDate), where("status", "==", "Confirmed"));
+            const memberSnap = await getDocs(memberQ);
+            let memberConflict = false;
+            memberSnap.forEach(doc => {
+                const timeStr = doc.data().time;
+                if (timeStr) {
+                    const [eH, eM] = timeStr.split(':').map(Number);
+                    if (Math.abs(bookMins - (eH * 60 + eM)) < 60) memberConflict = true;
+                }
+            });
+            if (memberConflict) {
+                showToast("You are already booked for a confirmed session within 1 hour of this time.", "error");
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
                 return;
             }

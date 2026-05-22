@@ -571,10 +571,29 @@ tr:hover {
 }
 
 .badge.stock-low {
-    background-color: #FEF2F2;
+    background-color: #FEF3C7;
+    color: #92400E;
+    font-weight: bold;
+    border: 1px solid #FCD34D;
+}
+
+.badge.stock-critical {
+    background-color: #FEE2E2;
     color: #991B1B;
     font-weight: bold;
-    border: 1px solid #FECACA;
+    border: 1px solid #FCA5A5;
+}
+
+body.dark-theme .badge.stock-low {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #FCD34D;
+    border-color: #92400E;
+}
+
+body.dark-theme .badge.stock-critical {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #FCA5A5;
+    border-color: #B91C1C;
 }
 
 /* Dark theme badge overrides */
@@ -4787,4 +4806,20 @@ body.dark-theme .plan-feature-row .btn-remove-feature {
 
 body.dark-theme .reg-receipt-container {
     background: rgba(255, 255, 255, 0.02);
+}
+
+/* --- Visual Validation Indicators --- */
+.required-asterisk {
+    color: var(--primary-red);
+    margin-left: 2px;
+    font-weight: 700;
+}
+.optional-indicator {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 500;
+    margin-left: 4px;
+    text-transform: none;
+    letter-spacing: 0;
+    opacity: 0.85;
 }
