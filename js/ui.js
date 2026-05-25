@@ -16,9 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmModal.innerHTML = `
             <div class="modal-content">
                 <div class="modal-icon" style="margin-bottom: 20px;">
-                    <i class="fas fa-question-circle" style="font-size: 48px; color: var(--primary-red); opacity: 0.9;"></i>
+                    <i id="customConfirmIcon" class="fas fa-question-circle" style="font-size: 48px; color: var(--primary-red); opacity: 0.9;"></i>
                 </div>
-                <h3 style="font-weight: 700; font-size: 20px; color: var(--text-primary); margin-bottom: 8px;">Confirmation</h3>
+                <h3 id="customConfirmTitle" style="font-weight: 700; font-size: 20px; color: var(--text-primary); margin-bottom: 8px;">Confirmation</h3>
                 <p id="customConfirmMessage">Are you sure?</p>
                 <div class="confirm-actions">
                     <button class="btn-cancel" id="customConfirmCancel" style="background: rgba(0,0,0,0.05); color: var(--text-muted);">Cancel</button>
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <form id="profileSettingsForm" style="display: flex; flex-direction: column; gap: 12px;">
                     <div class="form-group">
                         <label class="form-label" style="font-size: 12px; font-weight: 600;">Full Name</label>
-                        <input type="text" id="userProfileName" required style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <input type="text" id="userProfileName" required maxlength="80" pattern="[A-Za-zñÑ\s\-'\.]+" title="Letters, spaces, hyphens and apostrophes only" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                     <div class="form-group">
                         <label class="form-label" style="font-size: 12px; font-weight: 600;">Email</label>
@@ -79,15 +79,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="form-group">
                         <label class="form-label" style="font-size: 12px; font-weight: 600;">Emergency Contact Number</label>
-                        <input type="text" id="userProfileEmergency" placeholder="e.g. 09123456789" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <input type="tel" id="userProfileEmergency" placeholder="e.g. 09123456789" maxlength="15" pattern="^\+?[0-9\-\s]{7,15}$" title="7-15 digits; +, - and spaces allowed" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                     <div class="form-group">
                         <label class="form-label" style="font-size: 12px; font-weight: 600;">Current Password (Required to change password)</label>
-                        <input type="password" id="userProfileCurrentPassword" placeholder="********" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <input type="password" id="userProfileCurrentPassword" placeholder="********" maxlength="64" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                     <div class="form-group">
                         <label class="form-label" style="font-size: 12px; font-weight: 600;">New Password (Leave blank to keep current)</label>
-                        <input type="password" id="userProfilePassword" placeholder="********" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <input type="password" id="userProfilePassword" placeholder="********" maxlength="64" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Confirm New Password</label>
+                        <input type="password" id="userProfilePasswordConfirm" placeholder="Repeat new password" maxlength="64" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                     <div class="btn-row" style="margin-top: 15px;">
                         <button type="button" class="btn-cancel" onclick="document.getElementById('profileSettingsModal').style.display='none'">Cancel</button>
@@ -110,9 +114,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Global showToast function
+// M13: dedup identical messages within a short window so duplicate fast events
+// (e.g. RFID double-tap, retry loops) don't stack the same toast repeatedly.
+window.__toastDedupCache = window.__toastDedupCache || new Map();
 window.showToast = function(message, type = 'info') {
     const container = document.getElementById('toast-container');
     if (!container) return;
+
+    try {
+        const dedupKey = `${type}::${message}`;
+        const lastShownAt = window.__toastDedupCache.get(dedupKey) || 0;
+        const nowMs = Date.now();
+        if (nowMs - lastShownAt < 1500) return; // suppress duplicate within 1.5s
+        window.__toastDedupCache.set(dedupKey, nowMs);
+        // Cap map size to prevent unbounded growth
+        if (window.__toastDedupCache.size > 50) {
+            const firstKey = window.__toastDedupCache.keys().next().value;
+            window.__toastDedupCache.delete(firstKey);
+        }
+    } catch (_) { /* dedup is best-effort */ }
 
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
@@ -151,25 +171,92 @@ window.showToast = function(message, type = 'info') {
     }, 4000);
 };
 
-// Global showConfirm function
-window.showConfirm = function(message, onConfirm) {
+// Global showConfirm function.
+// Two call signatures are supported (backwards compatible):
+//   showConfirm("Message", onConfirm)
+//   showConfirm({ title, message, tone, confirmText, cancelText, icon, onConfirm })
+// `tone` ∈ 'default' | 'danger' | 'warning' | 'info' | 'success' — CSS class only, no behavior change.
+window.showConfirm = function(arg1, arg2) {
+    const opts = (typeof arg1 === 'string' || arg1 == null)
+        ? { message: arg1, onConfirm: arg2 }
+        : (arg1 || {});
+
+    const {
+        title = 'Confirmation',
+        message = 'Are you sure?',
+        tone = 'default',
+        confirmText = 'Confirm',
+        cancelText = 'Cancel',
+        icon = null,
+        onConfirm
+    } = opts;
+
     const modal = document.getElementById('customConfirmModal');
     if (!modal) return;
 
-    document.getElementById('customConfirmMessage').innerText = message;
-    document.getElementById('customConfirmMessage').style.whiteSpace = 'pre-line';
-    
+    // Tone → icon + class
+    const toneMap = {
+        default: { icon: 'fa-question-circle', color: 'var(--primary-red)' },
+        danger:  { icon: 'fa-exclamation-circle', color: 'var(--color-danger)' },
+        warning: { icon: 'fa-exclamation-triangle', color: 'var(--color-warning)' },
+        info:    { icon: 'fa-info-circle', color: 'var(--color-info)' },
+        success: { icon: 'fa-check-circle', color: 'var(--color-success)' }
+    };
+    const t = toneMap[tone] || toneMap.default;
+
+    const titleEl = document.getElementById('customConfirmTitle');
+    const iconEl = document.getElementById('customConfirmIcon');
+    const msgEl = document.getElementById('customConfirmMessage');
+
+    if (titleEl) titleEl.innerText = title;
+    if (iconEl) {
+        iconEl.className = `fas ${icon || t.icon}`;
+        iconEl.style.fontSize = '48px';
+        iconEl.style.opacity = '0.9';
+        iconEl.style.color = t.color;
+    }
+    msgEl.innerText = message;
+    msgEl.style.whiteSpace = 'pre-line';
+
+    // Tone class on the modal shell for tinting border/header (canonical recipe)
+    const shell = modal.querySelector('.modal-content');
+    if (shell) {
+        shell.classList.remove('tone-default', 'tone-danger', 'tone-warning', 'tone-info', 'tone-success');
+        shell.classList.add(`tone-${tone}`);
+    }
+
     const cancelBtn = document.getElementById('customConfirmCancel');
     const okBtn = document.getElementById('customConfirmOk');
+    cancelBtn.innerText = cancelText;
+    okBtn.innerText = confirmText;
+
+    // Tint primary button to match tone
+    if (tone === 'danger') {
+        okBtn.style.background = 'var(--color-danger)';
+    } else if (tone === 'warning') {
+        okBtn.style.background = 'var(--color-warning)';
+    } else if (tone === 'success') {
+        okBtn.style.background = 'var(--color-success)';
+    } else if (tone === 'info') {
+        okBtn.style.background = 'var(--color-info)';
+    } else {
+        okBtn.style.background = 'var(--dark-black)';
+    }
+    okBtn.style.color = '#fff';
+
+    const onKey = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); cancelBtn.click(); }
+    };
 
     const closeModal = () => {
         modal.style.display = 'none';
         okBtn.onclick = null;
         cancelBtn.onclick = null;
+        document.removeEventListener('keydown', onKey);
     };
 
     cancelBtn.onclick = closeModal;
-    
+
     okBtn.onclick = async () => {
         const originalText = okBtn.innerHTML;
         okBtn.disabled = true;
@@ -189,6 +276,7 @@ window.showConfirm = function(message, onConfirm) {
         }
     };
 
+    document.addEventListener('keydown', onKey);
     modal.style.display = 'flex';
 };
 

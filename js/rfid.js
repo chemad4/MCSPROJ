@@ -12,7 +12,19 @@ export function initRfid({ db, usersCol, attendanceCol, onShiftLogout } = {}) {
     const currentTime = Date.now();
     const activeEl = document.activeElement;
     const isRegistrationBox = activeEl && activeEl.classList.contains("rfid-register-input");
-    if (!isRegistrationBox && (currentTime - lastKeyTime > 50)) rfidBuffer = "";
+    
+    // UEC-01 Guard: Ignore keystrokes entirely if focused on normal text inputs
+    const isTextInput = activeEl && (
+      activeEl.tagName === "INPUT" ||
+      activeEl.tagName === "TEXTAREA" ||
+      activeEl.isContentEditable
+    );
+    if (isTextInput && !isRegistrationBox) {
+      rfidBuffer = "";
+      return;
+    }
+
+    if (currentTime - lastKeyTime > 50) rfidBuffer = "";
 
     if (e.key === "Enter" && rfidBuffer.length > 5) {
       const activeEl = document.activeElement;
@@ -104,10 +116,9 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
     if (guestSnap.empty) {
       playRfidBuzzer(120, 400);
       if (typeof showToast === "function") {
-        showToast(`Unrecognized card scanned (${scannedTag}). Access Denied.`, "error");
-      } else {
-        console.warn(`Unrecognized Card Scanned (ID: ${scannedTag}).`);
+        showToast("Card not recognized. Access denied.", "error");
       }
+      console.warn(`Unrecognized Card Scanned (ID: ${scannedTag}).`);
       return;
     }
 
@@ -135,6 +146,76 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
     }
 
     const attDoc = attSnapshot.docs[0];
+    const attData = attDoc.data() || {};
+    const checkInAt = typeof attData.timestamp === "number" ? attData.timestamp : null;
+    const msSinceIn = checkInAt !== null ? now.getTime() - checkInAt : null;
+    const THIRTY_MIN_MS = 30 * 60 * 1000;
+
+    if (msSinceIn !== null && msSinceIn >= 0 && msSinceIn < THIRTY_MIN_MS) {
+      const operatorRole = (localStorage.getItem("userRole") || "").toLowerCase();
+      const canOverride = operatorRole === "admin" || operatorRole === "staff";
+      if (!canOverride) {
+        playRfidBuzzer(90, 600);
+        if (typeof showToast === "function") {
+          showToast("Guest tap-out denied: guest card can only be tapped out 30 minutes after check-in. Ask staff for an override.", "error");
+        }
+        return;
+      }
+
+      showConfirm({
+        title: 'Override Guest Tap-Out?',
+        message: `Guest check-in was less than 30 minutes ago.\n\nOverride and check out this guest anyway?`,
+        tone: 'warning',
+        confirmText: 'Continue to Override',
+        onConfirm: () => {
+          showPrompt({
+            title: 'Override Reason Required',
+            message: 'Please provide a reason for the early guest checkout.',
+            placeholder: 'e.g. Guest left early',
+            onConfirm: async (reason) => {
+              try {
+                await updateDoc(doc(db, "attendance", attDoc.id), {
+                  timeOut: timeStr,
+                  status: "Checked Out",
+                  overrideTapOut: true,
+                  overrideByRole: localStorage.getItem("userRole") || "",
+                  overrideBy: localStorage.getItem("loggedInUser") || "",
+                  overrideReason: reason,
+                  overrideTimestamp: now.getTime(),
+                });
+
+                await updateDoc(doc(db, "guestCards", guestDoc.id), {
+                  status: "Available",
+                  checkedOutAt: now.getTime(),
+                  checkedOutByRole: localStorage.getItem("userRole") || "",
+                  checkedOutBy: localStorage.getItem("loggedInUser") || "",
+                  lastUsedDate: dateStr,
+                  issuedForDate: "",
+                  paymentId: "",
+                });
+
+                try {
+                  const passesCol = collection(db, "walkinPasses");
+                  const passQ = query(passesCol, where("rfid", "==", scannedTag), where("date", "==", dateStr), where("status", "==", "Active"));
+                  const passSnap = await getDocs(passQ);
+                  if (!passSnap.empty) {
+                    await updateDoc(doc(db, "walkinPasses", passSnap.docs[0].id), { status: "Used", usedAt: now.getTime() });
+                  }
+                } catch (_) {}
+
+                playRfidBuzzer(150, 300);
+                showToast("Early guest tap-out override successful.", "success");
+              } catch (e) {
+                console.error(e);
+                showToast("Failed to perform override check-out.", "error");
+              }
+            }
+          });
+        }
+      });
+      return;
+    }
+
     await updateDoc(doc(db, "attendance", attDoc.id), { timeOut: timeStr, status: "Checked Out" });
 
     // Free the guest card for reuse.
@@ -187,12 +268,27 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
         throw new Error("ACCESS_DENIED: Account is archived or suspended.");
       }
 
-      // Check membership expiration authoritatively
+      // Check membership expiration authoritatively.
+      // Compare at start-of-day so the expiry day itself is treated as the last valid day,
+      // and the member is locked out from 00:00 of the day AFTER expiry (no midnight loophole).
       let isExpired = false;
       if ((user.role || "").toLowerCase() === "member" && typeof user.dateRegistered === "number") {
+        // H2: if the member's plan name no longer exists in the catalog, deny access instead of
+        // silently falling back to the 30-day default (which would grant grace access on a deleted plan).
+        const plans = window.__membershipPlansData || [];
+        if (user.plan && plans.length > 0) {
+          const matched = plans.find(p => (p.name || '').toLowerCase() === (user.plan || '').toLowerCase());
+          if (!matched) {
+            throw new Error("ACCESS_DENIED: Your membership plan is no longer valid. Please see the front desk.");
+          }
+        }
         const planDays = (typeof window.getPlanDays === 'function') ? window.getPlanDays(user.plan) : 30;
         const expiryAt = user.dateRegistered + planDays * 24 * 60 * 60 * 1000;
-        if (Date.now() + offset > expiryAt) {
+        const expiryStartOfDay = new Date(expiryAt);
+        expiryStartOfDay.setHours(0, 0, 0, 0);
+        const todayStartOfDay = new Date(Date.now() + offset);
+        todayStartOfDay.setHours(0, 0, 0, 0);
+        if (todayStartOfDay.getTime() > expiryStartOfDay.getTime()) {
           isExpired = true;
         }
       }
@@ -234,12 +330,16 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
           status: "Checked Out",
         });
 
+        const isStaff = (user.role || "").toLowerCase() === "staff";
         const userUpdates = {
           attendanceStatus: "Checked Out",
           activeAttendanceId: null
         };
         if (isTrainer) {
           userUpdates.shiftStatus = "Off Floor";
+        } else if (isStaff) {
+          userUpdates.shiftStatus = "Off Shift";
+          userUpdates.shiftStart = null;
         }
         transaction.update(userRef, userUpdates);
 
@@ -250,6 +350,23 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
         if (isExpired) {
           throw new Error("ACCESS_DENIED: Membership is expired.");
         }
+
+        // Best-effort: surface (but don't block on) an expired locker lease for members.
+        // Returned to outer scope via a sentinel field on the returned object.
+        let lockerExpiredNote = null;
+        if (user.hasLocker && user.lockerId) {
+          try {
+            const lockerRef = doc(db, "lockers", user.lockerId);
+            const lockerSnap = await transaction.get(lockerRef);
+            if (lockerSnap.exists()) {
+              const ld = lockerSnap.data();
+              if (typeof ld.expiryDate === "number" && ld.expiryDate < freshNow.getTime()) {
+                lockerExpiredNote = "Locker lease expired — please renew at the desk.";
+              }
+            }
+          } catch (_) { /* non-blocking */ }
+        }
+        // attach below in return
 
         const newAttRef = doc(collection(db, "attendance"));
         const newAttData = {
@@ -265,16 +382,20 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
         };
         transaction.set(newAttRef, newAttData);
 
+        const isStaff = (user.role || "").toLowerCase() === "staff";
         const userUpdates = {
           attendanceStatus: "Checked In",
           activeAttendanceId: newAttRef.id
         };
         if (isTrainer) {
           userUpdates.shiftStatus = "On Floor";
+        } else if (isStaff) {
+          userUpdates.shiftStatus = "On Shift";
+          userUpdates.shiftStart = freshNow.getTime();
         }
         transaction.update(userRef, userUpdates);
 
-        return { action: "Checked In", userName, isTrainer };
+        return { action: "Checked In", userName, isTrainer, lockerExpiredNote };
       }
     });
 
@@ -284,6 +405,9 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
     } else {
       playRfidBuzzer(250, 200);
       showToast(`${checkinResult.userName} successfully checked in! Welcome!`, "success");
+      if (checkinResult.lockerExpiredNote) {
+        showToast(checkinResult.lockerExpiredNote, "warning");
+      }
     }
 
   } catch (err) {
@@ -307,53 +431,61 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
         return;
       }
 
-      showConfirm(
-        `Tap-out is blocked for 30 minutes after tap-in.\n\nOverride and allow tap-out anyway? (${minsLeft} minute(s) remaining)`,
-        async () => {
-          const reason = (prompt("Override reason (required):", "Early tap-out") || "").trim();
-          if (!reason) {
-            showToast("Override cancelled: reason is required.", "error");
-            return;
-          }
+      showConfirm({
+        title: 'Override Tap-Out?',
+        message: `Tap-out is blocked for 30 minutes after tap-in.\n\nOverride and allow tap-out anyway? (${minsLeft} minute(s) remaining)`,
+        tone: 'warning',
+        confirmText: 'Continue to Override',
+        onConfirm: () => {
+          showPrompt({
+            title: 'Override Reason Required',
+            message: 'Please provide a reason for the early tap-out override.',
+            placeholder: 'e.g. Early tap-out',
+            onConfirm: async (reason) => {
+              const freshOffset = window.serverTimeOffsetMs || 0;
+              const freshNow = new Date(Date.now() + freshOffset);
+              const freshTimeStr = freshNow.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
-          const freshOffset = window.serverTimeOffsetMs || 0;
-          const freshNow = new Date(Date.now() + freshOffset);
-          const freshTimeStr = freshNow.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+              try {
+                await runTransaction(db, async (t) => {
+                  const userRef = doc(db, "users", userId);
+                  const userSnap = await t.get(userRef);
+                  const user = userSnap.data();
+                  const isTrainer = (user.role || "").toLowerCase() === "trainer";
 
-          try {
-            await runTransaction(db, async (t) => {
-              const userRef = doc(db, "users", userId);
-              const userSnap = await t.get(userRef);
-              const user = userSnap.data();
-              const isTrainer = (user.role || "").toLowerCase() === "trainer";
+                  t.update(doc(db, "attendance", activeAttId), {
+                    timeOut: freshTimeStr,
+                    status: "Checked Out",
+                    overrideTapOut: true,
+                    overrideByRole: localStorage.getItem("userRole") || "",
+                    overrideBy: localStorage.getItem("loggedInUser") || "",
+                    overrideReason: reason,
+                    overrideTimestamp: freshNow.getTime(),
+                  });
 
-              t.update(doc(db, "attendance", activeAttId), {
-                timeOut: freshTimeStr,
-                status: "Checked Out",
-                overrideTapOut: true,
-                overrideByRole: localStorage.getItem("userRole") || "",
-                overrideBy: localStorage.getItem("loggedInUser") || "",
-                overrideReason: reason,
-                overrideTimestamp: freshNow.getTime(),
-              });
-
-              const userUpdates = {
-                attendanceStatus: "Checked Out",
-                activeAttendanceId: null
-              };
-              if (isTrainer) {
-                userUpdates.shiftStatus = "Off Floor";
+                  const isStaff = (user.role || "").toLowerCase() === "staff";
+                  const userUpdates = {
+                    attendanceStatus: "Checked Out",
+                    activeAttendanceId: null
+                  };
+                  if (isTrainer) {
+                    userUpdates.shiftStatus = "Off Floor";
+                  } else if (isStaff) {
+                    userUpdates.shiftStatus = "Off Shift";
+                    userUpdates.shiftStart = null;
+                  }
+                  t.update(userRef, userUpdates);
+                });
+                playRfidBuzzer(150, 300);
+                showToast("Early tap-out override successful.", "success");
+              } catch (e) {
+                console.error(e);
+                showToast("Failed to perform override check-out.", "error");
               }
-              t.update(userRef, userUpdates);
-            });
-            playRfidBuzzer(150, 300);
-            showToast("Early tap-out override successful.", "success");
-          } catch (e) {
-            console.error(e);
-            showToast("Failed to perform override check-out.", "error");
-          }
+            }
+          });
         }
-      );
+      });
     } else {
       console.error("Checkin/Out transaction failed: ", err);
       showToast(err.message || "An error occurred during check-in.", "error");

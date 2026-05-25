@@ -28,181 +28,103 @@
             });
         }
     </script>
-
-    <style>
-        body { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            background-color: var(--dark-black); 
-            background-image: url('images/login-bg.jpg');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            height: 100vh; 
-            margin: 0; 
-            padding: 20px; 
-            position: relative;
-        }
-        .login-container { 
-            background: rgba(20, 20, 20, 0.4); 
-            padding: 40px 30px; 
-            border-radius: 16px; 
-            box-shadow: 0 15px 50px rgba(0,0,0,0.5); 
-            width: 100%; 
-            max-width: 450px; 
-            text-align: center; 
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-top: 1px solid rgba(255, 255, 255, 0.3);
-            border-left: 1px solid rgba(255, 255, 255, 0.3);
-            z-index: 10;
-        }
-        .login-logo { 
-            font-size: 2.8rem; 
-            font-weight: 700; 
-            margin-bottom: 40px; 
-            letter-spacing: 1px; 
-            color: #ffffff; 
-            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        }
-        .login-logo span { 
-            color: var(--primary-red); 
-        }
-        .login-form input { 
-            width: 100%; 
-            padding: 18px; 
-            margin-bottom: 20px; 
-            border: 1px solid rgba(255, 255, 255, 0.2); 
-            border-radius: 8px; 
-            outline: none; 
-            font-size: 16px; 
-            box-sizing: border-box; 
-            background: rgba(255, 255, 255, 0.1);
-            color: #ffffff;
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
-            transition: all 0.3s ease;
-        }
-        .login-form input::placeholder {
-            color: rgba(255, 255, 255, 0.6);
-        }
-        .login-form input:focus { 
-            border-color: rgba(255, 255, 255, 0.5); 
-            background: rgba(255, 255, 255, 0.15);
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
-        }
-        .login-btn { 
-            width: 100%; 
-            padding: 18px; 
-            background-color: var(--primary-red); 
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            font-size: 18px; 
-            font-weight: bold; 
-            cursor: pointer; 
-            transition: 0.3s; 
-            box-shadow: 0 4px 15px rgba(153, 27, 27, 0.4);
-        }
-        .login-btn:hover { 
-            background-color: #900f14; 
-            box-shadow: 0 6px 20px rgba(153, 27, 27, 0.6);
-        }
-        .login-btn:disabled { 
-            background-color: #e0abae; 
-            cursor: not-allowed; 
-            box-shadow: none;
-        }
-        #errorMsg { 
-            color: #ffb3b3; 
-            margin-bottom: 15px; 
-            font-size: 14px; 
-            display: none; 
-            font-weight: 500; 
-            line-height: 1.4; 
-        }
-        #installAppBtn { 
-            display: none; 
-            width: 100%; 
-            padding: 18px; 
-            margin-top: 20px; 
-            background: rgba(255, 255, 255, 0.1); 
-            color: white; 
-            border: 1px solid rgba(255, 255, 255, 0.2); 
-            border-radius: 8px; 
-            font-size: 16px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            transition: 0.3s; 
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
-        }
-        #installAppBtn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-        
-        /* Links and text colors inside glass */
-        p a#forgotPasswordBtn {
-            color: rgba(255, 255, 255, 0.8) !important;
-            transition: color 0.3s ease;
-        }
-        p a#forgotPasswordBtn:hover {
-            color: #ffffff !important;
-        }
-        p.desktop-only {
-            color: rgba(255, 255, 255, 0.7) !important;
-        }
-
-        /* NEW: Mobile specific override */
-        @media (max-width: 800px) {
-            .desktop-only { display: none !important; }
-        }
-    </style>
 </head>
-<body>
+<body class="login-page">
 
-    <div class="login-container">
-        <div class="login-logo">FIT<span>TRACK</span></div>
-        <div id="errorMsg">Invalid email or password.</div>
-        
-        <form class="login-form" id="loginForm">
-            <input type="email" id="loginEmail" placeholder="Email Address" required>
-            <input type="password" id="loginPassword" placeholder="Password" required>
-            <button type="submit" class="login-btn" id="loginSubmitBtn">Log In</button>
+    <main class="login-card" role="main">
+        <h1 class="login-logo">FIT<span>TRACK</span></h1>
+
+        <noscript>
+            <div class="login-noscript" role="alert">
+                <strong>JavaScript is required.</strong>
+                Please enable JavaScript in your browser to sign in.
+            </div>
+        </noscript>
+
+        <div id="errorMsg" class="login-error" role="alert" aria-live="assertive" aria-atomic="true">
+            <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+            <span id="errorMsgText">Invalid email or password.</span>
+        </div>
+
+        <form class="login-form" id="loginForm" novalidate aria-describedby="errorMsg">
+            <div class="field">
+                <label for="loginEmail" class="sr-only">Email address</label>
+                <input
+                    type="email"
+                    id="loginEmail"
+                    class="input input-glass"
+                    placeholder="Email Address"
+                    autocomplete="username"
+                    autocapitalize="none"
+                    autocorrect="off"
+                    spellcheck="false"
+                    inputmode="email"
+                    required
+                    aria-required="true"
+                >
+            </div>
+
+            <div class="field">
+                <label for="loginPassword" class="sr-only">Password</label>
+                <input
+                    type="password"
+                    id="loginPassword"
+                    class="input input-glass"
+                    placeholder="Password"
+                    autocomplete="current-password"
+                    required
+                    aria-required="true"
+                >
+                <div id="capsLockHint" class="login-hint" role="status" aria-live="polite">
+                    <i class="fas fa-arrow-up" aria-hidden="true"></i>
+                    <span>Caps Lock is on</span>
+                </div>
+            </div>
+
+            <button
+                type="submit"
+                class="btn btn-primary btn-lg btn-block"
+                id="loginSubmitBtn"
+            >Log In</button>
         </form>
 
-        <p style="text-align: center; margin-top: 15px;">
-            <a href="#" id="forgotPasswordBtn" style="color: var(--text-muted); text-decoration: none; font-size: 14px;">Forgot Password?</a>
+        <p class="login-meta">
+            <button type="button" id="forgotPasswordBtn" class="login-meta-link">Forgot Password?</button>
         </p>
 
-        <p class="desktop-only" style="color: #AAAAAA; font-size: 13px; margin-top: 20px;">
-            <i class="fas fa-id-badge"></i> Or simply tap your ID Card to log in.
+        <p class="login-rfid-hint desktop-only">
+            <i class="fas fa-id-badge" aria-hidden="true"></i>
+            Or simply tap your ID Card to log in.
         </p>
 
-        <button id="installAppBtn">
-            <i class="fa-solid fa-download"></i> Install Fit Track App
-        </button>
-
-        <!-- Developer & QA Test Console -->
-        <div id="devTestConsole" style="display: none; margin-top: 20px; padding-top: 15px; border-top: 1px dashed rgba(255, 255, 255, 0.2); text-align: center;">
-            <p style="color: #FFB300; font-size: 13px; font-weight: 600; margin: 0 0 10px 0;">
-                <i class="fas fa-terminal"></i> Dev/QA Quick Auto-Login
+        <!-- Developer & QA Test Console (gated by hostname/dev-flag check below) -->
+        <div id="devTestConsole" class="dev-console" hidden>
+            <p class="dev-console-label">
+                <i class="fas fa-terminal" aria-hidden="true"></i>
+                Dev/QA Quick Auto-Login
             </p>
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-                <button type="button" onclick="window.location.replace('index.html?bypass=admin')" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">Admin</button>
-                <button type="button" onclick="window.location.replace('index.html?bypass=staff')" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">Staff</button>
-                <button type="button" onclick="window.location.replace('index.html?bypass=trainer')" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">Trainer</button>
-                <button type="button" onclick="window.location.replace('index.html?bypass=member')" style="padding: 8px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 600; transition: 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">Member</button>
+            <div class="dev-console-grid" role="group" aria-label="Developer bypass roles">
+                <button type="button" class="btn btn-sm btn-glass" data-bypass-role="admin">Admin</button>
+                <button type="button" class="btn btn-sm btn-glass" data-bypass-role="staff">Staff</button>
+                <button type="button" class="btn btn-sm btn-glass" data-bypass-role="trainer">Trainer</button>
+                <button type="button" class="btn btn-sm btn-glass" data-bypass-role="member">Member</button>
             </div>
         </div>
-    </div>
+    </main>
 
     <script>
         // DEVELOPER & QA TEST BYPASS HOOK
         // Allows testing tools (like Puppeteer, Playwright, or AI agents) to bypass the login screen and test dashboards instantly
         (function() {
+            function generateSecureRandomString(length = 8) {
+                if (!window.crypto || !window.crypto.getRandomValues) {
+                    throw new Error("Cryptographically secure random number generator is unavailable.");
+                }
+                const buf = new Uint8Array(length);
+                window.crypto.getRandomValues(buf);
+                return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
+            }
+
             const urlParams = new URLSearchParams(window.location.search);
             const bypassRole = urlParams.get('bypass');
             if (bypassRole) {
@@ -239,7 +161,7 @@
                     localStorage.setItem("userId", userId);
                     localStorage.setItem("loggedInUser", name);
                     localStorage.setItem("userRole", role);
-                    localStorage.setItem("sessionId", "test-session-" + Math.random().toString(36).substring(2, 10));
+                    localStorage.setItem("sessionId", "test-session-" + generateSecureRandomString(4));
                     if (role === 'Admin' || role === 'Staff' || role === 'Trainer') {
                         localStorage.setItem("shiftStart", Date.now());
                         if (role === 'Trainer') {
@@ -252,13 +174,21 @@
 
             // Check if we are running in local dev / test environment
             window.addEventListener('DOMContentLoaded', () => {
-                const isLocal = window.location.hostname === 'localhost' || 
-                                window.location.hostname === '127.0.0.1' || 
-                                window.location.protocol === 'file:' || 
+                const isLocal = window.location.hostname === 'localhost' ||
+                                window.location.hostname === '127.0.0.1' ||
+                                window.location.protocol === 'file:' ||
                                 new URLSearchParams(window.location.search).has('dev');
                 if (isLocal) {
                     const devConsole = document.getElementById('devTestConsole');
-                    if (devConsole) devConsole.style.display = 'block';
+                    if (devConsole) {
+                        devConsole.hidden = false;
+                        devConsole.querySelectorAll('[data-bypass-role]').forEach(btn => {
+                            btn.addEventListener('click', () => {
+                                const role = btn.getAttribute('data-bypass-role');
+                                window.location.replace(`index.html?bypass=${encodeURIComponent(role)}`);
+                            });
+                        });
+                    }
                 }
             });
         })();
@@ -267,18 +197,9 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { firebaseConfig } from "./js/firebase-config.js";
 
-        const loginConfig = {
-            apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
-            authDomain: "fit-track-ca8d1.firebaseapp.com",
-            projectId: "fit-track-ca8d1",
-            storageBucket: "fit-track-ca8d1.firebasestorage.app",
-            messagingSenderId: "157593985795",
-            appId: "1:157593985795:web:07156961dda8e2254fbf36",
-            measurementId: "G-NYGGEMMJMC"
-        };
-
-        const app = initializeApp(loginConfig);
+        const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
         const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
@@ -313,7 +234,7 @@
                 }
                 const scannedRfid = rfidBuffer;
                 rfidBuffer = "";
-                await authenticateUser(query(collection(db, "users"), where("rfid", "==", scannedRfid)));
+                await authenticateUser(query(collection(db, "users"), where("rfid", "==", scannedRfid)), null);
             } else if (e.key.length === 1 && /[a-zA-Z0-9]/.test(e.key)) { 
                 rfidBuffer += e.key;
             }
@@ -322,9 +243,9 @@
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const email = document.getElementById('loginEmail').value.trim();
+            const email = document.getElementById('loginEmail').value.trim().toLowerCase();
             const password = document.getElementById('loginPassword').value.trim();
-            await authenticateUser(query(collection(db, "users"), where("email", "==", email), where("password", "==", password)));
+            await authenticateUser(query(collection(db, "users"), where("email", "==", email)), password);
         });
 
         document.getElementById('forgotPasswordBtn').addEventListener('click', (e) => {
@@ -335,7 +256,7 @@
                 placeholder: 'your.email@example.com',
                 onConfirm: (email) => {
                     const trimmedEmail = email.trim();
-                    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
                         return showToast('Please enter a valid email address.', 'error');
                     }
                     resetPasswordFlow(trimmedEmail);
@@ -343,81 +264,128 @@
             });
         });
 
-        // L-08 Fix: Clear error message when user starts typing
+        // Helpers — keep error rendering and aria state in one place
+        const errorMsg = document.getElementById('errorMsg');
+        const errorMsgText = document.getElementById('errorMsgText');
+        const emailInputEl = document.getElementById('loginEmail');
+        const passwordInputEl = document.getElementById('loginPassword');
+        const capsLockHint = document.getElementById('capsLockHint');
+
+        function setError(text) {
+            if (!errorMsg || !errorMsgText) return;
+            errorMsgText.innerText = text;
+            errorMsg.classList.add('is-visible');
+            if (emailInputEl) emailInputEl.setAttribute('aria-invalid', 'true');
+            if (passwordInputEl) passwordInputEl.setAttribute('aria-invalid', 'true');
+        }
+
+        function clearError() {
+            if (!errorMsg) return;
+            errorMsg.classList.remove('is-visible');
+            if (emailInputEl) emailInputEl.removeAttribute('aria-invalid');
+            if (passwordInputEl) passwordInputEl.removeAttribute('aria-invalid');
+        }
+
+        // Clear error message when the user starts typing again
         ['loginEmail', 'loginPassword'].forEach(id => {
             const el = document.getElementById(id);
-            if (el) {
-                el.addEventListener('input', () => {
-                    const errorMsg = document.getElementById('errorMsg');
-                    if (errorMsg) errorMsg.style.display = 'none';
-                });
-            }
+            if (el) el.addEventListener('input', clearError);
         });
 
-        async function resetPasswordFlow(email) {
-            const q = query(collection(db, "users"), where("email", "==", email));
-            const snap = await getDocs(q);
-            if (snap.empty) {
-                showToast("No account found with this email.", "error");
-                return;
-            }
-            const userDoc = snap.docs[0];
-            const newPass = Math.random().toString(36).slice(-8);
+        // Caps Lock detection on password field
+        if (passwordInputEl && capsLockHint) {
+            const updateCapsHint = (e) => {
+                const on = typeof e.getModifierState === 'function' && e.getModifierState('CapsLock');
+                capsLockHint.classList.toggle('is-visible', !!on);
+            };
+            passwordInputEl.addEventListener('keydown', updateCapsHint);
+            passwordInputEl.addEventListener('keyup', updateCapsHint);
+            passwordInputEl.addEventListener('blur', () => capsLockHint.classList.remove('is-visible'));
+        }
 
+        async function resetPasswordFlow(email) {
+            // Always lowercase the lookup so case variants resolve consistently
+            const lookupEmail = (email || '').toLowerCase();
+            const genericMsg = "If an account exists with that email, a new password has been sent.";
             try {
+                const q = query(collection(db, "users"), where("email", "==", lookupEmail));
+                const snap = await getDocs(q);
+                if (snap.empty) {
+                    // Don't reveal whether the email is registered — anti-enumeration
+                    showToast(genericMsg, "success");
+                    return;
+                }
+                const userDoc = snap.docs[0];
+                // M9: silently no-op for archived accounts (still show generic message to prevent enumeration)
+                const ud = userDoc.data() || {};
+                if (ud.status === 'Archived' || ud.archived === true) {
+                    showToast(genericMsg, "success");
+                    return;
+                }
+                // Use crypto-strong randomness. Refuse insecure fallbacks.
+                if (!window.crypto || !window.crypto.getRandomValues) {
+                    throw new Error("SECURE_RANDOM_UNAVAILABLE: Cryptographically secure random number generator is unavailable.");
+                }
+                const buf = new Uint8Array(9);
+                window.crypto.getRandomValues(buf);
+                const newPass = btoa(String.fromCharCode(...buf)).replace(/[^A-Za-z0-9]/g, '').slice(0, 10);
                 await updateDoc(doc(db, "users", userDoc.id), { password: newPass });
                 await emailjs.send("service_x90mti6", "template_nda1wjc", {
                     to_name: userDoc.data().name || userDoc.data().givenName,
-                    to_email: email,
+                    to_email: lookupEmail,
                     generated_password: newPass,
                     plan: "Password Reset"
                 });
-                showToast("A new password has been sent to your email.", "success");
+                showToast(genericMsg, "success");
             } catch (e) {
-                showToast("Error resetting password.", "error");
+                console.error("Password reset failed:", e);
+                showToast(genericMsg, "success"); // still generic to avoid leaking
             }
         }
 
-        async function authenticateUser(dbQuery) {
-            const errorMsg = document.getElementById('errorMsg');
+        async function authenticateUser(dbQuery, enteredPassword) {
             const submitBtn = document.getElementById('loginSubmitBtn');
             const emailInput = document.getElementById('loginEmail');
+            const passwordInput = document.getElementById('loginPassword');
             const email = emailInput ? emailInput.value.trim().toLowerCase() : 'unknown';
 
-            // Check global lockout
-            const lockoutUntil = Number(localStorage.getItem("loginLockoutUntil") || 0);
-            if (Date.now() < lockoutUntil) {
-                const secondsLeft = Math.ceil((lockoutUntil - Date.now()) / 1000);
-                errorMsg.innerText = `Too many failed login attempts. Please try again in ${secondsLeft} seconds.`;
-                errorMsg.style.display = "block";
-                submitBtn.innerText = "Log In";
-                submitBtn.disabled = false;
+            const setBusy = (busy) => {
+                if (!submitBtn) return;
+                submitBtn.classList.toggle('is-loading', busy);
+                submitBtn.disabled = busy;
+                submitBtn.setAttribute('aria-busy', busy ? 'true' : 'false');
+                if (emailInput) emailInput.disabled = busy;
+                if (passwordInput) passwordInput.disabled = busy;
+            };
+
+            // Check local lockout first for fast feedback
+            const localLockoutUntil = Number(localStorage.getItem("loginLockoutUntil") || 0);
+            if (Date.now() < localLockoutUntil) {
+                const secondsLeft = Math.ceil((localLockoutUntil - Date.now()) / 1000);
+                setError(`Too many failed login attempts. Please try again in ${secondsLeft} seconds.`);
+                setBusy(false);
                 return;
             }
 
-            submitBtn.innerText = "Authenticating...";
-            submitBtn.disabled = true;
-            errorMsg.style.display = "none";
+            setBusy(true);
+            clearError();
 
+            let redirected = false;
             try {
                 const querySnapshot = await getDocs(dbQuery);
                 if (querySnapshot.empty) {
-                    // Record failed attempt
+                    // Record failed attempt locally since no matching email/rfid doc found
                     let failedCount = Number(localStorage.getItem("loginFailedAttempts") || 0) + 1;
                     localStorage.setItem("loginFailedAttempts", failedCount);
 
                     if (failedCount >= 5) {
-                        const lockTime = Date.now() + 30000; // 30 seconds lockout
+                        const lockTime = Date.now() + 30000;
                         localStorage.setItem("loginLockoutUntil", lockTime);
                         localStorage.setItem("loginFailedAttempts", 0);
-                        errorMsg.innerText = "Too many failed attempts. Access temporarily locked for 30 seconds.";
+                        setError("Too many failed attempts. Access temporarily locked for 30 seconds.");
                     } else {
-                        errorMsg.innerText = `Invalid credentials or unrecognized ID Card. (${5 - failedCount} attempts remaining)`;
+                        setError(`Invalid credentials or unrecognized ID Card. (${5 - failedCount} attempts remaining)`);
                     }
-
-                    errorMsg.style.display = "block";
-                    submitBtn.innerText = "Log In";
-                    submitBtn.disabled = false;
 
                     // Log failed attempt to activityLogs
                     try {
@@ -427,56 +395,89 @@
                             userName: email || "RFID Visitor",
                             role: "Visitor",
                             action: "Failed Login",
-                            details: `Failed login attempt for ${email || 'RFID Scanner'}.`,
+                            details: `Failed login attempt (unrecognized account) for ${email || 'RFID Scanner'}.`,
                             date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
                             time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
                             timestamp: now.getTime()
                         });
-                    } catch(e) { console.error("Failed login log failed:", e); }
+                    } catch(e) { console.error(e); }
 
+                    setBusy(false);
                     return;
-                } 
-                
-                // Reset failed attempts upon successful login
-                localStorage.removeItem("loginFailedAttempts");
-                localStorage.removeItem("loginLockoutUntil");
+                }
 
                 const userDoc = querySnapshot.docs[0];
                 const userData = userDoc.data();
                 const userId = userDoc.id;
                 const userRole = userData.role;
+
+                // ARCHIVE CHECK
+                if (userData.status === 'Archived') {
+                    setError("This account has been archived. Please contact management.");
+                    setBusy(false);
+                    return;
+                }
+
+                // Check Firestore lock status
+                const dbLockoutUntil = Number(userData.lockoutUntil || 0);
+                if (Date.now() < dbLockoutUntil) {
+                    const secondsLeft = Math.ceil((dbLockoutUntil - Date.now()) / 1000);
+                    setError(`Too many failed login attempts. Please try again in ${secondsLeft} seconds.`);
+                    setBusy(false);
+                    return;
+                }
+
+                // Password Verification (if password is supplied)
+                if (enteredPassword !== null) {
+                    if (userData.password !== enteredPassword) {
+                        // Failed password attempt
+                        let dbFailedCount = Number(userData.failedAttempts || 0) + 1;
+                        if (dbFailedCount >= 5) {
+                            const dbLockTime = Date.now() + 30000;
+                            await updateDoc(doc(db, "users", userId), { failedAttempts: 0, lockoutUntil: dbLockTime });
+                            localStorage.setItem("loginLockoutUntil", dbLockTime); // sync locally
+                            setError("Too many failed attempts. Access temporarily locked for 30 seconds.");
+                        } else {
+                            await updateDoc(doc(db, "users", userId), { failedAttempts: dbFailedCount });
+                            setError(`Invalid credentials or unrecognized ID Card. (${5 - dbFailedCount} attempts remaining)`);
+                        }
+
+                        // Log failed attempt to activityLogs
+                        try {
+                            const now = new Date();
+                            await addDoc(collection(db, "activityLogs"), {
+                                userId: userId,
+                                userName: userData.name || `${userData.givenName} ${userData.familyName}`,
+                                role: userRole,
+                                action: "Failed Login",
+                                details: `Failed password login attempt for ${email}.`,
+                                date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                                time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                                timestamp: now.getTime()
+                            });
+                        } catch(e) { console.error(e); }
+
+                        setBusy(false);
+                        return;
+                    }
+                }
+
+                // Successful authentication! Reset failed attempts in local storage and database
+                localStorage.removeItem("loginFailedAttempts");
+                localStorage.removeItem("loginLockoutUntil");
+                if (userData.failedAttempts || userData.lockoutUntil) {
+                    await updateDoc(doc(db, "users", userId), { failedAttempts: 0, lockoutUntil: 0 });
+                }
+
                 const userOnMobile = isMobileDevice();
 
-                // 1. ARCHIVE CHECK
-                if (userData.status === 'Archived') {
-                    errorMsg.innerText = "This account has been archived. Please contact management.";
-                    errorMsg.style.display = "block";
-                    submitBtn.innerText = "Log In";
-                    submitBtn.disabled = false;
-                    return;
+                // GENERATE UNIQUE SESSION ID TO OVERRIDE ANY PREVIOUS LOGINS
+                if (!window.crypto || !window.crypto.getRandomValues) {
+                    throw new Error("SECURE_RANDOM_UNAVAILABLE: Cryptographically secure random number generator is unavailable.");
                 }
-
-                // 2. DEVICE RESTRICTION CHECK (Temporarily disabled for testing)
-                /*
-                if ((userRole === "Admin" || userRole === "Staff") && userOnMobile) {
-                    errorMsg.innerText = "Access Denied: Admins/Staff must use Desktop.";
-                    errorMsg.style.display = "block";
-                    submitBtn.innerText = "Log In";
-                    submitBtn.disabled = false;
-                    return;
-                }
-
-                if ((userRole === "Member" || userRole === "Trainer") && !userOnMobile) {
-                    errorMsg.innerText = "Access Denied: Use the Mobile App.";
-                    errorMsg.style.display = "block";
-                    submitBtn.innerText = "Log In";
-                    submitBtn.disabled = false;
-                    return;
-                }
-                */
-
-                // 3. GENERATE UNIQUE SESSION ID TO OVERRIDE ANY PREVIOUS LOGINS
-                const newSessionId = Math.random().toString(36).substring(2, 15);
+                const buf = new Uint8Array(16);
+                window.crypto.getRandomValues(buf);
+                const newSessionId = Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
                 let updateData = { currentSession: newSessionId };
 
                 if (userRole === "Admin" || userRole === "Staff" || userRole === "Trainer") {
@@ -499,6 +500,7 @@
                 localStorage.setItem("loggedInUser", displayName);
                 localStorage.setItem("userRole", userRole);
                 localStorage.setItem("sessionId", newSessionId); // Save Session ID locally!
+                localStorage.setItem("loginAt", Date.now().toString()); // For session expiry check on dashboard load
                 if(userData.rfid) localStorage.setItem("userRfid", userData.rfid);
 
                 // Log the login activity
@@ -518,17 +520,20 @@
 
                 // Redirect
                 const roleLower = (userRole || "").trim().toLowerCase();
+                redirected = true;
                 if (roleLower === "admin") window.location.replace("adminDB.html");
                 else if (roleLower === "staff") window.location.replace("staffDB.html");
                 else if (roleLower === "trainer") window.location.replace("trainerDB.html");
                 else window.location.replace("memberDB.html");
-                
+
             } catch (error) {
                 console.error("Login Error:", error);
-                errorMsg.innerText = "Connection error. Please try again.";
-                errorMsg.style.display = "block";
-                submitBtn.innerText = "Log In";
-                submitBtn.disabled = false;
+                setError("Connection error. Please try again.");
+            } finally {
+                // Only restore the button if we are not navigating away — avoids
+                // a brief "Log In" flash before redirect, and guarantees the form
+                // is usable again on any failure path.
+                if (!redirected) setBusy(false);
             }
         }
     </script>

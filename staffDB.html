@@ -9,10 +9,16 @@
     <link rel="icon" type="image/png" href="images/icon-192.png">
 
     <script>
-        const role = (localStorage.getItem("userRole") || "").toLowerCase();
-        if (!localStorage.getItem("loggedInUser") || role !== "staff") {
-            window.location.replace("index.html");
-        }
+        (function () {
+            const SESSION_MAX_MS = 12 * 60 * 60 * 1000;
+            const loginAt = Number(localStorage.getItem("loginAt") || 0);
+            const expired = loginAt && (Date.now() - loginAt > SESSION_MAX_MS);
+            const role = (localStorage.getItem("userRole") || "").toLowerCase();
+            if (!localStorage.getItem("loggedInUser") || role !== "staff" || expired) {
+                if (expired) localStorage.clear();
+                window.location.replace("index.html");
+            }
+        })();
     </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -823,6 +829,9 @@
             </div>
             <div class="topbar-right">
                 <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn-circle"><i id="darkModeIcon" class="fas fa-moon"></i></button>
+                <button onclick="toggleNotifSidebar()" title="Toggle Notifications" class="icon-btn-circle" id="notifToggleBtn">
+                    <i class="fas fa-bell"></i>
+                </button>
                 
                 <div class="user-menu-container">
                     <div class="user-profile-trigger" id="userMenuTrigger">
@@ -841,7 +850,7 @@
                             <i class="fas fa-user-gear"></i> Profile Settings
                         </button>
                         <div class="dropdown-divider"></div>
-                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: var(--dark-black);">
+                        <button class="dropdown-item-btn is-danger" onclick="handleLogout()">
                             <i class="fa-solid fa-power-off"></i> Logout
                         </button>
                     </div>
@@ -850,12 +859,12 @@
         </header>
 
         <div id="dashboard" class="content-section active-section">
-            <div class="panel panel-transparent" style="margin-bottom: 20px;">
-                <div class="panel-body panel-body-compact">
-                    <h2 id="greetingText" style="margin-bottom: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--text-primary);">Overview</h2>
-                    <p class="text-muted-sm" style="font-size: 15px;">Front desk operations and member assistance.</p>
+            <header class="page-header">
+                <div class="page-header-text">
+                    <h2 id="greetingText" class="page-title">Overview</h2>
+                    <p class="page-subtitle">Front desk operations and member assistance.</p>
                 </div>
-            </div>
+            </header>
 
             <div
                 style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;">
@@ -875,7 +884,7 @@
                     <div class="panel-body" style="text-align: center; padding: 40px 20px;">
                         <h1 style="font-size: 48px; color: var(--text-primary); margin: 0;" id="presentMembers">0</h1>
                         <p style="color: var(--text-muted); margin-top: 10px;">Members Currently on Floor</p>
-                        <button class="action-btn" onclick="switchTab('attendance')" style="margin-top: 20px;"><i
+                        <button class="action-btn" onclick="switchTab('attendance')" style="margin-top: var(--space-5);"><i
                                 class="fa-solid fa-list"></i> View Logs</button>
                     </div>
                 </div>
@@ -920,7 +929,7 @@
 
             <!-- Equipment Category Quantity Summary -->
             <div style="margin-bottom: 12px; font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-chart-pie" style="color: var(--primary-red);"></i> Equipment Analytics
+                <i class="fa-solid fa-screwdriver-wrench" style="color: var(--primary-red);"></i> Equipment Status
             </div>
             <div class="equip-category-summary" id="equipCategorySummary">
                 <!-- Rendered by renderEquipmentCategorySummary() -->
@@ -946,6 +955,10 @@
                             <tbody id="machinesListBody"></tbody>
                         </table>
                     </div>
+                    <div class="table-footer">
+                        <div id="equipRecordCount">Showing 0-0 of 0</div>
+                        <div class="pagination-controls" id="equipPagination"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -962,7 +975,7 @@
 
             <!-- Product Category Quantity Summary -->
             <div style="margin-bottom: 12px; font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-chart-line" style="color: var(--primary-red);"></i> Inventory Analytics
+                <i class="fa-solid fa-triangle-exclamation" style="color: var(--primary-red);"></i> Inventory Alerts
             </div>
             <div class="equip-category-summary" id="productCategorySummary">
                 <!-- Rendered by renderProductCategorySummary() -->
@@ -970,6 +983,10 @@
             <div class="panel" style="background: transparent; border: none; box-shadow: none;">
                 <div class="panel-body" style="padding: 0;">
                     <div class="inventory-grid" id="productsGrid"></div>
+                    <div class="table-footer">
+                        <div id="prodRecordCount">Showing 0-0 of 0</div>
+                        <div class="pagination-controls" id="prodPagination"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1068,13 +1085,48 @@
         </div>
 
         <div id="payments" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
+            <!-- Advanced Filtering Controls -->
+            <div class="dense-control-bar">
+                <div class="search-box" style="width: 250px; margin-bottom: 0;">
                     <i class="fas fa-search"></i>
                     <input type="text" id="paymentSearch" placeholder="Search customer, ID or items..."
                         onkeyup="filterPayments()">
                 </div>
-                <button class="action-btn" style="background-color: var(--dark-black);" onclick="generateWeeklyPDF()"><i
+
+                <div class="filter-group">
+                    <select id="paymentFilterRange" onchange="filterPayments()">
+                        <option value="all">All Dates</option>
+                        <option value="today">Today</option>
+                        <option value="7days">Last 7 Days</option>
+                        <option value="30days">Last 30 Days</option>
+                        <option value="custom">Custom Range...</option>
+                    </select>
+
+                    <select id="paymentFilterStatus" onchange="filterPayments()">
+                        <option value="all">All Statuses</option>
+                        <option value="Paid">Paid</option>
+                        <option value="Voided">Voided</option>
+                    </select>
+
+                    <select id="paymentFilterMethod" onchange="filterPayments()">
+                        <option value="all">All Methods</option>
+                        <option value="Cash">Cash</option>
+                        <option value="GCash">GCash</option>
+                        <option value="RFID">RFID Credit</option>
+                    </select>
+                </div>
+
+                <div class="fin-date-range-group" id="finCustomRangeControls" style="display: none;">
+                    <i class="fas fa-calendar-alt" style="color: var(--text-muted); font-size: 12px;"></i>
+                    <input type="date" id="finDateFrom" onchange="filterPayments()">
+                    <span class="fin-date-sep">–</span>
+                    <input type="date" id="finDateTo" onchange="filterPayments()">
+                    <button type="button" class="btn-mini-ghost" onclick="clearFinDateRange()" title="Clear date range">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <button class="action-btn is-dark" onclick="generateWeeklyPDF()"><i
                         class="fas fa-file-pdf"></i> Generate Weekly Report</button>
             </div>
             <div class="panel">
@@ -1149,10 +1201,10 @@
 
             <!-- Locker Stats — Premium Ribbon -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
-                <!-- Total -->
+                <!-- Occupancy Rate -->
                 <div class="grid-stat-box" style="cursor: default;">
-                    <p>Total Lockers</p>
-                    <h3 id="totalLockersCount">0</h3>
+                    <p>Occupancy Rate</p>
+                    <h3 id="lockerOccupancyRate">0%</h3>
                 </div>
                 <!-- Available -->
                 <div class="grid-stat-box" style="cursor: default;">
@@ -1264,31 +1316,20 @@
                     <div id="chatUserList" style="overflow-y: auto; flex-grow: 1;"></div>
                 </div>
                 <div class="chat-main">
-                    <div
-                        style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px;">
-                        <button class="mobile-only-btn" onclick="closeMobileChat()"
-                            style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-primary);"><i
-                                class="fas fa-arrow-left"></i></button>
-                        <div id="chatHeader" style="font-weight: bold; font-size: 16px;">Select a user to start chatting
-                        </div>
+                    <div class="chat-main-header">
+                        <button class="mobile-only-btn chat-back-btn" onclick="closeMobileChat()" aria-label="Back to chat list"><i class="fas fa-arrow-left"></i></button>
+                        <div id="chatHeader" class="chat-header-title">Select a user to start chatting</div>
                     </div>
                     <div id="chatHistory" class="chat-history">
-                        <div
-                            style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;">
-                            <i class="fa-regular fa-comments"
-                                style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i>
+                        <div class="chat-empty">
+                            <i class="fa-regular fa-comments"></i>
                             <p>No chat selected</p>
                         </div>
                     </div>
-                    <div
-                        style="padding: 20px; background: var(--white); border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
-                        <input type="text" id="chatInput" placeholder="Type a message..."
-                            onkeypress="if(event.key === 'Enter') sendMessage()"
-                            style="flex-grow: 1; padding: 12px 20px; border: 1px solid var(--border-color); border-radius: 25px; outline: none;"
-                            disabled>
-                        <button id="chatSendBtn" onclick="sendMessage()"
-                            style="background: var(--dark-black); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; transition: 0.2s;"
-                            disabled><i class="fas fa-paper-plane"></i></button>
+                    <div class="chat-composer">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Type a message..."
+                            onkeypress="if(event.key === 'Enter') sendMessage()" disabled>
+                        <button id="chatSendBtn" class="chat-send-btn" onclick="sendMessage()" disabled aria-label="Send message"><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             </div>
@@ -1368,7 +1409,7 @@
                 </div>
                 <div class="btn-row">
                     <button type="button" class="btn-cancel" onclick="closeModal('equipmentModal')">Cancel</button>
-                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Register Equipment</button>
+                    <button type="submit" class="btn-submit is-dark">Register Equipment</button>
                 </div>
             </form>
         </div>
@@ -1426,7 +1467,7 @@
                 </div>
                 <div class="btn-row">
                     <button type="button" class="btn-cancel" onclick="closeModal('editEquipModal')">Cancel</button>
-                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
+                    <button type="submit" class="btn-submit is-dark">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -1474,14 +1515,14 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Expiration Date <span class="optional-indicator">(Optional)</span></label>
-                    <input type="date" id="editProdExpiry">
+                    <input type="date" id="editProdExpiry" onfocus="this.min=new Date().toISOString().split('T')[0]">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Serial Number / Asset ID <span class="optional-indicator">(Optional)</span></label>
                     <input type="text" id="editProdSerialNumber" placeholder="e.g. SN-998877">
                 </div>
                 <div class="btn-row">
-                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editProductModal')">Cancel</button>
+                    <button type="button" class="action-btn is-subtle" onclick="closeModal('editProductModal')">Cancel</button>
                     <button type="submit" class="action-btn">Save Changes</button>
                 </div>
             </form>
@@ -1530,14 +1571,14 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Expiration Date <span class="optional-indicator">(Optional)</span></label>
-                    <input type="date" id="prodExpiry">
+                    <input type="date" id="prodExpiry" onfocus="this.min=new Date().toISOString().split('T')[0]">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Serial Number / Asset ID <span class="optional-indicator">(Optional)</span></label>
                     <input type="text" id="prodSerialNumber" placeholder="e.g. SN-998877">
                 </div>
                 <div class="btn-row">
-                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('productModal')">Cancel</button>
+                    <button type="button" class="action-btn is-subtle" onclick="closeModal('productModal')">Cancel</button>
                     <button type="submit" class="action-btn">Register Product</button>
                 </div>
             </form>
@@ -1597,7 +1638,7 @@
                     <input type="text" id="regMemberEmergency" placeholder="Emergency Contact Number" required>
 
                     <div class="btn-row" style="margin-top: 8px;">
-                        <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('memberModal')">Cancel</button>
+                        <button type="button" class="action-btn is-subtle" onclick="closeModal('memberModal')">Cancel</button>
                         <button type="button" class="action-btn" onclick="regWizardNext(1)">Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i></button>
                     </div>
                 </div>
@@ -1632,7 +1673,7 @@
                     </div>
 
                     <div class="btn-row" style="margin-top: 16px;">
-                        <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="regWizardBack(2)"><i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
+                        <button type="button" class="action-btn is-subtle" onclick="regWizardBack(2)"><i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
                         <button type="button" class="action-btn" onclick="regWizardNext(2)">Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i></button>
                     </div>
                 </div>
@@ -1709,8 +1750,8 @@
                     </div>
 
                     <div class="btn-row" style="margin-top: 16px;">
-                        <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="regWizardBack(3)"><i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
-                        <button type="submit" class="action-btn" style="background: #10B981;"><i class="fas fa-check-circle" style="margin-right: 6px;"></i> Confirm & Register</button>
+                        <button type="button" class="action-btn is-subtle" onclick="regWizardBack(3)"><i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
+                        <button type="submit" class="action-btn is-success"><i class="fas fa-check-circle" style="margin-right: 6px;"></i> Confirm & Register</button>
                     </div>
                 </div>
             </form>
@@ -1773,7 +1814,7 @@
                 </div>
                 
                 <div class="btn-row">
-                    <button type="button" class="action-btn" style="background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('editMemberModal')">Cancel</button>
+                    <button type="button" class="action-btn is-subtle" onclick="closeModal('editMemberModal')">Cancel</button>
                     <button type="submit" class="action-btn"><i class="fas fa-save"></i> Save Changes</button>
                 </div>
             </form>
@@ -1812,7 +1853,7 @@
                         style="background-color: #f1f2f6; color: var(--dark-black);">
                         <i class="fas fa-plus"></i> Add Row
                     </button>
-                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">
+                    <button type="submit" class="btn-submit is-dark">
                         <i class="fas fa-paper-plane"></i> Save & Send Emails
                     </button>
                 </div>
@@ -1861,41 +1902,109 @@
                     placeholder="Leave blank to keep current tag">
 
                 <div class="btn-row" style="margin-top: 15px;">
-                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
+                    <button type="submit" class="btn-submit is-dark">Save Changes</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="bookingModal" class="modal">
-        <div class="modal-content" style="max-width: 480px;">
-            <div class="modal-header">
-                <h3>Book Personal Training</h3><span class="close-btn"
-                    onclick="closeModal('bookingModal')">&times;</span>
+    <!-- Booking Slide-Over Drawer replaced with Premium Member-style Modal -->
+    <div id="bookingModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="bookingModalTitle" style="display: none;">
+        <div class="modal-content booking-modal-content" style="max-width: 900px; width: 90%; padding: 0;">
+            <div class="modal-header" style="padding: 20px;">
+                <h3 id="bookingModalTitle">Book Personal Training Session</h3>
+                <span class="close-btn" onclick="closeModal('bookingModal')" aria-label="Close booking dialog">&times;</span>
             </div>
-            <form class="modal-form" id="bookingForm">
-                <div class="form-group">
-                    <label class="form-label">Member <span class="required-asterisk">*</span></label>
-                    <select id="bookMember" required></select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Trainer <span class="required-asterisk">*</span></label>
-                    <select id="bookTrainer" required></select>
-                </div>
-                <div class="form-row" style="display: flex; gap: 15px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label">Date <span class="required-asterisk">*</span></label>
-                        <input type="date" id="bookDate" required style="width: 100%;">
+            <div class="booking-layout-wrapper">
+                <!-- Left/Main Column: Selection Steps -->
+                <div class="booking-steps-section">
+                    <!-- Step 1: Select Member -->
+                    <div class="booking-step-card">
+                        <label class="booking-step-label" for="bookMember"><span class="step-badge" aria-hidden="true">1</span> Select Member</label>
+                        <select id="bookMember" required class="booking-select" aria-required="true" onchange="window.updateManualBookingState()"></select>
                     </div>
-                    <div class="form-group" style="flex: 1;">
-                        <label class="form-label">Time <span class="required-asterisk">*</span></label>
-                        <input type="time" id="bookTime" required step="3600" style="width: 100%;">
+
+                    <!-- Step 2: Select Trainer -->
+                    <div class="booking-step-card">
+                        <label class="booking-step-label" for="bookTrainer"><span class="step-badge" aria-hidden="true">2</span> Select Trainer</label>
+                        <select id="bookTrainer" required class="booking-select" aria-required="true" onchange="window.updateManualBookingState()"></select>
+                    </div>
+
+                    <!-- Step 3 & 4: Calendar & Time Grid wrapper -->
+                    <div class="booking-datetime-grid" id="manualBookingDateTimeGrid" style="display: none;">
+                        <!-- Step 3: Custom Calendar Picker -->
+                        <div class="custom-cal-container">
+                            <p class="booking-step-label" id="manualBookingStep3Label"><span class="step-badge" aria-hidden="true">3</span> Select Date</p>
+                            <div class="custom-cal-header">
+                                <button type="button" class="cal-nav-btn" id="manualCalPrevMonthBtn" aria-label="Previous month">&lt;</button>
+                                <span class="cal-month-title" id="manualCalMonthTitle" aria-live="polite">May 2026</span>
+                                <button type="button" class="cal-nav-btn" id="manualCalNextMonthBtn" aria-label="Next month">&gt;</button>
+                            </div>
+                            <div class="custom-cal-weekdays" aria-hidden="true">
+                                <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                            </div>
+                            <div class="custom-cal-days" id="manualCalDaysGrid" role="grid" aria-labelledby="manualBookingStep3Label">
+                                <!-- Days dynamically populated -->
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Time Slot Picker -->
+                        <div class="booking-step-card booking-step-card-time">
+                            <p class="booking-step-label" id="manualBookingStep4Label"><span class="step-badge" aria-hidden="true">4</span> Select Time Slot</p>
+                            <div class="selected-date-header" id="manualSelectedDateHeader" aria-live="polite">Select a date first</div>
+                            <div class="time-slots-grid" id="manualTimeSlotsGrid" role="list" aria-labelledby="manualBookingStep4Label">
+                                <!-- Time slots dynamically populated -->
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="btn-row" style="margin-top: 15px;">
-                    <button type="submit" class="action-btn">Confirm Booking</button>
-                </div>
-            </form>
+
+                <!-- Right Column: Service/Booking Details Summary -->
+                <aside class="booking-details-sidebar" id="manualBookingDetailsSidebar" aria-label="Booking summary" style="display: none;">
+                    <div class="sidebar-header">Booking Details</div>
+                    <div class="sidebar-body">
+                        <h4 class="service-title">PERSONAL TRAINING</h4>
+
+                        <div class="details-item">
+                            <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                            <div>
+                                <strong id="manualSummaryDateTime">Choose Date & Time</strong>
+                                <span class="sub-detail">Duration: 1 hr</span>
+                            </div>
+                        </div>
+
+                        <div class="details-item">
+                            <i class="fa-solid fa-dumbbell" aria-hidden="true"></i>
+                            <div>
+                                <strong id="manualSummaryTrainer">Trainer Not Selected</strong>
+                                <span class="sub-detail">Assigned Specialist</span>
+                            </div>
+                        </div>
+
+                        <div class="details-item">
+                            <i class="fa-solid fa-user" aria-hidden="true"></i>
+                            <div>
+                                <strong id="manualSummaryMember">Member Not Selected</strong>
+                                <span class="sub-detail" id="manualMemberCreditsDisplay">Credits: -</span>
+                            </div>
+                        </div>
+
+                        <div class="details-item">
+                            <i class="fa-solid fa-ticket" aria-hidden="true"></i>
+                            <div>
+                                <strong>1 Session Credit</strong>
+                                <span class="sub-detail">Deducted from member's balance</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-footer">
+                        <button type="button" id="manualConfirmBookingBtn" class="action-btn next-btn" disabled aria-disabled="true">
+                            <i class="fas fa-check-circle" aria-hidden="true"></i> Confirm Booking
+                        </button>
+                    </div>
+                </aside>
+            </div>
         </div>
     </div>
 
@@ -1922,7 +2031,7 @@
                     <textarea id="editBookingRemarks" placeholder="Enter reason for cancellation..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary); min-height: 80px;"></textarea>
                 </div>
                 <div class="btn-row" style="margin-top: 15px;">
-                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
+                    <button type="submit" class="btn-submit is-dark">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -1982,7 +2091,7 @@
                     <label class="form-label">Location / Section</label>
                     <input type="text" id="lockerLocationInput" placeholder="e.g. Male Locker Room" required>
                 </div>
-                <button type="submit" class="action-btn" style="width: 100%; justify-content: center;">Create Locker</button>
+                <button type="submit" class="action-btn is-block">Create Locker</button>
             </form>
         </div>
     </div>
@@ -2021,9 +2130,9 @@
                         <input type="number" id="assignDuration" class="form-input" value="1" min="1" required style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
                     </div>
                     <div class="flex gap-3 mt-6">
-                        <button type="button" class="action-btn" style="flex: 1; background: var(--body-bg); color: var(--text-primary); box-shadow: none;" onclick="closeModal('assignLockerModal')">Cancel</button>
+                        <button type="button" class="action-btn is-subtle is-flex" onclick="closeModal('assignLockerModal')">Cancel</button>
                         <div style="display: flex; flex-direction: column; gap: 8px; flex: 1.5;">
-                            <button type="submit" class="action-btn" style="width: 100%; justify-content: center;">Assign Locker</button>
+                            <button type="submit" class="action-btn is-block">Assign Locker</button>
                         </div>
                     </div>
                 </form>
@@ -2044,9 +2153,12 @@
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button type="button" class="action-btn" style="flex: 1; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;" onclick="releaseLocker()">Release Locker</button>
-                        <button type="button" class="action-btn" style="background: #1e293b; color: white;" onclick="printLockerReceipt()">Print</button>
+                        <button type="button" class="action-btn is-danger-soft is-flex" onclick="releaseLocker()">Release Locker</button>
+                        <button type="button" class="action-btn is-dark" onclick="printLockerReceipt()">Print</button>
                     </div>
+                </div>
+                <div id="deleteLockerBtnWrapper" style="margin-top: 16px; border-top: 1px dashed var(--border-color); padding-top: 12px; display: none;">
+                    <button type="button" class="action-btn is-block w-full" style="background: #ef4444; color: white;" onclick="deleteLocker()">Delete Locker</button>
                 </div>
             </div>
         </div>

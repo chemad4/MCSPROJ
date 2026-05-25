@@ -1,6 +1,6 @@
 // Cache version — bump this on each deployment to invalidate stale assets.
 // Using date-based versioning for clarity (Audit Fix 3.6).
-const CACHE_NAME = 'fit-track-cache-v3-standardized';
+const CACHE_NAME = 'fit-track-cache-v5-2026-05-24';
 const urlsToCache = [
   './',
   'index.html',
@@ -24,7 +24,12 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        const cachePromises = urlsToCache.map(url => {
+          return cache.add(url).catch(err => {
+            console.warn(`ServiceWorker: Failed to cache core asset "${url}":`, err);
+          });
+        });
+        return Promise.all(cachePromises);
       })
   );
 });

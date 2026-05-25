@@ -8,10 +8,16 @@
     <link rel="icon" type="image/png" href="images/icon-192.png">
 
     <script>
-        const role = (localStorage.getItem("userRole") || "").toLowerCase();
-        if (!localStorage.getItem("loggedInUser") || role !== "trainer") {
-            window.location.replace("index.html");
-        }
+        (function () {
+            const SESSION_MAX_MS = 12 * 60 * 60 * 1000;
+            const loginAt = Number(localStorage.getItem("loginAt") || 0);
+            const expired = loginAt && (Date.now() - loginAt > SESSION_MAX_MS);
+            const role = (localStorage.getItem("userRole") || "").toLowerCase();
+            if (!localStorage.getItem("loggedInUser") || role !== "trainer" || expired) {
+                if (expired) localStorage.clear();
+                window.location.replace("index.html");
+            }
+        })();
     </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -206,7 +212,7 @@
                             <i class="fas fa-user-gear"></i> Profile Settings
                         </button>
                         <div class="dropdown-divider"></div>
-                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: var(--dark-black);">
+                        <button class="dropdown-item-btn is-danger" onclick="handleLogout()">
                             <i class="fa-solid fa-power-off"></i> Logout
                         </button>
                     </div>
@@ -218,12 +224,12 @@
             
             <div id="trainerNotificationArea"></div>
 
-            <div class="panel" style="border: none; background: transparent; box-shadow: none; margin-bottom: 25px; padding: 0;">
-                <div class="panel-body" style="padding: 10px 5px;">
-                    <h2 id="greetingText" style="margin-bottom: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--text-primary);">Overview</h2>
-                    <p style="color: var(--text-muted); font-size: 15px;">Manage your schedule and member requests.</p>
+            <header class="page-header">
+                <div class="page-header-text">
+                    <h2 id="greetingText" class="page-title">Overview</h2>
+                    <p class="page-subtitle">Manage your schedule and member requests.</p>
                 </div>
-            </div>
+            </header>
 
             <div class="stat-cards">
                 <div class="stat-card card-black" id="closestBookingCard" style="cursor: default;">
@@ -307,20 +313,20 @@
                         </div>
                 </div>
                 <div class="chat-main">
-                    <div style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px;">
-                        <button class="mobile-only-btn" onclick="closeMobileChat()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--dark-black);"><i class="fas fa-arrow-left"></i></button>
-                        <div id="chatHeader" style="font-weight: bold; font-size: 16px;">Select a user to start chatting</div>
+                    <div class="chat-main-header">
+                        <button class="mobile-only-btn chat-back-btn" onclick="closeMobileChat()" aria-label="Back"><i class="fas fa-arrow-left"></i></button>
+                        <div id="chatHeader" class="chat-header-title">Select a user to start chatting</div>
                     </div>
 
                     <div id="chatHistory" class="chat-history">
-                        <div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;">
-                            <i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i>
+                        <div class="chat-empty">
+                            <i class="fa-regular fa-comments"></i>
                             <p>No chat selected</p>
                         </div>
                     </div>
-                    <div style="padding: 20px; background: var(--white); border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
-                        <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()" style="flex-grow: 1; padding: 12px 20px; border: 1px solid var(--border-color); border-radius: 25px; outline: none;" disabled>
-                        <button id="chatSendBtn" onclick="sendMessage()" style="background: var(--dark-black); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; transition: 0.2s;" disabled><i class="fas fa-paper-plane"></i></button>
+                    <div class="chat-composer">
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()" disabled>
+                        <button id="chatSendBtn" class="chat-send-btn" onclick="sendMessage()" aria-label="Send" disabled><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             </div>
@@ -353,7 +359,7 @@
                     <textarea id="editBookingRemarks" placeholder="Enter reason for cancellation..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary); min-height: 80px;"></textarea>
                 </div>
                 <div class="btn-row" style="margin-top: 15px;">
-                    <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
+                    <button type="submit" class="btn-submit is-dark">Save Changes</button>
                 </div>
             </form>
         </div>

@@ -67,16 +67,33 @@ window.toggleBkStatusDropdown = function (e, bookingId) {
     document.querySelectorAll('.bk-status-wrapper.open').forEach(w => w.classList.remove('open'));
     if (!wasOpen) {
         wrapper.classList.add('open');
-        // Position the fixed dropdown below the trigger button
+        // Position the fixed dropdown — flip above if it would clip the viewport
         const trigger = e.currentTarget;
         const rect = trigger.getBoundingClientRect();
         const dropdown = wrapper.querySelector('.bk-status-dropdown');
         if (dropdown) {
-            dropdown.style.top = (rect.bottom + 4) + 'px';
-            dropdown.style.left = rect.left + 'px';
+            const viewportH = window.innerHeight;
+            const viewportW = window.innerWidth;
+            const estHeight = dropdown.offsetHeight || 200;
+            const estWidth = dropdown.offsetWidth || 160;
+            // Vertical: flip above the trigger if it would overflow the bottom edge
+            const top = (rect.bottom + estHeight + 4 > viewportH)
+                ? Math.max(8, rect.top - estHeight - 4)
+                : (rect.bottom + 4);
+            // Horizontal: nudge left if it would overflow the right edge
+            const left = (rect.left + estWidth > viewportW - 8)
+                ? Math.max(8, viewportW - estWidth - 8)
+                : rect.left;
+            dropdown.style.top = top + 'px';
+            dropdown.style.left = left + 'px';
         }
     }
 };
+
+// Close open dropdowns when the page scrolls (otherwise they detach visually from their trigger)
+window.addEventListener('scroll', () => {
+    document.querySelectorAll('.bk-status-wrapper.open').forEach(w => w.classList.remove('open'));
+}, true);
 
 window.quickUpdateStatus = function (e, bookingId, newStatus) {
     e.stopPropagation();
@@ -99,24 +116,55 @@ window.openBookingDrawer = function () {
     const allUsers = window.allUsersData || [];
 
     if (memberSelect) {
-        memberSelect.innerHTML = '<option value="" disabled selected>Select a Member...</option>' +
-            members.map(m => `<option value="${m.id}">${m.uid ? m.uid + ' - ' : ''}${m.name || (m.givenName + ' ' + m.familyName)}</option>`).join('');
+        memberSelect.innerHTML = '<option value="" disabled selected>Select Member...</option>' +
+            members.filter(m => m.status !== 'Archived').map(m => `<option value="${m.id}">${m.uid ? m.uid + ' - ' : ''}${m.name || (m.givenName + ' ' + m.familyName)}</option>`).join('');
     }
     if (trainerSelect) {
-        const trainers = allUsers.filter(u => (u.role || '').toLowerCase() === 'trainer');
-        trainerSelect.innerHTML = '<option value="" disabled selected>Select a Trainer...</option>' +
+        const trainers = allUsers.filter(u => (u.role || '').toLowerCase() === 'trainer' && u.status !== 'Archived');
+        trainerSelect.innerHTML = '<option value="" disabled selected>Select Trainer...</option>' +
             trainers.map(t => `<option value="${t.id}">${t.uid ? t.uid + ' - ' : ''}${t.name || (t.givenName + ' ' + t.familyName)}</option>`).join('');
     }
-    const form = document.getElementById('bookingForm');
-    if (form) form.reset();
-    if (typeof setBookingDateMin === 'function') setBookingDateMin(document.getElementById('bookDate'));
-    document.getElementById('bkDrawerOverlay').classList.add('open');
-    document.getElementById('bkDrawer').classList.add('open');
+
+    // Reset manual state
+    window.manualBookingState = {
+        memberId: '',
+        memberName: '',
+        trainerId: '',
+        trainerName: '',
+        date: '',
+        time: '',
+        month: new Date().getMonth(),
+        year: new Date().getFullYear()
+    };
+
+    const grid = document.getElementById('manualBookingDateTimeGrid');
+    const sidebar = document.getElementById('manualBookingDetailsSidebar');
+    if (grid) grid.style.display = 'none';
+    if (sidebar) sidebar.style.display = 'none';
+
+    window.setupManualCalNav();
+
+    const confirmBtn = document.getElementById('manualConfirmBookingBtn');
+    if (confirmBtn) {
+        confirmBtn.onclick = window.executeManualBooking;
+    }
+
+    // Use shared showModal or direct style block
+    const modal = document.getElementById('bookingModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('is-visible');
+        modal.removeAttribute('aria-hidden');
+    }
 };
 
 window.closeBookingDrawer = function () {
-    document.getElementById('bkDrawerOverlay').classList.remove('open');
-    document.getElementById('bkDrawer').classList.remove('open');
+    const modal = document.getElementById('bookingModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('is-visible');
+        modal.setAttribute('aria-hidden', 'true');
+    }
 };
 
 // Keep old openBookingModal as alias for backward compat
@@ -125,24 +173,24 @@ window.openBookingModal = window.openBookingDrawer;
 // --- KPI Update ---
 function updateBookingKPIs() {
     const data = window.bookingsData || [];
-    if (!data.length) return;
     const today = new Date().toLocaleDateString('en-CA');
     const todayCount = data.filter(b => b.date === today && b.status !== 'Cancelled').length;
     const pendingCount = data.filter(b => b.status === 'Pending').length;
-    const confirmedCount = data.filter(b => b.status === 'Confirmed').length;
 
-    // This week
+    // This week range
     const now = new Date();
     const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
     const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6);
     const sow = startOfWeek.toLocaleDateString('en-CA');
     const eow = endOfWeek.toLocaleDateString('en-CA');
-    const weekCount = data.filter(b => b.date >= sow && b.date <= eow).length;
+    const inWeek = (b) => b.date >= sow && b.date <= eow;
+    const weekCount = data.filter(inWeek).length;
+    const noShowWeek = data.filter(b => inWeek(b) && b.status === 'No Show').length;
 
     const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
     el('bkTodayCount', todayCount);
     el('bkPendingCount', pendingCount);
-    el('bkConfirmedCount', confirmedCount);
+    el('bkNoShowWeek', noShowWeek);
     el('bkTotalWeek', weekCount);
 }
 
@@ -214,18 +262,21 @@ function renderEnhancedBookingRow(b) {
 
     const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
 
+    const allowedTransitions = (window.BOOKING_STATUS_TRANSITIONS && window.BOOKING_STATUS_TRANSITIONS[b.status]) || [];
     const statusCell = `
         <div class="bk-status-wrapper">
-            <span class="bk-status-badge ${statusClass}" onclick="toggleBkStatusDropdown(event, '${b.id}')">
-                ${b.status} <i class="fa-solid fa-chevron-down bk-chevron"></i>
+            <span class="bk-status-badge ${statusClass}" ${allowedTransitions.length > 0 ? `onclick="toggleBkStatusDropdown(event, '${b.id}')"` : ''}>
+                ${b.status} ${allowedTransitions.length > 0 ? '<i class="fa-solid fa-chevron-down bk-chevron"></i>' : ''}
             </span>
+            ${allowedTransitions.length > 0 ? `
             <div class="bk-status-dropdown">
-                ${statuses.filter(s => s !== b.status).map(s => `
+                ${allowedTransitions.map(s => `
                     <div class="bk-status-option" onclick="quickUpdateStatus(event, '${b.id}', '${s}')">
                         <span class="bk-dot" style="background: ${dotColors[s]}"></span> ${s}
                     </div>
                 `).join('')}
             </div>
+            ` : ''}
         </div>
     `;
 
@@ -417,107 +468,434 @@ function renderBookingCalendar() {
     }, 100);
 })();
 
-// --- Drawer Form Submit (replaces old bookingModal submit) ---
-(function () {
-    const interval = setInterval(() => {
-        const form = document.getElementById('bookingForm');
-        if (!form) return;
-        clearInterval(interval);
+// --- Drawer Form Submit replaced with Premium Calendar Booking Controller ---
+window.manualBookingState = {
+    memberId: '',
+    memberName: '',
+    trainerId: '',
+    trainerName: '',
+    date: '',
+    time: '',
+    month: new Date().getMonth(),
+    year: new Date().getFullYear()
+};
 
-        // Remove existing listeners by cloning
-        const newForm = form.cloneNode(true);
-        form.parentNode.replaceChild(newForm, form);
+window.updateManualBookingState = function() {
+    const mSelect = document.getElementById('bookMember');
+    const tSelect = document.getElementById('bookTrainer');
+    if (!mSelect || !tSelect) return;
+    
+    window.manualBookingState.memberId = mSelect.value;
+    window.manualBookingState.memberName = mSelect.value ? mSelect.options[mSelect.selectedIndex].text : '';
+    window.manualBookingState.trainerId = tSelect.value;
+    window.manualBookingState.trainerName = tSelect.value ? tSelect.options[tSelect.selectedIndex].text : '';
+    
+    // Clean up name if it has UID prefix (e.g. "MEM-12345 - Given Family")
+    if (window.manualBookingState.memberName.includes(' - ')) {
+        window.manualBookingState.memberName = window.manualBookingState.memberName.split(' - ').slice(1).join(' - ');
+    }
+    if (window.manualBookingState.trainerName.includes(' - ')) {
+        window.manualBookingState.trainerName = window.manualBookingState.trainerName.split(' - ').slice(1).join(' - ');
+    }
 
-        newForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const submitBtn = newForm.querySelector('button[type="submit"]');
-            const origText = submitBtn ? submitBtn.innerHTML : '';
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; }
+    const summaryMember = document.getElementById('manualSummaryMember');
+    const summaryTrainer = document.getElementById('manualSummaryTrainer');
+    const creditsDisplay = document.getElementById('manualMemberCreditsDisplay');
+    
+    if (window.manualBookingState.memberId) {
+        const mData = (window.membersData || []).find(m => m.id === window.manualBookingState.memberId);
+        const creds = mData ? (mData.sessionsRemaining !== undefined ? mData.sessionsRemaining : 0) : 0;
+        summaryMember.innerText = window.manualBookingState.memberName;
+        creditsDisplay.innerText = `Credits remaining: ${creds}`;
+    } else {
+        summaryMember.innerText = "Member Not Selected";
+        creditsDisplay.innerText = "Credits: -";
+    }
+    
+    if (window.manualBookingState.trainerId) {
+        summaryTrainer.innerText = window.manualBookingState.trainerName;
+    } else {
+        summaryTrainer.innerText = "Trainer Not Selected";
+    }
+    
+    const grid = document.getElementById('manualBookingDateTimeGrid');
+    const sidebar = document.getElementById('manualBookingDetailsSidebar');
+    if (window.manualBookingState.memberId && window.manualBookingState.trainerId) {
+        if (grid) grid.style.display = 'grid';
+        if (sidebar) sidebar.style.display = 'flex';
+        window.renderManualBookingCalendar();
+        // If a date was already chosen, re-render time slots so conflict
+        // availability reflects the newly selected trainer/member. The
+        // previously selected time may no longer be valid, so clear it.
+        if (window.manualBookingState.date) {
+            window.manualBookingState.time = '';
+            window.renderManualBookingTimeSlots(window.manualBookingState.date);
+        }
+        window.updateManualBookingSummary();
+    } else {
+        if (grid) grid.style.display = 'none';
+        if (sidebar) sidebar.style.display = 'none';
+    }
+};
 
-            const memberSelect = document.getElementById('bookMember');
-            const trainerSelect = document.getElementById('bookTrainer');
-            const dateEl = document.getElementById('bookDate');
-            const timeEl = document.getElementById('bookTime');
+window.renderManualBookingCalendar = () => {
+    const daysGrid = document.getElementById('manualCalDaysGrid');
+    const monthTitle = document.getElementById('manualCalMonthTitle');
+    if (!daysGrid || !monthTitle || !window.manualBookingState) return;
 
-            if (typeof setBookingDateMin === 'function') setBookingDateMin(dateEl);
-            if (typeof updateBookingTimeMinForToday === 'function') updateBookingTimeMinForToday(dateEl, timeEl);
+    const { month, year, date: selectedDate } = window.manualBookingState;
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    monthTitle.innerText = `${monthNames[month]} ${year}`;
 
-            if (!dateEl.checkValidity()) { dateEl.reportValidity(); if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; } return; }
-            if (!timeEl.checkValidity()) { timeEl.reportValidity(); if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; } return; }
+    daysGrid.innerHTML = '';
 
-            const memberId = memberSelect.value, trainerId = trainerSelect.value;
-            const bookDate = dateEl.value, bookTime = timeEl.value;
-            const memberName = memberSelect.options[memberSelect.selectedIndex].text;
-            const trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
 
-            if (typeof isBookingSessionInPast === 'function' && isBookingSessionInPast(bookDate, bookTime)) {
-                showToast("Choose a date and time in the future.", "error");
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; }
-                return;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < firstDayIndex; i++) {
+        const blank = document.createElement('div');
+        blank.className = 'cal-day-cell';
+        blank.style.pointerEvents = 'none';
+        daysGrid.appendChild(blank);
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+        const cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'cal-day-cell';
+        cell.innerText = day;
+
+        const currentMonthString = String(month + 1).padStart(2, '0');
+        const currentDayString = String(day).padStart(2, '0');
+        const dateStr = `${year}-${currentMonthString}-${currentDayString}`;
+
+        const cellDate = new Date(year, month, day);
+        cellDate.setHours(0, 0, 0, 0);
+
+        if (cellDate < today) {
+            cell.disabled = true;
+        }
+
+        if (dateStr === selectedDate) {
+            cell.classList.add('selected');
+        }
+
+        const hasBooking = (window.bookingsData || []).some(b => {
+            return b.date === dateStr && 
+                   b.memberId === window.manualBookingState.memberId && 
+                   ["Confirmed", "Pending"].includes(b.status);
+        });
+        if (hasBooking) {
+            cell.classList.add('has-dot');
+        }
+
+        cell.addEventListener('click', () => {
+            window.manualBookingState.date = dateStr;
+            window.manualBookingState.time = ''; 
+            
+            const selectedCell = daysGrid.querySelector('.cal-day-cell.selected');
+            if (selectedCell) selectedCell.classList.remove('selected');
+            cell.classList.add('selected');
+
+            window.renderManualBookingTimeSlots(dateStr);
+            window.updateManualBookingSummary();
+        });
+
+        daysGrid.appendChild(cell);
+    }
+};
+
+window.renderManualBookingTimeSlots = (dateStr) => {
+    const slotsGrid = document.getElementById('manualTimeSlotsGrid');
+    const selectedDateHeader = document.getElementById('manualSelectedDateHeader');
+    if (!slotsGrid || !selectedDateHeader || !window.manualBookingState) return;
+
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const options = { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' };
+    selectedDateHeader.innerText = dateObj.toLocaleDateString('en-US', options);
+
+    slotsGrid.innerHTML = '';
+
+    const startHour = 8;
+    const endHour = 20;
+
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    const bookings = window.bookingsData || [];
+    const trainerBookings = bookings.filter(b => b.date === dateStr && b.trainerId === window.manualBookingState.trainerId && ["Confirmed", "Pending"].includes(b.status));
+    const memberBookings = bookings.filter(b => b.date === dateStr && b.memberId === window.manualBookingState.memberId && ["Confirmed", "Pending"].includes(b.status));
+
+    for (let h = startHour; h <= endHour; h++) {
+        const timeStr = `${String(h).padStart(2, '0')}:00`;
+        const period = h >= 12 ? 'PM' : 'AM';
+        const displayHour = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+        const displayTime = `${displayHour}:00 ${period}`;
+
+        const slotBtn = document.createElement('button');
+        slotBtn.type = 'button';
+        slotBtn.className = 'time-slot-btn';
+        slotBtn.innerText = displayTime;
+
+        let disabled = false;
+        let reason = '';
+
+        if (dateStr === todayStr) {
+            const currentHour = today.getHours();
+            if (h <= currentHour) {
+                disabled = true;
+                reason = 'Past';
+            }
+        }
+
+        const slotMins = h * 60;
+        const hasTrainerConflict = trainerBookings.some(tb => {
+            const [tbH, tbM] = tb.time.split(':').map(Number);
+            const tbMins = tbH * 60 + tbM;
+            return Math.abs(slotMins - tbMins) < 60; 
+        });
+
+        if (hasTrainerConflict) {
+            disabled = true;
+            reason = 'Trainer Booked';
+        }
+
+        const hasMemberConflict = memberBookings.some(mb => {
+            const [mbH, mbM] = mb.time.split(':').map(Number);
+            const mbMins = mbH * 60 + mbM;
+            return Math.abs(slotMins - mbMins) < 60; 
+        });
+
+        if (hasMemberConflict) {
+            disabled = true;
+            reason = 'Conflict';
+        }
+
+        if (disabled) {
+            slotBtn.disabled = true;
+            slotBtn.innerText = `${displayTime} (${reason})`;
+        } else {
+            if (timeStr === window.manualBookingState.time) {
+                slotBtn.classList.add('selected');
             }
 
+            slotBtn.addEventListener('click', () => {
+                window.manualBookingState.time = timeStr;
 
+                const selectedBtn = slotsGrid.querySelector('.time-slot-btn.selected');
+                if (selectedBtn) selectedBtn.classList.remove('selected');
+                slotBtn.classList.add('selected');
 
-            // Conflict check
-            try {
-                const fb = window._fb;
-                if (!bookTime || !bookTime.includes(':')) {
-                    showToast("Invalid booking time selected.", "error");
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; }
-                    return;
+                window.updateManualBookingSummary();
+            });
+        }
+
+        slotsGrid.appendChild(slotBtn);
+    }
+};
+
+window.updateManualBookingSummary = () => {
+    const summaryDateTime = document.getElementById('manualSummaryDateTime');
+    const confirmBtn = document.getElementById('manualConfirmBookingBtn');
+    if (!summaryDateTime || !confirmBtn || !window.manualBookingState) return;
+
+    const { date, time } = window.manualBookingState;
+
+    if (date && time) {
+        const [y, m, d] = date.split('-').map(Number);
+        const dateObj = new Date(y, m - 1, d);
+        const options = { month: 'short', day: 'numeric', year: 'numeric' };
+        const readableDate = dateObj.toLocaleDateString('en-US', options);
+
+        const [h, min] = time.split(':').map(Number);
+        const period = h >= 12 ? 'PM' : 'AM';
+        const displayHour = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+        const readableTime = `${displayHour}:00 ${period}`;
+
+        summaryDateTime.innerText = `${readableDate} at ${readableTime}`;
+        confirmBtn.disabled = false;
+        confirmBtn.removeAttribute('aria-disabled');
+    } else {
+        summaryDateTime.innerText = "Choose Date & Time";
+        confirmBtn.disabled = true;
+        confirmBtn.setAttribute('aria-disabled', 'true');
+    }
+};
+
+window.setupManualCalNav = () => {
+    const prevBtn = document.getElementById('manualCalPrevMonthBtn');
+    const nextBtn = document.getElementById('manualCalNextMonthBtn');
+    if (!prevBtn || !nextBtn || window.manualCalNavSetup) return;
+    
+    window.manualCalNavSetup = true;
+    prevBtn.addEventListener('click', () => {
+        window.manualBookingState.month--;
+        if (window.manualBookingState.month < 0) {
+            window.manualBookingState.month = 11;
+            window.manualBookingState.year--;
+        }
+        window.renderManualBookingCalendar();
+    });
+    
+    nextBtn.addEventListener('click', () => {
+        window.manualBookingState.month++;
+        if (window.manualBookingState.month > 11) {
+            window.manualBookingState.month = 0;
+            window.manualBookingState.year++;
+        }
+        window.renderManualBookingCalendar();
+    });
+};
+
+window.executeManualBooking = async () => {
+    const confirmBtn = document.getElementById('manualConfirmBookingBtn');
+    if (confirmBtn.disabled) return;
+    const originalHtml = confirmBtn.innerHTML;
+
+    if (!window.manualBookingState) {
+        showToast("Booking state is invalid.", "error");
+        return;
+    }
+    const { memberId, memberName, trainerId, trainerName, date, time } = window.manualBookingState;
+    if (!memberId || !trainerId || !date || !time) {
+        showToast("Please make sure all booking fields (Member, Trainer, Date, and Time) are selected.", "error");
+        return;
+    }
+
+    // Same-day pre-confirm: warn (but allow) when the target member already has
+    // a booking on the chosen date. Skipped once after the user clicks Proceed.
+    if (!window._manualBookingSkipSameDayConfirm && typeof window.findSameDayBookings === 'function') {
+        const sameDay = window.findSameDayBookings(memberId, date);
+        if (sameDay.length > 0) {
+            const lines = sameDay.map(b => '• ' + window.formatBookingSummary(b)).join('\n');
+            window.showConfirm({
+                title: 'Member already has a session today',
+                message: `${memberName || 'This member'} already has ${sameDay.length === 1 ? 'a booking' : 'bookings'} on this date:\n${lines}\n\nProceed with another booking at ${time} with ${trainerName}?`,
+                tone: 'warning',
+                confirmText: 'Proceed anyway',
+                cancelText: 'Cancel',
+                onConfirm: () => {
+                    window._manualBookingSkipSameDayConfirm = true;
+                    window.executeManualBooking();
                 }
-                const [bH, bM] = bookTime.split(':').map(Number);
-                const bookMins = bH * 60 + bM;
+            });
+            return;
+        }
+    }
+    window._manualBookingSkipSameDayConfirm = false;
 
-                // 1. Trainer Conflict Check
-                const q = fb.query(fb.bookingsCol, fb.where("trainerId", "==", trainerId), fb.where("date", "==", bookDate), fb.where("status", "==", "Confirmed"));
-                const snap = await fb.getDocs(q);
-                let conflict = false;
-                snap.forEach(d => {
-                    const ts = d.data().time;
-                    if (ts && typeof ts === 'string' && ts.includes(':')) {
-                        const parts = ts.split(':');
-                        const eH = parseInt(parts[0], 10);
-                        const eM = parseInt(parts[1], 10);
-                        if (!isNaN(eH) && !isNaN(eM)) {
-                            if (Math.abs(bookMins - (eH * 60 + eM)) < 60) conflict = true;
-                        }
-                    }
-                });
-                if (conflict) {
-                    showToast("Trainer already booked within 1 hour of this time.", "error");
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; }
-                    return;
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+    try {
+        if (typeof window.syncServerTimeOffset === 'function') {
+            await window.syncServerTimeOffset();
+        }
+        const offset = window.serverTimeOffsetMs || 0;
+        const freshNowMs = Date.now() + offset;
+        const targetBookingTimeMsCheck = new Date(date + 'T' + time).getTime();
+        if (targetBookingTimeMsCheck < freshNowMs) {
+            showToast("Choose a date and time in the future. Past sessions cannot be booked.", "error");
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = originalHtml;
+            return;
+        }
+
+        const fb = window._fb;
+        await fb.runTransaction(fb.db, async (tx) => {
+            const memberRef = fb.doc(fb.db, "users", memberId);
+            const trainerRef = fb.doc(fb.db, "users", trainerId);
+            const trainerSlotRef = fb.doc(fb.db, "bookingSlots", window.slotIdForTrainer(trainerId, date, time));
+            const memberSlotRef  = fb.doc(fb.db, "bookingSlots", window.slotIdForMember(memberId, date, time));
+
+            const [memberSnap, trainerSnap, trainerSlotSnap, memberSlotSnap] = await Promise.all([
+                tx.get(memberRef),
+                tx.get(trainerRef),
+                tx.get(trainerSlotRef),
+                tx.get(memberSlotRef)
+            ]);
+
+            if (!memberSnap.exists()) {
+                throw new Error("Member record does not exist.");
+            }
+            // H1: trainer must still exist, still be a Trainer, and still be Active.
+            if (!trainerSnap.exists()) {
+                throw new Error("Trainer no longer exists. Please choose a different trainer.");
+            }
+            const tData = trainerSnap.data() || {};
+            if ((tData.role || '').toLowerCase() !== 'trainer') {
+                throw new Error("Selected user is no longer a trainer. Please choose a different trainer.");
+            }
+            if ((tData.status || '').toLowerCase() === 'archived' || tData.status !== 'Active') {
+                throw new Error("Trainer is not currently active. Please choose a different trainer.");
+            }
+            const mData = memberSnap.data();
+
+            // Expiration Check
+            if (window.isMemberPlanExpired && window.isMemberPlanExpired(mData)) {
+                throw new Error("Member's membership has expired. Please renew their plan before booking.");
+            }
+            if (typeof mData.dateRegistered === 'number') {
+                const planDays = (typeof window.getPlanDays === 'function') ? window.getPlanDays(mData.plan) : 30;
+                const expiryAt = mData.dateRegistered + planDays * 24 * 60 * 60 * 1000;
+                const targetBookingTimeMs = new Date(date + 'T' + time).getTime();
+                if (targetBookingTimeMs > expiryAt) {
+                    throw new Error("Target booking date exceeds the member's membership plan expiration date. Please renew their plan for that period.");
                 }
+            }
 
-                // 2. Member Conflict Check
-                const memberQ = fb.query(fb.bookingsCol, fb.where("memberId", "==", memberId), fb.where("date", "==", bookDate), fb.where("status", "==", "Confirmed"));
-                const memberSnap = await fb.getDocs(memberQ);
-                let memberConflict = false;
-                memberSnap.forEach(d => {
-                    const ts = d.data().time;
-                    if (ts && typeof ts === 'string' && ts.includes(':')) {
-                        const parts = ts.split(':');
-                        const eH = parseInt(parts[0], 10);
-                        const eM = parseInt(parts[1], 10);
-                        if (!isNaN(eH) && !isNaN(eM)) {
-                            if (Math.abs(bookMins - (eH * 60 + eM)) < 60) memberConflict = true;
-                        }
-                    }
-                });
-                if (memberConflict) {
-                    showToast("Member is already booked for a confirmed session within 1 hour of this time.", "error");
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; }
-                    return;
-                }
-            } catch (err) { console.warn('Conflict check skipped', err); }
+            // Time-Tampering / Future Date check
+            const freshNowMsTx = Date.now() + (window.serverTimeOffsetMs || 0);
+            const targetBookingTimeMsTx = new Date(date + 'T' + time).getTime();
+            if (targetBookingTimeMsTx < freshNowMsTx) {
+                throw new Error("Choose a date and time in the future. Past sessions cannot be booked.");
+            }
 
-            const fb2 = window._fb || {};
-            await fb2.addDoc(fb2.bookingsCol, { memberId, memberName, trainerId, trainerName, date: bookDate, time: bookTime, status: "Confirmed", timestamp: Date.now() });
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = origText; }
-            closeBookingDrawer();
-            showToast("Personal Training Session booked!", "success");
-            if (window.logActivity) window.logActivity("Booking Created", "Admin/Staff booked a training session.");
+            // Slot collisions
+            if (trainerSlotSnap.exists()) {
+                throw new Error("Trainer already has a confirmed session at this hour.");
+            }
+            if (memberSlotSnap.exists()) {
+                throw new Error("Member already has a booking at this hour.");
+            }
+
+            // Credit Check
+            const sessionsRemaining = mData.sessionsRemaining !== undefined ? Number(mData.sessionsRemaining) : 0;
+            if (sessionsRemaining <= 0) {
+                throw new Error("Member has 0 session credits remaining. Please buy more credits first.");
+            }
+
+            // Write atomically
+            const newBookingRef = fb.doc(fb.bookingsCol);
+            tx.update(memberRef, { sessionsRemaining: fb.increment(-1) });
+            tx.set(trainerSlotRef, { bookingId: newBookingRef.id, trainerId, date, time });
+            tx.set(memberSlotRef,  { bookingId: newBookingRef.id, memberId,  date, time });
+
+            tx.set(newBookingRef, {
+                memberId,
+                memberName,
+                trainerId,
+                trainerName,
+                date,
+                time,
+                status: "Confirmed",
+                creditState: "held",
+                timestamp: Date.now()
+            });
         });
-    }, 300);
-})();
+
+        window.closeModal('bookingModal');
+        showToast("PT Session booked successfully!", "success");
+        if (window.logActivity) window.logActivity("Booking Created", `Admin/Staff booked a training session on ${date} at ${time} with ${trainerName}.`);
+    } catch (err) {
+        console.error("Manual Booking failed:", err);
+        showToast(err.message || "Failed to book session.", "error");
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = originalHtml;
+    }
+};

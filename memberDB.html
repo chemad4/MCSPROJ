@@ -8,10 +8,16 @@
     <link rel="icon" type="image/png" href="images/icon-192.png">
 
     <script>
-        const role = (localStorage.getItem("userRole") || "").toLowerCase();
-        if (!localStorage.getItem("loggedInUser") || role !== "member") {
-            window.location.replace("index.html");
-        }
+        (function () {
+            const SESSION_MAX_MS = 12 * 60 * 60 * 1000;
+            const loginAt = Number(localStorage.getItem("loginAt") || 0);
+            const expired = loginAt && (Date.now() - loginAt > SESSION_MAX_MS);
+            const role = (localStorage.getItem("userRole") || "").toLowerCase();
+            if (!localStorage.getItem("loggedInUser") || role !== "member" || expired) {
+                if (expired) localStorage.clear();
+                window.location.replace("index.html");
+            }
+        })();
     </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -24,552 +30,31 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/bookings-ui.js"></script>
-    
-    <style>
-        /* Member specific styles */
-        .trainer-card {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            transition: 0.3s;
-        }
-        .trainer-card:hover {
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-            transform: translateY(-2px);
-        }
-        .trainer-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: var(--dark-black);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-        }
-        .trainer-info {
-            flex-grow: 1;
-        }
-        .trainer-name {
-            font-weight: bold;
-            font-size: 16px;
-            color: var(--dark-black);
-            margin-bottom: 5px;
-        }
-        .trainer-specialty {
-            font-size: 13px;
-            color: var(--text-muted);
-        }
-        .trainer-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-        }
-
-        /* Notification Banner Style */
-        .notification-banner {
-            background-color: #d4edda;
-            color: #155724;
-            padding: 15px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 5px solid #28a745;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            animation: slideDown 0.5s ease-out;
-        }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Responsive Flexbox Layouts */
-        .table-controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 15px;
-        }
-        .search-box {
-            flex-grow: 1;
-            min-width: 250px;
-        }
-        .welcome-panel-body {
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 30px;
-            flex-wrap: wrap; 
-            gap: 20px;
-        }
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 20px;
-            margin-top: 20px;
-        }
-
-        /* Mobile Button Default Hidden */
-        .mobile-only-btn { display: none; }
-
-        /* MASTER MOBILE OVERRIDES: APP-STYLE BOTTOM NAV */
-        @media (max-width: 768px) {
-            /* Transform Sidebar into a Bottom Nav Bar */
-            .sidebar {
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                width: 100%;
-                height: 70px;
-                transform: none; 
-                z-index: 9999;
-                display: flex;
-                padding: 0;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
-            }
-
-            .logo-area { display: none; }
-
-            .nav-menu {
-                display: flex;
-                flex-direction: row;
-                width: 100%;
-                justify-content: space-around;
-                margin: 0;
-                padding: 0;
-                background: var(--dark-black);
-            }
-
-            .nav-item {
-                margin: 0;
-                padding: 10px 0;
-                flex-direction: column;
-                justify-content: center;
-                border-radius: 0;
-                flex: 1; 
-                text-align: center;
-            }
-
-            .nav-item i {
-                margin-right: 0 !important;
-                margin-bottom: 4px;
-                font-size: 20px;
-            }
-
-            .menu-text {
-                font-size: 11px;
-                display: block;
-            }
-
-            /* Main Content Adjustments */
-            .main-content { 
-                margin-left: 0 !important; 
-                margin-bottom: 70px; 
-                width: 100%; 
-                padding: 15px; 
-            }
-
-            .topbar { left: 0 !important; width: 100% !important; padding: 10px 15px; }
-            .live-clock { display: none !important; }
-            #topBarName { display: none; }
-
-            .dashboard-grid { grid-template-columns: 1fr; }
-            .table-controls { flex-direction: column; align-items: stretch; }
-            .search-box, .search-box input { width: 100% !important; }
-            .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-            .welcome-panel-body { flex-direction: column; text-align: center; }
-            .welcome-panel-body > div { text-align: center !important; }
-
-            /* NEW: Mobile Chat Fixes */
-            .chat-container { flex-direction: column !important; height: calc(100vh - 160px) !important; }
-            .chat-sidebar { width: 100% !important; border-right: none !important; }
-            .chat-main { display: none; width: 100% !important; }
-            
-            /* Classes triggered via JS when chat is active */
-            .chat-container.mobile-chat-open .chat-sidebar { display: none !important; }
-            .chat-container.mobile-chat-open .chat-main { display: flex !important; flex-direction: column; flex-grow: 1; }
-            .mobile-only-btn { display: block !important; }
-        }
-
-        /* PREMIUM INTERACTIVE BOOKING LAYOUT */
-        .booking-modal-content {
-            max-width: 900px !important;
-            width: 95% !important;
-            border-radius: 12px !important;
-            background: var(--panel-bg) !important;
-            color: var(--text-primary) !important;
-            border: 1px solid var(--border-color) !important;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15) !important;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            padding: 0 !important;
-        }
-        .booking-modal-content .modal-header {
-            padding: 20px 25px !important;
-            border-bottom: 1px solid var(--border-color) !important;
-            background: var(--panel-bg);
-        }
-        .booking-layout-wrapper {
-            display: grid;
-            grid-template-columns: 1.6fr 1fr;
-            min-height: 480px;
-        }
-        .booking-steps-section {
-            padding: 25px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            border-right: 1px solid var(--border-color);
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-        .booking-details-sidebar {
-            padding: 25px;
-            background: rgba(0,0,0,0.01);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-        body.dark-theme .booking-details-sidebar {
-            background: rgba(255,255,255,0.02);
-        }
-        .booking-step-card {
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 15px 20px;
-            box-shadow: var(--card-shadow);
-        }
-        .booking-step-label {
-            font-size: 14px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-        .step-badge {
-            background: var(--accent-blue);
-            color: white;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        .booking-select {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background: var(--panel-bg);
-            color: var(--text-primary);
-            font-size: 14px;
-            font-weight: 500;
-            outline: none;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .booking-select:focus {
-            border-color: var(--accent-blue);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-        }
-        .booking-datetime-grid {
-            display: grid;
-            grid-template-columns: 1.1fr 0.9fr;
-            gap: 20px;
-        }
-        .custom-cal-container {
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 15px;
-            background: var(--panel-bg);
-            box-shadow: var(--card-shadow);
-        }
-        .custom-cal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 15px;
-        }
-        .cal-month-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-        .cal-nav-btn {
-            background: none;
-            border: 1px solid var(--border-color);
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            cursor: pointer;
-            color: var(--text-primary);
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: 0.2s;
-        }
-        .cal-nav-btn:hover {
-            background: rgba(0,0,0,0.03);
-            border-color: var(--accent-blue);
-            color: var(--accent-blue);
-        }
-        body.dark-theme .cal-nav-btn:hover {
-            background: rgba(255,255,255,0.05);
-        }
-        .custom-cal-weekdays {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            text-align: center;
-            margin-bottom: 8px;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-        }
-        .custom-cal-days {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 6px;
-        }
-        .cal-day-cell {
-            aspect-ratio: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 600;
-            border-radius: 50%;
-            cursor: pointer;
-            border: none;
-            background: none;
-            color: var(--text-primary);
-            transition: 0.2s;
-            position: relative;
-        }
-        .cal-day-cell:hover:not(:disabled) {
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--accent-blue);
-        }
-        .cal-day-cell.selected {
-            background: var(--accent-blue) !important;
-            color: white !important;
-            font-weight: 700;
-            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
-        }
-        .cal-day-cell:disabled {
-            color: var(--text-muted);
-            opacity: 0.25;
-            cursor: not-allowed;
-        }
-        .cal-day-cell.has-dot::after {
-            content: '';
-            position: absolute;
-            bottom: 4px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 4px;
-            height: 4px;
-            background: var(--accent-blue);
-            border-radius: 50%;
-        }
-        .cal-day-cell.selected.has-dot::after {
-            background: white;
-        }
-        .selected-date-header {
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 12px;
-            padding-bottom: 6px;
-            border-bottom: 1px solid var(--border-color);
-        }
-        .time-slots-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-            max-height: 250px;
-            overflow-y: auto;
-            padding-right: 4px;
-        }
-        .time-slot-btn {
-            width: 100%;
-            padding: 10px 14px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background: var(--panel-bg);
-            color: var(--text-primary);
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-align: center;
-        }
-        .time-slot-btn:hover:not(:disabled) {
-            border-color: var(--accent-blue);
-            color: var(--accent-blue);
-            background: rgba(59, 130, 246, 0.03);
-        }
-        .time-slot-btn.selected {
-            background: rgba(59, 130, 246, 0.08) !important;
-            border-color: var(--accent-blue) !important;
-            color: var(--accent-blue) !important;
-            box-shadow: 0 0 0 1px var(--accent-blue);
-        }
-        .time-slot-btn:disabled {
-            opacity: 0.35;
-            background: rgba(0,0,0,0.02);
-            border-style: dashed;
-            cursor: not-allowed;
-            color: var(--text-muted);
-        }
-        body.dark-theme .time-slot-btn:disabled {
-            background: rgba(255,255,255,0.01);
-        }
-        .sidebar-header {
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.75px;
-            color: var(--text-muted);
-            margin-bottom: 20px;
-        }
-        .sidebar-body {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            flex-grow: 1;
-        }
-        .service-title {
-            font-size: 20px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            color: var(--text-primary);
-            margin-bottom: 5px;
-        }
-        .details-item {
-            display: flex;
-            gap: 15px;
-            align-items: flex-start;
-        }
-        .details-item i {
-            font-size: 16px;
-            color: var(--text-muted);
-            margin-top: 2px;
-            width: 20px;
-            text-align: center;
-        }
-        .details-item strong {
-            display: block;
-            font-size: 14px;
-            color: var(--text-primary);
-            font-weight: 600;
-        }
-        .details-item .sub-detail {
-            font-size: 12px;
-            color: var(--text-muted);
-            display: block;
-            margin-top: 2px;
-        }
-        .sidebar-footer {
-            margin-top: 30px;
-        }
-        .sidebar-footer .next-btn {
-            width: 100%;
-            padding: 14px;
-            font-size: 15px;
-            font-weight: 700;
-            border-radius: 8px;
-            background: var(--accent-blue) !important;
-            color: white !important;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .sidebar-footer .next-btn:hover:not(:disabled) {
-            background: #2563eb !important;
-            transform: translateY(-1px);
-        }
-        .sidebar-footer .next-btn:disabled {
-            background: var(--border-color) !important;
-            color: var(--text-muted) !important;
-            box-shadow: none;
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        /* Responsive Layout Overrides */
-        @media (max-width: 768px) {
-            .booking-layout-wrapper {
-                grid-template-columns: 1fr;
-            }
-            .booking-steps-section {
-                border-right: none;
-                border-bottom: 1px solid var(--border-color);
-                max-height: none;
-                overflow: visible;
-                padding: 15px;
-            }
-            .booking-details-sidebar {
-                max-height: none;
-                overflow: visible;
-                padding: 20px 15px;
-            }
-            .booking-datetime-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
 </head>
-<body>
+<body class="member-page">
 
-    <aside class="sidebar">
+    <aside class="sidebar" aria-label="Primary navigation">
         <div class="logo-area">FIT <span>TRACK</span></div>
 
-        <ul class="nav-menu" id="navMenu">
-            <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)">
-                <i class="fa-solid fa-house-user"></i> <span class="menu-text">Home</span>
+        <ul class="nav-menu" id="navMenu" role="list">
+            <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)" aria-current="page" tabindex="0">
+                <i class="fa-solid fa-house-user" aria-hidden="true"></i> <span class="menu-text">Home</span>
             </li>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('trainers', this)">
-                <i class="fa-solid fa-users-viewfinder"></i> <span class="menu-text">Trainers</span>
+            <li class="nav-item nav-clickable" onclick="switchTab('trainers', this)" tabindex="0">
+                <i class="fa-solid fa-users-viewfinder" aria-hidden="true"></i> <span class="menu-text">Trainers</span>
             </li>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)">
-                <i class="fa-solid fa-calendar-check"></i> <span class="menu-text">Bookings</span>
+            <li class="nav-item nav-clickable" onclick="switchTab('bookings', this)" tabindex="0">
+                <i class="fa-solid fa-calendar-check" aria-hidden="true"></i> <span class="menu-text">Bookings</span>
             </li>
 
-            <li class="nav-item nav-clickable" onclick="switchTab('myProgram', this)">
-                <i class="fa-solid fa-dumbbell"></i> <span class="menu-text">My Program</span>
+            <li class="nav-item nav-clickable" onclick="switchTab('myProgram', this)" tabindex="0">
+                <i class="fa-solid fa-dumbbell" aria-hidden="true"></i> <span class="menu-text">My Program</span>
             </li>
 
-            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Gym Directory')">
-                <i class="fa-solid fa-comments"></i> <span class="menu-text">Messages</span>
+            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Gym Directory')" tabindex="0">
+                <i class="fa-solid fa-comments" aria-hidden="true"></i> <span class="menu-text">Messages</span>
             </li>
         </ul>
     </aside>
@@ -577,33 +62,35 @@
     <main class="main-content">
         <header class="topbar">
             <div class="topbar-left">
-                <span id="pageTitle" style="font-weight: 500; color: var(--text-primary); font-size: 16px;">My Dashboard</span>
+                <span id="pageTitle" class="topbar-page-title">My Dashboard</span>
             </div>
-            <div class="topbar-center" style="margin-left: auto; margin-right: 20px;">
-                <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
+            <div class="topbar-center">
+                <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock" aria-hidden="true"></i> Loading time...</span>
             </div>
             <div class="topbar-right">
-                <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn-circle"><i id="darkModeIcon" class="fas fa-moon"></i></button>
-                
+                <button onclick="toggleDarkMode()" title="Toggle dark mode" aria-label="Toggle dark mode" class="icon-btn-circle">
+                    <i id="darkModeIcon" class="fas fa-moon" aria-hidden="true"></i>
+                </button>
+
                 <div class="user-menu-container">
-                    <div class="user-profile-trigger" id="userMenuTrigger">
-                        <div id="topBarNameContainer" style="display: flex; align-items: center; gap: 8px; pointer-events: none;">
-                            <i class="fa-solid fa-circle-user" style="font-size: 24px; color: var(--text-muted);"></i>
-                            <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                                <span id="topBarName" style="font-weight: 600; font-size: 14px; line-height: 1;">Loading...</span>
-                                <span style="font-size: 11px; color: var(--text-muted);">Gym Member</span>
+                    <div class="user-profile-trigger" id="userMenuTrigger" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="false" aria-controls="userDropdown">
+                        <div id="topBarNameContainer" class="topbar-user">
+                            <i class="fa-solid fa-circle-user topbar-user-avatar" aria-hidden="true"></i>
+                            <div class="topbar-user-stack">
+                                <span id="topBarName" class="topbar-user-name">Loading...</span>
+                                <span class="topbar-user-role">Gym Member</span>
                             </div>
-                            <i class="fa-solid fa-chevron-down" style="font-size: 10px; color: var(--text-muted); margin-left: 4px;"></i>
+                            <i class="fa-solid fa-chevron-down topbar-user-chevron" aria-hidden="true"></i>
                         </div>
                     </div>
-                    
-                    <div class="dropdown-menu" id="userDropdown">
-                        <button class="dropdown-item-btn" onclick="openProfileSettingsModal()">
-                            <i class="fas fa-user-gear"></i> Profile Settings
+
+                    <div class="dropdown-menu" id="userDropdown" role="menu">
+                        <button class="dropdown-item-btn" onclick="openProfileSettingsModal()" role="menuitem">
+                            <i class="fas fa-user-gear" aria-hidden="true"></i> Profile Settings
                         </button>
-                        <div class="dropdown-divider"></div>
-                        <button class="dropdown-item-btn" onclick="handleLogout()" style="color: #ef4444; font-weight: 600;">
-                            <i class="fa-solid fa-power-off"></i> Logout
+                        <div class="dropdown-divider" role="separator"></div>
+                        <button class="dropdown-item-btn is-danger" onclick="handleLogout()" role="menuitem">
+                            <i class="fa-solid fa-power-off" aria-hidden="true"></i> Logout
                         </button>
                     </div>
                 </div>
@@ -614,28 +101,28 @@
             
             <div id="memberNotificationArea"></div>
 
-            <div class="panel" style="border: none; background: transparent; box-shadow: none; margin-bottom: 25px; padding: 0;">
-                <div class="panel-body" style="padding: 10px 5px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+            <div class="panel is-bare">
+                <div class="panel-body greeting-row">
                     <div>
-                        <h2 id="greetingText" style="margin-bottom: 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; color: var(--text-primary);">Overview</h2>
-                        <p style="color: var(--text-muted); font-size: 15px;">Ready to crush your goals today?</p>
+                        <h2 id="greetingText" class="greeting-title">Overview</h2>
+                        <p class="greeting-subtitle">Ready to crush your goals today?</p>
                     </div>
-                    <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-                        <div style="background: var(--panel-bg); padding: 15px 20px; border-radius: 8px; border: 1px solid var(--border-color); text-align: left; min-width: 150px;">
-                            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;">Current Plan</div>
-                            <div id="myPlanName" style="font-size: 18px; font-weight: 700; color: var(--primary-red); line-height: 1.2;">Loading...</div>
-                            <div id="myPlanDays" style="font-size: 13px; margin-top: 5px; color: var(--text-muted);"><i class="fa-regular fa-clock"></i> Checking...</div>
+                    <div class="greeting-stats">
+                        <div class="greeting-stat">
+                            <div class="greeting-stat-label">Current Plan</div>
+                            <div id="myPlanName" class="greeting-stat-value">Loading...</div>
+                            <div id="myPlanDays" class="greeting-stat-foot"><i class="fa-regular fa-clock"></i> Checking...</div>
                         </div>
-                        <div style="background: var(--panel-bg); padding: 15px 20px; border-radius: 8px; border: 1px solid var(--border-color); text-align: left; min-width: 180px;">
-                            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;">Personal Training</div>
-                            <div style="display: flex; align-items: baseline; gap: 4px;">
-                                <span id="mySessionsRemaining" style="font-size: 24px; font-weight: 800; color: var(--text-primary);">--</span>
-                                <span style="font-size: 13px; color: var(--text-muted);">/</span>
-                                <span id="mySessionsTotal" style="font-size: 14px; color: var(--text-muted); font-weight: 600;">--</span>
-                                <span style="font-size: 12px; color: var(--text-muted); margin-left: 5px;">Remaining</span>
+                        <div class="greeting-stat greeting-stat-wide">
+                            <div class="greeting-stat-label">Personal Training</div>
+                            <div class="sessions-row">
+                                <span id="mySessionsRemaining" class="sessions-remaining">--</span>
+                                <span class="sessions-divider">/</span>
+                                <span id="mySessionsTotal" class="sessions-total">--</span>
+                                <span class="sessions-tag">Remaining</span>
                             </div>
-                            <div style="width: 100%; height: 6px; background: var(--border-color); border-radius: 3px; margin-top: 8px; overflow: hidden;">
-                                <div id="mySessionsBar" style="width: 0%; height: 100%; background: var(--primary-red); transition: width 0.3s ease;"></div>
+                            <div class="sessions-progress">
+                                <div id="mySessionsBar" class="sessions-progress-fill"></div>
                             </div>
                         </div>
                     </div>
@@ -643,48 +130,47 @@
             </div>
 
             <div class="dashboard-grid">
-                <div class="panel" style="margin-bottom: 0; display: flex; flex-direction: column;">
-                    <div class="panel-header"><i class="fa-solid fa-clipboard-user"></i> My Recent Attendance</div>
-                    <div class="table-container" style="box-shadow: none; flex-grow: 1;">
+                <div class="panel is-flex-col">
+                    <div class="panel-header"><i class="fa-solid fa-clipboard-user" aria-hidden="true"></i> My Recent Attendance</div>
+                    <div class="table-container">
                         <table id="myAttendanceTable">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Time In</th>
-                                    <th>Time Out</th>
-                                    <th>Status</th>
+                                    <th scope="col">Date</th>
+                                    <th scope="col">Time In</th>
+                                    <th scope="col">Time Out</th>
+                                    <th scope="col">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="myAttendanceBody">
-                                <tr><td colspan="4" style="text-align: center; color: #888;">Loading your logs...</td></tr>
+                                <tr><td colspan="4" class="member-loading-row" aria-live="polite">Loading your logs...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 20px;">
+                <div class="dashboard-side-stack">
                     <!-- Fitness Goals Card -->
-                    <div class="panel" style="margin-bottom: 0;">
-                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            <span><i class="fa-solid fa-bullseye"></i> My Fitness Goals</span>
-                            <button id="saveGoalsBtn" onclick="saveFitnessGoals()" style="background: none; border: none; color: var(--primary-red); cursor: pointer; font-size: 13px; font-weight: 600; padding: 4px 8px; border-radius: 4px; transition: 0.2s;">
-                                <i class="fa-solid fa-floppy-disk"></i> Save
+                    <div class="panel panel-tight">
+                        <div class="panel-header panel-header-split">
+                            <span><i class="fa-solid fa-bullseye" aria-hidden="true"></i> My Fitness Goals</span>
+                            <button id="saveGoalsBtn" class="btn btn-ghost btn-sm" onclick="saveFitnessGoals()">
+                                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Save
                             </button>
                         </div>
                         <div class="panel-body">
-                            <textarea id="fitnessGoalsInput" placeholder="What are you working towards? (e.g., Lose 5kg, Bench 100kg, Run a 5k...)" 
-                                style="width: 100%; min-height: 120px; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; font-family: inherit; font-size: 14px; resize: none; background: var(--body-bg); color: var(--text-primary); transition: 0.3s;"></textarea>
-                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
-                                <i class="fa-solid fa-circle-info"></i> Your trainer can see these to better help you.
+                            <label for="fitnessGoalsInput" class="sr-only">Fitness goals</label>
+                            <textarea id="fitnessGoalsInput" class="goals-textarea" maxlength="2000" placeholder="What are you working towards? (e.g., Lose 5kg, Bench 100kg, Run a 5k...)"></textarea>
+                            <p class="goals-hint">
+                                <i class="fa-solid fa-circle-info" aria-hidden="true"></i> Your trainer can see these to better help you.
                             </p>
                         </div>
                     </div>
 
                     <!-- Trainers on Floor Card -->
-                    <div class="panel" style="margin-bottom: 0;">
-                        <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Trainers on Floor</div>
-                        <div class="panel-body" id="dashActiveTrainersFeed" style="max-height: 300px; overflow-y: auto;">
-                        </div>
+                    <div class="panel panel-tight">
+                        <div class="panel-header"><i class="fa-solid fa-users-gear" aria-hidden="true"></i> Trainers on Floor</div>
+                        <div class="panel-body trainers-floor-feed" id="dashActiveTrainersFeed" aria-live="polite"></div>
                     </div>
                 </div>
             </div>
@@ -692,81 +178,87 @@
 
         <div id="trainers" class="content-section">
             <div class="panel">
-                <div class="panel-header"><i class="fa-solid fa-users-gear"></i> Gym Trainers</div>
+                <div class="panel-header"><i class="fa-solid fa-users-gear" aria-hidden="true"></i> Gym Trainers</div>
                 <div class="panel-body">
-                    <div class="search-box" style="margin-bottom: 20px; width: 100%; max-width: 400px;">
-                        <i class="fas fa-search"></i>
-                        <input type="text" id="memberTrainerSearch" placeholder="Search by name or specialty..." onkeyup="filterMemberTrainers()" style="width: 100%;">
+                    <div class="search-box trainer-search-box">
+                        <i class="fas fa-search" aria-hidden="true"></i>
+                        <label for="memberTrainerSearch" class="sr-only">Search trainers</label>
+                        <input type="text" id="memberTrainerSearch" placeholder="Search by name or specialty..." onkeyup="filterMemberTrainers()" autocomplete="off">
                     </div>
-                    
-                    <div class="trainer-grid" id="memberTrainerGrid">
-                    </div>
+
+                    <div class="trainer-grid" id="memberTrainerGrid" aria-live="polite"></div>
                 </div>
             </div>
         </div>
 
         <div id="bookings" class="content-section">
-            <div class="table-controls">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" id="myBookingSearch" placeholder="Search sessions..." onkeyup="filterMyBookings()">
+            <div class="member-table-controls">
+                <div class="search-box member-search-box">
+                    <i class="fas fa-search" aria-hidden="true"></i>
+                    <label for="myBookingSearch" class="sr-only">Search bookings</label>
+                    <input type="text" id="myBookingSearch" placeholder="Search sessions..." onkeyup="filterMyBookings()" autocomplete="off">
                 </div>
-                <button class="action-btn" onclick="openMemberBookingModal()"><i class="fas fa-calendar-plus"></i> Book a Session</button>
+                <button class="action-btn" onclick="openMemberBookingModal()"><i class="fas fa-calendar-plus" aria-hidden="true"></i> Book a Session</button>
             </div>
-            
+
             <div class="panel">
-                <div class="panel-header"><i class="fas fa-calendar-alt"></i> Session Schedules</div>
-                <div class="table-container" style="box-shadow: none;">
+                <div class="panel-header"><i class="fas fa-calendar-alt" aria-hidden="true"></i> Session Schedules</div>
+                <div class="table-container">
                     <table id="myBookingsTable">
                         <thead>
                             <tr>
-                                <th>Trainer</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Status</th>
-                                <th>Action</th>
+                                <th scope="col">Trainer</th>
+                                <th scope="col">Date</th>
+                                <th scope="col">Time</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="myBookingsBody"></tbody>
+                        <tbody id="myBookingsBody" aria-live="polite"></tbody>
                     </table>
                 </div>
                 <div class="table-footer">
-                    <div id="myBkRecordCount" style="font-size: 13px; color: var(--text-muted);"></div>
+                    <div id="myBkRecordCount" class="record-count"></div>
                     <div class="pagination-controls" id="myBkPagination"></div>
                 </div>
             </div>
         </div>
 
-        <div id="chats" class="content-section" style="padding: 0;">
+        <div id="chats" class="content-section content-section-flush">
             <div class="chat-container">
                 <div class="chat-sidebar">
-                    <div id="chatDirectoryTitle" style="padding: 20px; border-bottom: 1px solid var(--border-color); font-weight: bold; background: var(--white); color: var(--text-primary);">
-                        <i class="fa-solid fa-address-book"></i> Contacts
+                    <div id="chatDirectoryTitle" class="chat-directory-title">
+                        <i class="fa-solid fa-address-book" aria-hidden="true"></i> Contacts
                     </div>
-                    <div style="padding: 10px; border-bottom: 1px solid var(--border-color); background: var(--panel-bg);">
-                        <div class="search-box" style="width: 100%;">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="chatSearch" placeholder="Search staff or trainers..." onkeyup="filterChatUsers()">
+                    <div class="chat-search-wrap">
+                        <div class="search-box chat-search-box">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <label for="chatSearch" class="sr-only">Search contacts</label>
+                            <input type="text" id="chatSearch" placeholder="Search staff or trainers..." onkeyup="filterChatUsers()" autocomplete="off">
                         </div>
                     </div>
-                    <div id="chatUserList" style="overflow-y: auto; flex-grow: 1;">
-                        </div>
+                    <div id="chatUserList" class="chat-user-list" role="list"></div>
                 </div>
                 <div class="chat-main">
-                    <div style="padding: 20px; background: var(--white); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 15px;">
-                        <button class="mobile-only-btn" onclick="closeMobileChat()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-primary);"><i class="fas fa-arrow-left"></i></button>
-                        <div id="chatHeader" style="font-weight: bold; font-size: 16px;">Select a user to start chatting</div>
+                    <div class="chat-main-header">
+                        <button class="mobile-only-btn chat-back-btn" onclick="closeMobileChat()" aria-label="Back to contacts">
+                            <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                        </button>
+                        <div id="chatHeader" class="chat-header-title">Select a user to start chatting</div>
                     </div>
 
-                    <div id="chatHistory" class="chat-history">
-                        <div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;">
-                            <i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i>
+                    <div id="chatHistory" class="chat-history" aria-live="polite">
+                        <div class="chat-empty">
+                            <i class="fa-regular fa-comments" aria-hidden="true"></i>
                             <p>No chat selected</p>
                         </div>
                     </div>
-                    <div style="padding: 20px; background: var(--white); border-top: 1px solid var(--border-color); display: flex; gap: 10px;">
-                        <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()" style="flex-grow: 1; padding: 12px 20px; border: 1px solid var(--border-color); border-radius: 25px; outline: none;" disabled>
-                        <button id="chatSendBtn" onclick="sendMessage()" style="background: var(--dark-black); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; transition: 0.2s;" disabled><i class="fas fa-paper-plane"></i></button>
+                    <div class="chat-composer">
+                        <label for="chatInput" class="sr-only">Message</label>
+                        <input type="text" id="chatInput" class="chat-input" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()" autocomplete="off" disabled>
+                        <button id="chatSendBtn" class="chat-send-btn" onclick="sendMessage()" aria-label="Send message" disabled>
+                            <i class="fas fa-paper-plane" aria-hidden="true"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -775,12 +267,12 @@
         <!-- MY PROGRAM SECTION -->
         <div id="myProgram" class="content-section">
             <div class="panel">
-                <div class="panel-header"><i class="fas fa-dumbbell"></i> My Workout Program</div>
-                <div id="myCurrentProgram" style="padding:20px;"></div>
+                <div class="panel-header"><i class="fas fa-dumbbell" aria-hidden="true"></i> My Workout Program</div>
+                <div id="myCurrentProgram" class="my-current-program"></div>
             </div>
-            <div class="panel" style="margin-top:20px;">
-                <div class="panel-header"><i class="fas fa-list"></i> Available Programs</div>
-                <div id="memberProgramsList" style="padding:16px;display:flex;flex-wrap:wrap;gap:14px;">
+            <div class="panel my-programs-panel">
+                <div class="panel-header"><i class="fas fa-list" aria-hidden="true"></i> Available Programs</div>
+                <div id="memberProgramsList" class="member-programs-list" aria-live="polite">
                     <!-- Populated by JS -->
                 </div>
             </div>
@@ -788,45 +280,44 @@
 
     </main>
 
-    <div id="memberBookingModal" class="modal">
+    <div id="memberBookingModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="memberBookingModalTitle" aria-hidden="true">
         <div class="modal-content booking-modal-content">
             <div class="modal-header">
-                <h3>Request a Training Session</h3>
-                <span class="close-btn" onclick="closeModal('memberBookingModal')">&times;</span>
+                <h3 id="memberBookingModalTitle">Request a Training Session</h3>
+                <button type="button" class="close-btn" onclick="closeModal('memberBookingModal')" aria-label="Close booking dialog">&times;</button>
             </div>
             <div class="booking-layout-wrapper">
                 <!-- Left/Main Column: Selection Steps -->
                 <div class="booking-steps-section">
                     <!-- Step 1: Select Trainer -->
                     <div class="booking-step-card">
-                        <label class="booking-step-label"><span class="step-badge">1</span> Select a Trainer</label>
-                        <select id="memberBookTrainer" required class="booking-select">
-                        </select>
+                        <label class="booking-step-label" for="memberBookTrainer"><span class="step-badge" aria-hidden="true">1</span> Select a Trainer</label>
+                        <select id="memberBookTrainer" required class="booking-select" aria-required="true"></select>
                     </div>
 
                     <!-- Step 2 & 3: Calendar & Time Grid wrapper -->
-                    <div class="booking-datetime-grid" style="display: none;" id="bookingDateTimeGrid">
+                    <div class="booking-datetime-grid" id="bookingDateTimeGrid" hidden>
                         <!-- Step 2: Custom Calendar Picker -->
                         <div class="custom-cal-container">
-                            <label class="booking-step-label"><span class="step-badge">2</span> Select Date</label>
+                            <p class="booking-step-label" id="bookingStep2Label"><span class="step-badge" aria-hidden="true">2</span> Select Date</p>
                             <div class="custom-cal-header">
-                                <button type="button" class="cal-nav-btn" id="calPrevMonthBtn">&lt;</button>
-                                <span class="cal-month-title" id="calMonthTitle">May 2026</span>
-                                <button type="button" class="cal-nav-btn" id="calNextMonthBtn">&gt;</button>
+                                <button type="button" class="cal-nav-btn" id="calPrevMonthBtn" aria-label="Previous month">&lt;</button>
+                                <span class="cal-month-title" id="calMonthTitle" aria-live="polite">May 2026</span>
+                                <button type="button" class="cal-nav-btn" id="calNextMonthBtn" aria-label="Next month">&gt;</button>
                             </div>
-                            <div class="custom-cal-weekdays">
+                            <div class="custom-cal-weekdays" aria-hidden="true">
                                 <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
                             </div>
-                            <div class="custom-cal-days" id="calDaysGrid">
+                            <div class="custom-cal-days" id="calDaysGrid" role="grid" aria-labelledby="bookingStep2Label">
                                 <!-- Days dynamically populated -->
                             </div>
                         </div>
 
                         <!-- Step 3: Time Slot Picker -->
-                        <div class="booking-step-card" style="padding: 15px;">
-                            <label class="booking-step-label"><span class="step-badge">3</span> Select Time Slot</label>
-                            <div class="selected-date-header" id="selectedDateHeader">Select a date first</div>
-                            <div class="time-slots-grid" id="timeSlotsGrid">
+                        <div class="booking-step-card booking-step-card-time">
+                            <p class="booking-step-label" id="bookingStep3Label"><span class="step-badge" aria-hidden="true">3</span> Select Time Slot</p>
+                            <div class="selected-date-header" id="selectedDateHeader" aria-live="polite">Select a date first</div>
+                            <div class="time-slots-grid" id="timeSlotsGrid" role="list" aria-labelledby="bookingStep3Label">
                                 <!-- Time slots dynamically populated -->
                             </div>
                         </div>
@@ -834,13 +325,13 @@
                 </div>
 
                 <!-- Right Column: Service/Booking Details Summary -->
-                <div class="booking-details-sidebar" id="bookingDetailsSidebar" style="display: none;">
+                <aside class="booking-details-sidebar" id="bookingDetailsSidebar" aria-label="Booking summary" hidden>
                     <div class="sidebar-header">Service Details</div>
                     <div class="sidebar-body">
                         <h4 class="service-title">PERSONAL TRAINING</h4>
-                        
+
                         <div class="details-item">
-                            <i class="fa-regular fa-clock"></i>
+                            <i class="fa-regular fa-clock" aria-hidden="true"></i>
                             <div>
                                 <strong id="summaryDateTime">Choose Date & Time</strong>
                                 <span class="sub-detail">Duration: 1 hr</span>
@@ -848,7 +339,7 @@
                         </div>
 
                         <div class="details-item">
-                            <i class="fa-solid fa-dumbbell"></i>
+                            <i class="fa-solid fa-dumbbell" aria-hidden="true"></i>
                             <div>
                                 <strong id="summaryTrainer">Trainer Not Selected</strong>
                                 <span class="sub-detail">Assigned Specialist</span>
@@ -856,7 +347,7 @@
                         </div>
 
                         <div class="details-item">
-                            <i class="fa-solid fa-location-dot"></i>
+                            <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
                             <div>
                                 <strong>XFit Track Main Floor</strong>
                                 <span class="sub-detail">PT Zone</span>
@@ -864,7 +355,7 @@
                         </div>
 
                         <div class="details-item">
-                            <i class="fa-solid fa-ticket"></i>
+                            <i class="fa-solid fa-ticket" aria-hidden="true"></i>
                             <div>
                                 <strong>1 Session Credit</strong>
                                 <span class="sub-detail" id="memberCreditsDisplay">Deducted from plan</span>
@@ -873,33 +364,33 @@
                     </div>
 
                     <div class="sidebar-footer">
-                        <button type="button" id="confirmBookingBtn" class="action-btn next-btn" disabled>
-                            <i class="fas fa-paper-plane"></i> Send Request
+                        <button type="button" id="confirmBookingBtn" class="action-btn next-btn" disabled aria-disabled="true">
+                            <i class="fas fa-paper-plane" aria-hidden="true"></i> Send Request
                         </button>
                     </div>
-                </div>
+                </aside>
             </div>
         </div>
     </div>
 
-    <div id="membershipExpiredModal" class="modal" style="display: none; z-index: 10000; backdrop-filter: blur(8px); background: rgba(0,0,0,0.85);">
-        <div class="modal-content" style="max-width: 400px; text-align: center; border: 1px solid rgba(255,255,255,0.1); background: var(--panel-bg);">
-            <div style="padding: 30px 20px;">
-                <div style="width: 80px; height: 80px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 40px;">
+    <div id="membershipExpiredModal" class="modal modal-expired">
+        <div class="modal-content expired-modal">
+            <div class="expired-modal-body">
+                <div class="expired-modal-icon">
                     <i class="fa-solid fa-hourglass-end"></i>
                 </div>
-                <h2 style="font-weight: 700; margin-bottom: 10px; color: var(--text-primary);">Membership Expired</h2>
-                <p style="color: var(--text-muted); line-height: 1.6; margin-bottom: 25px;">
+                <h2 class="expired-modal-title">Membership Expired</h2>
+                <p class="expired-modal-text">
                     Your membership has expired. To continue using our facilities and booking sessions, please renew your plan at the front desk.
                 </p>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <button onclick="handleLogout()" class="action-btn" style="width: 100%; background: var(--dark-black); justify-content: center;">
-                        <i class="fa-solid fa-power-off"></i> Logout
-                    </button>
-                    <p style="font-size: 12px; color: var(--text-muted); margin-top: 15px;">
-                        Need help? Contact us at support@fittrack.com
-                    </p>
-                </div>
+            </div>
+            <div class="expired-modal-actions">
+                <button onclick="handleLogout()" class="btn btn-primary btn-block">
+                    <i class="fa-solid fa-power-off"></i> Logout
+                </button>
+                <p class="expired-modal-note">
+                    Need help? Contact us at support@fittrack.com
+                </p>
             </div>
         </div>
     </div>

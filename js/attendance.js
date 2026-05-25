@@ -11,10 +11,19 @@ export function initAttendance({ db, attendanceCol, servicesChartInstanceGetter,
   const cm = Number.isFinite(closingMinute) ? closingMinute : DEFAULT_CLOSING_MINUTE;
 
   let currentUnsubscribe = null;
+  const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
+  // Only admin/staff need live attendance updates; members and trainers see attendance as
+  // read-only history and can use a one-shot fetch instead.
+  const useLiveAttendance = (loggedInRole === "admin" || loggedInRole === "staff");
 
   window.filterAttendanceByDate = (dateVal) => {
-    if (currentUnsubscribe) currentUnsubscribe();
-    
+    // Always tear down any previous subscription to prevent listener leaks when the
+    // date picker is changed rapidly.
+    if (currentUnsubscribe) {
+        try { currentUnsubscribe(); } catch (_) {}
+        currentUnsubscribe = null;
+    }
+
     let targetDateStr;
     if (!dateVal) {
         targetDateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -23,13 +32,23 @@ export function initAttendance({ db, attendanceCol, servicesChartInstanceGetter,
         const dateObj = new Date(y, m - 1, d);
         targetDateStr = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     }
-    
+
     const q = query(attendanceCol, where("date", "==", targetDateStr));
-    currentUnsubscribe = onSnapshot(q, (snapshot) => {
-        attendanceData = [];
-        snapshot.forEach((d) => attendanceData.push({ id: d.id, ...d.data() }));
-        renderAttendance(attendanceData, servicesChartInstanceGetter, targetDateStr);
-    });
+    if (useLiveAttendance) {
+        currentUnsubscribe = onSnapshot(q, (snapshot) => {
+            attendanceData = [];
+            snapshot.forEach((d) => attendanceData.push({ id: d.id, ...d.data() }));
+            const render = () => renderAttendance(attendanceData, servicesChartInstanceGetter, targetDateStr);
+            if (typeof window.softRender === 'function') window.softRender('attendance', render);
+            else render();
+        });
+    } else {
+        getDocs(q).then(snapshot => {
+            attendanceData = [];
+            snapshot.forEach((d) => attendanceData.push({ id: d.id, ...d.data() }));
+            renderAttendance(attendanceData, servicesChartInstanceGetter, targetDateStr);
+        }).catch(e => console.error("Attendance fetch failed:", e));
+    }
   };
 
   window.filterAttendanceByDate(); // Load today initially
@@ -78,11 +97,20 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDat
   });
 
   // Build chart counts using the grouped data
+  // M3: a "Checked In" record older than the gym's operating window is stale —
+  // member forgot to tap out. Don't count them as currently present.
+  const STALE_PRESENCE_MS = 16 * 60 * 60 * 1000; // ~ one full operating day
+  const nowMs = Date.now();
   grouped.forEach((g) => {
     if ((g.type || "").includes("Gold")) gold++;
     else if ((g.type || "").includes("Silver")) silver++;
     else if ((g.type || "").includes("Walk-in")) walkin++;
-    if (g.latestStatus === "Checked In") presentCount++;
+    if (g.latestStatus === "Checked In") {
+      const latestTs = (g.latestRecord || {}).timestamp || 0;
+      if (latestTs && (nowMs - latestTs) < STALE_PRESENCE_MS) {
+        presentCount++;
+      }
+    }
   });
 
   if (attTbody) {

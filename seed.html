@@ -24,16 +24,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, query, where, setDoc, doc, Timestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-const firebaseConfig = {
-    apiKey: "AIzaSyB5xluf59a0X6v-_TNzR6Ny0mtcjSVWyLA",
-    authDomain: "fit-track-ca8d1.firebaseapp.com",
-    projectId: "fit-track-ca8d1",
-    storageBucket: "fit-track-ca8d1.firebasestorage.app",
-    messagingSenderId: "157593985795",
-    appId: "1:157593985795:web:c66490e91f0bd44e0f53eb",
-    measurementId: "G-NYGGEMMJMC"
-};
+import { firebaseConfig } from "./js/firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
