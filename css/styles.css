@@ -371,49 +371,152 @@ body.dark-theme .sub-item:hover {
 
 /* TOPBAR */
 .topbar {
-    height: 70px;
-    background-color: var(--panel-bg);
+    height: 74px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 
+        0 10px 30px -10px rgba(0, 0, 0, 0.08), 
+        0 1px 3px rgba(0, 0, 0, 0.02),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    border-radius: 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 30px;
-    border-bottom: 1px solid var(--border-color);
+    padding: 0 24px;
+    margin: 20px 24px 0 24px;
     z-index: 1000;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.topbar-greeting {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.topbar-subtext {
+    font-family: 'Geist Mono', Monaco, monospace;
+    font-size: 10.5px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.topbar .search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    min-width: 320px;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    margin: 0 auto 0 40px;
+}
+
+.topbar .search:focus-within {
+    background: var(--white);
+    border-color: #ff5d4a;
+    box-shadow: 0 0 0 3px rgba(255, 93, 74, 0.15);
+}
+
+.topbar .search input {
+    background: transparent;
+    border: none;
+    outline: none;
+    flex: 1;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 0 !important;
+}
+
+.topbar .search input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+.topbar .search .kbd {
+    font-family: 'Geist Mono', Monaco, monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: var(--white);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 1px rgba(0,0,0,0.05);
 }
 
 .topbar-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
-.topbar-right button {
-    background: none;
-    border: none;
-    font-size: 14px;
-    cursor: pointer;
+.topbar .icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.02);
     color: var(--text-muted);
-    transition: all 0.2s ease;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    padding: 0;
+}
+
+.topbar .icon-btn:hover {
+    background: var(--white);
+    color: var(--primary-red);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.topbar .icon-btn#notifToggleBtn.has-unread::after {
+    content: '';
+    position: absolute;
+    top: 9px;
+    right: 10px;
+    width: 7px;
+    height: 7px;
+    background: #ff5d4a;
+    border-radius: 50%;
+    border: 2px solid var(--white);
+}
+
+/* Primary Plus Button */
+.topbar .btn-coral {
+    background: linear-gradient(135deg, #ff5d4a, #e8442f);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    font-weight: 600;
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 14px rgba(232, 68, 47, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.icon-btn-circle {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    border: 1px solid transparent;
+.topbar .btn-coral:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(232, 68, 47, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-.icon-btn-circle:hover {
-    background-color: rgba(0, 0, 0, 0.03);
-    border-color: var(--border-color);
-    color: var(--primary-red);
-}
-
-.topbar-right button:hover {
-    color: var(--primary-red);
+.topbar .btn-coral:active {
+    transform: translateY(0);
 }
 
 /* User Dropdown */
@@ -507,7 +610,7 @@ body.dark-theme .sub-item:hover {
     display: none;
     padding: 20px;
     overflow-y: auto;
-    height: calc(100vh - 60px);
+    height: calc(100vh - 94px);
     position: relative;
 }
 
@@ -732,6 +835,60 @@ tr:hover {
     color: #991B1B;
     font-weight: bold;
     border: 1px solid #FCA5A5;
+}
+
+/* User Roles Badges */
+.badge.role-admin {
+    background-color: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
+}
+.badge.role-staff {
+    background-color: #EFF6FF;
+    color: #1E40AF;
+    border: 1px solid #BFDBFE;
+}
+.badge.role-trainer {
+    background-color: #ECFDF5;
+    color: #065F46;
+    border: 1px solid #A7F3D0;
+}
+.badge.role-member {
+    background-color: #F5F3FF;
+    color: #5B21B6;
+    border: 1px solid #DDD6FE;
+}
+.badge.role-system {
+    background-color: #F1F5F9;
+    color: #334155;
+    border: 1px solid #CBD5E1;
+}
+
+/* Dark theme overrides for User Roles Badges */
+body.dark-theme .badge.role-admin {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #FCA5A5;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+body.dark-theme .badge.role-staff {
+    background-color: rgba(59, 130, 246, 0.15);
+    color: #93C5FD;
+    border-color: rgba(59, 130, 246, 0.3);
+}
+body.dark-theme .badge.role-trainer {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: #6EE7B7;
+    border-color: rgba(16, 185, 129, 0.3);
+}
+body.dark-theme .badge.role-member {
+    background-color: rgba(139, 92, 246, 0.15);
+    color: #C7D2FE;
+    border-color: rgba(139, 92, 246, 0.3);
+}
+body.dark-theme .badge.role-system {
+    background-color: rgba(148, 163, 184, 0.15);
+    color: #CBD5E1;
+    border-color: rgba(148, 163, 184, 0.3);
 }
 
 body.dark-theme .badge.stock-low {
@@ -1525,43 +1682,62 @@ body.dark-theme .notif-item {
     position: relative;
 }
 
-/* --- MODAL STYLES --- */
+/* ═══════════════════════════════════════════════════════════════════════
+   PREMIUM MODAL BASE — Liquid-Glass material
+   Drives every legacy `.modal > .modal-content > .modal-header > .close-btn`
+   modal across admin/staff/trainer/member dashboards.
+   DOM IDs, onclick handlers, form fields & display:flex/none toggles preserved.
+   ═══════════════════════════════════════════════════════════════════════ */
 .modal {
     display: none;
     position: fixed;
     z-index: 2000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     overflow: auto;
-    background-color: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: var(--scrim-bg, rgba(15, 23, 42, 0.34));
+    backdrop-filter: var(--scrim-blur, blur(18px) saturate(140%));
+    -webkit-backdrop-filter: var(--scrim-blur, blur(18px) saturate(140%));
     align-items: center;
     justify-content: center;
+    padding: 24px;
+    animation: modal-scrim-in 260ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+}
+
+@keyframes modal-scrim-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 .modal-content {
-    background-color: var(--white);
-    padding: 32px;
-    border-radius: 20px;
-    width: 95%;
-    max-width: 420px;
-    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.05);
-    border: none;
-    animation: modalDropIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    background: var(--glass-bg-strong, rgba(255, 255, 255, 0.86));
+    backdrop-filter: var(--glass-blur, blur(28px) saturate(170%));
+    -webkit-backdrop-filter: var(--glass-blur, blur(28px) saturate(170%));
+    padding: 28px 28px 24px;
+    border-radius: 24px;
+    width: 100%;
+    max-width: 460px;
+    border: 0.5px solid var(--glass-edge, rgba(255, 255, 255, 0.85));
+    box-shadow:
+        var(--glass-inner, inset 0 1px 0 rgba(255, 255, 255, 0.7)),
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 8px 20px -8px rgba(15, 23, 42, 0.18),
+        0 28px 60px -20px rgba(15, 23, 42, 0.35);
+    color: var(--text-primary);
+    animation: modal-rise 320ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+    transform-origin: center;
 }
 
-@keyframes modalDropIn {
+@keyframes modal-rise {
     from {
-        transform: translateY(-50px) scale(0.95);
         opacity: 0;
+        transform: translateY(16px) scale(0.96);
+        filter: blur(2px);
     }
-
     to {
-        transform: translateY(0) scale(1);
         opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
     }
 }
 
@@ -1569,59 +1745,154 @@ body.dark-theme .notif-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    gap: 14px;
+    margin-bottom: 22px;
 }
 
 .modal-header h3 {
-    color: var(--text-primary);
-    font-weight: 600;
-}
-
-.close-btn {
-    font-size: 1.2rem;
-    cursor: pointer;
-    color: #94a3b8;
-    background: #f1f5f9;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
     display: flex;
     align-items: center;
+    gap: 14px;
+    margin: 0;
+    color: var(--text-heading, var(--text-primary));
+    font-family: 'Bricolage Grotesque', 'Inter', system-ui, -apple-system, sans-serif;
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: -0.012em;
+    line-height: 1.25;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Icon plate — turn the first inline <i> into a premium gradient badge.
+   Zero-markup change: legacy <h3><i class="fa-..."></i> Title</h3> works as-is. */
+.modal-header h3 > i.fa-solid:first-child,
+.modal-header h3 > i.fas:first-child,
+.modal-header h3 > i.fa-regular:first-child,
+.modal-header h3 > i.far:first-child,
+.modal-header h3 > i.fa-brands:first-child {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--modal-icon-plate-bg, linear-gradient(135deg, #fde68a, #fb923c, #f43f5e));
+    box-shadow: var(--modal-icon-plate-shadow,
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        0 6px 14px -6px rgba(244, 63, 94, 0.45));
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    font-size: 16px;
+    line-height: 1;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+    transition: transform 220ms var(--ease-ios), box-shadow 220ms var(--ease-ios);
+}
+
+.modal-header h3:hover > i.fa-solid:first-child,
+.modal-header h3:hover > i.fas:first-child {
+    transform: scale(1.04) rotate(-2deg);
+}
+
+/* Tone-tinted icon plates */
+.modal-content.tone-danger  .modal-header h3 > i:first-child,
+.modal.tone-danger          .modal-header h3 > i:first-child {
+    background: linear-gradient(135deg, #fecaca 0%, #ef4444 55%, #b91c1c 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px -6px rgba(239,68,68,0.55);
+}
+.modal-content.tone-warning .modal-header h3 > i:first-child,
+.modal.tone-warning         .modal-header h3 > i:first-child {
+    background: linear-gradient(135deg, #fde68a 0%, #f59e0b 55%, #b45309 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px -6px rgba(245,158,11,0.55);
+}
+.modal-content.tone-success .modal-header h3 > i:first-child,
+.modal.tone-success         .modal-header h3 > i:first-child {
+    background: linear-gradient(135deg, #a7f3d0 0%, #10b981 55%, #047857 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px -6px rgba(16,185,129,0.55);
+}
+.modal-content.tone-info    .modal-header h3 > i:first-child,
+.modal.tone-info            .modal-header h3 > i:first-child {
+    background: linear-gradient(135deg, #bfdbfe 0%, #3b82f6 55%, #1d4ed8 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px -6px rgba(59,130,246,0.55);
+}
+
+/* Refined close-btn — circle, tactile, theme-aware, rotates on hover.
+   Works for both <span class="close-btn"> and <button class="close-btn">. */
+.close-btn {
+    flex: 0 0 auto;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-muted, #64748b);
+    background: transparent;
+    border: 0.5px solid transparent;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition:
+        background-color 220ms var(--ease-ios),
+        color 220ms var(--ease-ios),
+        border-color 220ms var(--ease-ios),
+        transform 280ms var(--ease-ios);
+    user-select: none;
 }
 
 .close-btn:hover {
-    color: var(--primary-red);
-    background: #fee2e2;
+    color: var(--text-heading, #0f172a);
+    background: rgba(15, 23, 42, 0.06);
+    border-color: rgba(15, 23, 42, 0.08);
+    transform: rotate(90deg);
+}
+
+.close-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--modal-accent, #991b1b) 28%, transparent);
 }
 
 body.dark-theme .close-btn {
-    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.65);
 }
 
 body.dark-theme .close-btn:hover {
-    background: rgba(239, 68, 68, 0.15);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
+/* Refined modal form inputs — premium glass-aware */
 .modal-form input,
-.modal-form select {
+.modal-form select,
+.modal-form textarea {
     width: 100%;
-    padding: 14px 16px;
-    margin-bottom: 16px;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
+    padding: 13px 16px;
+    margin-bottom: 14px;
+    border: 1px solid var(--modal-hairline-strong, rgba(15, 23, 42, 0.14));
+    border-radius: 14px;
     outline: none;
-    background-color: rgba(255, 255, 255, 0.5);
+    background: color-mix(in srgb, var(--glass-bg-strong, #ffffff) 70%, transparent);
     color: var(--text-primary);
-    transition: all 0.3s;
-    font-size: 15px;
+    font-family: inherit;
+    font-size: 14.5px;
+    line-height: 1.45;
+    transition:
+        border-color 180ms var(--ease-ios),
+        box-shadow 180ms var(--ease-ios),
+        background-color 180ms var(--ease-ios);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.modal-form textarea {
+    min-height: 96px;
+    resize: vertical;
 }
 
 .modal-form select {
-    appearance: none;
-    -webkit-appearance: none;
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%236b7280%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2364748b%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
     background-repeat: no-repeat;
     background-position: right 16px top 50%;
     background-size: 10px auto;
@@ -1629,27 +1900,119 @@ body.dark-theme .close-btn:hover {
     cursor: pointer;
 }
 
+.modal-form input::placeholder,
+.modal-form textarea::placeholder {
+    color: var(--text-muted, #94a3b8);
+    opacity: 0.85;
+}
+
+.modal-form input:hover:not(:focus),
+.modal-form select:hover:not(:focus),
+.modal-form textarea:hover:not(:focus) {
+    border-color: color-mix(in srgb, var(--modal-accent, #991b1b) 30%, var(--modal-hairline-strong));
+}
+
 .modal-form input:focus,
-.modal-form select:focus {
-    border-color: var(--primary-red);
-    box-shadow: 0 0 0 3px rgba(192, 23, 24, 0.2);
-    background-color: var(--white);
+.modal-form select:focus,
+.modal-form textarea:focus {
+    border-color: var(--modal-accent, var(--primary-red, #991b1b));
+    background-color: var(--glass-bg-strong, #ffffff);
+    box-shadow:
+        0 0 0 3px color-mix(in srgb, var(--modal-accent, #991b1b) 22%, transparent),
+        inset 0 0 0 0.5px var(--modal-accent, #991b1b);
+}
+
+body.dark-theme .modal-form input,
+body.dark-theme .modal-form select,
+body.dark-theme .modal-form textarea {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+}
+
+body.dark-theme .modal-form input:focus,
+body.dark-theme .modal-form select:focus,
+body.dark-theme .modal-form textarea:focus {
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .modal-form button {
     width: 100%;
-    background: var(--primary-red);
-    color: white;
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--modal-accent, var(--primary-red)) 100%, white 0%) 0%,
+        color-mix(in srgb, var(--modal-accent, var(--primary-red)) 88%, black 12%) 100%);
+    color: #ffffff;
     border: none;
-    padding: 12px;
-    border-radius: 4px;
+    padding: 13px 16px;
+    border-radius: 12px;
     cursor: pointer;
-    font-size: 16px;
-    transition: 0.3s;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 1px 2px rgba(15, 23, 42, 0.08),
+        0 6px 14px -6px color-mix(in srgb, var(--modal-accent, var(--primary-red)) 55%, transparent);
+    transition:
+        transform 120ms var(--ease-spring-soft, cubic-bezier(0.34, 1.3, 0.64, 1)),
+        box-shadow 200ms var(--ease-ios),
+        filter 200ms var(--ease-ios);
 }
 
 .modal-form button:hover {
-    background: #900f14;
+    filter: brightness(1.05);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 2px 4px rgba(15, 23, 42, 0.10),
+        0 10px 22px -8px color-mix(in srgb, var(--modal-accent, var(--primary-red)) 65%, transparent);
+}
+
+.modal-form button:active {
+    transform: scale(0.98);
+}
+
+/* Mobile bottom-sheet — graceful collapse on small screens */
+@media (max-width: 640px) {
+    .modal {
+        align-items: flex-end;
+        padding: 0;
+    }
+    .modal-content {
+        max-width: 100%;
+        border-radius: 24px 24px 0 0;
+        padding: 22px 20px 20px;
+        max-height: 92vh;
+        overflow-y: auto;
+        animation-name: modal-sheet-rise;
+    }
+    @keyframes modal-sheet-rise {
+        from { opacity: 0; transform: translateY(36px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    /* Drag-handle affordance */
+    .modal-content::before {
+        content: '';
+        display: block;
+        width: 38px;
+        height: 4px;
+        border-radius: 999px;
+        background: var(--modal-hairline-strong, rgba(15, 23, 42, 0.18));
+        margin: -6px auto 14px;
+    }
+}
+
+/* Reduced-motion respect */
+@media (prefers-reduced-motion: reduce) {
+    .modal,
+    .modal-content,
+    .close-btn,
+    .modal-form input,
+    .modal-form select,
+    .modal-form textarea,
+    .modal-form button {
+        animation: none !important;
+        transition-duration: 0.001ms !important;
+    }
 }
 
 /* --- INTERNAL MESSENGER STYLES --- */
@@ -2175,6 +2538,91 @@ body.dark-theme .expiring-expired {
     justify-content: center;
 }
 
+/* ─── Premium modal action-row treatment (scoped to .modal-content) ──── */
+.modal-content .btn-row {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--modal-hairline, rgba(15, 23, 42, 0.08));
+    gap: 10px;
+}
+
+.modal-content .btn-cancel {
+    background: transparent;
+    color: var(--text-heading, var(--text-primary));
+    border: 1px solid var(--modal-hairline-strong, rgba(15, 23, 42, 0.14));
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    transition:
+        background-color 180ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1)),
+        border-color 180ms var(--ease-ios),
+        transform 120ms var(--ease-spring-soft, cubic-bezier(0.34, 1.3, 0.64, 1));
+}
+
+.modal-content .btn-cancel:hover {
+    background: rgba(15, 23, 42, 0.05);
+    border-color: var(--modal-hairline-strong, rgba(15, 23, 42, 0.2));
+}
+
+.modal-content .btn-cancel:active {
+    transform: scale(0.98);
+}
+
+body.dark-theme .modal-content .btn-cancel {
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+body.dark-theme .modal-content .btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.modal-content .btn-submit,
+.modal-content .action-btn:not(.btn-cancel) {
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--modal-accent, var(--primary-red, #991b1b)) 100%, white 0%) 0%,
+        color-mix(in srgb, var(--modal-accent, var(--primary-red, #991b1b)) 88%, black 12%) 100%);
+    color: #ffffff;
+    border: none;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 1px 2px rgba(15, 23, 42, 0.08),
+        0 6px 14px -6px color-mix(in srgb, var(--modal-accent, var(--primary-red, #991b1b)) 55%, transparent);
+    transition:
+        transform 120ms var(--ease-spring-soft, cubic-bezier(0.34, 1.3, 0.64, 1)),
+        box-shadow 200ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1)),
+        filter 200ms var(--ease-ios);
+}
+
+.modal-content .btn-submit:hover,
+.modal-content .action-btn:not(.btn-cancel):hover {
+    filter: brightness(1.05);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.28),
+        0 2px 4px rgba(15, 23, 42, 0.10),
+        0 10px 22px -8px color-mix(in srgb, var(--modal-accent, var(--primary-red, #991b1b)) 65%, transparent);
+}
+
+.modal-content .btn-submit:active,
+.modal-content .action-btn:not(.btn-cancel):active {
+    transform: scale(0.98);
+}
+
+.modal-content .btn-submit:focus-visible,
+.modal-content .action-btn:focus-visible,
+.modal-content .btn-cancel:focus-visible {
+    outline: none;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 0 0 3px color-mix(in srgb, var(--modal-accent, var(--primary-red, #991b1b)) 28%, transparent);
+}
+
 /* --- View Toggle --- */
 .view-toggle-group {
     display: flex;
@@ -2453,59 +2901,113 @@ body.dark-theme .card-actions .btn-icon {
 }
 
 .toast {
-    background: var(--white);
+    background: var(--glass-bg-strong, rgba(255, 255, 255, 0.86));
+    backdrop-filter: var(--glass-blur, blur(28px) saturate(170%));
+    -webkit-backdrop-filter: var(--glass-blur, blur(28px) saturate(170%));
     color: var(--text-primary);
-    padding: 15px 20px;
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    padding: 14px 18px 14px 16px;
+    border-radius: 16px;
+    border: 0.5px solid var(--glass-edge, rgba(255, 255, 255, 0.85));
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 12px 28px -10px rgba(15, 23, 42, 0.28);
     display: flex;
     align-items: center;
     gap: 12px;
     min-width: 300px;
-    transform: translateX(120%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border-left: 4px solid var(--primary-red);
+    max-width: 420px;
+    transform: translateX(120%) scale(0.95);
+    opacity: 0;
+    transition:
+        transform 320ms var(--ease-spring-soft, cubic-bezier(0.34, 1.3, 0.64, 1)),
+        opacity 240ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+    position: relative;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+/* Tone-coloured accent bar (3px luminous edge on the left) */
+.toast::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--primary-red, #991b1b);
+    box-shadow: 0 0 12px -2px var(--primary-red, #991b1b);
 }
 
 .toast.toast-show {
-    transform: translateX(0);
+    transform: translateX(0) scale(1);
+    opacity: 1;
 }
 
 .toast-icon {
-    font-size: 20px;
+    flex: 0 0 auto;
+    font-size: 18px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--primary-red, #991b1b) 12%, transparent);
+    color: var(--primary-red, #991b1b);
 }
 
-.toast-success {
-    border-left-color: #2E7D32;
-}
-
+.toast-success::before { background: #10b981; box-shadow: 0 0 12px -2px #10b981; }
 .toast-success .toast-icon {
-    color: #2E7D32;
+    background: color-mix(in srgb, #10b981 14%, transparent);
+    color: #047857;
 }
 
-.toast-error {
-    border-left-color: var(--primary-red);
-}
-
+.toast-error::before { background: #ef4444; box-shadow: 0 0 12px -2px #ef4444; }
 .toast-error .toast-icon {
-    color: var(--primary-red);
+    background: color-mix(in srgb, #ef4444 14%, transparent);
+    color: #b91c1c;
 }
 
-.toast-info {
-    border-left-color: #1976D2;
-}
-
+.toast-info::before { background: #3b82f6; box-shadow: 0 0 12px -2px #3b82f6; }
 .toast-info .toast-icon {
-    color: #1976D2;
+    background: color-mix(in srgb, #3b82f6 14%, transparent);
+    color: #1d4ed8;
 }
 
 .toast-close {
     margin-left: auto;
-    background: none;
+    background: transparent;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
-    font-size: 16px;
+    font-size: 14px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        background-color 180ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1)),
+        color 180ms var(--ease-ios),
+        transform 220ms var(--ease-ios);
+}
+.toast-close:hover {
+    background: rgba(15, 23, 42, 0.06);
+    color: var(--text-heading, var(--text-primary));
+    transform: rotate(90deg);
+}
+
+body.dark-theme .toast {
+    background: var(--glass-bg-strong, rgba(22, 30, 46, 0.86));
+    border-color: rgba(255, 255, 255, 0.10);
+    color: var(--text-primary);
+}
+body.dark-theme .toast-close:hover {
+    background: rgba(255, 255, 255, 0.10);
 }
 
 /* --- CUSTOM CONFIRM MODAL --- */
@@ -3834,16 +4336,19 @@ body.dark-theme .grid-stat-box p {
     opacity: 0.75;
 }
 
-/* --- Slide-Over Drawer --- */
+/* --- Slide-Over Drawer (premium glass) --- */
 .bk-drawer-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--scrim-bg, rgba(15, 23, 42, 0.34));
+    backdrop-filter: var(--scrim-blur, blur(18px) saturate(140%));
+    -webkit-backdrop-filter: var(--scrim-blur, blur(18px) saturate(140%));
     z-index: 2500;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.3s, visibility 0.3s;
-    backdrop-filter: blur(2px);
+    transition:
+        opacity 320ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1)),
+        visibility 320ms var(--ease-ios);
 }
 
 .bk-drawer-overlay.open {
@@ -3858,13 +4363,18 @@ body.dark-theme .grid-stat-box p {
     width: 420px;
     max-width: 95vw;
     height: 100vh;
-    background: var(--panel-bg);
+    background: var(--glass-bg-strong, var(--panel-bg));
+    backdrop-filter: var(--glass-blur, blur(28px) saturate(170%));
+    -webkit-backdrop-filter: var(--glass-blur, blur(28px) saturate(170%));
+    border-left: 0.5px solid var(--glass-edge, rgba(255, 255, 255, 0.85));
     z-index: 2600;
     transform: translateX(100%);
-    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 380ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
     display: flex;
     flex-direction: column;
-    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.15);
+    box-shadow:
+        inset 1px 0 0 rgba(255, 255, 255, 0.4),
+        -18px 0 40px -10px rgba(15, 23, 42, 0.25);
 }
 
 .bk-drawer.open {
@@ -3872,38 +4382,74 @@ body.dark-theme .grid-stat-box p {
 }
 
 .bk-drawer-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--border-color);
+    padding: 22px 24px 18px;
+    border-bottom: 1px solid var(--modal-hairline, rgba(15, 23, 42, 0.08));
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    position: relative;
 }
 
+/* Refined kicker hairline accent at the very top of the drawer */
+.bk-drawer-header::before {
+    content: '';
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--primary-red, #991b1b) 50%, transparent) 30%,
+        color-mix(in srgb, var(--primary-red, #991b1b) 80%, transparent) 50%,
+        color-mix(in srgb, var(--primary-red, #991b1b) 50%, transparent) 70%,
+        transparent 100%);
+    opacity: 0;
+    transition: opacity 380ms var(--ease-ios) 220ms;
+}
+.bk-drawer.open .bk-drawer-header::before { opacity: 1; }
+
 .bk-drawer-header h3 {
+    font-family: 'Bricolage Grotesque', 'Inter', sans-serif;
     font-size: 18px;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    color: var(--text-heading, var(--text-primary));
     margin: 0;
 }
 
 .bk-drawer-close {
-    width: 34px;
-    height: 34px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    border: 0.5px solid transparent;
+    border-radius: 50%;
     background: transparent;
-    font-size: 22px;
+    font-size: 18px;
     color: var(--text-muted);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.15s;
+    padding: 0;
+    transition:
+        background-color 220ms var(--ease-ios),
+        color 220ms var(--ease-ios),
+        border-color 220ms var(--ease-ios),
+        transform 280ms var(--ease-ios);
 }
 
 .bk-drawer-close:hover {
-    border-color: var(--primary-red);
-    color: var(--primary-red);
+    color: var(--text-heading, var(--text-primary));
+    background: rgba(15, 23, 42, 0.06);
+    border-color: rgba(15, 23, 42, 0.08);
+    transform: rotate(90deg);
+}
+
+body.dark-theme .bk-drawer-close:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .bk-drawer-body {
@@ -4052,7 +4598,42 @@ body.dark-theme .bk-drawer {
    COMPREHENSIVE DARK THEME OVERRIDES
    ============================================ */
 body.dark-theme .topbar {
-    background-color: var(--panel-bg);
+    background: rgba(18, 18, 24, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 
+        0 10px 30px -10px rgba(0, 0, 0, 0.4), 
+        0 1px 3px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body.dark-theme .topbar .search {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-theme .topbar .search:focus-within {
+    background: rgba(0, 0, 0, 0.2);
+    border-color: #ff5d4a;
+}
+
+body.dark-theme .topbar .search .kbd {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+body.dark-theme .topbar .icon-btn {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-theme .topbar .icon-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ff5d4a;
+}
+
+body.dark-theme .topbar .icon-btn#notifToggleBtn.has-unread::after {
+    border-color: rgba(18, 18, 24, 1);
 }
 
 body.dark-theme .panel-header {
@@ -6984,7 +7565,26 @@ body.dark-theme .trainer-avatar { color: var(--text-heading); }
         width: 100%;
         padding: var(--space-4);
     }
-    .topbar { left: 0 !important; width: 100% !important; padding: var(--space-3) var(--space-4); }
+    .topbar { 
+        left: 0 !important; 
+        width: 100% !important; 
+        padding: var(--space-3) var(--space-4); 
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border: none !important;
+        border-bottom: 1px solid var(--border-color) !important;
+        height: 64px !important;
+        box-shadow: none !important;
+        background: var(--panel-bg) !important;
+    }
+    .topbar .search {
+        display: none !important;
+    }
+    .topbar .btn-coral {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        border-radius: 8px !important;
+    }
     .live-clock { display: none !important; }
     #topBarName { display: none; }
 
@@ -7055,10 +7655,10 @@ body.dark-theme .trainer-avatar { color: var(--text-heading); }
     box-shadow: var(--shadow-xs);
 }
 .booking-step-label {
-    font-size: var(--text-sm);
-    font-weight: var(--fw-bold);
+    font-size: 11px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.14em;
     color: var(--text-heading);
     display: flex;
     align-items: center;
@@ -7066,17 +7666,146 @@ body.dark-theme .trainer-avatar { color: var(--text-heading); }
     margin-bottom: var(--space-3);
 }
 .step-badge {
-    background: var(--accent-blue);
+    background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 60%, #1d4ed8 100%);
     color: #fff;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: var(--text-xs);
-    font-weight: var(--fw-bold);
+    font-size: 11px;
+    font-weight: 700;
     flex-shrink: 0;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.35),
+        0 4px 10px -4px rgba(59, 130, 246, 0.55);
+    transition: transform 220ms var(--ease-spring-soft, cubic-bezier(0.34, 1.3, 0.64, 1));
+}
+.booking-step-label:hover .step-badge { transform: scale(1.08); }
+
+/* ─── Premium wizard stepper (memberModal reg-wizard, etc.) ──────────── */
+.reg-wizard-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin: 6px 0 24px;
+    padding: 0;
+}
+.reg-step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    transition: opacity 220ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+    opacity: 0.55;
+}
+.reg-step-item.active,
+.reg-step-item.completed { opacity: 1; }
+
+.reg-step-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--modal-hairline-strong, #cbd5e1) 50%, transparent);
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    border: 1px solid var(--modal-hairline, rgba(15, 23, 42, 0.08));
+    transition:
+        background-color 260ms var(--ease-ios),
+        color 220ms var(--ease-ios),
+        border-color 220ms var(--ease-ios),
+        transform 280ms var(--ease-spring-soft, cubic-bezier(0.34, 1.3, 0.64, 1)),
+        box-shadow 260ms var(--ease-ios);
+    position: relative;
+}
+
+.reg-step-item.active .reg-step-circle {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--primary-red, #991b1b) 92%, white) 0%,
+        color-mix(in srgb, var(--primary-red, #991b1b) 82%, black 18%) 100%);
+    color: #fff;
+    border-color: transparent;
+    transform: scale(1.08);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 1px 2px rgba(15, 23, 42, 0.08),
+        0 8px 18px -6px color-mix(in srgb, var(--primary-red, #991b1b) 60%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--primary-red, #991b1b) 12%, transparent);
+}
+
+.reg-step-item.completed .reg-step-circle {
+    background: linear-gradient(135deg, #34d399 0%, #10b981 60%, #047857 100%);
+    color: transparent;
+    border-color: transparent;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.25),
+        0 6px 14px -6px rgba(16, 185, 129, 0.55);
+}
+.reg-step-item.completed .reg-step-circle::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 8px;
+    border-left: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    transform: rotate(-45deg) translate(1px, -2px);
+}
+
+.reg-step-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    transition: color 220ms var(--ease-ios);
+    white-space: nowrap;
+}
+.reg-step-item.active .reg-step-label {
+    color: var(--text-heading, var(--text-primary));
+}
+.reg-step-item.completed .reg-step-label {
+    color: #047857;
+}
+
+.reg-step-connector {
+    flex: 1 1 auto;
+    min-width: 28px;
+    max-width: 72px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--modal-hairline-strong, rgba(15, 23, 42, 0.12));
+    margin: 0 8px;
+    align-self: flex-start;
+    margin-top: 17px;
+    position: relative;
+    overflow: hidden;
+}
+.reg-step-connector::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #34d399, #10b981);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 420ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1));
+}
+/* When the next step is active or completed, the previous connector fills */
+.reg-step-item.completed + .reg-step-connector::after,
+.reg-step-item.active + .reg-step-connector::after { transform: scaleX(0.5); }
+.reg-step-item.completed + .reg-step-connector + .reg-step-item.completed ~ .reg-step-connector::after,
+.reg-step-item.completed + .reg-step-connector::after { transform: scaleX(1); }
+
+@media (max-width: 520px) {
+    .reg-step-label { display: none; }
+    .reg-step-connector { min-width: 16px; max-width: 40px; }
 }
 .booking-select {
     width: 100%;
@@ -7450,3 +8179,1093 @@ body.dark-theme .trainer-avatar { color: var(--text-heading); }
 .greeting-stat-wide { min-width: 180px; }
 .booking-step-card-time { padding: var(--space-4); }
 /* End member dashboard styles */
+
+/* ═════════════════════════════════════════════════════════════════════
+   MODAL REDESIGN — "Atrium" (2026-05-27 r2)
+   Premium editorial dialogs. CSS-only — no markup changes. Cascades
+   over BOTH the legacy .modal / .modal-content recipe AND the
+   canonical .modal-overlay / .modal-shell recipe. All four dashboards,
+   confirm/prompt dialogs, the booking modal and the membership-expired
+   modal inherit.
+
+   Identity:
+   • Frosted-glass scrim with theatrical key light from above
+   • Floating panel with ambient tonal halo + interior gloss
+   • Magazine kicker rule above title; tightly tracked display heading
+   • Refined circular ghost close button (no spin)
+   • Apple-style ease (0.32, 0.72, 0, 1); scale-in with no overshoot
+   • Tone system: halo + accent button (default = brand red)
+   • Inputs with hairline border, soft focus halo, no pop
+   • Mobile bottom-sheet with proper drag handle, no blade
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Tokens ─────────────────────────────────────────────────────────── */
+:root {
+    /* Accent — current modal tone (overridden by .tone-* classes) */
+    --modal-accent: var(--primary-red);
+    --modal-accent-rgb: 153, 27, 27;
+
+    /* Surface */
+    --modal-surface: #ffffff;
+    --modal-surface-soft: #fafbfc;
+    --modal-hairline: rgba(15, 23, 42, 0.08);
+    --modal-hairline-strong: rgba(15, 23, 42, 0.14);
+    --modal-eyebrow-fg: #64748b;
+
+    /* Theatrical key light + ambient halo */
+    --modal-keylight:
+        radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 60%);
+    --modal-ambient:
+        radial-gradient(140% 80% at 50% 130%, color-mix(in srgb, var(--modal-accent) 10%, transparent) 0%, transparent 55%);
+
+    /* Layered floating shadow stack (soft + crisp + inner rim) */
+    --modal-shadow:
+        0 1px 0 0 rgba(255, 255, 255, 0.85) inset,
+        0 -1px 0 0 rgba(15, 23, 42, 0.04) inset,
+        0 0 0 1px rgba(15, 23, 42, 0.04),
+        0 2px 4px -2px rgba(15, 23, 42, 0.06),
+        0 12px 24px -8px rgba(15, 23, 42, 0.10),
+        0 40px 80px -16px rgba(15, 23, 42, 0.22);
+
+    /* Halo: ambient backlight tied to tone */
+    --modal-halo: 0 0 60px -12px color-mix(in srgb, var(--modal-accent) 32%, transparent);
+
+    /* Motion — Apple/Linear curve (no overshoot) */
+    --modal-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --modal-dur-in: 360ms;
+    --modal-dur-out: 220ms;
+
+    /* Liquid-Glass material tokens (premium redesign) */
+    --glass-bg: rgba(255, 255, 255, 0.74);
+    --glass-bg-strong: rgba(255, 255, 255, 0.86);
+    --glass-edge: rgba(255, 255, 255, 0.85);
+    --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 0 0 0.5px rgba(255, 255, 255, 0.4);
+    --glass-blur: blur(28px) saturate(170%);
+
+    /* Scrim / overlay backdrop */
+    --scrim-bg: rgba(15, 23, 42, 0.32);
+    --scrim-blur: blur(18px) saturate(140%);
+
+    /* Modal icon-plate (header iconography) */
+    --modal-icon-plate-bg: linear-gradient(135deg, #fde68a 0%, #fb923c 50%, #f43f5e 100%);
+    --modal-icon-plate-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.55),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+        0 6px 14px -6px rgba(244, 63, 94, 0.45),
+        0 1px 2px rgba(244, 63, 94, 0.25);
+
+    /* Refined easings */
+    --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-spring-soft: cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+body.dark-theme {
+    --modal-surface: #1a2334;
+    --modal-surface-soft: #141c2a;
+    --modal-hairline: rgba(255, 255, 255, 0.08);
+    --modal-hairline-strong: rgba(255, 255, 255, 0.14);
+    --modal-eyebrow-fg: #94a3b8;
+    --modal-accent-rgb: 239, 68, 68;
+
+    /* Glass tokens — dark theme */
+    --glass-bg: rgba(20, 26, 40, 0.74);
+    --glass-bg-strong: rgba(22, 30, 46, 0.86);
+    --glass-edge: rgba(255, 255, 255, 0.12);
+    --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+    --scrim-bg: rgba(2, 6, 16, 0.58);
+    --modal-keylight:
+        radial-gradient(120% 60% at 50% -10%, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 60%);
+    --modal-ambient:
+        radial-gradient(140% 80% at 50% 130%, color-mix(in srgb, var(--modal-accent) 18%, transparent) 0%, transparent 55%);
+    --modal-shadow:
+        0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+        0 -1px 0 0 rgba(0, 0, 0, 0.4) inset,
+        0 0 0 1px rgba(255, 255, 255, 0.04),
+        0 2px 4px -2px rgba(0, 0, 0, 0.5),
+        0 18px 36px -8px rgba(0, 0, 0, 0.55),
+        0 48px 96px -16px rgba(0, 0, 0, 0.7);
+    --modal-halo: 0 0 80px -16px color-mix(in srgb, var(--modal-accent) 45%, transparent);
+}
+
+/* Tone palette — accent feeds halo, hero icon, primary button */
+.modal.tone-danger, .modal-overlay.tone-danger, .modal-content.tone-danger, .modal-shell.tone-danger,
+#customConfirmModal .modal-content.tone-danger {
+    --modal-accent: #ef4444; --modal-accent-rgb: 239, 68, 68;
+}
+.modal.tone-warning, .modal-overlay.tone-warning, .modal-content.tone-warning, .modal-shell.tone-warning,
+#customConfirmModal .modal-content.tone-warning {
+    --modal-accent: #f59e0b; --modal-accent-rgb: 245, 158, 11;
+}
+.modal.tone-success, .modal-overlay.tone-success, .modal-content.tone-success, .modal-shell.tone-success,
+#customConfirmModal .modal-content.tone-success {
+    --modal-accent: #10b981; --modal-accent-rgb: 16, 185, 129;
+}
+.modal.tone-info, .modal-overlay.tone-info, .modal-content.tone-info, .modal-shell.tone-info,
+#customConfirmModal .modal-content.tone-info {
+    --modal-accent: #3b82f6; --modal-accent-rgb: 59, 130, 246;
+}
+
+/* ── Scrim: applies to canonical .modal-overlay only.
+   The legacy .modal base (rewritten with glass tokens) governs itself. ── */
+.modal-overlay {
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 255, 255, 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 50%, rgba(15, 23, 42, 0.42) 0%, rgba(15, 23, 42, 0.62) 100%);
+    backdrop-filter: blur(14px) saturate(125%);
+    -webkit-backdrop-filter: blur(14px) saturate(125%);
+}
+body.dark-theme .modal-overlay {
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(120, 145, 200, 0.06) 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.78) 100%);
+}
+
+/* ── Shell: canonical .modal-shell only.
+   The legacy .modal-content uses the new Liquid-Glass base above. ──────── */
+.modal-shell {
+    position: relative;
+    background-color: var(--modal-surface);
+    background-image:
+        var(--modal-keylight),
+        var(--modal-ambient);
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    border-radius: 22px;
+    box-shadow: var(--modal-shadow), var(--modal-halo);
+    border: 1px solid var(--modal-hairline);
+    overflow: hidden;
+    isolation: isolate;
+}
+
+/* Top hairline — refined accent that brightens with tone (canonical shell) */
+.modal-shell::before {
+    content: "";
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--modal-accent) 60%, transparent) 25%,
+        color-mix(in srgb, var(--modal-accent) 90%, transparent) 50%,
+        color-mix(in srgb, var(--modal-accent) 60%, transparent) 75%,
+        transparent 100%);
+    opacity: 0;
+    animation: modal-accent-in 600ms var(--modal-ease) 120ms forwards;
+    z-index: 3;
+}
+
+@keyframes modal-accent-in {
+    from { opacity: 0; transform: scaleX(0.6); }
+    to   { opacity: 1; transform: scaleX(1); }
+}
+
+/* ── Header — canonical-shell editorial hierarchy.
+   (Legacy .modal-content > .modal-header is governed by new base above.) */
+.modal-shell-header .modal-shell-title {
+    position: relative;
+    font-family: 'Bricolage Grotesque', 'Inter', -apple-system, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text-heading);
+    font-size: 22px;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+}
+
+/* Canonical shell header refinements */
+.modal-shell-header {
+    padding: var(--space-6) var(--space-6) var(--space-5);
+    border-bottom: 1px solid var(--modal-hairline);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%);
+}
+body.dark-theme .modal-shell-header {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+}
+.modal-shell-subtitle {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.55;
+    margin-top: 6px;
+    letter-spacing: -0.005em;
+}
+
+/* ── Close button — canonical shell only (legacy .close-btn uses new base) */
+.modal-shell .modal-close {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--modal-hairline);
+    font-size: 13px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition:
+        transform 200ms var(--modal-ease),
+        color 200ms ease,
+        background 200ms ease,
+        border-color 200ms ease,
+        box-shadow 200ms ease;
+    position: relative;
+    z-index: 4;
+    flex-shrink: 0;
+}
+.modal-shell .modal-close:hover {
+    color: var(--text-heading);
+    border-color: var(--modal-hairline-strong);
+    background: color-mix(in srgb, var(--text-heading) 5%, transparent);
+    transform: scale(1.06);
+    box-shadow: 0 6px 12px -4px rgba(15, 23, 42, 0.12);
+}
+.modal-shell .modal-close:active { transform: scale(0.94); }
+.modal-shell .modal-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--modal-accent) 28%, transparent);
+}
+
+/* ── Motion — canonical shell uses the existing transition pipeline.
+   Legacy .modal-content uses `modal-rise` defined in the new base above. */
+.modal-overlay.is-open .modal-shell {
+    transition:
+        transform var(--modal-dur-in) var(--modal-ease),
+        opacity 240ms ease,
+        filter var(--modal-dur-in) var(--modal-ease);
+}
+.modal-overlay:not(.is-open) .modal-shell {
+    filter: blur(3px);
+}
+
+/* ── Optional sub-components (progressive enhancement) ──────────────── */
+
+/* .modal-eyebrow — kicker label with twin hairlines */
+.modal-eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--modal-eyebrow-fg);
+    margin: 0 0 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+}
+.modal-eyebrow::before {
+    content: "";
+    width: 18px;
+    height: 1px;
+    background: var(--modal-accent);
+}
+.modal-eyebrow::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--modal-hairline-strong), transparent);
+    min-width: 40px;
+}
+
+/* .modal-hero — premium icon hero for confirm/status dialogs */
+.modal-hero {
+    text-align: center;
+    padding: 8px 4px 4px;
+}
+.modal-hero-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    margin-bottom: 18px;
+    background:
+        radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.4) 0%, transparent 50%),
+        color-mix(in srgb, var(--modal-accent) 14%, transparent);
+    color: var(--modal-accent);
+    border: 1px solid color-mix(in srgb, var(--modal-accent) 26%, transparent);
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
+        inset 0 -1px 0 0 color-mix(in srgb, var(--modal-accent) 20%, transparent),
+        0 12px 24px -10px color-mix(in srgb, var(--modal-accent) 65%, transparent),
+        0 0 0 6px color-mix(in srgb, var(--modal-accent) 6%, transparent),
+        0 0 36px -8px color-mix(in srgb, var(--modal-accent) 45%, transparent);
+    position: relative;
+    animation: modal-hero-rise 480ms var(--modal-ease) 80ms both;
+}
+@keyframes modal-hero-rise {
+    from { opacity: 0; transform: scale(0.85) translateY(6px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-hero-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text-heading);
+    margin: 0 0 6px;
+    line-height: 1.25;
+}
+.modal-hero-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin: 0 auto;
+    max-width: 38ch;
+}
+
+/* .modal-meta — pill row for status chips */
+.modal-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+}
+.modal-meta .meta-chip {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: var(--color-neutral-bg);
+    color: var(--color-neutral-fg);
+    border: 1px solid var(--modal-hairline);
+}
+.modal-meta .meta-chip.is-accent {
+    background: color-mix(in srgb, var(--modal-accent) 10%, transparent);
+    color: var(--modal-accent);
+    border-color: color-mix(in srgb, var(--modal-accent) 25%, transparent);
+}
+
+/* .modal-divider-deck — section break */
+.modal-divider-deck {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+}
+.modal-divider-deck::before,
+.modal-divider-deck::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--modal-hairline);
+}
+
+/* Footer brand mark — appears when footer uses .is-signed */
+.modal-shell-footer.is-signed::before {
+    content: "XFITTRACK";
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.24em;
+    color: var(--text-muted);
+    margin-right: auto;
+    opacity: 0.5;
+}
+
+/* ── Body: stagger reveal on first-level children ───────────────────── */
+.modal-content > .modal-form > *,
+.modal-shell-body > * {
+    animation: modal-body-rise 420ms var(--modal-ease) both;
+    animation-delay: calc(160ms + var(--stagger, 0) * 36ms);
+}
+.modal-content > .modal-form > *:nth-child(1) { --stagger: 0; }
+.modal-content > .modal-form > *:nth-child(2) { --stagger: 1; }
+.modal-content > .modal-form > *:nth-child(3) { --stagger: 2; }
+.modal-content > .modal-form > *:nth-child(4) { --stagger: 3; }
+.modal-content > .modal-form > *:nth-child(5) { --stagger: 4; }
+.modal-content > .modal-form > *:nth-child(6) { --stagger: 5; }
+.modal-content > .modal-form > *:nth-child(7) { --stagger: 6; }
+.modal-content > .modal-form > *:nth-child(n+8) { --stagger: 7; }
+@keyframes modal-body-rise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* (Duplicate .modal-form input/select/textarea/button recipe removed —
+   the new Liquid-Glass base block at top of file is the single source of truth.) */
+.modal-form input[type="number"] { font-variant-numeric: tabular-nums; }
+
+/* Form labels — restrained tracking, semi-bold */
+.modal-form label,
+.modal-content .form-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--text-heading);
+    text-transform: none;
+    display: inline-block;
+    margin-bottom: 6px;
+}
+
+.form-label-hint {
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+/* Read-only input treatment (e.g. profile email) */
+.modal-form input[readonly] {
+    background: rgba(15, 23, 42, 0.04);
+    color: var(--text-muted);
+    cursor: default;
+}
+body.dark-theme .modal-form input[readonly] {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* ─── Profile-settings modal specifics ──────────────────────────────── */
+.profile-settings-modal { max-width: 480px; }
+.visually-hidden-input {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0);
+    border: 0;
+}
+.profile-settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.btn-logout {
+    margin-top: 18px;
+    padding: 12px 16px;
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: color-mix(in srgb, var(--primary-red, #991b1b) 6%, transparent);
+    color: var(--primary-red, #991b1b);
+    border: 1px solid color-mix(in srgb, var(--primary-red, #991b1b) 22%, transparent);
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background-color 180ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1)),
+        border-color 180ms var(--ease-ios),
+        transform 120ms var(--ease-spring-soft, cubic-bezier(0.34, 1.3, 0.64, 1));
+}
+.btn-logout:hover {
+    background: color-mix(in srgb, var(--primary-red, #991b1b) 12%, transparent);
+    border-color: color-mix(in srgb, var(--primary-red, #991b1b) 35%, transparent);
+}
+.btn-logout:active { transform: scale(0.98); }
+
+/* ── Canonical shell footer + body refinements ──────────────────────── */
+.modal-shell-body {
+    padding: var(--space-6);
+}
+.modal-shell-footer {
+    padding: var(--space-4) var(--space-6);
+    border-top: 1px solid var(--modal-hairline);
+    background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--text-heading) 2%, transparent) 100%);
+    gap: 10px;
+}
+body.dark-theme .modal-shell-footer {
+    background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+/* ═════════════════════════════════════════════════════════════════════
+   CONFIRM / PROMPT DIALOG — Premium hero card
+   Conic-gradient icon plate, animated pulse halo, gradient submit
+   button with internal shimmer, refined textarea with floating label
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Scrim — deeper, more theatrical for these centerpiece dialogs */
+#customConfirmModal,
+#customPromptModal {
+    background:
+        radial-gradient(ellipse 90% 60% at 50% -15%, color-mix(in srgb, var(--primary-red) 14%, transparent) 0%, transparent 55%),
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255, 255, 255, 0.10) 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 50%, rgba(15, 23, 42, 0.50) 0%, rgba(15, 23, 42, 0.72) 100%) !important;
+    backdrop-filter: blur(18px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+}
+body.dark-theme #customConfirmModal,
+body.dark-theme #customPromptModal {
+    background:
+        radial-gradient(ellipse 90% 60% at 50% -15%, rgba(239, 68, 68, 0.22) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.70) 0%, rgba(0, 0, 0, 0.85) 100%) !important;
+}
+
+/* Card — wider, taller hero zone, multi-layer glow */
+#customConfirmModal .modal-content,
+#customPromptModal .modal-content {
+    background-color: var(--modal-surface) !important;
+    background-image:
+        radial-gradient(circle 200px at 50% 0%, color-mix(in srgb, var(--modal-accent) 8%, transparent) 0%, transparent 100%),
+        radial-gradient(140% 60% at 50% -10%, rgba(255, 255, 255, 0.7) 0%, transparent 50%),
+        var(--modal-ambient) !important;
+    background-repeat: no-repeat !important;
+    border: 1px solid var(--modal-hairline) !important;
+    box-shadow:
+        0 1px 0 0 rgba(255, 255, 255, 0.85) inset,
+        0 -1px 0 0 rgba(15, 23, 42, 0.04) inset,
+        0 0 0 1px rgba(15, 23, 42, 0.04),
+        0 2px 4px -2px rgba(15, 23, 42, 0.06),
+        0 24px 48px -12px rgba(15, 23, 42, 0.18),
+        0 60px 100px -20px rgba(15, 23, 42, 0.25),
+        0 0 80px -20px color-mix(in srgb, var(--modal-accent) 50%, transparent) !important;
+    border-radius: 24px !important;
+    padding: 48px 36px 32px !important;
+    max-width: 460px !important;
+    width: 92% !important;
+    text-align: center !important;
+    position: relative;
+}
+
+/* Top accent line — luminous, scales in */
+#customConfirmModal .modal-content::before,
+#customPromptModal .modal-content::before {
+    content: "";
+    position: absolute;
+    left: 28px;
+    right: 28px;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--modal-accent) 70%, transparent) 30%,
+        var(--modal-accent) 50%,
+        color-mix(in srgb, var(--modal-accent) 70%, transparent) 70%,
+        transparent 100%);
+    box-shadow: 0 0 8px 0 color-mix(in srgb, var(--modal-accent) 60%, transparent);
+    transform: scaleX(0);
+    animation: dialog-accent-in 700ms var(--modal-ease) 100ms forwards;
+}
+@keyframes dialog-accent-in {
+    to { transform: scaleX(1); }
+}
+
+body.dark-theme #customConfirmModal .modal-content,
+body.dark-theme #customPromptModal .modal-content {
+    background-image:
+        radial-gradient(circle 200px at 50% 0%, color-mix(in srgb, var(--modal-accent) 18%, transparent) 0%, transparent 100%),
+        radial-gradient(140% 60% at 50% -10%, rgba(255, 255, 255, 0.04) 0%, transparent 50%),
+        var(--modal-ambient) !important;
+}
+
+/* Hero icon plate — premium conic gradient, animated halo ring, pulse */
+#customConfirmModal .modal-icon,
+#customPromptModal .modal-icon {
+    width: 84px !important;
+    height: 84px !important;
+    border-radius: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto 24px !important;
+    position: relative !important;
+    background:
+        radial-gradient(circle at 50% 25%, rgba(255, 255, 255, 0.6) 0%, transparent 55%),
+        conic-gradient(from 220deg at 50% 50%,
+            color-mix(in srgb, var(--modal-accent) 22%, transparent) 0%,
+            color-mix(in srgb, var(--modal-accent) 8%, transparent) 50%,
+            color-mix(in srgb, var(--modal-accent) 22%, transparent) 100%) !important;
+    border: 1px solid color-mix(in srgb, var(--modal-accent) 32%, transparent) !important;
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.55),
+        inset 0 -1px 0 0 color-mix(in srgb, var(--modal-accent) 18%, transparent),
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 16px 32px -10px color-mix(in srgb, var(--modal-accent) 60%, transparent),
+        0 0 0 6px color-mix(in srgb, var(--modal-accent) 5%, transparent),
+        0 0 0 12px color-mix(in srgb, var(--modal-accent) 3%, transparent),
+        0 0 48px -8px color-mix(in srgb, var(--modal-accent) 55%, transparent) !important;
+    animation: dialog-hero-rise 540ms var(--modal-ease) 80ms both !important;
+}
+/* Pulse ring around the hero plate */
+#customConfirmModal .modal-icon::after,
+#customPromptModal .modal-icon::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: 24px;
+    border: 1px solid color-mix(in srgb, var(--modal-accent) 50%, transparent);
+    opacity: 0;
+    animation: dialog-hero-pulse 2.6s var(--ease-in-out) 600ms infinite;
+    pointer-events: none;
+}
+@keyframes dialog-hero-rise {
+    from { opacity: 0; transform: scale(0.7) translateY(8px); filter: blur(6px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+}
+@keyframes dialog-hero-pulse {
+    0%   { opacity: 0; transform: scale(1); }
+    50%  { opacity: 0.6; }
+    100% { opacity: 0; transform: scale(1.18); }
+}
+
+body.dark-theme #customConfirmModal .modal-icon,
+body.dark-theme #customPromptModal .modal-icon {
+    background:
+        radial-gradient(circle at 50% 25%, rgba(255, 255, 255, 0.1) 0%, transparent 55%),
+        conic-gradient(from 220deg at 50% 50%,
+            color-mix(in srgb, var(--modal-accent) 30%, transparent) 0%,
+            color-mix(in srgb, var(--modal-accent) 12%, transparent) 50%,
+            color-mix(in srgb, var(--modal-accent) 30%, transparent) 100%) !important;
+}
+
+#customConfirmModal .modal-icon i,
+#customPromptModal .modal-icon i {
+    font-size: 30px !important;
+    color: var(--modal-accent) !important;
+    opacity: 1 !important;
+    filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--modal-accent) 50%, transparent));
+    position: relative;
+    z-index: 2;
+}
+
+/* Title — display weight, very tight tracking */
+#customConfirmModal h3,
+#customPromptModal h3 {
+    font-family: 'Inter', -apple-system, sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 24px !important;
+    letter-spacing: -0.028em !important;
+    color: var(--text-heading) !important;
+    margin: 0 0 10px !important;
+    line-height: 1.2 !important;
+}
+
+/* Message — generous leading, narrow column */
+#customConfirmMessage,
+#customPromptMessage {
+    margin: 0 auto 26px !important;
+    font-size: 14.5px !important;
+    line-height: 1.6 !important;
+    color: var(--text-muted) !important;
+    max-width: 36ch !important;
+    letter-spacing: -0.005em !important;
+    font-weight: 400 !important;
+}
+
+/* Textarea — refined, restrained min-height, soft focus halo */
+#customPromptInput {
+    width: 100% !important;
+    padding: 14px 16px !important;
+    border: 1.5px solid var(--modal-hairline) !important;
+    border-radius: 14px !important;
+    background: var(--modal-surface-soft) !important;
+    color: var(--text-primary) !important;
+    font-size: 14.5px !important;
+    min-height: 84px !important;
+    margin-bottom: 24px !important;
+    resize: vertical !important;
+    font-family: inherit !important;
+    line-height: 1.55 !important;
+    letter-spacing: -0.005em !important;
+    transition:
+        border-color 200ms ease,
+        background 200ms ease,
+        box-shadow 240ms var(--modal-ease) !important;
+    outline: none !important;
+    text-align: left;
+}
+#customPromptInput::placeholder {
+    color: var(--text-muted);
+    opacity: 0.55;
+}
+#customPromptInput:hover { border-color: var(--modal-hairline-strong) !important; }
+#customPromptInput:focus {
+    border-color: var(--modal-accent) !important;
+    background: var(--modal-surface) !important;
+    box-shadow:
+        0 0 0 4px color-mix(in srgb, var(--modal-accent) 12%, transparent),
+        0 4px 12px -4px color-mix(in srgb, var(--modal-accent) 30%, transparent) !important;
+}
+/* Invalid state — soft shake, danger glow */
+#customPromptInput.is-invalid {
+    border-color: var(--color-danger) !important;
+    background: color-mix(in srgb, var(--color-danger) 4%, var(--modal-surface)) !important;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-danger) 14%, transparent) !important;
+    animation: dialog-input-shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes dialog-input-shake {
+    0%, 100% { transform: translateX(0); }
+    15%, 45%, 75% { transform: translateX(-6px); }
+    30%, 60%, 90% { transform: translateX(6px); }
+}
+
+/* ── Action row — twin premium buttons ──────────────────────────────── */
+.confirm-actions {
+    display: flex !important;
+    gap: 10px !important;
+    justify-content: stretch !important;
+    margin-top: 4px !important;
+}
+.confirm-actions button {
+    flex: 1 !important;
+    padding: 14px 22px !important;
+    border: 1px solid transparent !important;
+    border-radius: 14px !important;
+    cursor: pointer !important;
+    font-size: 14.5px !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.005em !important;
+    font-family: inherit !important;
+    transition:
+        transform 180ms var(--modal-ease),
+        background 200ms ease,
+        border-color 200ms ease,
+        box-shadow 240ms ease,
+        filter 200ms ease,
+        color 200ms ease !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    position: relative;
+    overflow: hidden;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* Cancel — ghost with hairline */
+.confirm-actions .btn-cancel {
+    background: transparent !important;
+    color: var(--text-muted) !important;
+    border-color: var(--modal-hairline) !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03) !important;
+}
+.confirm-actions .btn-cancel:hover {
+    background: color-mix(in srgb, var(--text-heading) 4%, transparent) !important;
+    border-color: var(--modal-hairline-strong) !important;
+    color: var(--text-heading) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px -2px rgba(15, 23, 42, 0.08) !important;
+}
+.confirm-actions .btn-cancel:active { transform: translateY(0) scale(0.98); }
+
+/* Confirm / Save — gradient pill with shimmer + glow */
+.confirm-actions .btn-confirm,
+.confirm-actions .btn-save {
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, var(--modal-accent) 100%, white 8%) 0%,
+            var(--modal-accent) 50%,
+            color-mix(in srgb, var(--modal-accent) 92%, black) 100%) !important;
+    color: #fff !important;
+    border-color: color-mix(in srgb, var(--modal-accent) 70%, black) !important;
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.10),
+        0 1px 2px rgba(15, 23, 42, 0.10),
+        0 8px 18px -6px color-mix(in srgb, var(--modal-accent) 65%, transparent),
+        0 0 0 0 color-mix(in srgb, var(--modal-accent) 25%, transparent) !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
+/* Sheen — diagonal highlight that sweeps on hover */
+.confirm-actions .btn-confirm::before,
+.confirm-actions .btn-save::before {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0;
+    left: -60%;
+    width: 60%;
+    background: linear-gradient(110deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.28) 50%,
+        transparent 100%);
+    transform: skewX(-18deg);
+    transition: left 700ms var(--modal-ease);
+    pointer-events: none;
+}
+.confirm-actions .btn-confirm:hover::before,
+.confirm-actions .btn-save:hover::before { left: 130%; }
+
+.confirm-actions .btn-confirm:hover,
+.confirm-actions .btn-save:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.32),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.12),
+        0 1px 2px rgba(15, 23, 42, 0.12),
+        0 14px 28px -8px color-mix(in srgb, var(--modal-accent) 75%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--modal-accent) 12%, transparent) !important;
+}
+.confirm-actions .btn-confirm:active,
+.confirm-actions .btn-save:active { transform: translateY(0) scale(0.98); }
+.confirm-actions button:focus-visible {
+    outline: none !important;
+    box-shadow:
+        0 0 0 4px color-mix(in srgb, var(--modal-accent) 25%, transparent),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.18) !important;
+}
+.confirm-actions button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* ── Booking modal — premium frame, preserve interior grid ──────────── */
+.booking-modal-content {
+    max-width: 920px !important;
+    border-radius: 22px !important;
+    border: 1px solid var(--modal-hairline) !important;
+    box-shadow: var(--modal-shadow), var(--modal-halo) !important;
+    background-color: var(--modal-surface) !important;
+    background-image: var(--modal-keylight), var(--modal-ambient) !important;
+}
+.booking-modal-content > .modal-header {
+    padding: var(--space-5) var(--space-6) !important;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%);
+    border-bottom: 1px solid var(--modal-hairline) !important;
+    margin: 0 !important;
+}
+body.dark-theme .booking-modal-content > .modal-header {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+}
+.booking-steps-section { border-right: 1px solid var(--modal-hairline); }
+.booking-details-sidebar {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--modal-accent) 4%, var(--modal-surface-soft)) 0%,
+        var(--modal-surface-soft) 100%);
+}
+
+/* ── Member profile modal — let mp-modal-shell breathe (uses its own internal layout) */
+#memberProfileModal .modal-content {
+    padding: 0 !important;
+    background: var(--modal-surface) !important;
+    border-radius: 22px !important;
+}
+#memberProfileModal .modal-content > .modal-header { display: none; }
+
+/* ── Profile settings modal — close button restyled inline overrides ── */
+#profileSettingsModal .modal-content .close-btn {
+    position: absolute !important;
+    right: 16px !important;
+    top: 16px !important;
+    font-size: 13px !important;
+}
+
+/* ── Long-form modals: sticky header drop-shadow when content scrolls ─ */
+.modal-content.is-scrollable {
+    max-height: 88vh;
+    overflow-y: auto;
+}
+.modal-content.is-scrollable > .modal-header {
+    position: sticky;
+    top: 0;
+    background: var(--modal-surface);
+    z-index: 4;
+    padding-top: 24px;
+    margin-left: -32px;
+    margin-right: -32px;
+    padding-left: 32px;
+    padding-right: 32px;
+}
+
+/* ── Mobile bottom-sheet — drag handle, no blade, refined sheet rise ── */
+@media (max-width: 640px) {
+    .modal,
+    .modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+    .modal-content,
+    .modal-shell {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 24px 24px 0 0 !important;
+        padding-top: 28px !important;
+        max-height: 92vh;
+        overflow-y: auto;
+        animation: modal-sheet-up 420ms var(--modal-ease) both;
+        transform-origin: 50% 100%;
+    }
+    /* Top accent → drag handle */
+    .modal-content::before,
+    .modal-shell::before {
+        left: 50% !important;
+        right: auto !important;
+        top: 10px !important;
+        width: 44px !important;
+        height: 5px !important;
+        border-radius: 999px !important;
+        background: var(--modal-hairline-strong) !important;
+        transform: translateX(-50%);
+        animation: none !important;
+        opacity: 1 !important;
+    }
+    #customConfirmModal .modal-content,
+    #customPromptModal .modal-content {
+        border-radius: 24px 24px 0 0 !important;
+        padding-top: 36px !important;
+    }
+    .modal-shell-footer.is-signed::before { display: none; }
+}
+@keyframes modal-sheet-up {
+    from { opacity: 0; transform: translateY(40px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .modal-content,
+    .modal-shell,
+    .modal-content::before,
+    .modal-shell::before,
+    .modal-hero-icon,
+    .modal-content > .modal-form > *,
+    .modal-shell-body > * {
+        animation: none !important;
+        transform: none !important;
+        filter: none !important;
+    }
+}
+
+/* ── Membership-expired modal — Atrium treatment ────────────────────── */
+.modal.modal-expired {
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(239, 68, 68, 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 50%, rgba(80, 12, 12, 0.7) 0%, rgba(0, 0, 0, 0.86) 100%);
+}
+.expired-modal {
+    border: 1px solid var(--modal-hairline);
+    background-color: var(--modal-surface);
+    background-image: var(--modal-keylight),
+        radial-gradient(140% 80% at 50% 130%, rgba(239, 68, 68, 0.14) 0%, transparent 55%);
+    box-shadow: var(--modal-shadow),
+        0 0 80px -16px rgba(239, 68, 68, 0.4);
+    --modal-accent: #ef4444;
+}
+.expired-modal-icon {
+    border-radius: 20px;
+    background:
+        radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.4) 0%, transparent 50%),
+        color-mix(in srgb, #ef4444 14%, transparent);
+    color: #ef4444;
+    border: 1px solid color-mix(in srgb, #ef4444 30%, transparent);
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.45),
+        0 12px 24px -10px rgba(239, 68, 68, 0.65),
+        0 0 0 6px rgba(239, 68, 68, 0.06),
+        0 0 36px -8px rgba(239, 68, 68, 0.45);
+}
+.expired-modal-title {
+    letter-spacing: -0.025em;
+    font-weight: 700;
+}
+
+/* (Duplicate .toast block removed — premium glass toast lives at the .toast
+   recipe above. Single source of truth.) */
+
+/* End modal redesign — Atrium 2026-05-27 r2 */
+
+/* ═════════════════════════════════════════════════════════════════════
+   FINAL POLISH — RFID tap pulse, invoice mono numerals, calendar lift
+   ════════════════════════════════════════════════════════════════════ */
+
+/* RFID Payment Modal — animated tap-zone pulse around the wifi icon.
+   Markup: <i class="fa-solid fa-wifi"> with inline animation:pulse.
+   We add concentric rings around it via the modal-body. */
+#rfidPaymentModal .modal-body {
+    position: relative;
+}
+#rfidPaymentModal .modal-body > i.fa-wifi {
+    position: relative;
+    z-index: 2;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%,
+        color-mix(in srgb, var(--primary-red, #991b1b) 18%, transparent) 0%,
+        transparent 70%);
+}
+#rfidPaymentModal .modal-body > i.fa-wifi::before {
+    z-index: 1;
+}
+#rfidPaymentModal .modal-body > i.fa-wifi::after {
+    content: '';
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--primary-red, #991b1b) 40%, transparent);
+    animation: rfid-ring 1.8s var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1)) infinite;
+    z-index: 0;
+}
+@keyframes rfid-ring {
+    0%   { transform: scale(0.7); opacity: 0.9; }
+    80%  { transform: scale(1.4); opacity: 0; }
+    100% { transform: scale(1.4); opacity: 0; }
+}
+
+/* Invoice modal — premium mono numerals for amounts */
+#invoiceModal {
+    font-variant-numeric: tabular-nums;
+}
+#invoiceModal [id="invoiceId"],
+#invoiceModal [id$="Amount"],
+#invoiceModal [id$="Total"] {
+    font-family: 'Geist Mono', 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+/* Booking calendar — premium selected-day lift, refined hover */
+.cal-day-cell {
+    border-radius: 12px !important;
+    transition:
+        background-color 180ms var(--ease-ios, cubic-bezier(0.32, 0.72, 0, 1)),
+        color 180ms var(--ease-ios),
+        transform 220ms var(--ease-spring-soft, cubic-bezier(0.34, 1.3, 0.64, 1)),
+        box-shadow 220ms var(--ease-ios) !important;
+}
+.cal-day-cell:hover:not(:disabled):not(.selected) {
+    background: color-mix(in srgb, var(--accent-blue, #3b82f6) 10%, transparent) !important;
+    color: var(--accent-blue, #3b82f6) !important;
+    transform: translateY(-1px);
+}
+.cal-day-cell.selected {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent-blue, #3b82f6) 95%, white) 0%,
+        color-mix(in srgb, var(--accent-blue, #3b82f6) 80%, black 20%) 100%) !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 1px 2px rgba(15, 23, 42, 0.08),
+        0 8px 18px -6px color-mix(in srgb, var(--accent-blue, #3b82f6) 55%, transparent) !important;
+    transform: translateY(-1px);
+}
+.cal-day-cell:active:not(:disabled) {
+    transform: translateY(0) scale(0.96);
+}
+
+/* Image-source modal — premium picker buttons */
+#imageSourceModal .modal-content {
+    max-width: 380px;
+}
+
+/* Membership-expired modal — keep the existing premium recipe intact,
+   just nudge title typography to match new system */
+.expired-modal-title {
+    font-family: 'Bricolage Grotesque', 'Inter', sans-serif !important;
+}
+
+/* Reduced-motion respect for added animations */
+@media (prefers-reduced-motion: reduce) {
+    #rfidPaymentModal .modal-body > i.fa-wifi::after,
+    .reg-step-circle,
+    .reg-step-connector::after,
+    .step-badge,
+    .cal-day-cell {
+        animation: none !important;
+        transition-duration: 0.001ms !important;
+    }
+}

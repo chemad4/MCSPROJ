@@ -196,11 +196,20 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, enableIndexedDbPersistence, collection, addDoc, query, where, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { firebaseConfig } from "./js/firebase-config.js";
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
+
+        // Enable Offline Persistence for gold-standard Firestore quota optimization.
+        enableIndexedDbPersistence(db).catch((err) => {
+            if (err.code === 'failed-precondition') {
+                console.warn("Firestore persistence failed-precondition (multiple tabs open)");
+            } else if (err.code === 'unimplemented') {
+                console.warn("Firestore persistence unimplemented in browser");
+            }
+        });
 
         const isMobileDevice = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 800;
 

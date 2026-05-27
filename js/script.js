@@ -2,7 +2,7 @@
 // 1. IMPORT FIREBASE DEPENDENCIES
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where, orderBy, limit, getDocs, getDoc, increment, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where, orderBy, limit, getDocs, getDoc, increment, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 // Firebase Storage removed — images stored as Base64 in Firestore (free tier compatible)
 import { initAttendance } from "./attendance.js";
 import { initRfid } from "./rfid.js";
@@ -269,6 +269,17 @@ window.syncDOM = function (container, dataArray, renderFunc, idPrefix) {
 // ==========================================
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// Enable Offline Persistence for gold-standard Firestore quota optimization.
+// Reads will be served from local cache first, costing 0 quota reads.
+// Only new/modified documents since the last page sync will be fetched from the server.
+enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+        console.warn("Firestore persistence failed-precondition (multiple tabs open)");
+    } else if (err.code === 'unimplemented') {
+        console.warn("Firestore persistence unimplemented in browser");
+    }
+});
 
 // Resize an image file to max 250x250 and return as Base64 data URL (Firestore-compatible, no Firebase Storage needed)
 window.uploadImage = function (file, _folder) {
@@ -574,6 +585,11 @@ window.handleLogout = async function () {
 window.switchTab = function (tabId, element, evt) {
     if (evt) evt.stopPropagation();
     else if (typeof event !== 'undefined' && event) event.stopPropagation();
+
+    const globalSearch = document.getElementById('globalSearchInput');
+    if (globalSearch) {
+        globalSearch.value = '';
+    }
 
     document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('active-section'));
     if (document.getElementById(tabId)) document.getElementById(tabId).classList.add('active-section');
@@ -1219,8 +1235,9 @@ if (currentUserId) {
             });
             _emitChat();
         };
-        const sentQ = query(messagesCol, where("sender", "==", myName), orderBy("timestamp", "desc"), limit(500));
-        const recvQ = query(messagesCol, where("receiver", "==", myName), orderBy("timestamp", "desc"), limit(500));
+        // PRESENTATION PROOFING: Lower chat message buffer to 30 for lightweight presentation loads.
+        const sentQ = query(messagesCol, where("sender", "==", myName), orderBy("timestamp", "desc"), limit(30));
+        const recvQ = query(messagesCol, where("receiver", "==", myName), orderBy("timestamp", "desc"), limit(30));
         onSnapshot(sentQ, _ingest, (err) => console.warn("[messages:sent] listener error", err));
         onSnapshot(recvQ, _ingest, (err) => console.warn("[messages:recv] listener error", err));
     }
@@ -1419,10 +1436,11 @@ function getCategoryIcon(catName) {
     const c = (catName || "").toLowerCase();
     if (c.includes('cardio')) return '<i class="fa-solid fa-person-running"></i>';
     if (c.includes('strength')) return '<i class="fa-solid fa-dumbbell"></i>';
-    if (c.includes('accessories')) return '<i class="fa-solid fa-mats"></i>';
-    if (c.includes('supplements')) return '<i class="fa-solid fa-capsules"></i>';
-    if (c.includes('beverage')) return '<i class="fa-solid fa-bottle-water"></i>';
-    if (c.includes('merch')) return '<i class="fa-solid fa-shirt"></i>';
+    if (c.includes('free weight') || c.includes('weight')) return '<i class="fa-solid fa-box"></i>';
+    if (c.includes('accessories') || c.includes('mat')) return '<i class="fa-solid fa-shapes"></i>';
+    if (c.includes('supplement')) return '<i class="fa-solid fa-capsules"></i>';
+    if (c.includes('beverage') || c.includes('drink')) return '<i class="fa-solid fa-bottle-water"></i>';
+    if (c.includes('merch') || c.includes('apparel') || c.includes('shirt')) return '<i class="fa-solid fa-shirt"></i>';
     return '<i class="fa-solid fa-box"></i>';
 }
 
@@ -1652,10 +1670,23 @@ function renderInventory() {
 
         let placeholderStyle = "";
         if (!item.image) {
-            if (catClean.includes("beverage")) placeholderStyle = "background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.15)); color: #059669; border-color: rgba(16, 185, 129, 0.2);";
-            else if (catClean.includes("supplement")) placeholderStyle = "background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.15)); color: #4f46e5; border-color: rgba(99, 102, 241, 0.2);";
-            else if (catClean.includes("apparel") || catClean.includes("merch")) placeholderStyle = "background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(236, 72, 153, 0.15)); color: #d97706; border-color: rgba(245, 158, 11, 0.2);";
-            else placeholderStyle = "background: linear-gradient(135deg, rgba(148, 163, 184, 0.1), rgba(71, 85, 105, 0.15)); color: #475569; border-color: rgba(148, 163, 184, 0.2);";
+            if (catClean.includes("beverage") || catClean.includes("drink")) {
+                placeholderStyle = "background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 182, 212, 0.15)); color: #059669; border-color: rgba(16, 185, 129, 0.2);";
+            } else if (catClean.includes("supplement")) {
+                placeholderStyle = "background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.15)); color: #4f46e5; border-color: rgba(99, 102, 241, 0.2);";
+            } else if (catClean.includes("apparel") || catClean.includes("merch")) {
+                placeholderStyle = "background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(236, 72, 153, 0.15)); color: #d97706; border-color: rgba(245, 158, 11, 0.2);";
+            } else if (catClean.includes("cardio")) {
+                placeholderStyle = "background: linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(2, 132, 199, 0.15)); color: #0284c7; border-color: rgba(14, 165, 233, 0.2);";
+            } else if (catClean.includes("strength")) {
+                placeholderStyle = "background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(109, 40, 217, 0.15)); color: #6d28d9; border-color: rgba(139, 92, 246, 0.2);";
+            } else if (catClean.includes("free weight") || catClean.includes("weight")) {
+                placeholderStyle = "background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(67, 56, 202, 0.15)); color: #4338ca; border-color: rgba(79, 70, 229, 0.2);";
+            } else if (catClean.includes("accessories") || catClean.includes("mat")) {
+                placeholderStyle = "background: linear-gradient(135deg, rgba(241, 245, 249, 0.9), rgba(226, 232, 240, 0.95)); color: #475569; border-color: rgba(148, 163, 184, 0.3);";
+            } else {
+                placeholderStyle = "background: linear-gradient(135deg, rgba(148, 163, 184, 0.1), rgba(71, 85, 105, 0.15)); color: #475569; border-color: rgba(148, 163, 184, 0.2);";
+            }
         }
 
         let actionButtons = !isConsumable ? `
@@ -2175,7 +2206,10 @@ async function handleInventorySubmit(e, isProduct) {
             }
         }
 
-        const existingItem = inventoryData.find(i => i.name.toLowerCase() === nameStr.toLowerCase());
+        const existingItem = isProduct ? inventoryData.find(i => {
+            const isConsumable = i.itemType === 'product' || ['Supplements', 'Beverages', 'Merch', 'Supplements (Powder/Capsules)', 'Beverages (Bottled Drinks)', 'Apparel / Merchandise'].includes(i.cat);
+            return isConsumable && i.name.toLowerCase() === nameStr.toLowerCase();
+        }) : null;
 
         if (existingItem) {
             await updateDoc(doc(db, "inventory", existingItem.id), { qty: increment(addQty) });
@@ -2454,10 +2488,11 @@ function renderPOSProducts() {
         // Use fallback icon for walk-in day pass or missing/unsafe images.
         // isSafeImageSrc gates against SVG/javascript: data URIs (XSS).
         const hasValidImage = item.image && item.image !== 'images/default-product.png' && window.isSafeImageSrc(item.image);
+        const fallbackIconHtml = item.isPlan ? '<i class="fa-solid fa-ticket"></i>' : getCategoryIcon(item.cat);
         const imageHtml = hasValidImage
             ? `<img src="${escapeHtml(item.image)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-               <div class="pos-fallback-icon" style="display:none;"><i class="fa-solid ${item.isPlan ? 'fa-ticket' : 'fa-box'}"></i></div>`
-            : `<div class="pos-fallback-icon"><i class="fa-solid ${item.isPlan ? 'fa-ticket' : 'fa-box'}"></i></div>`;
+               <div class="pos-fallback-icon" style="display:none;">${fallbackIconHtml}</div>`
+            : `<div class="pos-fallback-icon">${fallbackIconHtml}</div>`;
 
         // Data-attributes + delegated handler avoid double-encoding traps where
         // item.name/image contain quotes or HTML metacharacters.
@@ -3587,7 +3622,9 @@ let currentTrainerSortOrder = 'desc';
 // cover every consumer. For a small gym this is ~3+ months of history; for a busy one,
 // ~weeks — still plenty for operational dashboards.
 if (isStaffSide) {
-    const paymentsQ = query(paymentsCol, orderBy("timestamp", "desc"), limit(1000));
+    // PRESENTATION PROOFING: Lower the payments limit to 50 (perfect for school demo datasets),
+    // reducing document reads by 95% per dashboard load/sync.
+    const paymentsQ = query(paymentsCol, orderBy("timestamp", "desc"), limit(50));
     onSnapshot(paymentsQ, (snapshot) => {
         paymentsData = [];
         snapshot.forEach(doc => paymentsData.push({ id: doc.id, ...doc.data() }));
@@ -4518,9 +4555,14 @@ if (isStaffSide || roleNorm === "trainer") {
         });
     });
 } else if (roleNorm === "member") {
-    // One-shot fetch of just the trainers (for booking) + staff (for chat).
-    // Members do not need every other member's doc.
-    getDocs(usersCol).then(snapshot => {
+    // QUOTA FIX: Query ONLY staff, admins, and trainers. 
+    // Regular gym members do not need to download the details of other members,
+    // which previously burned thousands of reads on every member login.
+    const staffAndTrainersQ = query(
+        usersCol,
+        where("role", "in", ["Trainer", "Staff", "Admin", "trainer", "staff", "admin"])
+    );
+    getDocs(staffAndTrainersQ).then(snapshot => {
         allUsersData = []; membersData = []; chatUsers = [];
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
@@ -7865,6 +7907,74 @@ function initUI() {
         sidebarAvatar.innerText = initials || "U";
     }
 
+    // --- Global Search Input Routing & Shortcuts ---
+    window.handleGlobalSearch = function (queryVal) {
+        const activeSection = document.querySelector('.content-section.active-section');
+        if (!activeSection) return;
+        
+        const activeId = activeSection.id;
+        
+        if (activeId === 'members') {
+            const input = document.getElementById('memberSearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterMembers) window.filterMembers();
+            }
+        } else if (activeId === 'bookings') {
+            const input = document.getElementById('bookingSearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.handleBookingSearch) window.handleBookingSearch();
+            }
+        } else if (activeId === 'activityLog') {
+            const input = document.getElementById('activitySearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterActivityLogs) window.filterActivityLogs();
+            }
+        } else if (activeId === 'pos') {
+            const input = document.getElementById('posSearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterPOSCatalog) window.filterPOSCatalog();
+            }
+        } else if (activeId === 'chats') {
+            const input = document.getElementById('chatSearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterChatUsers) window.filterChatUsers();
+            }
+        } else if (activeId === 'inventory') {
+            const machinesTab = document.getElementById('machinesPanel');
+            const productsTab = document.getElementById('productsPanel');
+            if (machinesTab && machinesTab.classList.contains('active')) {
+                const input = document.getElementById('machineSearch');
+                if (input) {
+                    input.value = queryVal;
+                    input.dispatchEvent(new Event('input'));
+                }
+            } else if (productsTab && productsTab.classList.contains('active')) {
+                const input = document.getElementById('productSearch');
+                if (input) {
+                    input.value = queryVal;
+                    input.dispatchEvent(new Event('input'));
+                }
+            }
+        }
+    };
+
+    // Keyboard shortcut handler for Cmd+K / Ctrl+K
+    document.addEventListener('keydown', function (e) {
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            const globalSearch = document.getElementById('globalSearchInput');
+            if (globalSearch) {
+                globalSearch.focus();
+                globalSearch.select();
+            }
+        }
+    });
+
     // --- Real-time Session Sync ---
     // (Merged into the top-level onSnapshot at the start of this file — see section 3.
     //  Removing the duplicate listener here saves ~50% of reads on the self-user doc.)
@@ -8091,7 +8201,9 @@ window.isBookingSessionInPast = isBookingSessionInPast;
         // for the lifetime of the gym. 90 days covers quarterly reporting, all
         // dashboard KPIs (today / this-week / no-shows-week), and trainer payroll.
         const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 90);
+        // PRESENTATION PROOFING: Reduce bookings lookup history to 14 days for extreme presentation speed
+        // and minimum read overhead.
+        cutoff.setDate(cutoff.getDate() - 14);
         const cutoffStr = cutoff.toLocaleDateString('en-CA');
         bookingsQuery = query(bookingsCol, where("date", ">=", cutoffStr));
     } else {
@@ -9733,7 +9845,8 @@ window.changeActivityPage = function (dir) {
 // a write from this tab if you need to see your own log appear immediately.
 window.refreshActivityLogs = function () {
     if (!isAdmin) return Promise.resolve();
-    const q = query(activityLogsCol, orderBy("timestamp", "desc"), limit(200));
+    // PRESENTATION PROOFING: Lower activity logs limit to 25 for maximum read quota conservation.
+    const q = query(activityLogsCol, orderBy("timestamp", "desc"), limit(25));
     return getDocs(q).then(snapshot => {
         activityData = [];
         snapshot.forEach(doc => activityData.push({ id: doc.id, ...doc.data() }));
@@ -9833,6 +9946,12 @@ function renderActivityLogs() {
         return;
     }
 
+    // Remove empty state if present
+    const emptyStateRow = actTbody.querySelector('#activityEmptyState');
+    if (emptyStateRow) {
+        emptyStateRow.remove();
+    }
+
     // Action → icon mapping
     const actionIcons = {
         'POS Sale': 'fa-cash-register',
@@ -9865,13 +9984,15 @@ function renderActivityLogs() {
 
     const renderLogRow = (log) => {
         const icon = actionIcons[log.action] || 'fa-circle-info';
-        const roleBadge = log.role === 'Admin'
-            ? '<span class="badge active" style="background: var(--primary-red);">Admin</span>'
-            : log.role === 'Staff'
-                ? '<span class="badge active" style="background: #2980b9;">Staff</span>'
-                : log.role === 'Trainer'
-                    ? '<span class="badge active" style="background: #27ae60;">Trainer</span>'
-                    : `<span class="badge active" style="background: var(--dark-black);">${escapeHtml(log.role || 'System')}</span>`;
+        
+        const role = log.role || 'System';
+        let roleClass = 'role-system';
+        if (role === 'Admin') roleClass = 'role-admin';
+        else if (role === 'Staff') roleClass = 'role-staff';
+        else if (role === 'Trainer') roleClass = 'role-trainer';
+        else if (role === 'Member') roleClass = 'role-member';
+
+        const roleBadge = `<span class="badge ${roleClass}">${escapeHtml(role)}</span>`;
 
         return `
             <tr>

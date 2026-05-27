@@ -1107,23 +1107,28 @@
             <div class="topbar-left" style="display: flex; align-items: center; gap: 16px;">
                 <i class="fas fa-bars mobile-toggle" id="mobileMenuBtn"></i>
                 <div class="topbar-greeting-wrapper" style="display: flex; flex-direction: column;">
-                    <div class="topbar-greeting" id="greetingText" style="font-size: 15px; font-weight: 700; color: var(--text-primary); line-height: 1.2;">
+                    <div class="topbar-greeting" id="greetingText">
                         Good Morning, <span style="color: #ff5d4a;">XFit</span>.
                     </div>
-                    <div class="topbar-subtext" id="liveClock" style="font-size: 10px; color: var(--text-muted); margin-top: 2px; font-family: 'Geist Mono', Monaco, Consolas, monospace; letter-spacing: 0.04em;">
+                    <div class="topbar-subtext" id="liveClock">
                         Loading time...
                     </div>
                 </div>
             </div>
+
+            <div class="search">
+                <i class="fa-solid fa-magnifying-glass" style="font-size: 12px; color: var(--text-muted);"></i>
+                <input type="text" id="globalSearchInput" placeholder="Search members, bookings, products…" oninput="handleGlobalSearch(this.value)" />
+                <span class="kbd">⌘K</span>
+            </div>
+
             <div class="topbar-right">
-                <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn-circle"><i id="darkModeIcon"
-                        class="fas fa-moon"></i></button>
-                <button onclick="toggleNotifSidebar()" title="Toggle Notifications" class="icon-btn-circle"
-                    id="notifToggleBtn">
+                <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn">
+                    <i id="darkModeIcon" class="fas fa-moon"></i>
+                </button>
+                <button onclick="toggleNotifSidebar()" title="Toggle Notifications" class="icon-btn has-unread" id="notifToggleBtn">
                     <i class="fas fa-bell"></i>
                 </button>
-
-
             </div>
         </header>
 
@@ -1991,13 +1996,6 @@
         </div>
 
         <div id="bookings" class="content-section">
-            <header class="page-header">
-                <div class="page-header-text">
-                    <h2 class="page-title"><i class="fa-solid fa-calendar-check page-title-icon"></i>Booking Management</h2>
-                    <p class="page-subtitle">Schedule, track, and manage all personal training sessions.</p>
-                </div>
-            </header>
-
             <!-- KPI Ribbon -->
             <div class="bk-kpi-ribbon">
                 <div class="bk-kpi-card">

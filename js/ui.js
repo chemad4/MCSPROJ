@@ -15,14 +15,14 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmModal.id = 'customConfirmModal';
         confirmModal.innerHTML = `
             <div class="modal-content">
-                <div class="modal-icon" style="margin-bottom: 20px;">
-                    <i id="customConfirmIcon" class="fas fa-question-circle" style="font-size: 48px; color: var(--primary-red); opacity: 0.9;"></i>
+                <div class="modal-icon">
+                    <i id="customConfirmIcon" class="fas fa-question-circle"></i>
                 </div>
-                <h3 id="customConfirmTitle" style="font-weight: 700; font-size: 20px; color: var(--text-primary); margin-bottom: 8px;">Confirmation</h3>
+                <h3 id="customConfirmTitle">Confirmation</h3>
                 <p id="customConfirmMessage">Are you sure?</p>
                 <div class="confirm-actions">
-                    <button class="btn-cancel" id="customConfirmCancel" style="background: rgba(0,0,0,0.05); color: var(--text-muted);">Cancel</button>
-                    <button class="btn-confirm" id="customConfirmOk" style="background: var(--dark-black); color: white;">Confirm</button>
+                    <button class="btn-cancel" id="customConfirmCancel">Cancel</button>
+                    <button class="btn-confirm" id="customConfirmOk">Confirm</button>
                 </div>
             </div>
         `;
@@ -35,15 +35,15 @@ document.addEventListener('DOMContentLoaded', () => {
         promptModal.id = 'customPromptModal';
         promptModal.innerHTML = `
             <div class="modal-content">
-                <div class="modal-icon" style="margin-bottom: 20px;">
-                    <i class="fas fa-comment-dots" style="font-size: 48px; color: var(--primary-red); opacity: 0.9;"></i>
+                <div class="modal-icon">
+                    <i class="fas fa-comment-dots"></i>
                 </div>
-                <h3 id="customPromptTitle" style="font-weight: 700; font-size: 20px; color: var(--text-primary); margin-bottom: 8px;">Required Remarks</h3>
+                <h3 id="customPromptTitle">Required Remarks</h3>
                 <p id="customPromptMessage">Please provide details below:</p>
                 <textarea id="customPromptInput" placeholder="Type your remarks here..."></textarea>
                 <div class="confirm-actions">
-                    <button class="btn-cancel" id="customPromptCancel" style="background: rgba(0,0,0,0.05); color: var(--text-muted);">Cancel</button>
-                    <button class="btn-confirm" id="customPromptOk" style="background: var(--dark-black); color: white;">Submit</button>
+                    <button class="btn-cancel" id="customPromptCancel">Cancel</button>
+                    <button class="btn-confirm" id="customPromptOk">Submit</button>
                 </div>
             </div>
         `;
@@ -56,50 +56,52 @@ document.addEventListener('DOMContentLoaded', () => {
         pModal.id = 'profileSettingsModal';
         pModal.className = 'modal';
         pModal.innerHTML = `
-            <div class="modal-content" style="max-width: 450px; position: relative;">
-                <span class="close-btn" onclick="document.getElementById('profileSettingsModal').style.display='none'" style="position: absolute; right: 20px; top: 15px; cursor: pointer; font-size: 24px;">&times;</span>
-                <h3 style="text-align: center; margin-bottom: 20px;">Edit Profile</h3>
-                
+            <div class="modal-content profile-settings-modal">
+                <div class="modal-header">
+                    <h3><i class="fa-solid fa-user-gear"></i> Edit Profile</h3>
+                    <span class="close-btn" onclick="document.getElementById('profileSettingsModal').style.display='none'" aria-label="Close">&times;</span>
+                </div>
+
                 <div class="profile-upload-wrapper">
                     <img src="images/default-profile.png" id="userProfilePreview" class="profile-upload-img">
-                    <label for="userProfileFile" class="profile-upload-btn">
+                    <label for="userProfileFile" class="profile-upload-btn" aria-label="Change profile picture">
                         <i class="fas fa-pencil-alt"></i>
                     </label>
                 </div>
-                <input type="file" id="userProfileFile" accept="image/*" style="display: none;" onchange="previewImage(this, 'userProfilePreview')">
+                <input type="file" id="userProfileFile" accept="image/*" class="visually-hidden-input" onchange="previewImage(this, 'userProfilePreview')">
 
-                <form id="profileSettingsForm" style="display: flex; flex-direction: column; gap: 12px;">
+                <form id="profileSettingsForm" class="modal-form profile-settings-form">
                     <div class="form-group">
-                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Full Name</label>
-                        <input type="text" id="userProfileName" required maxlength="80" pattern="[A-Za-zñÑ\s\-'\.]+" title="Letters, spaces, hyphens and apostrophes only" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <label class="form-label" for="userProfileName">Full Name</label>
+                        <input type="text" id="userProfileName" required maxlength="80" pattern="[A-Za-zñÑ\s\-'\.]+" title="Letters, spaces, hyphens and apostrophes only" placeholder="Your full name">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Email</label>
-                        <input type="email" id="userProfileEmail" readonly style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: #f1f5f9; color: #64748b;">
+                        <label class="form-label" for="userProfileEmail">Email</label>
+                        <input type="email" id="userProfileEmail" readonly>
                     </div>
                     <div class="form-group">
-                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Emergency Contact Number</label>
-                        <input type="tel" id="userProfileEmergency" placeholder="e.g. 09123456789" maxlength="15" pattern="^\+?[0-9\-\s]{7,15}$" title="7-15 digits; +, - and spaces allowed" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <label class="form-label" for="userProfileEmergency">Emergency Contact Number</label>
+                        <input type="tel" id="userProfileEmergency" placeholder="e.g. 09123456789" maxlength="15" pattern="^\+?[0-9\-\s]{7,15}$" title="7-15 digits; +, - and spaces allowed">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Current Password (Required to change password)</label>
-                        <input type="password" id="userProfileCurrentPassword" placeholder="********" maxlength="64" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <label class="form-label" for="userProfileCurrentPassword">Current Password <span class="form-label-hint">(required to change password)</span></label>
+                        <input type="password" id="userProfileCurrentPassword" placeholder="••••••••" maxlength="64" autocomplete="current-password">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" style="font-size: 12px; font-weight: 600;">New Password (Leave blank to keep current)</label>
-                        <input type="password" id="userProfilePassword" placeholder="********" maxlength="64" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <label class="form-label" for="userProfilePassword">New Password <span class="form-label-hint">(leave blank to keep current)</span></label>
+                        <input type="password" id="userProfilePassword" placeholder="••••••••" maxlength="64" autocomplete="new-password">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" style="font-size: 12px; font-weight: 600;">Confirm New Password</label>
-                        <input type="password" id="userProfilePasswordConfirm" placeholder="Repeat new password" maxlength="64" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <label class="form-label" for="userProfilePasswordConfirm">Confirm New Password</label>
+                        <input type="password" id="userProfilePasswordConfirm" placeholder="Repeat new password" maxlength="64" autocomplete="new-password">
                     </div>
-                    <div class="btn-row" style="margin-top: 15px;">
+                    <div class="btn-row">
                         <button type="button" class="btn-cancel" onclick="document.getElementById('profileSettingsModal').style.display='none'">Cancel</button>
-                        <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
+                        <button type="submit" class="btn-submit">Save Changes</button>
                     </div>
-                    <div style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; justify-content: center;">
-                        <button type="button" class="btn-cancel" onclick="handleLogout()" style="color: var(--primary-red); border: 1px solid rgba(153, 27, 27, 0.2); width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(153, 27, 27, 0.05); font-weight: 600;"><i class="fa-solid fa-power-off"></i> Log Out</button>
-                    </div>
+                    <button type="button" class="btn-logout" onclick="handleLogout()">
+                        <i class="fa-solid fa-power-off"></i> Log Out
+                    </button>
                 </form>
             </div>
         `;
@@ -214,9 +216,6 @@ window.showConfirm = function(arg1, arg2) {
     if (titleEl) titleEl.innerText = title;
     if (iconEl) {
         iconEl.className = `fas ${icon || t.icon}`;
-        iconEl.style.fontSize = '48px';
-        iconEl.style.opacity = '0.9';
-        iconEl.style.color = t.color;
     }
     msgEl.innerText = message;
     msgEl.style.whiteSpace = 'pre-line';
@@ -232,20 +231,6 @@ window.showConfirm = function(arg1, arg2) {
     const okBtn = document.getElementById('customConfirmOk');
     cancelBtn.innerText = cancelText;
     okBtn.innerText = confirmText;
-
-    // Tint primary button to match tone
-    if (tone === 'danger') {
-        okBtn.style.background = 'var(--color-danger)';
-    } else if (tone === 'warning') {
-        okBtn.style.background = 'var(--color-warning)';
-    } else if (tone === 'success') {
-        okBtn.style.background = 'var(--color-success)';
-    } else if (tone === 'info') {
-        okBtn.style.background = 'var(--color-info)';
-    } else {
-        okBtn.style.background = 'var(--dark-black)';
-    }
-    okBtn.style.color = '#fff';
 
     const onKey = (e) => {
         if (e.key === 'Escape') { e.preventDefault(); cancelBtn.click(); }
@@ -309,8 +294,11 @@ window.showPrompt = function({ title, message, placeholder, onConfirm }) {
     okBtn.onclick = async () => {
         const val = input.value.trim();
         if (!val) {
-            input.style.borderColor = 'var(--primary-red)';
-            setTimeout(() => input.style.borderColor = '', 2000);
+            input.classList.remove('is-invalid');
+            void input.offsetWidth;
+            input.classList.add('is-invalid');
+            input.focus();
+            setTimeout(() => input.classList.remove('is-invalid'), 1200);
             return;
         }
         const originalText = okBtn.innerHTML;
