@@ -1,6 +1,6 @@
 // Cache version — bump this on each deployment to invalidate stale assets.
 // Using date-based versioning for clarity (Audit Fix 3.6).
-const CACHE_NAME = 'fit-track-cache-v5-2026-05-24';
+const CACHE_NAME = 'fit-track-cache-v9-2026-05-27';
 const urlsToCache = [
   './',
   'index.html',
@@ -14,6 +14,8 @@ const urlsToCache = [
   'js/rfid.js',
   'js/utils.js',
   'js/ui.js',
+  'js/bookings-ui.js',
+  'js/firebase-config.js',
   'images/icon-192.png'
 ];
 

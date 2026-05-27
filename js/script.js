@@ -215,8 +215,27 @@ window.syncDOM = function (container, dataArray, renderFunc, idPrefix) {
 
         if (el) {
             // Update existing if content changed
-            if (el.innerHTML !== html) {
-                el.innerHTML = html;
+            const isTable = container.tagName === 'TBODY';
+            const temp = document.createElement(isTable ? 'table' : 'div');
+            temp.innerHTML = isTable ? `<tbody>${html}</tbody>` : html;
+            const newEl = isTable ? temp.querySelector('tr') : temp.firstElementChild;
+            
+            if (newEl) {
+                if (el.innerHTML !== newEl.innerHTML) {
+                    el.innerHTML = newEl.innerHTML;
+                }
+                // Sync attributes
+                Array.from(newEl.attributes).forEach(attr => {
+                    if (el.getAttribute(attr.name) !== attr.value) {
+                        el.setAttribute(attr.name, attr.value);
+                    }
+                });
+                // Remove obsolete attributes
+                Array.from(el.attributes).forEach(attr => {
+                    if (!newEl.hasAttribute(attr.name) && attr.name !== 'id') {
+                        el.removeAttribute(attr.name);
+                    }
+                });
             }
         } else {
             // Create new element
@@ -354,9 +373,10 @@ if (currentUserId && currentSessionId) {
             if (gTextEl) {
                 const hour = new Date().getHours();
                 const firstName = dbName.split(' ')[0];
-                if (hour < 12) gTextEl.innerText = `Good Morning, ${firstName}.`;
-                else if (hour < 18) gTextEl.innerText = `Good Afternoon, ${firstName}.`;
-                else gTextEl.innerText = `Good Evening, ${firstName}.`;
+                let greetingWord = "Good Morning";
+                if (hour >= 12 && hour < 18) greetingWord = "Good Afternoon";
+                else if (hour >= 18) greetingWord = "Good Evening";
+                gTextEl.innerHTML = `${greetingWord}, <span style="color: #ff5d4a; font-weight: 700;">${firstName}</span>.`;
             }
 
             // Fitness Goals input (member) — preserved from second listener
@@ -420,16 +440,6 @@ if (currentUserId && currentSessionId) {
                     if (typeof window.renderBookings === 'function') {
                         window.renderBookings();
                     }
-
-                    // Sync enrolled program ID for member
-                    if (userData.enrolledProgramId) {
-                        window.__enrolledProgramId = userData.enrolledProgramId;
-                        localStorage.setItem("enrolledProgramId", userData.enrolledProgramId);
-                    } else {
-                        window.__enrolledProgramId = null;
-                        localStorage.removeItem("enrolledProgramId");
-                    }
-                    if (typeof renderMemberPrograms === 'function') renderMemberPrograms();
 
                     // Send expiry reminder email once when ≤7 days remain
                     if (diffDays > 0 && diffDays <= 7 && !userData.expirySentNotification) {
@@ -1085,9 +1095,13 @@ async function logStockMovement(productId, productName, changeAmount, reason) {
 
 // Ledger is staff-only and rarely viewed — fetch once on load instead of live-syncing.
 // Call window.refreshStockMovements() after any local stock-movement write to refresh the view.
+// QUOTA FIX: cap to 500 most recent movements. Previously this read the entire collection
+// — which grows by 1 doc per POS sale line item + 1 per restock — so a busy gym was paying
+// for thousands of reads on every staff page load.
 window.refreshStockMovements = function () {
     if (!isStaffSide) return Promise.resolve();
-    return getDocs(stockMovementsCol).then(snapshot => {
+    const q = query(stockMovementsCol, orderBy("timestamp", "desc"), limit(500));
+    return getDocs(q).then(snapshot => {
         stockMovementsData = [];
         snapshot.forEach(doc => stockMovementsData.push({ id: doc.id, ...doc.data() }));
         stockMovementsData.sort((a, b) => b.timestamp - a.timestamp);
@@ -1176,12 +1190,31 @@ window.openChatTab = function (role, element, title) {
 }
 
 // Chat needs live sync — but only attach if a user is logged in (skip for index.html / login screen).
+// QUOTA FIX: messages are identified by sender/receiver name strings. Previously every user
+// listened to the ENTIRE messages collection (full table read on every connect + every new
+// message anywhere in the gym streamed to every client). Now we run two scoped listeners
+// per user — one for messages sent BY me, one for messages sent TO me — each capped at the
+// 500 most recent. Cuts message reads by 10-100x in a real gym.
 if (currentUserId) {
-    onSnapshot(messagesCol, (snapshot) => {
-        messagesData = [];
-        snapshot.forEach(doc => messagesData.push({ id: doc.id, ...doc.data() }));
-        renderChatHistory();
-    });
+    const myName = localStorage.getItem("loggedInUser");
+    if (myName) {
+        const _msgIndex = new Map();
+        const _emitChat = () => {
+            messagesData = Array.from(_msgIndex.values());
+            renderChatHistory();
+        };
+        const _ingest = (snapshot) => {
+            snapshot.docChanges().forEach(ch => {
+                if (ch.type === 'removed') _msgIndex.delete(ch.doc.id);
+                else _msgIndex.set(ch.doc.id, { id: ch.doc.id, ...ch.doc.data() });
+            });
+            _emitChat();
+        };
+        const sentQ = query(messagesCol, where("sender", "==", myName), orderBy("timestamp", "desc"), limit(500));
+        const recvQ = query(messagesCol, where("receiver", "==", myName), orderBy("timestamp", "desc"), limit(500));
+        onSnapshot(sentQ, _ingest, (err) => console.warn("[messages:sent] listener error", err));
+        onSnapshot(recvQ, _ingest, (err) => console.warn("[messages:recv] listener error", err));
+    }
 }
 
 function renderChatUserList() {
@@ -1328,6 +1361,16 @@ window.sendMessage = async function () {
     if (!text || !currentChatUser) return;
     if (text.length > 2000) return showToast("Message too long (max 2000 characters).", "error");
 
+    // R3 (Sprint 7): client-side rate limit — at most 5 messages per 10s rolling window.
+    // Stops trivial console-loop floods. Server-side rules should still cap quota.
+    window.__msgRateBuf = window.__msgRateBuf || [];
+    const nowMs = Date.now();
+    window.__msgRateBuf = window.__msgRateBuf.filter(t => nowMs - t < 10000);
+    if (window.__msgRateBuf.length >= 5) {
+        return showToast("You're sending messages too fast. Please wait a moment.", "error");
+    }
+    window.__msgRateBuf.push(nowMs);
+
     const myName = localStorage.getItem("loggedInUser");
     if (currentChatUser === myName) return showToast("You can't message yourself.", "error");
 
@@ -1375,6 +1418,11 @@ function getCategoryIcon(catName) {
 }
 
 window.quickRestock = async function (id) {
+    // S3 (Sprint 8): fast-fail RBAC — admin/staff only.
+    const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+    if (_r !== 'admin' && _r !== 'staff') {
+        return showToast("Permission denied.", "error");
+    }
     const item = inventoryData.find(i => i.id === id);
     if (!item) return;
     const name = item.name;
@@ -1403,6 +1451,29 @@ window.quickRestock = async function (id) {
 let currentInventoryView = 'grid'; // 'grid' or 'list'
 let selectedEquipItems = new Set();
 let selectedProdItems = new Set();
+
+window.currentProductAlertFilter = null;
+window.currentEquipAlertFilter = null;
+
+window.toggleProductAlertFilter = function (filterId) {
+    if (window.currentProductAlertFilter === filterId) {
+        window.currentProductAlertFilter = null;
+    } else {
+        window.currentProductAlertFilter = filterId;
+    }
+    window.prodCurrentPage = 1;
+    renderInventory();
+};
+
+window.toggleEquipAlertFilter = function (filterId) {
+    if (window.currentEquipAlertFilter === filterId) {
+        window.currentEquipAlertFilter = null;
+    } else {
+        window.currentEquipAlertFilter = filterId;
+    }
+    window.equipCurrentPage = 1;
+    renderInventory();
+};
 
 function renderInventory() {
     const equipGrid = document.getElementById('machinesGrid');
@@ -1468,12 +1539,57 @@ function renderInventory() {
     let filteredEquipment = equipment.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(equipSearch) || item.cat.toLowerCase().includes(equipSearch);
         const matchesStatus = equipStatusFilter === 'all' || item.currentStatus === equipStatusFilter;
-        return matchesSearch && matchesStatus;
+        
+        let matchesAlert = true;
+        if (window.currentEquipAlertFilter) {
+            if (window.currentEquipAlertFilter === 'Missing Tag') {
+                const tag = (item.assetTag || '').trim();
+                matchesAlert = !tag || tag === 'undefined';
+            } else {
+                matchesAlert = item.currentStatus === window.currentEquipAlertFilter;
+            }
+        }
+        
+        return matchesSearch && matchesStatus && matchesAlert;
     });
 
     const prodSearch = (document.getElementById('productSearch')?.value || "").toLowerCase();
     let filteredProducts = consumables.filter(item => {
-        return item.name.toLowerCase().includes(prodSearch) || item.cat.toLowerCase().includes(prodSearch);
+        const matchesSearch = item.name.toLowerCase().includes(prodSearch) || item.cat.toLowerCase().includes(prodSearch);
+        
+        let matchesAlert = true;
+        if (window.currentProductAlertFilter) {
+            const qty = Number(item.qty || 0);
+            const threshold = Number(item.lowStockThreshold || 5);
+            
+            if (window.currentProductAlertFilter === 'outOfStock') {
+                matchesAlert = qty === 0;
+            } else if (window.currentProductAlertFilter === 'lowStock') {
+                matchesAlert = qty > 0 && qty <= threshold;
+            } else if (window.currentProductAlertFilter === 'expired') {
+                if (item.expiry && qty > 0) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const expDate = new Date(item.expiry + 'T00:00:00');
+                    matchesAlert = expDate < today;
+                } else {
+                    matchesAlert = false;
+                }
+            } else if (window.currentProductAlertFilter === 'nearExpiry') {
+                if (item.expiry && qty > 0) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const sevenDaysLater = new Date(today);
+                    sevenDaysLater.setDate(today.getDate() + 7);
+                    const expDate = new Date(item.expiry + 'T00:00:00');
+                    matchesAlert = expDate >= today && expDate <= sevenDaysLater;
+                } else {
+                    matchesAlert = false;
+                }
+            }
+        }
+        
+        return matchesSearch && matchesAlert;
     });
 
     filteredEquipment.sort((a, b) => {
@@ -1774,6 +1890,12 @@ window.openEquipmentModal = () => {
 }
 window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
 window.deleteInventoryItem = async (id) => {
+    // S2 (Sprint 8): fast-fail RBAC — admin/staff only. The UI gates this button,
+    // but the function was console-callable by trainer/member roles.
+    const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+    if (_r !== 'admin' && _r !== 'staff') {
+        return showToast("Permission denied.", "error");
+    }
     const item = inventoryData.find(i => i.id === id);
     const inCart = Array.isArray(window.posCart) ? window.posCart.some(c => c.id === id) : false;
     const msg = inCart
@@ -1812,6 +1934,11 @@ window.openEditEquipModal = function (id) {
 if (document.getElementById('editEquipForm')) {
     document.getElementById('editEquipForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        // S6 (Sprint 8): admin/staff only.
+        const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+        if (_r !== 'admin' && _r !== 'staff') {
+            return showToast("Permission denied.", "error");
+        }
         const id = document.getElementById('editEquipId').value;
         const oldEquip = inventoryData.find(i => i.id === id);
 
@@ -1908,6 +2035,11 @@ window.openEditProductModal = function (id) {
 if (document.getElementById('editProductForm')) {
     document.getElementById('editProductForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        // S6 (Sprint 8): admin/staff only.
+        const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+        if (_r !== 'admin' && _r !== 'staff') {
+            return showToast("Permission denied.", "error");
+        }
         const id = document.getElementById('editProdId').value;
         const oldProd = inventoryData.find(i => i.id === id);
 
@@ -1979,6 +2111,11 @@ if (document.getElementById('editProductForm')) {
 
 async function handleInventorySubmit(e, isProduct) {
     e.preventDefault();
+    // S6 (Sprint 8): admin/staff only.
+    const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+    if (_r !== 'admin' && _r !== 'staff') {
+        return showToast("Permission denied.", "error");
+    }
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
     if (submitBtn) {
@@ -3435,15 +3572,23 @@ let currentStaffSortOrder = 'desc';
 let currentTrainerSortField = 'dateRegistered';
 let currentTrainerSortOrder = 'desc';
 
-if (isStaffSide) onSnapshot(paymentsCol, (snapshot) => {
-    paymentsData = [];
-    snapshot.forEach(doc => paymentsData.push({ id: doc.id, ...doc.data() }));
-    softRender('payments', () => {
-        renderPayments();
-        if (window.renderWeeklyReport) window.renderWeeklyReport();
-        if (window.refreshDashboardAnalytics) window.refreshDashboardAnalytics();
-    });
-});
+// QUOTA FIX: payments grows unbounded. Previously the listener loaded the ENTIRE collection
+// on every staff/admin page load (and on every new payment write — re-billed). All payment
+// KPIs are scoped to today/this-week/last-week/last-30d, so the 1000 most recent transactions
+// cover every consumer. For a small gym this is ~3+ months of history; for a busy one,
+// ~weeks — still plenty for operational dashboards.
+if (isStaffSide) {
+    const paymentsQ = query(paymentsCol, orderBy("timestamp", "desc"), limit(1000));
+    onSnapshot(paymentsQ, (snapshot) => {
+        paymentsData = [];
+        snapshot.forEach(doc => paymentsData.push({ id: doc.id, ...doc.data() }));
+        softRender('payments', () => {
+            renderPayments();
+            if (window.renderWeeklyReport) window.renderWeeklyReport();
+            if (window.refreshDashboardAnalytics) window.refreshDashboardAnalytics();
+        });
+    }, (err) => console.warn("[payments] listener error", err));
+}
 
 function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
@@ -3864,23 +4009,27 @@ window.renderEquipmentCategorySummary = function () {
     });
 
     const chips = [
-        { label: 'Operational', count: operational, icon: 'fa-circle-check', color: '#15803d', bg: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.15)' },
-        { label: 'Under Maintenance', count: maintenance, icon: 'fa-screwdriver-wrench', color: '#d97706', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.15)' },
-        { label: 'Out of Order', count: outOfOrder, icon: 'fa-circle-xmark', color: '#991b1b', bg: 'rgba(153, 27, 27, 0.1)', border: 'rgba(153, 27, 27, 0.15)' },
-        { label: 'Missing Asset Tag', count: missingTag, icon: 'fa-tag', color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.15)' }
+        { id: 'Operational', label: 'Operational', count: operational, icon: 'fa-circle-check', color: '#15803d', bg: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.15)' },
+        { id: 'Maintenance', label: 'Under Maintenance', count: maintenance, icon: 'fa-screwdriver-wrench', color: '#d97706', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.15)' },
+        { id: 'Out of Order', label: 'Out of Order', count: outOfOrder, icon: 'fa-circle-xmark', color: '#991b1b', bg: 'rgba(153, 27, 27, 0.1)', border: 'rgba(153, 27, 27, 0.15)' },
+        { id: 'Missing Tag', label: 'Missing Asset Tag', count: missingTag, icon: 'fa-tag', color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.15)' }
     ];
 
-    container.innerHTML = chips.map(c => `
-        <div class="equip-cat-card" style="border-left: 4px solid ${c.color};">
-            <div class="equip-cat-icon" style="background: ${c.bg}; color: ${c.color}; border: 1px solid ${c.border};">
-                <i class="fas ${c.icon}"></i>
+    container.innerHTML = chips.map(c => {
+        const isActive = window.currentEquipAlertFilter === c.id;
+        const activeClass = isActive ? 'active-filter' : '';
+        return `
+            <div class="equip-cat-card ${activeClass}" style="border-left: 4px solid ${c.color}; cursor: pointer;" onclick="window.toggleEquipAlertFilter('${c.id}')">
+                <div class="equip-cat-icon" style="background: ${c.bg}; color: ${c.color}; border: 1px solid ${c.border};">
+                    <i class="fas ${c.icon}"></i>
+                </div>
+                <div class="equip-cat-info">
+                    <div class="equip-cat-name">${c.label}</div>
+                    <div class="equip-cat-count">${c.count} <span class="equip-cat-units">units</span></div>
+                </div>
             </div>
-            <div class="equip-cat-info">
-                <div class="equip-cat-name">${c.label}</div>
-                <div class="equip-cat-count">${c.count} <span class="equip-cat-units">units</span></div>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 };
 
 // Product Category Quantity Counter
@@ -3916,23 +4065,27 @@ window.renderProductCategorySummary = function () {
     });
 
     const chips = [
-        { label: 'Out of Stock', count: outOfStock, icon: 'fa-ban', color: '#991b1b', bg: 'rgba(153, 27, 27, 0.1)', border: 'rgba(153, 27, 27, 0.15)' },
-        { label: 'Low Stock', count: lowStock, icon: 'fa-box-open', color: '#d97706', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.15)' },
-        { label: 'Expired', count: expired, icon: 'fa-skull-crossbones', color: '#991b1b', bg: 'rgba(153, 27, 27, 0.1)', border: 'rgba(153, 27, 27, 0.15)' },
-        { label: 'Near Expiry (7d)', count: nearExpiry, icon: 'fa-calendar-xmark', color: '#c2410c', bg: 'rgba(194, 65, 12, 0.1)', border: 'rgba(194, 65, 12, 0.15)' }
+        { id: 'outOfStock', label: 'Out of Stock', count: outOfStock, icon: 'fa-ban', color: '#991b1b', bg: 'rgba(153, 27, 27, 0.1)', border: 'rgba(153, 27, 27, 0.15)' },
+        { id: 'lowStock', label: 'Low Stock', count: lowStock, icon: 'fa-box-open', color: '#d97706', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.15)' },
+        { id: 'expired', label: 'Expired', count: expired, icon: 'fa-skull-crossbones', color: '#991b1b', bg: 'rgba(153, 27, 27, 0.1)', border: 'rgba(153, 27, 27, 0.15)' },
+        { id: 'nearExpiry', label: 'Near Expiry (7d)', count: nearExpiry, icon: 'fa-calendar-xmark', color: '#c2410c', bg: 'rgba(194, 65, 12, 0.1)', border: 'rgba(194, 65, 12, 0.15)' }
     ];
 
-    container.innerHTML = chips.map(c => `
-        <div class="equip-cat-card" style="border-left: 4px solid ${c.color};">
-            <div class="equip-cat-icon" style="background: ${c.bg}; color: ${c.color}; border: 1px solid ${c.border};">
-                <i class="fas ${c.icon}"></i>
+    container.innerHTML = chips.map(c => {
+        const isActive = window.currentProductAlertFilter === c.id;
+        const activeClass = isActive ? 'active-filter' : '';
+        return `
+            <div class="equip-cat-card ${activeClass}" style="border-left: 4px solid ${c.color}; cursor: pointer;" onclick="window.toggleProductAlertFilter('${c.id}')">
+                <div class="equip-cat-icon" style="background: ${c.bg}; color: ${c.color}; border: 1px solid ${c.border};">
+                    <i class="fas ${c.icon}"></i>
+                </div>
+                <div class="equip-cat-info">
+                    <div class="equip-cat-name">${c.label}</div>
+                    <div class="equip-cat-count">${c.count} <span class="equip-cat-units">items</span></div>
+                </div>
             </div>
-            <div class="equip-cat-info">
-                <div class="equip-cat-name">${c.label}</div>
-                <div class="equip-cat-count">${c.count} <span class="equip-cat-units">items</span></div>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 };
 
 
@@ -3980,10 +4133,39 @@ window.voidTransaction = async function (id, isRefund = false) {
                     // H7: pre-query walk-in passes issued by this payment so we can invalidate them in-txn
                     // (Firestore queries are not allowed inside a transaction.)
                     let _walkinPassRefs = [];
+                    let _walkinPassTags = [];
                     try {
                         const wpSnap = await getDocs(query(walkinPassesCol, where("paymentId", "==", id)));
-                        wpSnap.forEach(d => _walkinPassRefs.push(d.ref));
+                        wpSnap.forEach(d => {
+                            _walkinPassRefs.push(d.ref);
+                            const r = (d.data() || {}).rfid;
+                            if (r) _walkinPassTags.push(r);
+                        });
                     } catch (_) { /* best-effort */ }
+
+                    // O3 (Sprint 9): pre-query active walk-in attendance records for the RFID tags
+                    // attached to passes issued by this payment. Without this, voiding the payment
+                    // leaves the guest "Checked In" forever — orphaned attendance, stuck guest card,
+                    // and a guest who can still tap out for a service the gym refunded.
+                    let _walkinAttRefs = [];
+                    if (_walkinPassTags.length > 0) {
+                        try {
+                            const todayStr = new Date(Date.now() + (window.serverTimeOffsetMs || 0))
+                                .toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                            // Firestore `in` clause is capped at 10; chunk just in case.
+                            const uniqTags = Array.from(new Set(_walkinPassTags));
+                            for (let i = 0; i < uniqTags.length; i += 10) {
+                                const chunk = uniqTags.slice(i, i + 10);
+                                const attSnap = await getDocs(query(
+                                    collection(db, "attendance"),
+                                    where("guestRfid", "in", chunk),
+                                    where("date", "==", todayStr),
+                                    where("status", "==", "Checked In")
+                                ));
+                                attSnap.forEach(d => _walkinAttRefs.push(d.ref));
+                            }
+                        } catch (_) { /* best-effort */ }
+                    }
 
                     await runTransaction(db, async (transaction) => {
                         const paymentRef = doc(db, "payments", id);
@@ -4127,6 +4309,23 @@ window.voidTransaction = async function (id, isRefund = false) {
                             const wpSnap = await transaction.get(wpRef);
                             if (wpSnap.exists() && wpSnap.data().status === "Active") {
                                 transaction.update(wpRef, { status: "Voided", voidedAt: Date.now() });
+                            }
+                        }
+
+                        // O3 (Sprint 9): close out any still-active walk-in attendance records
+                        // for tags whose pass we just voided. Without this, the guest stays
+                        // "Checked In" indefinitely — the void doesn't reach the attendance log.
+                        const _voidTimeStr = new Date(Date.now() + (window.serverTimeOffsetMs || 0))
+                            .toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                        for (const attRef of _walkinAttRefs) {
+                            const attSnap = await transaction.get(attRef);
+                            if (attSnap.exists() && attSnap.data().status === "Checked In") {
+                                transaction.update(attRef, {
+                                    status: "Checked Out",
+                                    timeOut: _voidTimeStr,
+                                    voidedByPayment: id,
+                                    voidedAt: Date.now()
+                                });
                             }
                         }
 
@@ -4927,6 +5126,11 @@ function renderMembershipPlans() {
 }
 
 window.togglePlanStatus = async function (id, isChecked) {
+    // S5 (Sprint 8): fast-fail RBAC — admin only.
+    const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+    if (_r !== 'admin') {
+        return showToast("Permission denied.", "error");
+    }
     const newStatus = isChecked ? 'Active' : 'Inactive';
     try {
         await updateDoc(doc(db, "membershipPlans", id), { status: newStatus });
@@ -5023,6 +5227,11 @@ window.openEditPlanModal = function (id) {
 };
 
 window.deletePlan = function (id, name) {
+    // S5 (Sprint 8): fast-fail RBAC — admin only.
+    const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+    if (_r !== 'admin') {
+        return showToast("Permission denied.", "error");
+    }
     // Block if any member is currently subscribed — prevents NaN expiry / orphan plan lookups
     const subscribers = (membersData || []).filter(m => (m.plan || '').toLowerCase() === (name || '').toLowerCase());
     if (subscribers.length > 0) {
@@ -5054,6 +5263,12 @@ window.deletePlan = function (id, name) {
 if (document.getElementById('planForm')) {
     document.getElementById('planForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        // S5 (Sprint 8): admin-only.
+        const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+        if (_r !== 'admin') {
+            return showToast("Permission denied.", "error");
+        }
 
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const origText = submitBtn ? submitBtn.innerHTML : '';
@@ -5139,345 +5354,22 @@ window.addPlanFeatureInput = function(val = "") {
     container.appendChild(div);
 };
 
-// ==========================================
-// 10.4 PROGRAMS MODULE
-// ==========================================
-let programsData = [];
-const programsCol = collection(db, "programs");
-
-// Programs change rarely. Cache + one-shot read (same pattern as membershipPlans).
-const __PROGRAMS_CACHE_KEY = "xft_cache_programs";
-const __PROGRAMS_CACHE_TTL_MS = 10 * 60 * 1000;
-window.refreshPrograms = function (force) {
-    const applyData = (arr) => {
-        programsData = arr;
-        renderPrograms();
-        renderMemberPrograms();
-    };
-    if (!force) {
-        try {
-            const raw = sessionStorage.getItem(__PROGRAMS_CACHE_KEY);
-            if (raw) {
-                const cached = JSON.parse(raw);
-                if (cached && (Date.now() - cached.t) < __PROGRAMS_CACHE_TTL_MS) {
-                    applyData(cached.data || []);
-                    return Promise.resolve();
-                }
-            }
-        } catch (_) {}
-    }
-    return getDocs(programsCol).then(snapshot => {
-        const arr = [];
-        snapshot.forEach(d => arr.push({ id: d.id, ...d.data() }));
-        try { sessionStorage.setItem(__PROGRAMS_CACHE_KEY, JSON.stringify({ t: Date.now(), data: arr })); } catch (_) {}
-        applyData(arr);
-    });
-};
-window.refreshPrograms();
-
-function renderPrograms() {
-    const grid = document.getElementById('programsGrid');
-    if (!grid) return;
-
-    if (programsData.length === 0) {
-        grid.innerHTML = '<p style="color:var(--text-muted);font-size:14px;padding:20px;">No programs yet. Click "Add Program" to create one.</p>';
-        return;
-    }
-
-    grid.innerHTML = programsData.map(p => {
-        const cap = Number(p.capacity || 0);
-        const enrolled = Number(p.enrolledCount || 0);
-        const capLabel = cap > 0 ? `${enrolled} / ${cap} enrolled` : `${enrolled} enrolled`;
-        return `
-        <div class="bg-white border border-gray-200 rounded shadow-sm p-5 flex flex-col gap-3">
-            <div class="flex justify-between items-start">
-                <div>
-                    <h3 class="text-base font-bold text-slate-900">${escapeHtml(p.name)}</h3>
-                    <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#fee2e2;color:#991b1b;">${escapeHtml(p.category || '')}</span>
-                </div>
-                <div class="flex gap-2">
-                    <button class="btn-icon btn-edit" title="Edit" onclick="openEditProgramModal('${p.id}')"><i class="fas fa-edit"></i></button>
-                    <button class="btn-icon btn-delete" title="Delete" onclick="deleteProgram('${p.id}','${escapeHtml(p.name)}')"><i class="fas fa-trash"></i></button>
-                </div>
-            </div>
-            <p style="font-size:13px;color:var(--text-muted);">${p.description ? escapeHtml(p.description) : 'No description.'}</p>
-            <div style="display:flex;gap:12px;font-size:12px;color:var(--text-primary);font-weight:600;flex-wrap:wrap;">
-                <span><i class="fas fa-clock" style="color:#991b1b;"></i> ${p.durationHours || 1} hr${p.durationHours > 1 ? 's' : ''}/day</span>
-                <span><i class="fas fa-calendar-days" style="color:#991b1b;"></i> ${p.daysPerWeek || 3} day${p.daysPerWeek > 1 ? 's' : ''}/week</span>
-                <span><i class="fas fa-users" style="color:#991b1b;"></i> ${capLabel}</span>
-            </div>
-        </div>
-    `}).join('');
-}
-
-window.openAddProgramModal = function () {
-    document.getElementById('programModalTitle').innerHTML = '<i class="fa-solid fa-dumbbell"></i> Add Program';
-    document.getElementById('programId').value = '';
-    document.getElementById('programForm').reset();
-    document.getElementById('programModal').style.display = 'flex';
-};
-
-window.openEditProgramModal = function (id) {
-    const p = programsData.find(x => x.id === id);
-    if (!p) return;
-    document.getElementById('programModalTitle').innerHTML = '<i class="fa-solid fa-dumbbell"></i> Edit Program';
-    document.getElementById('programId').value = p.id;
-    document.getElementById('programName').value = p.name || '';
-    document.getElementById('programCategory').value = p.category || '';
-    document.getElementById('programDuration').value = p.durationHours || '';
-    document.getElementById('programDaysPerWeek').value = p.daysPerWeek || '';
-    const capEl = document.getElementById('programCapacity');
-    if (capEl) capEl.value = (typeof p.capacity === 'number' && p.capacity > 0) ? p.capacity : '';
-    document.getElementById('programDescription').value = p.description || '';
-    document.getElementById('programModal').style.display = 'flex';
-};
-
-window.deleteProgram = function (id, name) {
-    showConfirm(`Delete program "${name}"? Members currently enrolled will lose their program assignment.`, async () => {
-        try {
-            await deleteDoc(doc(db, "programs", id));
-            if (window.refreshPrograms) await window.refreshPrograms(true);
-            showToast(`Program "${name}" deleted.`, "success");
-            if (window.logActivity) window.logActivity("Program Deleted", `Deleted program: ${name}`);
-        } catch (err) {
-            console.error(err);
-            showToast("Failed to delete program.", "error");
-        }
-    });
-};
-
-window.submitProgramForm = async function (e) {
-    e.preventDefault();
-    const btn = document.getElementById('programSubmitBtn');
-    btn.disabled = true;
-    btn.textContent = 'Saving...';
-
-    const id = document.getElementById('programId').value;
-    const capRaw = (document.getElementById('programCapacity') || {}).value;
-    const capParsed = capRaw === '' || capRaw == null ? 0 : Number(capRaw);
-    const data = {
-        name: document.getElementById('programName').value.trim(),
-        category: document.getElementById('programCategory').value,
-        durationHours: Number(document.getElementById('programDuration').value),
-        daysPerWeek: Number(document.getElementById('programDaysPerWeek').value),
-        capacity: Number.isFinite(capParsed) && capParsed > 0 ? Math.floor(capParsed) : 0,
-        description: document.getElementById('programDescription').value.trim()
-    };
-
-    try {
-        if (id) {
-            await updateDoc(doc(db, "programs", id), data);
-        } else {
-            data.enrolledCount = 0;
-            await addDoc(programsCol, data);
-        }
-        if (window.refreshPrograms) await window.refreshPrograms(true);
-        showToast(id ? "Program updated." : "Program created.", "success");
-        closeModal('programModal');
-        if (window.logActivity) window.logActivity(id ? "Program Updated" : "Program Created", `Program: ${data.name}`);
-    } catch (err) {
-        console.error(err);
-        showToast("Failed to save program.", "error");
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Save Program';
-    }
-};
-
-function renderMemberPrograms() {
-    const listEl = document.getElementById('memberProgramsList');
-    const currentEl = document.getElementById('myCurrentProgram');
-    if (!listEl && !currentEl) return;
-
-    const role = (localStorage.getItem("userRole") || "").toLowerCase();
-    if (role !== "member") return;
-
-    const enrolledProgramId = localStorage.getItem("enrolledProgramId") || window.__enrolledProgramId || null;
-
-    if (currentEl) {
-        if (enrolledProgramId) {
-            const prog = programsData.find(p => p.id === enrolledProgramId);
-            if (prog) {
-                currentEl.innerHTML = `
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-                        <div>
-                            <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:4px;">${escapeHtml(prog.name)}</h3>
-                            <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#fee2e2;color:#991b1b;">${escapeHtml(prog.category || '')}</span>
-                            <p style="margin-top:10px;font-size:13px;color:var(--text-muted);">${prog.description ? escapeHtml(prog.description) : ''}</p>
-                            <div style="margin-top:10px;display:flex;gap:14px;font-size:13px;font-weight:600;">
-                                <span><i class="fas fa-clock" style="color:#991b1b;"></i> ${prog.durationHours} hr${prog.durationHours > 1 ? 's' : ''}/day</span>
-                                <span><i class="fas fa-calendar-days" style="color:#991b1b;"></i> ${prog.daysPerWeek} day${prog.daysPerWeek > 1 ? 's' : ''}/week</span>
-                            </div>
-                        </div>
-                        <button class="action-btn" style="background:#f1f5f9;color:var(--text-primary);white-space:nowrap;" onclick="unenrollProgram()">
-                            <i class="fas fa-times-circle"></i> Leave Program
-                        </button>
-                    </div>
-                `;
-            } else {
-                currentEl.innerHTML = '<p style="color:var(--text-muted);font-size:14px;">Your enrolled program is no longer available.</p>';
-                // Auto-clear the dangling enrollment so future tabs don't keep showing stale state
-                const userId = localStorage.getItem("userId");
-                if (userId) {
-                    updateDoc(doc(db, "users", userId), { enrolledProgramId: null }).catch(() => {});
-                }
-                window.__enrolledProgramId = null;
-                localStorage.removeItem("enrolledProgramId");
-            }
-        } else {
-            currentEl.innerHTML = '<p style="color:var(--text-muted);font-size:14px;">You are not enrolled in any program. Browse available programs below and click Enroll.</p>';
-        }
-    }
-
-    if (listEl) {
-        if (programsData.length === 0) {
-            listEl.innerHTML = '<p style="color:var(--text-muted);font-size:14px;">No programs available at the moment.</p>';
-            return;
-        }
-        listEl.innerHTML = programsData.map(p => {
-            const isEnrolled = p.id === enrolledProgramId;
-            const cap = Number(p.capacity || 0);
-            const enrolled = Number(p.enrolledCount || 0);
-            const isFull = cap > 0 && enrolled >= cap && !isEnrolled;
-            const capLine = cap > 0
-                ? `<span><i class="fas fa-users" style="color:#991b1b;"></i> ${enrolled} / ${cap}</span>`
-                : '';
-            let actionBtn;
-            if (isEnrolled) {
-                actionBtn = `<button class="action-btn" style="width:100%;background:#f1f5f9;color:var(--text-primary);" onclick="unenrollProgram()">Leave</button>`;
-            } else if (isFull) {
-                actionBtn = `<button class="action-btn" style="width:100%;background:#e5e7eb;color:#6b7280;cursor:not-allowed;" disabled>Full</button>`;
-            } else {
-                actionBtn = `<button class="action-btn" style="width:100%;background:var(--primary-red);color:white;" onclick="enrollInProgram('${p.id}')">Enroll</button>`;
-            }
-            return `
-                <div style="background:var(--white);border:1px solid var(--border-color);border-radius:12px;padding:16px;width:280px;flex-shrink:0;${isEnrolled ? 'border-color:#991b1b;' : ''}">
-                    <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
-                        <h4 style="font-size:14px;font-weight:700;color:var(--text-primary);">${escapeHtml(p.name)}</h4>
-                        ${isEnrolled ? '<span style="font-size:10px;font-weight:700;color:#991b1b;"><i class="fas fa-check-circle"></i> Enrolled</span>' : ''}
-                    </div>
-                    <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#fee2e2;color:#991b1b;">${escapeHtml(p.category || '')}</span>
-                    <p style="font-size:12px;color:var(--text-muted);margin:8px 0;">${p.description ? escapeHtml(p.description) : 'No description.'}</p>
-                    <div style="display:flex;gap:12px;font-size:11px;font-weight:600;margin-bottom:12px;flex-wrap:wrap;">
-                        <span><i class="fas fa-clock" style="color:#991b1b;"></i> ${p.durationHours} hr/day</span>
-                        <span><i class="fas fa-calendar-days" style="color:#991b1b;"></i> ${p.daysPerWeek} days/wk</span>
-                        ${capLine}
-                    </div>
-                    ${actionBtn}
-                </div>
-            `;
-        }).join('');
-    }
-}
-
-window.enrollInProgram = async function (programId) {
-    const userId = localStorage.getItem("userId");
-    if (!userId) return;
-    if (window._programEnrollInFlight) return;
-    window._programEnrollInFlight = true;
-    try {
-        // M16: enroll inside a transaction so we can verify program still exists,
-        // member is not archived, and prevent double-enroll races.
-        await runTransaction(db, async (transaction) => {
-            const userRef = doc(db, "users", userId);
-            const programRef = doc(db, "programs", programId);
-            const userSnap = await transaction.get(userRef);
-            const programSnap = await transaction.get(programRef);
-            if (!userSnap.exists()) throw new Error("Your account is no longer available.");
-            if (!programSnap.exists()) throw new Error("This program no longer exists.");
-            const uData = userSnap.data();
-            if (uData.status === 'Archived' || uData.archived === true) {
-                throw new Error("Account is archived — enrollment not allowed.");
-            }
-            if (uData.enrolledProgramId && uData.enrolledProgramId === programId) {
-                throw new Error("You are already enrolled in this program.");
-            }
-            // H3: enforce program capacity via an atomically-maintained counter.
-            // capacity === 0 (or missing) means unlimited.
-            const pData = programSnap.data() || {};
-            const capacity = Number(pData.capacity || 0);
-            const enrolled = Number(pData.enrolledCount || 0);
-            if (capacity > 0 && enrolled >= capacity) {
-                throw new Error("This program is full. Please try another or check back later.");
-            }
-            // If member is switching programs, decrement the prior program's counter.
-            if (uData.enrolledProgramId && uData.enrolledProgramId !== programId) {
-                const priorRef = doc(db, "programs", uData.enrolledProgramId);
-                const priorSnap = await transaction.get(priorRef);
-                if (priorSnap.exists()) {
-                    const priorCount = Number((priorSnap.data() || {}).enrolledCount || 0);
-                    transaction.update(priorRef, { enrolledCount: Math.max(0, priorCount - 1) });
-                }
-            }
-            transaction.update(userRef, { enrolledProgramId: programId });
-            transaction.update(programRef, { enrolledCount: enrolled + 1 });
-        });
-        window.__enrolledProgramId = programId;
-        localStorage.setItem("enrolledProgramId", programId);
-        showToast("Enrolled in program!", "success");
-        renderMemberPrograms();
-    } catch (err) {
-        console.error(err);
-        showToast(err.message || "Failed to enroll.", "error");
-    } finally {
-        delete window._programEnrollInFlight;
-    }
-};
-
-window.unenrollProgram = function () {
-    const userId = localStorage.getItem("userId");
-    if (!userId) return;
-    // Block leaving while in-flight bookings still exist for this member
-    const activeBookings = (window.bookingsData || []).filter(b =>
-        b.memberId === userId && (b.status === 'Pending' || b.status === 'Confirmed')
-    );
-    if (activeBookings.length > 0) {
-        return showToast(`Cancel your ${activeBookings.length} active booking(s) before leaving the program.`, "error");
-    }
-    showConfirm("Leave this program? You can re-enroll later if you change your mind.", async () => {
-        if (window._programEnrollInFlight) return;
-        window._programEnrollInFlight = true;
-        try {
-            // M16: also re-check active bookings inside the txn to close the race
-            await runTransaction(db, async (transaction) => {
-                const userRef = doc(db, "users", userId);
-                const userSnap = await transaction.get(userRef);
-                if (!userSnap.exists()) throw new Error("Your account is no longer available.");
-                // H3: decrement the program's enrolledCount when leaving
-                const priorProgramId = (userSnap.data() || {}).enrolledProgramId;
-                if (priorProgramId) {
-                    const priorRef = doc(db, "programs", priorProgramId);
-                    const priorSnap = await transaction.get(priorRef);
-                    if (priorSnap.exists()) {
-                        const priorCount = Number((priorSnap.data() || {}).enrolledCount || 0);
-                        transaction.update(priorRef, { enrolledCount: Math.max(0, priorCount - 1) });
-                    }
-                }
-                transaction.update(userRef, { enrolledProgramId: null });
-            });
-            window.__enrolledProgramId = null;
-            localStorage.removeItem("enrolledProgramId");
-            showToast("Left program.", "info");
-            renderMemberPrograms();
-        } catch (err) {
-            console.error(err);
-            showToast(err.message || "Failed to leave program.", "error");
-        } finally {
-            delete window._programEnrollInFlight;
-        }
-    });
-};
 
 // ==========================================
 // 10.5 LOCKER SYSTEM MODULE
 // ==========================================
-// Lockers change rarely (admin-triggered writes only) — fetch once on load. Re-call
-// window.refreshLockers() after any locker write from this tab to refresh the UI.
+// QUOTA FIX: lockers use a single persistent onSnapshot listener. Local writes propagate
+// through Firestore's local cache, so refreshLockers() callers after a write are NO-OPS
+// (the snapshot listener will fire automatically). Previously every locker assignment tore
+// down and re-attached the listener — paying for a full collection read EACH TIME. With
+// ~50 lockers and a busy front desk, that was thousands of wasted reads per day.
 let lockersUnsubscribe = null;
+let _lockersAttached = false;
 window.refreshLockers = function () {
     if (!isStaffSide) return Promise.resolve();
-    if (lockersUnsubscribe) lockersUnsubscribe(); // Unsubscribe from any previous listeners to prevent leak
-    
+    if (_lockersAttached) return Promise.resolve(); // listener already streaming — no-op
+    _lockersAttached = true;
+
     return new Promise((resolve) => {
         lockersUnsubscribe = onSnapshot(lockersCol, (snapshot) => {
             lockersData = [];
@@ -5486,6 +5378,10 @@ window.refreshLockers = function () {
                 renderLockers();
                 populateRegLockerDropdown();
             });
+            resolve();
+        }, (err) => {
+            console.warn("[lockers] listener error", err);
+            _lockersAttached = false;
             resolve();
         });
     });
@@ -5691,6 +5587,12 @@ window.toggleLockerGcashRef = function (val) {
 };
 
 window.deleteLocker = async function () {
+    // L3 (Sprint 6): fast-fail RBAC — the UI hides the button for non-admins
+    // but the function was console-callable on `window`. Admin-only.
+    const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+    if (_r !== 'admin') {
+        return showToast("Permission denied.", "error");
+    }
     const lockerId = document.getElementById('assignLockerId').value;
     const locker = lockersData.find(l => l.id === lockerId);
     if (!locker) return;
@@ -5739,6 +5641,13 @@ if (document.getElementById('assignLockerForm')) {
         const lockerId = document.getElementById('assignLockerId').value;
         const memberId = document.getElementById('assignMemberSelect').value;
         const duration = parseInt(document.getElementById('assignDuration').value);
+
+        // L1 (Sprint 6): reject non-positive / non-finite / unreasonably-long durations.
+        // Without this, duration=0 produced a free locker with same-day expiry,
+        // and negative durations produced a locker assigned with a past expiry.
+        if (!Number.isFinite(duration) || duration < 1 || duration > 12) {
+            return showToast("Locker duration must be between 1 and 12 month(s).", "error");
+        }
 
         const payMethodEl = document.getElementById('assignLockerPayMethod');
         const payMethod = payMethodEl ? payMethodEl.value : 'Cash';
@@ -5886,6 +5795,12 @@ if (document.getElementById('assignLockerForm')) {
 }
 
 window.releaseLocker = async function () {
+    // L2 (Sprint 6): fast-fail RBAC — function was console-callable by any role
+    // (member/trainer) since it was exposed on `window`. Only admin/staff may release.
+    const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+    if (_r !== 'admin' && _r !== 'staff') {
+        return showToast("Permission denied.", "error");
+    }
     const lockerId = document.getElementById('assignLockerId').value;
     const locker = lockersData.find(l => l.id === lockerId);
     if (!locker) return;
@@ -5933,6 +5848,19 @@ window.printLockerReceipt = function () {
     window.print();
 };
 
+window.currentMemberAlertFilter = null;
+
+window.toggleMemberAlertFilter = function (filterId) {
+    if (window.currentMemberAlertFilter === filterId) {
+        window.currentMemberAlertFilter = null;
+    } else {
+        window.currentMemberAlertFilter = filterId;
+    }
+    
+    window.memCurrentPage = 1;
+    renderMembers();
+};
+
 function renderMembers() {
     const memTbody = document.querySelector('#membersTable tbody');
     const arcTbody = document.querySelector('#archivedMembersTable tbody');
@@ -5978,7 +5906,26 @@ function renderMembers() {
             const matchesPlan = planFilter === "all" || m.plan === planFilter;
             const matchesStatus = statusFilter === "all" || statusStr === statusFilter;
 
-            if (matchesSearch && matchesPlan && matchesStatus) {
+            let matchesAlert = true;
+            if (window.currentMemberAlertFilter) {
+                if (window.currentMemberAlertFilter === 'active') {
+                    matchesAlert = statusLower === 'active';
+                } else if (window.currentMemberAlertFilter === 'expiringSoon') {
+                    const plan = m.plan || 'Standard Member';
+                    const planDays = window.getPlanDays(plan);
+                    if (m.dateRegistered) {
+                        const expiryDate = m.dateRegistered + (planDays * 24 * 60 * 60 * 1000);
+                        const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+                        matchesAlert = diffDays > 0 && diffDays <= 7;
+                    } else {
+                        matchesAlert = false;
+                    }
+                } else if (window.currentMemberAlertFilter === 'newMembers') {
+                    matchesAlert = m.dateRegistered && m.dateRegistered > thirtyDaysAgo;
+                }
+            }
+
+            if (matchesSearch && matchesPlan && matchesStatus && matchesAlert) {
                 activeList.push(m);
             }
 
@@ -5999,6 +5946,15 @@ function renderMembers() {
     if (document.getElementById('financialTotalActiveMembers')) document.getElementById('financialTotalActiveMembers').innerText = activeMembers;
     if (document.getElementById('financialExpiringSoon')) document.getElementById('financialExpiringSoon').innerText = expiringSoon;
     if (document.getElementById('financialNewMembers')) document.getElementById('financialNewMembers').innerText = newMembers30d;
+
+    // Update KPI UI Card highlight classes
+    const kpiActive = document.getElementById('kpiActiveMembers');
+    const kpiExpiring = document.getElementById('kpiExpiringSoon');
+    const kpiNew = document.getElementById('kpiNewMembers');
+    
+    if (kpiActive) kpiActive.classList.toggle('active-filter-kpi', window.currentMemberAlertFilter === 'active');
+    if (kpiExpiring) kpiExpiring.classList.toggle('active-filter-kpi', window.currentMemberAlertFilter === 'expiringSoon');
+    if (kpiNew) kpiNew.classList.toggle('active-filter-kpi', window.currentMemberAlertFilter === 'newMembers');
 
     // 2. Render Rows
     const renderMemberRow = (m, isArchived) => {
@@ -7824,8 +7780,17 @@ function initUI() {
         const clockElement = document.getElementById('liveClock');
         if (clockElement) {
             const now = new Date();
-            const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
-            clockElement.innerHTML = `<i class="fa-regular fa-clock"></i> ${now.toLocaleDateString('en-US', options)}`;
+            const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            
+            const dayName = days[now.getDay()];
+            const dayVal = now.getDate();
+            const monthName = months[now.getMonth()];
+            const yearVal = now.getFullYear();
+            
+            const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            clockElement.innerHTML = `${dayName} · ${dayVal} ${monthName} ${yearVal} · ${timeStr}`;
         }
     }
     let clockTimerId = setInterval(updateClock, 1000); updateClock();
@@ -7866,10 +7831,11 @@ function initUI() {
         const hour = new Date().getHours();
         const name = localStorage.getItem("loggedInUser") || "User";
         const firstName = name.split(' ')[0];
+        let greetingWord = "Good Morning";
+        if (hour >= 12 && hour < 18) greetingWord = "Good Afternoon";
+        else if (hour >= 18) greetingWord = "Good Evening";
 
-        if (hour < 12) greetingText.innerText = `Good Morning, ${firstName}.`;
-        else if (hour < 18) greetingText.innerText = `Good Afternoon, ${firstName}.`;
-        else greetingText.innerText = `Good Evening, ${firstName}.`;
+        greetingText.innerHTML = `${greetingWord}, <span style="color: #ff5d4a; font-weight: 700;">${firstName}</span>.`;
     }
 
     // --- Topbar Name Initialization ---
@@ -8098,11 +8064,16 @@ window.isBookingSessionInPast = isBookingSessionInPast;
     } else if (roleNorm === "trainer") {
         bookingsQuery = query(bookingsCol, where("trainerId", "==", currentUserId));
     } else if (isStaffSide) {
-        // Date is stored as a formatted string, so range-filter server-side is not possible
-        // without a schema change. Keep collection-wide for staff/admin — they need the full
-        // booking grid for management. (~30% of total sessions; majority of reads now come
-        // from this single listener for staff users, which is acceptable.)
-        bookingsQuery = bookingsCol;
+        // QUOTA FIX: bookings.date is stored YYYY-MM-DD (en-CA / ISO), which IS
+        // lexicographically sortable — so a server-side range filter works. Keep the
+        // last 90 days plus all future bookings. Previously this loaded the ENTIRE
+        // collection on every staff/admin connect; the bookings table grew unbounded
+        // for the lifetime of the gym. 90 days covers quarterly reporting, all
+        // dashboard KPIs (today / this-week / no-shows-week), and trainer payroll.
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 90);
+        const cutoffStr = cutoff.toLocaleDateString('en-CA');
+        bookingsQuery = query(bookingsCol, where("date", ">=", cutoffStr));
     } else {
         return;
     }
@@ -8430,6 +8401,13 @@ window.updateBookingStatus = async (id, newStatus) => {
     // Caller identity (used inside transactions to enforce trainer ownership)
     const _callerRole = (localStorage.getItem("userRole") || '').toLowerCase();
     const _callerId   = localStorage.getItem("userId");
+    // S1 (Sprint 8): updateBookingStatus is for staff/admin/trainer UI buttons only.
+    // Members have `cancelMemberBooking` for self-cancel; they must not be able to flip
+    // arbitrary bookings to Confirmed / Declined / Completed / No Show via console
+    // (which would refund or consume credits on someone else's account).
+    if (_callerRole !== 'admin' && _callerRole !== 'staff' && _callerRole !== 'trainer') {
+        return showToast("Permission denied.", "error");
+    }
     const _assertOwnership = (bData) => {
         // Trainers may only act on bookings assigned to them.
         // Admins and staff may act on any booking (staff confirmation is allowed by design).
@@ -9147,13 +9125,17 @@ window.setupBookingModalListeners = () => {
 
                     await runTransaction(db, async (transaction) => {
                         const bookingRef = doc(db, "bookings", originalId);
+                        const memberRefRS = doc(db, "users", memberId);
+                        const trainerRefRS = doc(db, "users", trainerId);
                         const newTrainerSlotRef = doc(db, "bookingSlots", slotIdForTrainer(trainerId, bookDate, bookTime));
                         const newMemberSlotRef  = doc(db, "bookingSlots", slotIdForMember(memberId, bookDate, bookTime));
                         const oldTrainerSlotRef = doc(db, "bookingSlots", slotIdForTrainer(trainerId, prevDate, prevTime));
                         const oldMemberSlotRef  = doc(db, "bookingSlots", slotIdForMember(memberId, prevDate, prevTime));
 
-                        const [bookingSnap, newTrainerSlotSnap, newMemberSlotSnap] = await Promise.all([
+                        const [bookingSnap, memberSnapRS, trainerSnapRS, newTrainerSlotSnap, newMemberSlotSnap] = await Promise.all([
                             transaction.get(bookingRef),
+                            transaction.get(memberRefRS),
+                            transaction.get(trainerRefRS),
                             transaction.get(newTrainerSlotRef),
                             transaction.get(newMemberSlotRef)
                         ]);
@@ -9165,8 +9147,46 @@ window.setupBookingModalListeners = () => {
                         if (bData.memberId !== memberId) {
                             throw new Error("You can only reschedule your own bookings.");
                         }
+                        // R1 (Sprint 7): trainer is locked client-side, but `trainerId`
+                        // is read from `window.bookingState` which is console-tamperable.
+                        // Re-pin it to the original booking's trainer inside the txn so a
+                        // panelist can't redirect their reschedule to hijack a different
+                        // trainer's slot or orphan the original trainer's slot lock.
+                        if (bData.trainerId !== trainerId) {
+                            throw new Error("Trainer cannot be changed when rescheduling. Please reopen the modal.");
+                        }
                         if (!["Pending", "Confirmed"].includes(bData.status)) {
                             throw new Error(`Bookings in "${bData.status}" status cannot be rescheduled.`);
+                        }
+
+                        // O1 (Sprint 9): Re-validate member plan expiry and trainer status against
+                        // the NEW date. Without this, a member can slide a session past their plan
+                        // expiry (e.g. expires Dec 15, reschedule from Dec 10 → Dec 20) — the
+                        // original new-booking path enforces this but the reschedule path skipped it.
+                        if (!memberSnapRS.exists()) {
+                            throw new Error("Member record does not exist.");
+                        }
+                        if (!trainerSnapRS.exists()) {
+                            throw new Error("Selected trainer no longer exists. Please pick a different trainer.");
+                        }
+                        const mDataRS = memberSnapRS.data();
+                        const tDataRS = trainerSnapRS.data();
+                        if ((tDataRS.role || '').toLowerCase() !== 'trainer') {
+                            throw new Error("Selected user is no longer a trainer.");
+                        }
+                        if ((tDataRS.status || 'Active') !== 'Active') {
+                            throw new Error("Selected trainer is no longer available. Please cancel and pick a different trainer.");
+                        }
+                        if (window.isMemberPlanExpired && window.isMemberPlanExpired(mDataRS)) {
+                            throw new Error("Your membership has expired. Please renew before rescheduling.");
+                        }
+                        if (typeof mDataRS.dateRegistered === 'number') {
+                            const planDaysRS = (typeof window.getPlanDays === 'function') ? window.getPlanDays(mDataRS.plan) : 30;
+                            const expiryAtRS = mDataRS.dateRegistered + planDaysRS * 24 * 60 * 60 * 1000;
+                            const targetMsRS = new Date(`${bookDate}T${bookTime}`).getTime();
+                            if (targetMsRS > expiryAtRS) {
+                                throw new Error("The new booking date is past your membership plan's expiration date. Please renew before rescheduling that far out.");
+                            }
                         }
 
                         // Re-check the 2-hour rule against the booking's CURRENT scheduled time
@@ -9632,11 +9652,23 @@ window.deleteBooking = async (id) => {
 window.cancelMemberBooking = function (bookingId, memberId) {
     showConfirm("Cancel this booking request? Your session credit will be refunded.", async () => {
         try {
+            // R2 (Sprint 7): `window.cancelMemberBooking` was console-callable on any
+            // bookingId — Member A could cancel Member B's pending booking. Caller must
+            // either own the booking or hold an admin/staff role.
+            const callerId = localStorage.getItem("userId");
+            const callerRole = (localStorage.getItem("userRole") || '').toLowerCase();
             await runTransaction(db, async (tx) => {
                 const bookingRef = doc(db, "bookings", bookingId);
                 const bSnap = await tx.get(bookingRef);
                 if (!bSnap.exists()) throw new Error("This booking no longer exists.");
                 const bData = bSnap.data();
+                // Ownership / RBAC gate inside the txn so the credit refund and slot
+                // cleanup can't be triggered against someone else's booking.
+                const isOwner = bData.memberId && bData.memberId === callerId;
+                const isPrivileged = callerRole === 'admin' || callerRole === 'staff';
+                if (!isOwner && !isPrivileged) {
+                    throw new Error("You can only cancel your own bookings.");
+                }
                 if (bData.status !== "Pending") {
                     throw new Error("This booking can no longer be cancelled.");
                 }
@@ -9885,6 +9917,11 @@ window.clearBatchSelection = function (type) {
 };
 
 window.applyBatchStatus = async function (type) {
+    // S4 (Sprint 8): fast-fail RBAC — admin/staff only.
+    const _r = (localStorage.getItem("userRole") || '').toLowerCase();
+    if (_r !== 'admin' && _r !== 'staff') {
+        return showToast("Permission denied.", "error");
+    }
     const set = (type === 'equipment') ? selectedEquipItems : selectedProdItems;
     const statusSelect = document.getElementById(type === 'equipment' ? 'equipBatchStatus' : 'prodBatchStatus');
     const newStatus = statusSelect.value;

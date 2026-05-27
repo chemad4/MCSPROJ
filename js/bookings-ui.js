@@ -830,7 +830,10 @@ window.executeManualBooking = async () => {
             if ((tData.role || '').toLowerCase() !== 'trainer') {
                 throw new Error("Selected user is no longer a trainer. Please choose a different trainer.");
             }
-            if ((tData.status || '').toLowerCase() === 'archived' || tData.status !== 'Active') {
+            // O2 (Sprint 9): match the member-booking path's check at script.js:9037.
+            // Treat missing status as 'Active' so trainers seeded without an explicit status
+            // field aren't incorrectly rejected during admin/staff manual booking.
+            if ((tData.status || 'Active') !== 'Active') {
                 throw new Error("Trainer is not currently active. Please choose a different trainer.");
             }
             const mData = memberSnap.data();

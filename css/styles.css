@@ -2786,6 +2786,17 @@ body.dark-theme .skeleton-bar {
     color: var(--text-primary);
 }
 
+.financial-kpi-card.active-filter-kpi {
+    border-color: var(--primary-red) !important;
+    background: rgba(153, 27, 27, 0.04) !important;
+    box-shadow: 0 4px 12px rgba(153, 27, 27, 0.08) !important;
+}
+
+body.dark-theme .financial-kpi-card.active-filter-kpi {
+    background: rgba(239, 68, 68, 0.08) !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12) !important;
+}
+
 .dense-control-bar {
     background: rgba(0, 0, 0, 0.02);
     border: 1px solid var(--border-color);
@@ -4948,6 +4959,17 @@ body.dark-theme .weekly-day-card.is-today {
     transform: translateY(-2px);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
     border-color: var(--primary-red);
+}
+
+.equip-cat-card.active-filter {
+    border-color: var(--primary-red) !important;
+    background: rgba(153, 27, 27, 0.04) !important;
+    box-shadow: 0 4px 12px rgba(153, 27, 27, 0.08) !important;
+}
+
+body.dark-theme .equip-cat-card.active-filter {
+    background: rgba(239, 68, 68, 0.08) !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12) !important;
 }
 
 .equip-cat-icon {
@@ -7381,14 +7403,6 @@ body.dark-theme .trainer-avatar { color: var(--text-heading); }
 }
 .chat-search-box { width: 100%; }
 .chat-user-list { overflow-y: auto; flex-grow: 1; }
-.my-current-program { padding: var(--space-5); }
-.my-programs-panel { margin-top: var(--space-5); }
-.member-programs-list {
-    padding: var(--space-4);
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-}
 .trainers-floor-feed { max-height: 300px; overflow-y: auto; }
 .greeting-stat-wide { min-width: 180px; }
 .booking-step-card-time { padding: var(--space-4); }

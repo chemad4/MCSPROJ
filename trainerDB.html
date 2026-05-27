@@ -186,11 +186,15 @@
 
     <main class="main-content">
         <header class="topbar">
-            <div class="topbar-left">
-                <span id="pageTitle" style="font-weight: 500; color: var(--dark-black); font-size: 16px;">Trainer Dashboard</span>
-            </div>
-            <div class="topbar-center" style="margin-left: auto; margin-right: 20px;">
-                <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
+            <div class="topbar-left" style="display: flex; align-items: center; gap: 16px;">
+                <div class="topbar-greeting-wrapper" style="display: flex; flex-direction: column;">
+                    <div class="topbar-greeting" id="greetingText" style="font-size: 15px; font-weight: 700; color: var(--text-primary); line-height: 1.2;">
+                        Good Morning, <span style="color: #ff5d4a;">XFit</span>.
+                    </div>
+                    <div class="topbar-subtext" id="liveClock" style="font-size: 10px; color: var(--text-muted); margin-top: 2px; font-family: 'Geist Mono', Monaco, Consolas, monospace; letter-spacing: 0.04em;">
+                        Loading time...
+                    </div>
+                </div>
             </div>
             <div class="topbar-right">
                 <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn-circle"><i id="darkModeIcon" class="fas fa-moon"></i></button>
@@ -224,12 +228,7 @@
             
             <div id="trainerNotificationArea"></div>
 
-            <header class="page-header">
-                <div class="page-header-text">
-                    <h2 id="greetingText" class="page-title">Overview</h2>
-                    <p class="page-subtitle">Manage your schedule and member requests.</p>
-                </div>
-            </header>
+
 
             <div class="stat-cards">
                 <div class="stat-card card-black" id="closestBookingCard" style="cursor: default;">

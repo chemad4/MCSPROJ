@@ -1034,8 +1034,6 @@
             <ul class="submenu">
                 <li class="nav-item sub-item nav-clickable" onclick="switchTab('membershipPlans', this)"><span
                         class="menu-text">Plans & Pricing</span></li>
-                <li class="nav-item sub-item nav-clickable" onclick="switchTab('programs', this)"><span
-                        class="menu-text">Programs</span></li>
                 <li class="nav-item sub-item nav-clickable" onclick="switchTab('lockers', this)"><span
                         class="menu-text">Locker Management</span></li>
             </ul>
@@ -1091,12 +1089,16 @@
 
     <main class="main-content">
         <header class="topbar">
-            <div class="topbar-left">
+            <div class="topbar-left" style="display: flex; align-items: center; gap: 16px;">
                 <i class="fas fa-bars mobile-toggle" id="mobileMenuBtn"></i>
-                <span id="pageTitle" class="page-title">Dashboard</span>
-            </div>
-            <div class="topbar-center" style="margin-left: auto; margin-right: 20px;">
-                <span class="live-clock" id="liveClock"><i class="fa-regular fa-clock"></i> Loading time...</span>
+                <div class="topbar-greeting-wrapper" style="display: flex; flex-direction: column;">
+                    <div class="topbar-greeting" id="greetingText" style="font-size: 15px; font-weight: 700; color: var(--text-primary); line-height: 1.2;">
+                        Good Morning, <span style="color: #ff5d4a;">XFit</span>.
+                    </div>
+                    <div class="topbar-subtext" id="liveClock" style="font-size: 10px; color: var(--text-muted); margin-top: 2px; font-family: 'Geist Mono', Monaco, Consolas, monospace; letter-spacing: 0.04em;">
+                        Loading time...
+                    </div>
+                </div>
             </div>
             <div class="topbar-right">
                 <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn-circle"><i id="darkModeIcon"
@@ -1135,15 +1137,7 @@
         </header>
 
         <div id="dashboard" class="content-section active-section">
-            <!-- Header Section -->
-            <div class="panel panel-transparent">
-                <div class="panel-body panel-body-compact">
-                    <h2 id="greetingText"
-                        style="margin-bottom: 4px; font-size: 26px; font-weight: 700; color: var(--text-primary);">
-                        Dashboard</h2>
-                    <p class="text-muted-sm">Real-time operational summary.</p>
-                </div>
-            </div>
+
 
             <div class="dashboard-layout" id="dashboardLayout">
                 <!-- Left Column (2fr) -->
@@ -1557,11 +1551,11 @@
                     <span class="value" id="financialTodayRevenue">₱0.00</span>
                 </div>
                 <div class="financial-kpi-card">
-                    <span class="label">Total Revenue</span>
+                    <span class="label" title="Sum of the 1,000 most recent non-voided transactions">Recent Revenue</span>
                     <span class="value" id="financialTotalRevenue">₱0.00</span>
                 </div>
                 <div class="financial-kpi-card">
-                    <span class="label" style="color: #991b1b;">Total Voided</span>
+                    <span class="label" style="color: #991b1b;" title="Voided amount across the 1,000 most recent transactions">Recent Voided</span>
                     <span class="value" id="financialTotalVoided">₱0.00</span>
                 </div>
             </div>
@@ -1660,15 +1654,15 @@
         <div id="members" class="content-section">
             <!-- Top-Level KPI Cards -->
             <div class="financial-kpi-row">
-                <div class="financial-kpi-card">
+                <div class="financial-kpi-card" id="kpiActiveMembers" style="cursor: pointer;" onclick="window.toggleMemberAlertFilter('active')">
                     <span class="label">Active Members</span>
                     <span class="value" id="financialTotalActiveMembers">0</span>
                 </div>
-                <div class="financial-kpi-card">
-                    <span class="label" style="color: #92400e;">Expiring Soon (< 7d)</span>
-                            <span class="value" id="financialExpiringSoon">0</span>
+                <div class="financial-kpi-card" id="kpiExpiringSoon" style="cursor: pointer;" onclick="window.toggleMemberAlertFilter('expiringSoon')">
+                    <span class="label" style="color: #92400e;">Expiring Soon (&lt; 7d)</span>
+                    <span class="value" id="financialExpiringSoon">0</span>
                 </div>
-                <div class="financial-kpi-card">
+                <div class="financial-kpi-card" id="kpiNewMembers" style="cursor: pointer;" onclick="window.toggleMemberAlertFilter('newMembers')">
                     <span class="label" style="color: #166534;">New Sign-ups (30d)</span>
                     <span class="value" id="financialNewMembers">0</span>
                 </div>
@@ -2467,24 +2461,6 @@
 
             <div id="plansTableBody" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Dynamic Plans will be rendered here by renderMembershipPlans() -->
-            </div>
-        </div>
-
-        <!-- ═══════════════════════════════════════════ -->
-        <!-- PROGRAMS SECTION                          -->
-        <!-- ═══════════════════════════════════════════ -->
-        <div id="programs" class="content-section bg-slate-50" style="padding: 32px;">
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h2 class="text-2xl font-semibold text-slate-800 tracking-tight"><i class="fa-solid fa-dumbbell mr-2 text-slate-400"></i>Workout Programs</h2>
-                    <p class="text-sm text-slate-500 mt-1">Create and manage fitness programs that members can enroll in.</p>
-                </div>
-                <button class="bg-[#991b1b] hover:bg-red-800 text-white text-sm font-medium px-4 py-2 rounded shadow-sm transition-colors flex items-center gap-2" onclick="openAddProgramModal()">
-                    <i class="fas fa-plus"></i> Add Program
-                </button>
-            </div>
-            <div id="programsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <!-- Rendered by JS -->
             </div>
         </div>
 
@@ -3820,57 +3796,6 @@
         </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════ -->
-    <!-- ADD / EDIT PROGRAM MODAL                   -->
-    <!-- ═══════════════════════════════════════════ -->
-    <div id="programModal" class="modal">
-        <div class="modal-content" style="max-width: 480px;">
-            <div class="modal-header">
-                <h3 id="programModalTitle"><i class="fa-solid fa-dumbbell"></i> Add Program</h3>
-                <span class="close-btn" onclick="closeModal('programModal')">&times;</span>
-            </div>
-            <form id="programForm" onsubmit="submitProgramForm(event)">
-                <input type="hidden" id="programId">
-                <div class="form-group">
-                    <label class="form-label">Program Name <span class="required-asterisk">*</span></label>
-                    <input type="text" id="programName" placeholder="e.g. 12-Week Fat Loss" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Category <span class="required-asterisk">*</span></label>
-                    <select id="programCategory" required>
-                        <option value="" disabled selected>Select category...</option>
-                        <option>Weight Loss</option>
-                        <option>Muscle Gain</option>
-                        <option>Endurance</option>
-                        <option>Flexibility & Mobility</option>
-                        <option>General Fitness</option>
-                    </select>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label">Duration (hrs/day) <span class="required-asterisk">*</span></label>
-                        <input type="number" id="programDuration" placeholder="1" min="1" max="8" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Days per Week <span class="required-asterisk">*</span></label>
-                        <input type="number" id="programDaysPerWeek" placeholder="3" min="1" max="7" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Capacity <span style="color:var(--text-muted);font-weight:400;">(leave blank for unlimited)</span></label>
-                    <input type="number" id="programCapacity" placeholder="e.g. 20" min="1" max="500">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Description</label>
-                    <textarea id="programDescription" rows="3" placeholder="Brief description of this program..." style="width:100%;padding:10px;border:1px solid var(--border-color);border-radius:6px;font-family:inherit;font-size:14px;resize:vertical;background:rgba(255,255,255,0.5);color:var(--text-primary);"></textarea>
-                </div>
-                <div class="btn-row">
-                    <button type="button" class="btn-cancel" onclick="closeModal('programModal')">Cancel</button>
-                    <button type="submit" class="btn-submit" id="programSubmitBtn">Save Program</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
 </body>
 
