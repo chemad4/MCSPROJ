@@ -1,6 +1,6 @@
 // Cache version — bump this on each deployment to invalidate stale assets.
 // Using date-based versioning for clarity (Audit Fix 3.6).
-const CACHE_NAME = 'fit-track-cache-v10-2026-05-27-atrium';
+const CACHE_NAME = 'fit-track-cache-v12-2026-05-27-case-fix';
 const urlsToCache = [
   './',
   'index.html',

@@ -424,21 +424,58 @@ if (currentUserId && currentSessionId) {
 
             // Kick out duplicate logins OR logouts from another tab/device.
             // currentSession=null means the user logged out elsewhere; mismatch means another device claimed the session.
-            const sessionMismatch = userData.currentSession && userData.currentSession !== currentSessionId;
-            const sessionRevoked  = !userData.currentSession; // logged out somewhere
-            if (sessionMismatch || sessionRevoked) {
-                showToast(sessionRevoked
-                    ? "Your session ended (logged out elsewhere). Please sign in again."
-                    : "Session Override: Your account was just logged in from another device. Logging out here to protect your data.",
-                    "error");
-                localStorage.removeItem("loggedInUser");
-                localStorage.removeItem("userRole");
-                localStorage.removeItem("userRfid");
-                localStorage.removeItem("userId");
-                localStorage.removeItem("shiftStart");
-                localStorage.removeItem("sessionId");
-                localStorage.removeItem("trainerShiftStatus");
-                window.location.replace("index.html");
+            //
+            // BUG FIX: Three guards added to prevent false-positive session revocations:
+            //
+            // 1. Bypass/dev login sessions (userId starts with "test-") never write to Firestore,
+            //    so skip the session check entirely for them — they are local-only test sessions.
+            //
+            // 2. Only treat a session as "revoked" when Firestore explicitly returns null (i.e.
+            //    the field is present but null). If the field is simply undefined/missing — which
+            //    happens transiently during partial writes (e.g., editing a member's name) — we
+            //    must NOT kick the user out. Using `userData.currentSession === null` (strict
+            //    equality) avoids false revocations from undefined snapshot fields.
+            //
+            // 3. Add a 3-second settle debounce: wait for the snapshot to stabilise before
+            //    acting on a potential revocation, so a partial write mid-flight doesn't trigger
+            //    a logout before the final write arrives.
+            const isBypassSession = (currentUserId || '').startsWith('test-');
+            if (!isBypassSession) {
+                const sessionMismatch = userData.currentSession && userData.currentSession !== currentSessionId;
+                // Strict null check: undefined means field absent/partial write — do NOT revoke.
+                const sessionRevoked  = userData.currentSession === null;
+                if (sessionMismatch || sessionRevoked) {
+                    // Debounce: schedule logout 3 s out. If another snapshot arrives with a
+                    // valid session before the timer fires, clear the pending logout.
+                    if (!window._sessionRevokeTimer) {
+                        window._sessionRevokeTimer = setTimeout(() => {
+                            window._sessionRevokeTimer = null;
+                            // Re-verify from the latest known data before acting.
+                            const latestData = window.currentUserData || {};
+                            const stillMismatch = latestData.currentSession && latestData.currentSession !== currentSessionId;
+                            const stillRevoked  = latestData.currentSession === null;
+                            if (!stillMismatch && !stillRevoked) return; // false alarm — snapshot healed itself
+                            showToast(stillRevoked
+                                ? "Your session ended (logged out elsewhere). Please sign in again."
+                                : "Session Override: Your account was just logged in from another device. Logging out here to protect your data.",
+                                "error");
+                            localStorage.removeItem("loggedInUser");
+                            localStorage.removeItem("userRole");
+                            localStorage.removeItem("userRfid");
+                            localStorage.removeItem("userId");
+                            localStorage.removeItem("shiftStart");
+                            localStorage.removeItem("sessionId");
+                            localStorage.removeItem("trainerShiftStatus");
+                            window.location.replace("index.html");
+                        }, 3000);
+                    }
+                } else {
+                    // Valid session confirmed — cancel any pending revocation timer.
+                    if (window._sessionRevokeTimer) {
+                        clearTimeout(window._sessionRevokeTimer);
+                        window._sessionRevokeTimer = null;
+                    }
+                }
             }
 
             const roleLower = (currentUserRole || "").toLowerCase();
@@ -547,15 +584,38 @@ if (document.getElementById('welcomeName')) {
 
 // C5: cross-tab logout sync (same browser). If another tab clears userId/sessionId, this tab
 // boots back to login. Firestore snapshot covers cross-device; storage event covers same-browser.
+//
+// BUG FIX: The original storage listener redirected immediately on any key removal, including
+// transient writes (e.g., key temporarily removed then re-added). Added a 500 ms debounce so
+// we only redirect if the key is still gone after a short settle window. Bypass sessions
+// (userId starting with "test-") are also exempt since they never update Firestore.
+let _storageLogoutTimer = null;
 window.addEventListener('storage', (e) => {
+    // Bypass/test sessions are local-only; ignore storage events for them.
+    const uid = localStorage.getItem('userId') || '';
+    if (uid.startsWith('test-')) return;
+
+    const onLoginPage = window.location.pathname.endsWith('index.html') || window.location.pathname === '/';
+
     if (!e.key) {
         // Whole localStorage cleared (e.g., handleLogout()). Force boot if we thought we were logged in.
-        if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/') return;
-        window.location.replace('index.html');
+        if (onLoginPage) return;
+        if (_storageLogoutTimer) clearTimeout(_storageLogoutTimer);
+        _storageLogoutTimer = setTimeout(() => {
+            _storageLogoutTimer = null;
+            if (!localStorage.getItem('userId')) window.location.replace('index.html');
+        }, 500);
         return;
     }
     if ((e.key === 'userId' || e.key === 'sessionId') && !e.newValue) {
-        window.location.replace('index.html');
+        if (_storageLogoutTimer) clearTimeout(_storageLogoutTimer);
+        _storageLogoutTimer = setTimeout(() => {
+            _storageLogoutTimer = null;
+            // Only redirect if the key is still absent after the debounce window.
+            if (!localStorage.getItem('userId') || !localStorage.getItem('sessionId')) {
+                window.location.replace('index.html');
+            }
+        }, 500);
     }
 });
 
@@ -585,6 +645,9 @@ window.handleLogout = async function () {
 window.switchTab = function (tabId, element, evt) {
     if (evt) evt.stopPropagation();
     else if (typeof event !== 'undefined' && event) event.stopPropagation();
+
+    // Persist active tab state in sessionStorage so it survives soft/hard page refreshes
+    sessionStorage.setItem("activeTab", tabId);
 
     const globalSearch = document.getElementById('globalSearchInput');
     if (globalSearch) {
@@ -1125,7 +1188,7 @@ async function logStockMovement(productId, productName, changeAmount, reason) {
 // for thousands of reads on every staff page load.
 window.refreshStockMovements = function () {
     if (!isStaffSide) return Promise.resolve();
-    const q = query(stockMovementsCol, orderBy("timestamp", "desc"), limit(500));
+    const q = query(stockMovementsCol, orderBy("timestamp", "desc"), limit(100));
     return getDocs(q).then(snapshot => {
         stockMovementsData = [];
         snapshot.forEach(doc => stockMovementsData.push({ id: doc.id, ...doc.data() }));
@@ -6003,9 +6066,9 @@ function renderMembers() {
     const kpiExpiring = document.getElementById('kpiExpiringSoon');
     const kpiNew = document.getElementById('kpiNewMembers');
     
-    if (kpiActive) kpiActive.classList.toggle('active-filter-kpi', window.currentMemberAlertFilter === 'active');
-    if (kpiExpiring) kpiExpiring.classList.toggle('active-filter-kpi', window.currentMemberAlertFilter === 'expiringSoon');
-    if (kpiNew) kpiNew.classList.toggle('active-filter-kpi', window.currentMemberAlertFilter === 'newMembers');
+    if (kpiActive) kpiActive.classList.toggle('active-filter', window.currentMemberAlertFilter === 'active');
+    if (kpiExpiring) kpiExpiring.classList.toggle('active-filter', window.currentMemberAlertFilter === 'expiringSoon');
+    if (kpiNew) kpiNew.classList.toggle('active-filter', window.currentMemberAlertFilter === 'newMembers');
 
     // 2. Render Rows
     const renderMemberRow = (m, isArchived) => {
@@ -7698,6 +7761,28 @@ window.setupDynamicUIFormValidations = function () {
 
     // Injects a premium dynamic helper label below an input field if it doesn't exist
     const ensureValidationMessageEl = (input) => {
+        const parent = input.parentElement;
+        const isFlexParent = parent && (
+            parent.style.display === 'flex' || 
+            (parent.getAttribute('style') || '').includes('flex') || 
+            parent.classList.contains('flex') ||
+            (typeof window !== 'undefined' && window.getComputedStyle && window.getComputedStyle(parent).display === 'flex')
+        );
+
+        if (isFlexParent) {
+            const searchId = 'val-msg-' + input.id;
+            let existingMsg = document.getElementById(searchId);
+            if (existingMsg) {
+                return existingMsg;
+            }
+            existingMsg = document.createElement('span');
+            existingMsg.id = searchId;
+            existingMsg.className = 'form-validation-msg';
+            // Insert it directly after the flex container itself so it doesn't break the horizontal layout!
+            parent.parentNode.insertBefore(existingMsg, parent.nextSibling);
+            return existingMsg;
+        }
+
         let msgEl = input.nextElementSibling;
         if (msgEl && msgEl.classList.contains('form-validation-msg')) {
             return msgEl;
@@ -7944,21 +8029,47 @@ function initUI() {
                 input.value = queryVal;
                 if (window.filterChatUsers) window.filterChatUsers();
             }
-        } else if (activeId === 'inventory') {
-            const machinesTab = document.getElementById('machinesPanel');
-            const productsTab = document.getElementById('productsPanel');
-            if (machinesTab && machinesTab.classList.contains('active')) {
-                const input = document.getElementById('machineSearch');
-                if (input) {
-                    input.value = queryVal;
-                    input.dispatchEvent(new Event('input'));
-                }
-            } else if (productsTab && productsTab.classList.contains('active')) {
-                const input = document.getElementById('productSearch');
-                if (input) {
-                    input.value = queryVal;
-                    input.dispatchEvent(new Event('input'));
-                }
+        } else if (activeId === 'staff') {
+            const input = document.getElementById('staffSearchModern');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterStaff) window.filterStaff();
+            }
+        } else if (activeId === 'trainers') {
+            const input = document.getElementById('trainerSearchModern');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterTrainers) window.filterTrainers();
+            }
+        } else if (activeId === 'payments') {
+            const input = document.getElementById('paymentSearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterPayments) window.filterPayments();
+            }
+        } else if (activeId === 'attendance') {
+            const input = document.getElementById('attendanceSearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.renderAttendanceData) window.renderAttendanceData();
+            }
+        } else if (activeId === 'equipment') {
+            const input = document.getElementById('machineSearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterEquipment) window.filterEquipment();
+            }
+        } else if (activeId === 'products') {
+            const input = document.getElementById('productSearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterProducts) window.filterProducts();
+            }
+        } else if (activeId === 'ledger') {
+            const input = document.getElementById('ledgerSearch');
+            if (input) {
+                input.value = queryVal;
+                if (window.filterLedger) window.filterLedger();
             }
         }
     };
@@ -8004,8 +8115,8 @@ function initUI() {
             shiftStatusText.innerText = currentStatusText;
         }
 
-        document.querySelectorAll('.card-black, .grid-stat-box').forEach(card => {
-            const valueDiv = card.querySelector('.value');
+        document.querySelectorAll('.card-black, .grid-stat-box, .equip-cat-card').forEach(card => {
+            const valueDiv = card.querySelector('.value') || card.querySelector('.equip-cat-count');
             if (valueDiv && (valueDiv.innerText.toLowerCase().includes('shift') || valueDiv.innerText.toLowerCase().includes('checking status') || card.querySelector('#shiftStatusText'))) {
                 if (valueDiv && !card.querySelector('#shiftStatusText')) valueDiv.innerText = "Shift Status";
 
@@ -8061,6 +8172,12 @@ function initUI() {
             window.updateShiftTimer();
         }
     });
+
+    // Restore last active tab if present to prevent resetting to dashboard on refresh
+    const lastTab = sessionStorage.getItem("activeTab");
+    if (lastTab && document.getElementById(lastTab)) {
+        window.switchTab(lastTab);
+    }
 
     try { initDashboardCharts(); } catch (error) { console.warn("Chart tool delayed.", error); }
 }
@@ -8739,7 +8856,11 @@ window.openMemberBookingModal = () => {
 
     const trainerSelect = document.getElementById('memberBookTrainer');
     if (trainerSelect) {
-        const trainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer' && u.status !== 'Archived');
+        // Only Active trainers may be booked — exclude On Leave, Suspended, and Archived.
+        const trainers = allUsersData.filter(u =>
+            (u.role || "").toLowerCase() === 'trainer' &&
+            (u.status || 'Active') === 'Active'
+        );
         trainerSelect.innerHTML = '<option value="" disabled selected>Select a Trainer...</option>' +
             trainers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name || `${t.givenName || ''} ${t.familyName || ''}`.trim())}</option>`).join('');
     }

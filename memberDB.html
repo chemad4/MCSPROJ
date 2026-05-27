@@ -9,12 +9,11 @@
 
     <script>
         (function () {
-            const SESSION_MAX_MS = 12 * 60 * 60 * 1000;
+            const SESSION_MAX_MS = 24 * 60 * 60 * 1000;
             const loginAt = Number(localStorage.getItem("loginAt") || 0);
             const expired = loginAt && (Date.now() - loginAt > SESSION_MAX_MS);
             const role = (localStorage.getItem("userRole") || "").toLowerCase();
             if (!localStorage.getItem("loggedInUser") || role !== "member" || expired) {
-                if (expired) localStorage.clear();
                 window.location.replace("index.html");
             }
         })();

@@ -10,12 +10,11 @@
 
     <script>
         (function () {
-            const SESSION_MAX_MS = 12 * 60 * 60 * 1000;
+            const SESSION_MAX_MS = 24 * 60 * 60 * 1000;
             const loginAt = Number(localStorage.getItem("loginAt") || 0);
             const expired = loginAt && (Date.now() - loginAt > SESSION_MAX_MS);
             const role = (localStorage.getItem("userRole") || "").toLowerCase();
             if (!localStorage.getItem("loggedInUser") || role !== "staff" || expired) {
-                if (expired) localStorage.clear();
                 window.location.replace("index.html");
             }
         })();
@@ -852,15 +851,24 @@
         <div id="dashboard" class="content-section active-section">
 
 
-            <div
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px;">
-                <div class="grid-stat-box" onclick="switchTab('members')">
-                    <h3 id="dashActiveMembers">0</h3>
-                    <p>Active Members</p>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" style="border-left: 4px solid #991b1b; cursor: pointer;" onclick="switchTab('members')">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Active Members</div>
+                        <div class="equip-cat-count" id="dashActiveMembers">0</div>
+                    </div>
                 </div>
-                <div class="grid-stat-box" style="cursor: default;">
-                    <h3 class="shift-timer">--:--:--</h3>
-                    <p class="value">Shift Started</p>
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Shift Started</div>
+                        <div class="equip-cat-count shift-timer">--:--:--</div>
+                    </div>
                 </div>
             </div>
 
@@ -1186,21 +1194,33 @@
             </div>
 
             <!-- Locker Stats — Premium Ribbon -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
-                <!-- Occupancy Rate -->
-                <div class="grid-stat-box" style="cursor: default;">
-                    <p>Occupancy Rate</p>
-                    <h3 id="lockerOccupancyRate">0%</h3>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" style="border-left: 4px solid #991b1b;">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fas fa-percent"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Occupancy Rate</div>
+                        <div class="equip-cat-count" id="lockerOccupancyRate">0%</div>
+                    </div>
                 </div>
-                <!-- Available -->
-                <div class="grid-stat-box" style="cursor: default;">
-                    <p>Available</p>
-                    <h3 id="availableLockersCount" style="color: #10B981;">0</h3>
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fas fa-lock-open"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Available</div>
+                        <div class="equip-cat-count" id="availableLockersCount">0</div>
+                    </div>
                 </div>
-                <!-- Occupied -->
-                <div class="grid-stat-box" style="cursor: default;">
-                    <p>Occupied</p>
-                    <h3 id="occupiedLockersCount" style="color: #991b1b;">0</h3>
+                <div class="equip-cat-card" style="border-left: 4px solid #d97706;">
+                    <div class="equip-cat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15);">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Occupied</div>
+                        <div class="equip-cat-count" id="occupiedLockersCount">0</div>
+                    </div>
                 </div>
             </div>
 

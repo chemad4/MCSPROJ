@@ -10,11 +10,17 @@
 
     <script>
         (function () {
-            const SESSION_MAX_MS = 12 * 60 * 60 * 1000;
+            // Guard: redirect to login if not authenticated as Admin.
+            // NOTE: Do NOT call localStorage.clear() here — that fires the storage
+            // event on every open tab, causing ALL tabs to simultaneously redirect
+            // and creating the appearance of a "random page refresh".
+            // The Firestore onSnapshot session listener in script.js handles
+            // invalidation for multi-device/multi-tab scenarios.
+            const SESSION_MAX_MS = 24 * 60 * 60 * 1000; // 24h — avoids disrupting long operational shifts
             const loginAt = Number(localStorage.getItem("loginAt") || 0);
             const expired = loginAt && (Date.now() - loginAt > SESSION_MAX_MS);
-            if (!localStorage.getItem("loggedInUser") || localStorage.getItem("userRole") !== "Admin" || expired) {
-                if (expired) localStorage.clear();
+            const role = (localStorage.getItem("userRole") || "").toLowerCase();
+            if (!localStorage.getItem("loggedInUser") || role !== "admin" || expired) {
                 window.location.replace("index.html");
             }
         })();
@@ -1116,11 +1122,7 @@
                 </div>
             </div>
 
-            <div class="search">
-                <i class="fa-solid fa-magnifying-glass" style="font-size: 12px; color: var(--text-muted);"></i>
-                <input type="text" id="globalSearchInput" placeholder="Search members, bookings, products…" oninput="handleGlobalSearch(this.value)" />
-                <span class="kbd">⌘K</span>
-            </div>
+
 
             <div class="topbar-right">
                 <button onclick="toggleDarkMode()" title="Toggle Dark Mode" class="icon-btn">
@@ -1541,18 +1543,33 @@
 
         <div id="payments" class="content-section">
             <!-- Top-Level KPI Cards -->
-            <div class="financial-kpi-row">
-                <div class="financial-kpi-card">
-                    <span class="label" style="color: #166534;">Today's Revenue</span>
-                    <span class="value" id="financialTodayRevenue">₱0.00</span>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Today's Revenue</div>
+                        <div class="equip-cat-count" id="financialTodayRevenue">₱0.00</div>
+                    </div>
                 </div>
-                <div class="financial-kpi-card">
-                    <span class="label" title="Sum of the 1,000 most recent non-voided transactions">Recent Revenue</span>
-                    <span class="value" id="financialTotalRevenue">₱0.00</span>
+                <div class="equip-cat-card" style="border-left: 4px solid #991b1b;" title="Sum of the 1,000 most recent non-voided transactions">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Recent Revenue</div>
+                        <div class="equip-cat-count" id="financialTotalRevenue">₱0.00</div>
+                    </div>
                 </div>
-                <div class="financial-kpi-card">
-                    <span class="label" style="color: #991b1b;" title="Voided amount across the 1,000 most recent transactions">Recent Voided</span>
-                    <span class="value" id="financialTotalVoided">₱0.00</span>
+                <div class="equip-cat-card" style="border-left: 4px solid #6b7280;" title="Voided amount across the 1,000 most recent transactions">
+                    <div class="equip-cat-icon" style="background: rgba(107, 114, 128, 0.1); color: #6b7280; border: 1px solid rgba(107, 114, 128, 0.15);">
+                        <i class="fas fa-ban"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Recent Voided</div>
+                        <div class="equip-cat-count" id="financialTotalVoided">₱0.00</div>
+                    </div>
                 </div>
             </div>
 
@@ -1649,18 +1666,33 @@
 
         <div id="members" class="content-section">
             <!-- Top-Level KPI Cards -->
-            <div class="financial-kpi-row">
-                <div class="financial-kpi-card" id="kpiActiveMembers" style="cursor: pointer;" onclick="window.toggleMemberAlertFilter('active')">
-                    <span class="label">Active Members</span>
-                    <span class="value" id="financialTotalActiveMembers">0</span>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" id="kpiActiveMembers" style="border-left: 4px solid #15803d; cursor: pointer;" onclick="window.toggleMemberAlertFilter('active')">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Active Members</div>
+                        <div class="equip-cat-count" id="financialTotalActiveMembers">0</div>
+                    </div>
                 </div>
-                <div class="financial-kpi-card" id="kpiExpiringSoon" style="cursor: pointer;" onclick="window.toggleMemberAlertFilter('expiringSoon')">
-                    <span class="label" style="color: #92400e;">Expiring Soon (&lt; 7d)</span>
-                    <span class="value" id="financialExpiringSoon">0</span>
+                <div class="equip-cat-card" id="kpiExpiringSoon" style="border-left: 4px solid #d97706; cursor: pointer;" onclick="window.toggleMemberAlertFilter('expiringSoon')">
+                    <div class="equip-cat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15);">
+                        <i class="fas fa-hourglass-half"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Expiring Soon (&lt; 7d)</div>
+                        <div class="equip-cat-count" id="financialExpiringSoon">0</div>
+                    </div>
                 </div>
-                <div class="financial-kpi-card" id="kpiNewMembers" style="cursor: pointer;" onclick="window.toggleMemberAlertFilter('newMembers')">
-                    <span class="label" style="color: #166534;">New Sign-ups (30d)</span>
-                    <span class="value" id="financialNewMembers">0</span>
+                <div class="equip-cat-card" id="kpiNewMembers" style="border-left: 4px solid #991b1b; cursor: pointer;" onclick="window.toggleMemberAlertFilter('newMembers')">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">New Sign-ups (30d)</div>
+                        <div class="equip-cat-count" id="financialNewMembers">0</div>
+                    </div>
                 </div>
             </div>
 
@@ -1801,18 +1833,33 @@
 
         <div id="staff" class="content-section">
             <!-- Top-Level KPI Cards -->
-            <div class="financial-kpi-row">
-                <div class="financial-kpi-card">
-                    <span class="label">Total Staff</span>
-                    <span class="value" id="staffTotalActive">0</span>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" style="border-left: 4px solid #991b1b;">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Total Staff</div>
+                        <div class="equip-cat-count" id="staffTotalActive">0</div>
+                    </div>
                 </div>
-                <div class="financial-kpi-card">
-                    <span class="label" style="color: #92400e;">On Shift</span>
-                    <span class="value" id="staffOnShift">0</span>
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fas fa-user-clock"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">On Shift</div>
+                        <div class="equip-cat-count" id="staffOnShift">0</div>
+                    </div>
                 </div>
-                <div class="financial-kpi-card">
-                    <span class="label" style="color: #991b1b;">On Leave</span>
-                    <span class="value" id="staffOnLeave">0</span>
+                <div class="equip-cat-card" style="border-left: 4px solid #d97706;">
+                    <div class="equip-cat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15);">
+                        <i class="fas fa-plane-departure"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">On Leave</div>
+                        <div class="equip-cat-count" id="staffOnLeave">0</div>
+                    </div>
                 </div>
             </div>
 
@@ -1898,18 +1945,33 @@
 
         <div id="trainers" class="content-section">
             <!-- Top-Level KPI Cards -->
-            <div class="financial-kpi-row">
-                <div class="financial-kpi-card">
-                    <span class="label">Total Trainers</span>
-                    <span class="value" id="trainerTotalActive">0</span>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" style="border-left: 4px solid #991b1b;">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fas fa-users-rectangle"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Total Trainers</div>
+                        <div class="equip-cat-count" id="trainerTotalActive">0</div>
+                    </div>
                 </div>
-                <div class="financial-kpi-card">
-                    <span class="label" style="color: #92400e;">On Floor</span>
-                    <span class="value" id="trainerOnFloor">0</span>
+                <div class="equip-cat-card" style="border-left: 4px solid #d97706;">
+                    <div class="equip-cat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15);">
+                        <i class="fas fa-person-running"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">On Floor</div>
+                        <div class="equip-cat-count" id="trainerOnFloor">0</div>
+                    </div>
                 </div>
-                <div class="financial-kpi-card">
-                    <span class="label" style="color: #166534;">Sessions Today</span>
-                    <span class="value" id="trainerSessionsToday">0</span>
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Sessions Today</div>
+                        <div class="equip-cat-count" id="trainerSessionsToday">0</div>
+                    </div>
                 </div>
             </div>
 
@@ -1997,37 +2059,41 @@
 
         <div id="bookings" class="content-section">
             <!-- KPI Ribbon -->
-            <div class="bk-kpi-ribbon">
-                <div class="bk-kpi-card">
-                    <div class="bk-kpi-icon" style="background: rgba(16, 185, 129, 0.1); color: #10B981;"><i
-                            class="fa-solid fa-calendar-day"></i></div>
-                    <div class="bk-kpi-info">
-                        <span class="bk-kpi-value" id="bkTodayCount">0</span>
-                        <span class="bk-kpi-label">Today's Sessions</span>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fa-solid fa-calendar-day"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Today's Sessions</div>
+                        <div class="equip-cat-count" id="bkTodayCount">0</div>
                     </div>
                 </div>
-                <div class="bk-kpi-card">
-                    <div class="bk-kpi-icon" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B;"><i
-                            class="fa-solid fa-hourglass-half"></i></div>
-                    <div class="bk-kpi-info">
-                        <span class="bk-kpi-value" id="bkPendingCount">0</span>
-                        <span class="bk-kpi-label">Pending Approval</span>
+                <div class="equip-cat-card" style="border-left: 4px solid #d97706;">
+                    <div class="equip-cat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15);">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Pending Approval</div>
+                        <div class="equip-cat-count" id="bkPendingCount">0</div>
                     </div>
                 </div>
-                <div class="bk-kpi-card">
-                    <div class="bk-kpi-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b;"><i
-                            class="fa-solid fa-user-slash"></i></div>
-                    <div class="bk-kpi-info">
-                        <span class="bk-kpi-value" id="bkNoShowWeek">0</span>
-                        <span class="bk-kpi-label">No-Shows (Week)</span>
+                <div class="equip-cat-card" style="border-left: 4px solid #6b7280;">
+                    <div class="equip-cat-icon" style="background: rgba(107, 114, 128, 0.1); color: #6b7280; border: 1px solid rgba(107, 114, 128, 0.15);">
+                        <i class="fa-solid fa-user-slash"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">No-Shows (Week)</div>
+                        <div class="equip-cat-count" id="bkNoShowWeek">0</div>
                     </div>
                 </div>
-                <div class="bk-kpi-card">
-                    <div class="bk-kpi-icon" style="background: rgba(153, 27, 27, 0.1); color: var(--primary-red);"><i
-                            class="fa-solid fa-chart-line"></i></div>
-                    <div class="bk-kpi-info">
-                        <span class="bk-kpi-value" id="bkTotalWeek">0</span>
-                        <span class="bk-kpi-label">This Week</span>
+                <div class="equip-cat-card" style="border-left: 4px solid #991b1b;">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">This Week</div>
+                        <div class="equip-cat-count" id="bkTotalWeek">0</div>
                     </div>
                 </div>
             </div>
@@ -2320,23 +2386,42 @@
             </div>
 
             <!-- Stat Cards -->
-            <div
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                <div class="grid-stat-box">
-                    <h3 id="actTodayLogs">0</h3>
-                    <p>Today's Actions</p>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fas fa-list-check"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Today's Actions</div>
+                        <div class="equip-cat-count" id="actTodayLogs">0</div>
+                    </div>
                 </div>
-                <div class="grid-stat-box">
-                    <h3 id="actCriticalToday" style="color: #991b1b;">0</h3>
-                    <p>Critical Today</p>
+                <div class="equip-cat-card" style="border-left: 4px solid #991b1b;">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fas fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Critical Today</div>
+                        <div class="equip-cat-count" id="actCriticalToday">0</div>
+                    </div>
                 </div>
-                <div class="grid-stat-box">
-                    <h3 id="actActiveUsersToday">0</h3>
-                    <p>Active Users Today</p>
+                <div class="equip-cat-card" style="border-left: 4px solid #d97706;">
+                    <div class="equip-cat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15);">
+                        <i class="fas fa-user-clock"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Active Users Today</div>
+                        <div class="equip-cat-count" id="actActiveUsersToday">0</div>
+                    </div>
                 </div>
-                <div class="grid-stat-box">
-                    <h3 id="actTopAction">-</h3>
-                    <p>Top Action Today</p>
+                <div class="equip-cat-card" style="border-left: 4px solid #6b7280;">
+                    <div class="equip-cat-icon" style="background: rgba(107, 114, 128, 0.1); color: #6b7280; border: 1px solid rgba(107, 114, 128, 0.15);">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Top Action Today</div>
+                        <div class="equip-cat-count" id="actTopAction" style="font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</div>
+                    </div>
                 </div>
             </div>
 
@@ -2425,27 +2510,39 @@
             </div>
 
             <!-- Top KPI Ribbon -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <!-- KPI 1: Real subscriber count -->
-                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm flex flex-col">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Active Subscribers</div>
-                    <div class="text-2xl font-bold text-slate-900" id="mpSubscriberCount">0</div>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" style="border-left: 4px solid #991b1b;">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Active Subscribers</div>
+                        <div class="equip-cat-count" id="mpSubscriberCount">0</div>
+                    </div>
                 </div>
-                <!-- KPI 2: Plan tier count -->
-                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm flex flex-col">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Active Plan Tiers</div>
-                    <div class="text-2xl font-bold text-slate-900" id="mpActivePlans">0</div>
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Active Plan Tiers</div>
+                        <div class="equip-cat-count" id="mpActivePlans">0</div>
+                    </div>
                 </div>
-                <!-- KPI 3: Most popular plan -->
-                <div class="bg-white border-solid border border-gray-200 p-5 rounded shadow-sm flex flex-col">
-                    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Most Popular Plan</div>
-                    <div class="text-2xl font-bold text-slate-900 truncate" id="mpTopPlan">—</div>
+                <div class="equip-cat-card" style="border-left: 4px solid #d97706;">
+                    <div class="equip-cat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15);">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Most Popular Plan</div>
+                        <div class="equip-cat-count" id="mpTopPlan" style="font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">—</div>
+                    </div>
                 </div>
             </div>
 
             <!-- Core Layout Shift -->
             <h3
-                class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-solid border-gray-200 pb-2">
+                class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">
                 Active Plan Configurations</h3>
 
             <div id="plansTableBody" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2473,21 +2570,33 @@
             </div>
 
             <!-- Locker Stats — Premium Ribbon -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                <!-- Occupancy Rate -->
-                <div class="grid-stat-box" style="cursor: default;">
-                    <p>Occupancy Rate</p>
-                    <h3 id="lockerOccupancyRate">0%</h3>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" style="border-left: 4px solid #991b1b;">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fas fa-percent"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Occupancy Rate</div>
+                        <div class="equip-cat-count" id="lockerOccupancyRate">0%</div>
+                    </div>
                 </div>
-                <!-- Available -->
-                <div class="grid-stat-box" style="cursor: default;">
-                    <p>Available</p>
-                    <h3 id="availableLockersCount" style="color: #10B981;">0</h3>
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fas fa-lock-open"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Available</div>
+                        <div class="equip-cat-count" id="availableLockersCount">0</div>
+                    </div>
                 </div>
-                <!-- Occupied -->
-                <div class="grid-stat-box" style="cursor: default;">
-                    <p>Occupied</p>
-                    <h3 id="occupiedLockersCount" style="color: #991b1b;">0</h3>
+                <div class="equip-cat-card" style="border-left: 4px solid #d97706;">
+                    <div class="equip-cat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15);">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Occupied</div>
+                        <div class="equip-cat-count" id="occupiedLockersCount">0</div>
+                    </div>
                 </div>
             </div>
 

@@ -120,7 +120,14 @@ window.openBookingDrawer = function () {
             members.filter(m => m.status !== 'Archived').map(m => `<option value="${m.id}">${m.uid ? m.uid + ' - ' : ''}${m.name || (m.givenName + ' ' + m.familyName)}</option>`).join('');
     }
     if (trainerSelect) {
-        const trainers = allUsers.filter(u => (u.role || '').toLowerCase() === 'trainer' && u.status !== 'Archived');
+        // Only Active trainers (or those without a status field) may be booked.
+        // Trainers On Leave or Suspended must not appear in the dropdown.
+        const BOOKABLE_STATUSES = ['Active', ''];
+        const trainers = allUsers.filter(u =>
+            (u.role || '').toLowerCase() === 'trainer' &&
+            u.status !== 'Archived' &&
+            (BOOKABLE_STATUSES.includes(u.status || 'Active') || !u.status)
+        );
         trainerSelect.innerHTML = '<option value="" disabled selected>Select Trainer...</option>' +
             trainers.map(t => `<option value="${t.id}">${t.uid ? t.uid + ' - ' : ''}${t.name || (t.givenName + ' ' + t.familyName)}</option>`).join('');
     }

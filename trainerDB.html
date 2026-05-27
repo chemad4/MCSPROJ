@@ -9,12 +9,11 @@
 
     <script>
         (function () {
-            const SESSION_MAX_MS = 12 * 60 * 60 * 1000;
+            const SESSION_MAX_MS = 24 * 60 * 60 * 1000;
             const loginAt = Number(localStorage.getItem("loginAt") || 0);
             const expired = loginAt && (Date.now() - loginAt > SESSION_MAX_MS);
             const role = (localStorage.getItem("userRole") || "").toLowerCase();
             if (!localStorage.getItem("loggedInUser") || role !== "trainer" || expired) {
-                if (expired) localStorage.clear();
                 window.location.replace("index.html");
             }
         })();
@@ -217,26 +216,39 @@
 
 
 
-            <div class="stat-cards">
-                <div class="stat-card card-black" id="closestBookingCard" style="cursor: default;">
-                    <i class="fa-solid fa-clock"></i>
-                    <div class="mp-stat-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;">Closest Booking</div>
-                    <div class="value" id="closestBookingValue">Checking...</div>
-                    <div id="closestBookingSub" style="font-size: 13px; color: var(--text-muted); margin-top: 5px;"></div>
-                </div>
-
-                <div class="stat-card card-black" style="cursor: default; position: relative; overflow: hidden;">
-                    <i class="fa-solid fa-person-walking-arrow-right"></i>
-                    <div class="mp-stat-label" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;">Floor Presence</div>
-                    <div class="value" style="display: flex; align-items: center; gap: 10px;">
-                        <span id="shiftStatusText">Checking...</span>
-                        <span class="shift-timer" style="font-size: 14px; font-weight: bold; background: white; color: black; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">--:--:--</span>
+            <div class="equip-category-summary">
+                <div class="equip-cat-card" id="closestBookingCard" style="border-left: 4px solid #991b1b;">
+                    <div class="equip-cat-icon" style="background: rgba(153, 27, 27, 0.1); color: #991b1b; border: 1px solid rgba(153, 27, 27, 0.15);">
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Closest Booking</div>
+                        <div class="equip-cat-count" id="closestBookingValue" style="font-size: 18px;">Checking...</div>
+                        <div id="closestBookingSub" style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-top: 2px;"></div>
                     </div>
                 </div>
 
-                <div class="stat-card card-red" onclick="switchTab('bookings')">
-                    <i class="fa-solid fa-calendar-day"></i>
-                    <div class="value">View Schedule</div>
+                <div class="equip-cat-card" style="border-left: 4px solid #15803d;">
+                    <div class="equip-cat-icon" style="background: rgba(34, 197, 94, 0.1); color: #15803d; border: 1px solid rgba(34, 197, 94, 0.15);">
+                        <i class="fa-solid fa-person-walking-arrow-right"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Floor Presence</div>
+                        <div class="equip-cat-count" style="font-size: 18px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <span id="shiftStatusText">Checking...</span>
+                            <span class="shift-timer" style="font-size: 13px; font-weight: 700; background: rgba(34, 197, 94, 0.1); color: #15803d; padding: 3px 10px; border-radius: 20px;">--:--:--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="equip-cat-card" style="border-left: 4px solid #d97706; cursor: pointer;" onclick="switchTab('bookings')">
+                    <div class="equip-cat-icon" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.15);">
+                        <i class="fa-solid fa-calendar-day"></i>
+                    </div>
+                    <div class="equip-cat-info">
+                        <div class="equip-cat-name">Schedule</div>
+                        <div class="equip-cat-count" style="font-size: 18px;">View Sessions</div>
+                    </div>
                 </div>
             </div>
 
