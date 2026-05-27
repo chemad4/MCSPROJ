@@ -369,6 +369,15 @@ if (currentUserId && currentSessionId) {
             const tNameEl = document.getElementById('topBarName');
             if (tNameEl) tNameEl.innerText = dbName.split(' ')[0];
 
+            const sNameEl = document.getElementById('sidebarUserName');
+            if (sNameEl) sNameEl.innerText = dbName;
+            
+            const sAvatarEl = document.getElementById('sidebarAvatar');
+            if (sAvatarEl) {
+                const initials = dbName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                sAvatarEl.innerText = initials || "U";
+            }
+
             const gTextEl = document.getElementById('greetingText');
             if (gTextEl) {
                 const hour = new Date().getHours();
@@ -376,7 +385,7 @@ if (currentUserId && currentSessionId) {
                 let greetingWord = "Good Morning";
                 if (hour >= 12 && hour < 18) greetingWord = "Good Afternoon";
                 else if (hour >= 18) greetingWord = "Good Evening";
-                gTextEl.innerHTML = `${greetingWord}, <span style="color: #ff5d4a; font-weight: 700;">${firstName}</span>.`;
+                gTextEl.innerHTML = `${greetingWord}, <span style="color: var(--primary-red); font-weight: 700;">${firstName}</span>.`;
             }
 
             // Fitness Goals input (member) — preserved from second listener
@@ -7835,7 +7844,7 @@ function initUI() {
         if (hour >= 12 && hour < 18) greetingWord = "Good Afternoon";
         else if (hour >= 18) greetingWord = "Good Evening";
 
-        greetingText.innerHTML = `${greetingWord}, <span style="color: #ff5d4a; font-weight: 700;">${firstName}</span>.`;
+        greetingText.innerHTML = `${greetingWord}, <span style="color: var(--primary-red); font-weight: 700;">${firstName}</span>.`;
     }
 
     // --- Topbar Name Initialization ---
@@ -7843,6 +7852,17 @@ function initUI() {
     if (topBarName) {
         const name = localStorage.getItem("loggedInUser") || "User";
         topBarName.innerText = name.split(' ')[0];
+    }
+    const sidebarUserName = document.getElementById('sidebarUserName');
+    if (sidebarUserName) {
+        const name = localStorage.getItem("loggedInUser") || "User";
+        sidebarUserName.innerText = name;
+    }
+    const sidebarAvatar = document.getElementById('sidebarAvatar');
+    if (sidebarAvatar) {
+        const name = localStorage.getItem("loggedInUser") || "User";
+        const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        sidebarAvatar.innerText = initials || "U";
     }
 
     // --- Real-time Session Sync ---

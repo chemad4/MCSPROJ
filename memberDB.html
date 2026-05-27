@@ -34,7 +34,7 @@
 <body class="member-page">
 
     <aside class="sidebar" aria-label="Primary navigation">
-        <div class="logo-area">FIT <span>TRACK</span></div>
+        <div class="brand" style="font-family: inherit; font-size: 18px; font-weight: 700; color: var(--text-primary); padding: 20px 16px 8px; letter-spacing: -0.02em;">FitTrack</div>
 
         <ul class="nav-menu" id="navMenu" role="list">
             <li class="nav-item active nav-clickable" onclick="switchTab('dashboard', this)" aria-current="page" tabindex="0">
@@ -53,6 +53,14 @@
                 <i class="fa-solid fa-comments" aria-hidden="true"></i> <span class="menu-text">Messages</span>
             </li>
         </ul>
+        <div class="sidebar-footer" onclick="openProfileSettingsModal()" style="margin-top: auto; padding: 12px; border-radius: 16px; background: rgba(0, 0, 0, 0.03); display: flex; align-items: center; gap: 10px; border: 0.5px solid rgba(0, 0, 0, 0.05); cursor: pointer; transition: background 0.2s; margin: 12px;">
+            <div class="avatar" id="sidebarAvatar" style="width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #f87171, var(--primary-red)); display: grid; place-items: center; color: white; font-weight: 600; font-size: 13px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);">AV</div>
+            <div class="user-meta" style="display: flex; flex-direction: column; line-height: 1.2;">
+                <span class="name" id="sidebarUserName" style="font-size: 13px; font-weight: 600; color: var(--text-primary); text-align: left;">Adrian V.</span>
+                <span class="role" style="font-size: 10px; color: var(--text-muted); font-family: 'Geist Mono', Monaco, monospace; letter-spacing: 0.04em;">GYM MEMBER</span>
+            </div>
+            <i class="fa-solid fa-ellipsis" style="margin-left: auto; color: var(--text-muted); font-size: 13px;"></i>
+        </div>
     </aside>
 
     <main class="main-content">
@@ -60,7 +68,7 @@
             <div class="topbar-left" style="display: flex; align-items: center; gap: 16px;">
                 <div class="topbar-greeting-wrapper" style="display: flex; flex-direction: column;">
                     <div class="topbar-greeting" id="greetingText" style="font-size: 15px; font-weight: 700; color: var(--text-primary); line-height: 1.2;">
-                        Good Morning, <span style="color: #ff5d4a;">XFit</span>.
+                        Good Morning, <span style="color: var(--primary-red);">XFit</span>.
                     </div>
                     <div class="topbar-subtext" id="liveClock" style="font-size: 10px; color: var(--text-muted); margin-top: 2px; font-family: 'Geist Mono', Monaco, Consolas, monospace; letter-spacing: 0.04em;">
                         Loading time...
@@ -72,28 +80,7 @@
                     <i id="darkModeIcon" class="fas fa-moon" aria-hidden="true"></i>
                 </button>
 
-                <div class="user-menu-container">
-                    <div class="user-profile-trigger" id="userMenuTrigger" role="button" tabindex="0" aria-haspopup="menu" aria-expanded="false" aria-controls="userDropdown">
-                        <div id="topBarNameContainer" class="topbar-user">
-                            <i class="fa-solid fa-circle-user topbar-user-avatar" aria-hidden="true"></i>
-                            <div class="topbar-user-stack">
-                                <span id="topBarName" class="topbar-user-name">Loading...</span>
-                                <span class="topbar-user-role">Gym Member</span>
-                            </div>
-                            <i class="fa-solid fa-chevron-down topbar-user-chevron" aria-hidden="true"></i>
-                        </div>
-                    </div>
 
-                    <div class="dropdown-menu" id="userDropdown" role="menu">
-                        <button class="dropdown-item-btn" onclick="openProfileSettingsModal()" role="menuitem">
-                            <i class="fas fa-user-gear" aria-hidden="true"></i> Profile Settings
-                        </button>
-                        <div class="dropdown-divider" role="separator"></div>
-                        <button class="dropdown-item-btn is-danger" onclick="handleLogout()" role="menuitem">
-                            <i class="fa-solid fa-power-off" aria-hidden="true"></i> Logout
-                        </button>
-                    </div>
-                </div>
             </div>
         </header>
 

@@ -97,6 +97,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <button type="button" class="btn-cancel" onclick="document.getElementById('profileSettingsModal').style.display='none'">Cancel</button>
                         <button type="submit" class="btn-submit" style="background-color: var(--dark-black);">Save Changes</button>
                     </div>
+                    <div style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; justify-content: center;">
+                        <button type="button" class="btn-cancel" onclick="handleLogout()" style="color: var(--primary-red); border: 1px solid rgba(153, 27, 27, 0.2); width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(153, 27, 27, 0.05); font-weight: 600;"><i class="fa-solid fa-power-off"></i> Log Out</button>
+                    </div>
                 </form>
             </div>
         `;
