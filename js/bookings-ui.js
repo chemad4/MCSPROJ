@@ -116,16 +116,24 @@ window.openBookingDrawer = function () {
     const allUsers = window.allUsersData || [];
 
     if (memberSelect) {
+        const activeMembers = members.filter(m => {
+            const isArchived = (m.status || "").toLowerCase() === 'archived';
+            const isSuspended = (m.status || "").toLowerCase() === 'suspended';
+            const isExpired = window.isMemberPlanExpired && window.isMemberPlanExpired(m);
+            return (m.status || 'Active') === 'Active' && !isArchived && !isSuspended && !isExpired;
+        });
         memberSelect.innerHTML = '<option value="" disabled selected>Select Member...</option>' +
-            members.filter(m => m.status !== 'Archived').map(m => `<option value="${m.id}">${m.uid ? m.uid + ' - ' : ''}${m.name || (m.givenName + ' ' + m.familyName)}</option>`).join('');
+            activeMembers.map(m => `<option value="${m.id}">${m.uid ? m.uid + ' - ' : ''}${m.name || (m.givenName + ' ' + m.familyName)}</option>`).join('');
     }
     if (trainerSelect) {
         // Only Active trainers (or those without a status field) may be booked.
         // Trainers On Leave or Suspended must not appear in the dropdown.
-        const BOOKABLE_STATUSES = ['Active', ''];
+        const BOOKABLE_STATUSES = ['Active'];
         const trainers = allUsers.filter(u =>
             (u.role || '').toLowerCase() === 'trainer' &&
             u.status !== 'Archived' &&
+            u.status !== 'Suspended' &&
+            u.status !== 'On Leave' &&
             (BOOKABLE_STATUSES.includes(u.status || 'Active') || !u.status)
         );
         trainerSelect.innerHTML = '<option value="" disabled selected>Select Trainer...</option>' +
@@ -844,6 +852,13 @@ window.executeManualBooking = async () => {
                 throw new Error("Trainer is not currently active. Please choose a different trainer.");
             }
             const mData = memberSnap.data();
+
+            if ((mData.status || 'Active') === 'Suspended') {
+                throw new Error("ACCESS_DENIED: Member account is suspended. Bookings are prohibited.");
+            }
+            if ((mData.status || 'Active') === 'Archived') {
+                throw new Error("ACCESS_DENIED: Member account is archived. Bookings are prohibited.");
+            }
 
             // Expiration Check
             if (window.isMemberPlanExpired && window.isMemberPlanExpired(mData)) {

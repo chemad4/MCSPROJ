@@ -1764,56 +1764,48 @@ body.dark-theme .notif-item {
     min-width: 0;
 }
 
-/* Icon plate — turn the first inline <i> into a premium gradient badge.
-   Zero-markup change: legacy <h3><i class="fa-..."></i> Title</h3> works as-is. */
+/* Clean inline icon styling without the heavy background/gradient/shadow badge "logo" */
 .modal-header h3 > i.fa-solid:first-child,
 .modal-header h3 > i.fas:first-child,
 .modal-header h3 > i.fa-regular:first-child,
 .modal-header h3 > i.far:first-child,
 .modal-header h3 > i.fa-brands:first-child {
-    flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: var(--modal-icon-plate-bg, linear-gradient(135deg, #fde68a, #fb923c, #f43f5e));
-    box-shadow: var(--modal-icon-plate-shadow,
-        inset 0 1px 0 rgba(255, 255, 255, 0.55),
-        0 6px 14px -6px rgba(244, 63, 94, 0.45));
-    color: #ffffff;
+    font-size: 20px;
+    color: var(--primary-red, #991b1b);
+    margin-right: 10px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
-    line-height: 1;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
-    transition: transform 220ms var(--ease-ios), box-shadow 220ms var(--ease-ios);
+    background: none;
+    box-shadow: none;
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    text-shadow: none;
+    transition: transform 220ms var(--ease-ios);
 }
 
 .modal-header h3:hover > i.fa-solid:first-child,
 .modal-header h3:hover > i.fas:first-child {
-    transform: scale(1.04) rotate(-2deg);
+    transform: scale(1.1);
 }
 
-/* Tone-tinted icon plates */
+/* Tone-tinted icon colors */
 .modal-content.tone-danger  .modal-header h3 > i:first-child,
 .modal.tone-danger          .modal-header h3 > i:first-child {
-    background: linear-gradient(135deg, #fecaca 0%, #ef4444 55%, #b91c1c 100%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px -6px rgba(239,68,68,0.55);
+    color: #ef4444;
 }
 .modal-content.tone-warning .modal-header h3 > i:first-child,
 .modal.tone-warning         .modal-header h3 > i:first-child {
-    background: linear-gradient(135deg, #fde68a 0%, #f59e0b 55%, #b45309 100%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px -6px rgba(245,158,11,0.55);
+    color: #f59e0b;
 }
 .modal-content.tone-success .modal-header h3 > i:first-child,
 .modal.tone-success         .modal-header h3 > i:first-child {
-    background: linear-gradient(135deg, #a7f3d0 0%, #10b981 55%, #047857 100%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px -6px rgba(16,185,129,0.55);
+    color: #10b981;
 }
 .modal-content.tone-info    .modal-header h3 > i:first-child,
 .modal.tone-info            .modal-header h3 > i:first-child {
-    background: linear-gradient(135deg, #bfdbfe 0%, #3b82f6 55%, #1d4ed8 100%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 6px 14px -6px rgba(59,130,246,0.55);
+    color: #3b82f6;
 }
 
 /* Refined close-btn — circle, tactile, theme-aware, rotates on hover.

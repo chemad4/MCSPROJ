@@ -265,7 +265,13 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
       const user = userSnap.data();
 
       if (user.status === "Archived") {
-        throw new Error("ACCESS_DENIED: Account is archived or suspended.");
+        throw new Error("ACCESS_DENIED: Account is archived.");
+      }
+      if (user.status === "Suspended") {
+        throw new Error("ACCESS_DENIED: Account is suspended.");
+      }
+      if (((user.role || "").toLowerCase() === "trainer" || (user.role || "").toLowerCase() === "staff" || (user.role || "").toLowerCase() === "admin") && (user.status || "Active") !== "Active") {
+        throw new Error(`ACCESS_DENIED: Shift check-in denied. Your account status is "${user.status || 'Active'}".`);
       }
 
       // Check membership expiration authoritatively.

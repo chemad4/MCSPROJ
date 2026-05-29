@@ -4962,7 +4962,12 @@ window.confirmRenewal = async function () {
         return showToast("Computed renewal price is ₱0 due to high proration. Contact an admin to adjust manually.", "error");
     }
 
-    showConfirm(`Charge ₱${finalDue.toLocaleString(undefined, { minimumFractionDigits: 2 })} for ${plan.name}${hasLocker ? ' + Locker' : ''}?`, async () => {
+    showConfirm({
+        title: 'Confirm Renewal Charge',
+        message: `Charge ₱${finalDue.toLocaleString(undefined, { minimumFractionDigits: 2 })} for ${plan.name}${hasLocker ? ' + Locker' : ''}?`,
+        tone: 'success',
+        confirmText: 'Charge',
+        onConfirm: async () => {
         try {
             // Capture payment method + GCash ref for renewal
             const renewPayMethod = window.__renewPaymentMethod || 'Cash';
@@ -5008,6 +5013,9 @@ window.confirmRenewal = async function () {
                     throw new Error("Selected plan is no longer active. Please pick a different plan.");
                 }
                 const mData = memberSnap.data();
+                if (mData.status === 'Archived') {
+                    throw new Error("ACCESS_DENIED: Cannot renew an archived member account.");
+                }
                 const planDbPrice = Number(planSnap.data().price || 0);
                 const planDbDays = Number(planSnap.data().duration || 30);
 
@@ -5088,6 +5096,7 @@ window.confirmRenewal = async function () {
         } catch (err) {
             console.error("Renewal failed:", err);
             showToast("Error renewing membership. Please try again.", "error");
+        }
         }
     });
 };
@@ -5738,8 +5747,9 @@ function populateAssignMemberSelect() {
     select.innerHTML = '<option value="" disabled selected>Search for a member...</option>';
     membersData.filter(m => {
         const isArchived = (m.status || "").toLowerCase() === 'archived';
+        const isSuspended = (m.status || "").toLowerCase() === 'suspended';
         const isExpired = window.isMemberPlanExpired && window.isMemberPlanExpired(m);
-        return !isArchived && !isExpired;
+        return !isArchived && !isSuspended && !isExpired && (m.status || 'Active') === 'Active';
     }).forEach(m => {
         const opt = document.createElement('option');
         opt.value = m.id;
@@ -5824,6 +5834,10 @@ if (document.getElementById('assignLockerForm')) {
 
                 if ((memberData.status || "").toLowerCase() === 'archived') {
                     throw new Error("Cannot assign locker to an archived member.");
+                }
+
+                if ((memberData.status || "").toLowerCase() === 'suspended') {
+                    throw new Error("Cannot assign locker to a suspended member.");
                 }
 
                 if (window.isMemberPlanExpired && window.isMemberPlanExpired(memberData)) {
@@ -5919,7 +5933,12 @@ window.releaseLocker = async function () {
     const locker = lockersData.find(l => l.id === lockerId);
     if (!locker) return;
 
-    showConfirm(`Confirm Locker Release & Key Return:\n\nHas the member emptied Locker #${locker.number} and returned the physical locker key to the front desk?`, async () => {
+    showConfirm({
+        title: 'Confirm Locker Release',
+        message: `Confirm Locker Release & Key Return:\n\nHas the member emptied Locker #${locker.number} and returned the physical locker key to the front desk?`,
+        tone: 'success',
+        confirmText: 'Confirm Release',
+        onConfirm: async () => {
         try {
             await runTransaction(db, async (transaction) => {
                 const lockerRef = doc(db, "lockers", lockerId);
@@ -5953,6 +5972,7 @@ window.releaseLocker = async function () {
         } catch (err) {
             console.error(err);
             showToast(err.message || "Failed to release locker.", "error");
+        }
         }
     });
 };
@@ -6923,6 +6943,135 @@ if (document.getElementById('editStaffForm')) {
                 }
             }
 
+            // Trainer status cascade: if a trainer is being moved Active → non-Active,
+            // surface upcoming bookings and offer to atomically cancel them.
+            const priorUser = (window.allUsersData || []).find(u => u.id === id) || {};
+            const isTrainer = (priorUser.role || '').toLowerCase() === 'trainer';
+            const priorStatus = priorUser.status || 'Active';
+            const newStatus = updatedData.status;
+            const statusBlocksBookings = newStatus && newStatus !== 'Active';
+            const transitioningFromActive = priorStatus === 'Active' && statusBlocksBookings;
+
+            if (isTrainer && transitioningFromActive) {
+                const todayIso = new Date().toISOString().slice(0, 10);
+                let affected = [];
+                try {
+                    const snap = await getDocs(query(
+                        collection(db, "bookings"),
+                        where("trainerId", "==", id),
+                        where("status", "in", ["Confirmed", "Pending"]),
+                        where("date", ">=", todayIso)
+                    ));
+                    affected = snap.docs
+                        .map(d => ({ id: d.id, ...d.data() }))
+                        .sort((a, b) => ((a.date || '') + (a.time || '')).localeCompare((b.date || '') + (b.time || '')));
+                } catch (qErr) {
+                    console.error("Affected-bookings query failed:", qErr);
+                    return showToast("Could not check this trainer's upcoming bookings. Please try again.", "error");
+                }
+
+                if (affected.length > 0) {
+                    const confirmedCount = affected.filter(b => b.status === 'Confirmed').length;
+                    const pendingCount = affected.filter(b => b.status === 'Pending').length;
+                    const preview = affected.slice(0, 5)
+                        .map(b => ` • ${b.date || '?'} ${b.time || ''} — ${b.memberName || 'Member'}`)
+                        .join('\n');
+                    const moreLine = affected.length > 5 ? `\n (+${affected.length - 5} more)` : '';
+                    const trainerName = `${updatedData.givenName} ${updatedData.familyName}`.trim();
+
+                    const message =
+                        `This trainer has ${affected.length} upcoming session(s) (${confirmedCount} Confirmed, ${pendingCount} Pending).\n` +
+                        `Marking them as "${newStatus}" will cancel these and refund credits:\n\n` +
+                        `${preview}${moreLine}`;
+
+                    showConfirm({
+                        title: `Trainer has ${affected.length} upcoming booking(s)`,
+                        message,
+                        tone: 'warning',
+                        confirmText: 'Cancel sessions & update',
+                        cancelText: 'Keep trainer Active',
+                        onConfirm: async () => {
+                            // Firestore tx cap is 500 writes; each booking can produce up to 4
+                            // writes (member refund + booking update + 2 slot lock deletes),
+                            // plus 1 for the trainer status update. Cap at 120 to stay safe.
+                            if (affected.length > 120) {
+                                return showToast("Too many upcoming bookings to cascade in one step. Please cancel some manually first.", "error");
+                            }
+
+                            const cancelledForChat = [];
+                            try {
+                                await runTransaction(db, async (tx) => {
+                                    const bookingRefs = affected.map(b => doc(db, "bookings", b.id));
+                                    const snaps = [];
+                                    for (const ref of bookingRefs) {
+                                        snaps.push(await tx.get(ref));
+                                    }
+                                    cancelledForChat.length = 0;
+                                    for (let i = 0; i < snaps.length; i++) {
+                                        const bSnap = snaps[i];
+                                        if (!bSnap.exists()) continue;
+                                        const bData = bSnap.data();
+                                        if (bData.status !== 'Confirmed' && bData.status !== 'Pending') continue;
+
+                                        const template = `Your session on ${bData.date} at ${bData.time} was cancelled because your trainer is now ${newStatus}. Please rebook with another trainer or contact the front desk.`;
+                                        const bookingRef = bookingRefs[i];
+
+                                        if (bookingHoldsCredit(bData) && bData.memberId) {
+                                            tx.update(doc(db, "users", bData.memberId), { sessionsRemaining: increment(1) });
+                                            tx.update(bookingRef, { status: "Cancelled", creditState: 'refunded', cancelRemarks: template });
+                                        } else {
+                                            tx.update(bookingRef, { status: "Cancelled", cancelRemarks: template });
+                                        }
+                                        if (bData.trainerId && bData.date && bData.time) {
+                                            tx.delete(doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
+                                        }
+                                        if (bData.memberId && bData.date && bData.time) {
+                                            tx.delete(doc(db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, bData.time)));
+                                        }
+                                        cancelledForChat.push({ ...bData, id: bSnap.id, template });
+                                    }
+                                    tx.update(doc(db, "users", id), updatedData);
+                                });
+                            } catch (txErr) {
+                                console.error("Trainer status cascade tx failed:", txErr);
+                                return showToast("Failed to cancel bookings and update trainer status. No changes made.", "error");
+                            }
+
+                            // Best-effort member chat notifications (non-critical).
+                            let chatFailures = 0;
+                            for (const b of cancelledForChat) {
+                                if (!b.memberName || !trainerName) continue;
+                                try {
+                                    await addDoc(messagesCol, {
+                                        sender: trainerName,
+                                        receiver: b.memberName,
+                                        text: b.template,
+                                        timestamp: Date.now()
+                                    });
+                                } catch (msgErr) {
+                                    chatFailures++;
+                                    console.error("Cascade chat message failed:", msgErr);
+                                }
+                            }
+
+                            window.closeModal('editStaffModal');
+                            if (chatFailures > 0) {
+                                showToast(`Trainer set to ${newStatus}; ${cancelledForChat.length} booking(s) cancelled. ${chatFailures} member notification(s) failed to send.`, "warning");
+                            } else {
+                                showToast(`Trainer set to ${newStatus}; ${cancelledForChat.length} booking(s) cancelled, credits refunded.`, "success");
+                            }
+                            if (window.logActivity) {
+                                window.logActivity(
+                                    "Trainer Status Change Cascaded",
+                                    `Trainer ${trainerName} → ${newStatus}. ${cancelledForChat.length} upcoming booking(s) auto-cancelled, credits refunded.`
+                                );
+                            }
+                        }
+                    });
+                    return;
+                }
+            }
+
             await updateDoc(doc(db, "users", id), updatedData);
             window.closeModal('editStaffModal');
             showToast(`Details updated successfully!`, "success");
@@ -6937,7 +7086,12 @@ if (document.getElementById('editStaffForm')) {
 window.archiveUser = async (id, currentStatus) => {
     const actionText = currentStatus === 'Archived' ? 'Restore' : 'Archive';
     const newStatus = currentStatus === 'Archived' ? 'Active' : 'Archived';
-    showConfirm(`Are you sure you want to ${actionText.toLowerCase()} this account?`, async () => {
+    showConfirm({
+        title: `${actionText} Account`,
+        message: `Are you sure you want to ${actionText.toLowerCase()} this account?`,
+        tone: actionText === 'Restore' ? 'success' : 'default',
+        confirmText: actionText,
+        onConfirm: async () => {
         try {
             // On archive, also clear member's locker pointer (prevents stale lockerId on unarchive)
             const userUpdates = { status: newStatus };
@@ -7006,6 +7160,7 @@ window.archiveUser = async (id, currentStatus) => {
         } catch (error) {
             console.error("Archive/restore failed:", error);
             showToast("Operation failed. Please try again.", "error");
+        }
         }
     });
 }
@@ -8770,7 +8925,12 @@ window.updateBookingStatus = async (id, newStatus) => {
         return;
     }
 
-    showConfirm(`Are you sure you want to mark this session as ${newStatus}?`, async () => {
+    showConfirm({
+        title: `Mark as ${newStatus}`,
+        message: `Are you sure you want to mark this session as ${newStatus}?`,
+        tone: 'success',
+        confirmText: newStatus,
+        onConfirm: async () => {
         try {
             await runTransaction(db, async (tx) => {
                 const bookingRef = doc(db, "bookings", id);
@@ -8814,6 +8974,7 @@ window.updateBookingStatus = async (id, newStatus) => {
 
         showToast(`Session marked as ${newStatus}.`, "success");
         if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}.`);
+        }
     });
 }
 
@@ -9423,6 +9584,12 @@ window.setupBookingModalListeners = () => {
                             throw new Error("Selected trainer no longer exists. Please pick a different trainer.");
                         }
                         const mDataRS = memberSnapRS.data();
+                        if ((mDataRS.status || 'Active') === 'Suspended') {
+                            throw new Error("ACCESS_DENIED: Your account is suspended. Rescheduling is prohibited.");
+                        }
+                        if ((mDataRS.status || 'Active') === 'Archived') {
+                            throw new Error("ACCESS_DENIED: Your account is archived. Rescheduling is prohibited.");
+                        }
                         const tDataRS = trainerSnapRS.data();
                         if ((tDataRS.role || '').toLowerCase() !== 'trainer') {
                             throw new Error("Selected user is no longer a trainer.");
@@ -9518,6 +9685,12 @@ window.setupBookingModalListeners = () => {
                         throw new Error("Selected trainer is no longer available. Please pick a different trainer.");
                     }
                     const mData = memberSnap.data();
+                    if ((mData.status || 'Active') === 'Suspended') {
+                        throw new Error("ACCESS_DENIED: Your account is suspended. Bookings are prohibited.");
+                    }
+                    if ((mData.status || 'Active') === 'Archived') {
+                        throw new Error("ACCESS_DENIED: Your account is archived. Bookings are prohibited.");
+                    }
 
                     // Atomic slot collision (closes pre-query race)
                     if (trainerSlotSnap.exists()) {
@@ -9591,8 +9764,17 @@ window.setupBookingModalListeners = () => {
 
 window.openBookingModal = () => {
     const memberSelect = document.getElementById('bookMember'), trainerSelect = document.getElementById('bookTrainer');
-    memberSelect.innerHTML = '<option value="" disabled selected>Select a Member...</option>' + membersData.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name || `${m.givenName || ''} ${m.familyName || ''}`.trim())}</option>`).join('');
-    const trainers = allUsersData.filter(u => (u.role || "").toLowerCase() === 'trainer');
+    const activeMembers = membersData.filter(m => {
+        const isArchived = (m.status || "").toLowerCase() === 'archived';
+        const isSuspended = (m.status || "").toLowerCase() === 'suspended';
+        const isExpired = window.isMemberPlanExpired && window.isMemberPlanExpired(m);
+        return (m.status || 'Active') === 'Active' && !isArchived && !isSuspended && !isExpired;
+    });
+    memberSelect.innerHTML = '<option value="" disabled selected>Select a Member...</option>' + activeMembers.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name || `${m.givenName || ''} ${m.familyName || ''}`.trim())}</option>`).join('');
+    const trainers = allUsersData.filter(u => 
+        (u.role || "").toLowerCase() === 'trainer' && 
+        (u.status || 'Active') === 'Active'
+    );
     trainerSelect.innerHTML = '<option value="" disabled selected>Select an Assigned Trainer...</option>' + trainers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name || `${t.givenName || ''} ${t.familyName || ''}`.trim())}</option>`).join('');
 
     document.getElementById('bookingForm').reset();
@@ -9672,6 +9854,12 @@ if (document.getElementById('bookingForm')) {
                     throw new Error("Member record does not exist.");
                 }
                 const mData = memberSnap.data();
+                if ((mData.status || 'Active') === 'Suspended') {
+                    throw new Error("ACCESS_DENIED: Member account is suspended. Bookings are prohibited.");
+                }
+                if ((mData.status || 'Active') === 'Archived') {
+                    throw new Error("ACCESS_DENIED: Member account is archived. Bookings are prohibited.");
+                }
 
                 if (trainerSlotSnap.exists()) {
                     throw new Error("This trainer is already booked within 1 hour of this time.");
@@ -10191,7 +10379,14 @@ window.applyBatchStatus = async function (type) {
     if (set.size === 0) return showToast("No items selected.", "error");
     if (!newStatus) return showToast("Please select a status.", "error");
 
-    showConfirm(`Update status to "${newStatus}" for ${set.size} items?`, async () => {
+    const positiveStatuses = ['Operational', 'Available', 'Active', 'Restocked'];
+    const batchTone = positiveStatuses.includes(newStatus) ? 'success' : 'warning';
+    showConfirm({
+        title: 'Apply Batch Status',
+        message: `Update status to "${newStatus}" for ${set.size} items?`,
+        tone: batchTone,
+        confirmText: 'Apply',
+        onConfirm: async () => {
         const batchPromises = Array.from(set).map(id => updateDoc(doc(db, "inventory", id), { status: newStatus }));
         await Promise.all(batchPromises);
         showToast(`Batch updated successfully!`, "success");
@@ -10199,6 +10394,7 @@ window.applyBatchStatus = async function (type) {
         set.clear();
         statusSelect.value = "";
         renderInventory();
+        }
     });
 };
 
@@ -10338,6 +10534,9 @@ if (document.getElementById('addCreditForm')) {
                 const memberSnap = await transaction.get(memberRef);
                 if (!memberSnap.exists()) {
                     throw new Error("Member record not found.");
+                }
+                if ((memberSnap.data().status || 'Active') === 'Archived') {
+                    throw new Error("ACCESS_DENIED: Cannot top up credit for an archived member.");
                 }
                 
                 const currentBalance = memberSnap.data().creditBalance || 0;
