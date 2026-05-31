@@ -215,6 +215,42 @@ window.showToast = function(message, type = 'info') {
     }, 4000);
 };
 
+// Operator alert for batch items expiring within 7 days.
+// Rendered as a persistent amber banner above the POS area (not a transient toast)
+// so the operator sees it even if they look away for a moment.
+window.showBatchExpiryWarning = function (productName, expiryDate, daysLeft) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const banner = document.createElement('div');
+    banner.className = 'toast toast-warning batch-expiry-alert';
+    banner.style.cssText = 'min-width:320px;background:var(--warning-bg,#fff3cd);border-left:4px solid #f59e0b;color:#92400e;';
+
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-clock toast-icon';
+    icon.style.color = '#f59e0b';
+
+    const msg = document.createElement('span');
+    msg.textContent = `Batch Expiry Alert: "${productName}" stock expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'} (${expiryDate}). Consider marking for promotion.`;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.onclick = () => banner.remove();
+
+    banner.appendChild(icon);
+    banner.appendChild(msg);
+    banner.appendChild(closeBtn);
+    container.appendChild(banner);
+
+    // Keep visible for 12 seconds — long enough for the operator to read it
+    setTimeout(() => banner.classList.add('toast-show'), 10);
+    setTimeout(() => {
+        banner.classList.remove('toast-show');
+        setTimeout(() => banner.remove(), 300);
+    }, 12000);
+};
+
 // Global showConfirm function.
 // Two call signatures are supported (backwards compatible):
 //   showConfirm("Message", onConfirm)
@@ -232,7 +268,8 @@ window.showConfirm = function(arg1, arg2) {
         confirmText = 'Confirm',
         cancelText = 'Cancel',
         icon = null,
-        onConfirm
+        onConfirm,
+        onCancel
     } = opts;
 
     const modal = document.getElementById('customConfirmModal');
@@ -282,7 +319,7 @@ window.showConfirm = function(arg1, arg2) {
         document.removeEventListener('keydown', onKey);
     };
 
-    cancelBtn.onclick = closeModal;
+    cancelBtn.onclick = () => { closeModal(); if (typeof onCancel === 'function') onCancel(); };
 
     okBtn.onclick = async () => {
         const originalText = okBtn.innerHTML;
@@ -308,7 +345,7 @@ window.showConfirm = function(arg1, arg2) {
 };
 
 // Global showPrompt function
-window.showPrompt = function({ title, message, placeholder, onConfirm }) {
+window.showPrompt = function({ title, message, placeholder, onConfirm, onCancel }) {
     const modal = document.getElementById('customPromptModal');
     if (!modal) return;
 
@@ -328,8 +365,8 @@ window.showPrompt = function({ title, message, placeholder, onConfirm }) {
         cancelBtn.onclick = null;
     };
 
-    cancelBtn.onclick = closeModal;
-    
+    cancelBtn.onclick = () => { closeModal(); if (typeof onCancel === 'function') onCancel(); };
+
     okBtn.onclick = async () => {
         const val = input.value.trim();
         if (!val) {

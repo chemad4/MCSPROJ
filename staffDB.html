@@ -2261,6 +2261,42 @@
         </div>
     </div>
 
+    <div id="rfidTxnConfirmModal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 420px; text-align: center;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-shield-halved"></i> Confirm RFID Payment</h3>
+            </div>
+            <div class="modal-body" style="padding: 28px 24px;">
+                <i class="fa-solid fa-circle-check" style="font-size: 38px; color: #16a34a; margin-bottom: 14px;"></i>
+                <p style="font-size: 14px; color: var(--text-muted); margin: 0 0 18px;">Please review the transaction details before confirming.</p>
+                <div style="background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; text-align: left; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 13px; color: var(--text-muted);">Member</span>
+                        <span id="rfidTxnConfirmMemberName" style="font-weight: 700; font-size: 14px;"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; align-items: flex-start;">
+                        <span style="font-size: 13px; color: var(--text-muted); flex-shrink: 0; margin-right: 10px;">Items</span>
+                        <span id="rfidTxnConfirmItems" style="font-size: 13px; text-align: right;"></span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                        <span style="font-size: 14px; font-weight: 600;">Amount to Deduct</span>
+                        <span id="rfidTxnConfirmAmount" style="font-size: 18px; font-weight: 800; color: var(--primary-red);"></span>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="rfidTxnCancelBtn" type="button"
+                        style="flex: 1; padding: 11px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color); font-weight: 600; cursor: pointer; font-size: 14px;">
+                        Cancel
+                    </button>
+                    <button id="rfidTxnConfirmBtn" type="button"
+                        style="flex: 2; padding: 11px; border-radius: 6px; border: none; background: #16a34a; color: #fff; font-weight: 700; cursor: pointer; font-size: 14px;">
+                        Confirm Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="rfidPaymentModal" class="modal">
         <div class="modal-content" style="max-width: 400px; text-align: center;">
             <div class="modal-header">

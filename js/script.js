@@ -8,6 +8,7 @@ import { initAttendance } from "./attendance.js";
 import { initRfid } from "./rfid.js";
 import { escapeHtml, formatCurrency } from "./utils.js";
 import { firebaseConfig } from "./firebase-config.js";
+import { checkoutBatches } from "./inventory-checkout.js";
 
 // Expose utilities globally for inline handlers & other scripts
 window.escapeHtml = escapeHtml;
@@ -66,6 +67,7 @@ async function syncServerTimeOffset() {
         console.warn('[TimeSync] Failed to fetch server date header, defaulting to local clock.', err);
     }
 }
+window.syncServerTimeOffset = syncServerTimeOffset;
 syncServerTimeOffset();
 setInterval(syncServerTimeOffset, 5 * 60 * 1000);
 
@@ -340,12 +342,15 @@ window.chooseImageUrl = function() {
         message: 'Paste the direct URL of the image:',
         placeholder: 'https://example.com/image.jpg',
         onConfirm: (url) => {
-            if (!url.startsWith('https://') && !url.startsWith('http://')) {
+            if (!url || (!url.startsWith('https://') && !url.startsWith('http://'))) {
                 return showToast('Please enter a valid URL starting with https://', 'error');
+            }
+            if (!window.isSafeImageSrc(url)) {
+                return showToast('URL scheme not allowed. Use a direct https:// image link.', 'error');
             }
             const preview = document.getElementById(currentImageTarget.preview);
             const urlInput = document.getElementById(currentImageTarget.url);
-            if (preview) preview.src = url;
+            if (preview) preview.src = window.escapeHtml(url);
             if (urlInput) urlInput.value = url;
         }
     });
@@ -1322,9 +1327,15 @@ window.submitMaintenanceLog = async function() {
     if (!maintenanceDate) return showToast("Please select a maintenance date.", "error");
     if (!currentLogbookEquipId) return;
 
+    // VULN-06: cap remark length to prevent Firestore document bloat
+    const remark = remarkInput ? remarkInput.value.trim() : '';
+    if (remark.length > 500) {
+        return showToast("Remark must be 500 characters or fewer.", "error");
+    }
+
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
     try {
-        await logMaintenanceEntry(currentLogbookEquipId, currentLogbookEquipName, maintenanceDate, remarkInput ? remarkInput.value.trim() : '');
+        await logMaintenanceEntry(currentLogbookEquipId, currentLogbookEquipName, maintenanceDate, remark);
         if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
         if (remarkInput) remarkInput.value = '';
         showToast("Maintenance entry saved.", "success");
@@ -1483,12 +1494,23 @@ if (currentUserId) {
         const recvQ    = query(messagesCol, where("receiver",   "==", myName),        orderBy("timestamp", "desc"), limit(30));
         const sentIdQ  = query(messagesCol, where("senderId",   "==", currentUserId), orderBy("timestamp", "desc"), limit(30));
         const recvIdQ  = query(messagesCol, where("receiverId", "==", currentUserId), orderBy("timestamp", "desc"), limit(30));
-        onSnapshot(sentQ,   _ingest, (err) => console.warn("[messages:sent] listener error", err));
-        onSnapshot(recvQ,   _ingest, (err) => console.warn("[messages:recv] listener error", err));
+        const _chatErrHandler = (err) => {
+            console.error("Messaging snapshot listener failed:", err);
+            if (err.message && err.message.includes("requires an index")) {
+                if (typeof showToast === 'function') showToast("Chat Index Required! Check your browser console log link to deploy.", "error");
+            }
+        };
+        onSnapshot(sentQ,   _ingest, _chatErrHandler);
+        onSnapshot(recvQ,   _ingest, _chatErrHandler);
         onSnapshot(sentIdQ, _ingest, (err) => console.warn("[messages:sentId] listener error", err));
         onSnapshot(recvIdQ, _ingest, (err) => console.warn("[messages:recvId] listener error", err));
     }
 }
+
+// Maps idSafeName → raw user name; populated in renderChatUserList so openChat
+// can retrieve the unescaped original without injecting it into onclick attributes.
+const _chatNameIndex = new Map();
+window._chatNameIndex = _chatNameIndex;
 
 function renderChatUserList() {
     const list = document.getElementById('chatUserList');
@@ -1530,14 +1552,17 @@ function renderChatUserList() {
     if (admins.length === 0 && targetUsers.length === 0) {
         html = `<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">No users found.</div>`;
     } else {
+        _chatNameIndex.clear();
         if (admins.length > 0) {
             html += `<div class="chat-category">Admins</div>`;
             admins.forEach(u => {
                 let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
                 let escapedName = escapeHtml(u.name);
-                let escapedNameClick = u.name.replace(/'/g, "\\'");
+                _chatNameIndex.set(idSafeName, u.name); // raw name for openChat lookup
+                // Pass idSafeName to openChat — it resolves the raw name from _chatNameIndex,
+                // keeping all special chars out of the inline event attribute entirely.
                 html += `
-                    <div class="chat-user chat-user-item" data-name="${escapedName.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${escapedNameClick}')">
+                    <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat(_chatNameIndex.get('${idSafeName}'))">
                         <div class="chat-avatar" style="background: var(--primary-red);">
                             <i class="fa-solid fa-crown" style="font-size: 14px;"></i>
                         </div>
@@ -1559,13 +1584,13 @@ function renderChatUserList() {
             targetUsers.forEach(u => {
                 let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
                 let escapedName = escapeHtml(u.name);
-                let escapedNameClick = u.name.replace(/'/g, "\\'");
+                _chatNameIndex.set(idSafeName, u.name); // raw name for openChat lookup
                 let avatarContent = `${escapedName.charAt(0).toUpperCase()}`;
                 if ((u.role || "").toLowerCase() === 'member') {
                     avatarContent = `<i class="fa-solid fa-user" style="font-size: 14px;"></i>`;
                 }
                 html += `
-                    <div class="chat-user chat-user-item" data-name="${escapedName.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${escapedNameClick}')">
+                    <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat(_chatNameIndex.get('${idSafeName}'))">
                         <div class="chat-avatar">${avatarContent}</div>
                         <div>
                             <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${escapedName}</div>
@@ -1632,7 +1657,10 @@ function renderChatHistory() {
 
 window.sendMessage = async function () {
     const input = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('chatSendBtn');
     const text = input.value.trim();
+    // VULN-14: always clear the input immediately so whitespace-only attempts don't persist in the box
+    input.value = '';
     if (!text || !currentChatUser) return;
     if (text.length > 2000) return showToast("Message too long (max 2000 characters).", "error");
 
@@ -1659,12 +1687,18 @@ window.sendMessage = async function () {
         return showToast("Cannot send messages to an archived account.", "error");
     }
 
+    input.disabled = true;
+    sendBtn.disabled = true;
+
     try {
         await addDoc(messagesCol, { sender: myName, receiver: currentChatUser, text: text, timestamp: new Date().getTime() });
         input.value = "";
     } catch (err) {
         console.error("sendMessage failed:", err);
-        showToast("Failed to send message.", "error");
+        showToast("Message failed to send: " + err.message, "error");
+    } finally {
+        input.disabled = false;
+        sendBtn.disabled = false;
     }
 }
 
@@ -1965,11 +1999,11 @@ function renderInventory() {
 
         let actionButtons = !isConsumable ? `
             <button type="button" class="btn-icon btn-edit" title="Edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
-            <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
+            <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}', this)"><i class="fas fa-trash"></i></button>
         ` : `
             <button type="button" class="btn-icon btn-restock" style="color: var(--accent-green);" title="Quick Restock" onclick="quickRestock('${item.id}')"><i class="fas fa-plus-circle"></i></button>
             <button type="button" class="btn-icon btn-edit" title="Edit" onclick="openEditProductModal('${item.id}')"><i class="fas fa-edit"></i></button>
-            <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
+            <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}', this)"><i class="fas fa-trash"></i></button>
         `;
 
         let stockLevelHtml = '';
@@ -2113,7 +2147,7 @@ function renderInventory() {
                 <td>
                     <div style="display:flex; gap:8px;">
                         <button type="button" class="btn-icon" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
-                        <button type="button" class="btn-icon" onclick="deleteInventoryItem('${item.id}')"><i class="fas fa-trash"></i></button>
+                        <button type="button" class="btn-icon" onclick="deleteInventoryItem('${item.id}', this)"><i class="fas fa-trash"></i></button>
                     </div>
                 </td>
             </tr>
@@ -2241,7 +2275,7 @@ window.openEquipmentModal = () => {
     window.handleEquipCategoryChange('equipCategory', 'equipQty');
 }
 window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
-window.deleteInventoryItem = async (id) => {
+window.deleteInventoryItem = async (id, btn) => {
     // S2 (Sprint 8): fast-fail RBAC — admin/staff only. The UI gates this button,
     // but the function was console-callable by trainer/member roles.
     const _r = (localStorage.getItem("userRole") || '').toLowerCase();
@@ -2253,16 +2287,25 @@ window.deleteInventoryItem = async (id) => {
     const msg = inCart
         ? `Delete this inventory item? It is currently in the open POS cart and will be removed from it.`
         : "Delete this inventory item?";
-    showConfirm(msg, async () => {
-        await deleteDoc(doc(db, "inventory", id));
-        // Sweep any open cart so checkout doesn't fail mid-transaction on a missing item
-        if (Array.isArray(window.posCart)) {
-            window.posCart = window.posCart.filter(c => c.id !== id);
-            if (typeof renderCart === 'function') renderCart();
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
+    showConfirm({ message: msg, onCancel: _rearmBtn, onConfirm: async () => {
+        try {
+            await deleteDoc(doc(db, "inventory", id));
+            if (Array.isArray(window.posCart)) {
+                window.posCart = window.posCart.filter(c => c.id !== id);
+                if (typeof renderCart === 'function') renderCart();
+            }
+            showToast("Item deleted.", "info");
+            if (window.logActivity) window.logActivity("Item Deleted", `Deleted inventory item: ${item ? item.name : id}`);
+        } catch (err) {
+            console.error(err);
+            showToast("Failed to delete item.", "error");
+        } finally {
+            _rearmBtn();
         }
-        showToast("Item deleted.", "info");
-        if (window.logActivity) window.logActivity("Item Deleted", `Deleted inventory item: ${item ? item.name : id}`);
-    });
+    }});
 }
 
 window.openEditEquipModal = function (id) {
@@ -2316,6 +2359,12 @@ if (document.getElementById('editEquipForm')) {
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
                 return;
             }
+            // VULN-05: cap name length to prevent layout bombs and potential innerHTML injection
+            if (nameStr.length > 120) {
+                showToast("Equipment name must be 120 characters or fewer.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
 
             const qtyVal = parseInt(document.getElementById('editEquipQty').value, 10);
             if (isNaN(qtyVal) || qtyVal < 0) {
@@ -2325,6 +2374,12 @@ if (document.getElementById('editEquipForm')) {
             }
 
             const assetTagVal = document.getElementById('editEquipAssetTag').value.trim();
+            // VULN-11: empty/whitespace tag already normalizes to "" — enforce length cap too
+            if (assetTagVal && assetTagVal.length > 50) {
+                showToast("Asset tag must be 50 characters or fewer.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
             if (assetTagVal && inventoryData.some(i => i.id !== id && i.assetTag && i.assetTag.toLowerCase() === assetTagVal.toLowerCase())) {
                 showToast("Asset tag must be unique! This tag is already assigned to another item.", "error");
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
@@ -2422,6 +2477,12 @@ if (document.getElementById('editProductForm')) {
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
                 return;
             }
+            // VULN-05: cap product name length
+            if (nameStr.length > 120) {
+                showToast("Product name must be 120 characters or fewer.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
 
             const priceVal = Number(document.getElementById('editProdPrice').value);
             if (isNaN(priceVal) || priceVal <= 0) {
@@ -2495,6 +2556,12 @@ async function handleInventorySubmit(e, isProduct) {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
             return;
         }
+        // VULN-05: cap name length
+        if (nameStr.length > 120) {
+            showToast("Item name must be 120 characters or fewer.", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
 
         const addQty = parseInt(document.getElementById(isProduct ? 'prodQty' : 'equipQty').value, 10);
         if (isNaN(addQty) || addQty < 0) {
@@ -2505,6 +2572,12 @@ async function handleInventorySubmit(e, isProduct) {
 
         if (!isProduct) {
             const assetTagVal = document.getElementById('equipAssetTag').value.trim();
+            // VULN-11: enforce length cap on new asset tags
+            if (assetTagVal && assetTagVal.length > 50) {
+                showToast("Asset tag must be 50 characters or fewer.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
             if (assetTagVal && inventoryData.some(i => i.assetTag && i.assetTag.toLowerCase() === assetTagVal.toLowerCase())) {
                 showToast("Asset tag must be unique! This tag is already assigned to another item.", "error");
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
@@ -3095,6 +3168,7 @@ window.processPaymentConfirmed = async function () {
             const modal = document.getElementById('rfidPaymentModal');
             const input = document.getElementById('posRfidInput');
             const statusEl = document.getElementById('rfidPaymentStatus');
+            const closeBtn = modal ? modal.querySelector('.close-btn') : null;
 
             // Set dynamic price label based on current cart estimation
             let subtotalEstimate = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -3106,6 +3180,7 @@ window.processPaymentConfirmed = async function () {
             setTimeout(() => input.focus(), 100);
 
             const rfidData = await new Promise(resolve => {
+                let lastVal = '';
                 const handleClose = () => {
                     clearInterval(checkInterval);
                     clearTimeout(timeoutId);
@@ -3113,13 +3188,13 @@ window.processPaymentConfirmed = async function () {
                     delete window.selectMemberForPayment;
                     resolve(null);
                 };
-                closeBtn.addEventListener('click', handleClose, { once: true });
+                if (closeBtn) closeBtn.addEventListener('click', handleClose, { once: true });
 
                 const timeoutId = setTimeout(() => {
                     showToast("RFID scan timed out.", "info");
                     modal.style.display = 'none';
                     clearInterval(checkInterval);
-                    closeBtn.removeEventListener('click', handleClose);
+                    if (closeBtn) closeBtn.removeEventListener('click', handleClose);
                     input.removeEventListener('input', inputHandler);
                     delete window.selectMemberForPayment;
                     resolve(null);
@@ -3164,7 +3239,7 @@ window.processPaymentConfirmed = async function () {
                     document.getElementById('posRfidSearchDropdown').style.display = 'none';
                     clearTimeout(timeoutId);
                     clearInterval(checkInterval);
-                    closeBtn.removeEventListener('click', handleClose);
+                    if (closeBtn) closeBtn.removeEventListener('click', handleClose);
                     input.removeEventListener('input', inputHandler);
                     delete window.selectMemberForPayment;
                     resolve({ id, rfid, name });
@@ -3174,7 +3249,7 @@ window.processPaymentConfirmed = async function () {
                     if (modal.style.display === 'none') {
                         clearTimeout(timeoutId);
                         clearInterval(checkInterval);
-                        closeBtn.removeEventListener('click', handleClose);
+                        if (closeBtn) closeBtn.removeEventListener('click', handleClose);
                         input.removeEventListener('input', inputHandler);
                         delete window.selectMemberForPayment;
                         resolve(null);
@@ -3186,7 +3261,7 @@ window.processPaymentConfirmed = async function () {
                         if (memberMatch) {
                             clearTimeout(timeoutId);
                             clearInterval(checkInterval);
-                            closeBtn.removeEventListener('click', handleClose);
+                            if (closeBtn) closeBtn.removeEventListener('click', handleClose);
                             input.removeEventListener('input', inputHandler);
                             delete window.selectMemberForPayment;
                             resolve({ id: memberMatch.id, rfid: memberMatch.rfid, name: memberMatch.name || (memberMatch.givenName + ' ' + memberMatch.familyName) });
@@ -3205,6 +3280,53 @@ window.processPaymentConfirmed = async function () {
             memberIdForCredit = rfidData.id;
             customerName = rfidData.name;
             if (customerNameInput) customerNameInput.value = customerName;
+
+            // Close the scan modal before showing the confirmation step
+            closeModal('rfidPaymentModal');
+
+            // Compute estimate for display (authoritative total is re-computed server-side inside the txn)
+            const estimatedTotal = posCart.reduce((sum, item) => sum + (Number(item.price || 0) * Number(item.qty || 0)), 0);
+            const itemsSummary = posCart.map(i => `${i.qty}× ${i.name}`).join(', ');
+
+            const confirmed = await new Promise(resolve => {
+                const modal = document.getElementById('rfidTxnConfirmModal');
+                if (!modal) { resolve(true); return; }
+
+                document.getElementById('rfidTxnConfirmMemberName').textContent = customerName;
+                document.getElementById('rfidTxnConfirmItems').textContent = itemsSummary;
+                document.getElementById('rfidTxnConfirmAmount').textContent = `₱${estimatedTotal.toFixed(2)}`;
+
+                const confirmBtn = document.getElementById('rfidTxnConfirmBtn');
+                const cancelBtn = document.getElementById('rfidTxnCancelBtn');
+
+                const cleanup = () => {
+                    modal.style.display = 'none';
+                    confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+                    cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                };
+
+                // Re-query after cloneNode
+                modal.querySelector('#rfidTxnConfirmBtn').addEventListener('click', () => {
+                    const btn = modal.querySelector('#rfidTxnConfirmBtn');
+                    btn.disabled = true;
+                    btn.textContent = 'Processing...';
+                    modal.style.display = 'none';
+                    resolve(true);
+                }, { once: true });
+
+                modal.querySelector('#rfidTxnCancelBtn').addEventListener('click', () => {
+                    cleanup();
+                    resolve(false);
+                }, { once: true });
+
+                modal.style.display = 'flex';
+            });
+
+            if (!confirmed) {
+                showToast("Transaction canceled.", "info");
+                resetProcessingState();
+                return;
+            }
         }
 
         const walkinItem = posCart.find((x) => x.id === "WALKIN" || x.isPlan);
@@ -3282,6 +3404,24 @@ window.processPaymentConfirmed = async function () {
             }
         }
 
+        // ── Batch-tracked item checkout (FEFO, runs its own Firestore transaction) ──
+        // Items marked isBatchTracked:true in the inventory doc are deducted from
+        // their batches subcollection by checkoutBatches(). We run this BEFORE the
+        // main payment transaction so the batch writes are already committed when
+        // the payment record is created.  If checkoutBatches throws, the entire
+        // checkout aborts before any payment doc is written.
+        const batchCheckoutResults = []; // { cartItem, result } per batch-tracked item
+        for (const cartItem of posCart) {
+            if (cartItem.id === 'WALKIN' || cartItem.isPlan) continue;
+            const invObj = inventoryData.find(i => i.id === cartItem.id);
+            if (!invObj || !invObj.isBatchTracked) continue;
+            const result = await checkoutBatches(db, cartItem.id, cartItem.qty);
+            if (!result.success) {
+                throw new Error(`Batch stock error for "${cartItem.name}": ${result.message}`);
+            }
+            batchCheckoutResults.push({ cartItem, result });
+        }
+
         const transactionResult = await runTransaction(db, async (transaction) => {
             // C4: reserve GCash ref atomically (must be done before any writes)
             if (selectedPaymentMethod === 'GCash' && posGcashRef) {
@@ -3323,27 +3463,33 @@ window.processPaymentConfirmed = async function () {
                 if (!snap.exists()) {
                     throw new Error(`Product "${cartItem.name}" no longer exists in inventory.`);
                 }
-                const dbQty = snap.data().qty || 0;
-                if (dbQty < cartItem.qty) {
-                    throw new Error(`Insufficient stock for "${cartItem.name}"! Real-time Stock: ${dbQty}, Requested: ${cartItem.qty}`);
-                }
-                
-                // Authoritative Database Expiration Check
-                const dbExpiry = snap.data().expiry;
-                if (dbExpiry) {
-                    const dbExpDate = new Date(dbExpiry + 'T00:00:00');
-                    const dbToday = new Date(Date.now() + (window.serverTimeOffsetMs || 0));
-                    dbToday.setHours(0, 0, 0, 0);
-                    if (!isNaN(dbExpDate.getTime()) && dbExpDate < dbToday) {
-                        throw new Error(`Product "${cartItem.name}" has expired (Expiry: ${dbExpiry}) and cannot be sold.`);
+
+                const isBatchItem = !!snap.data().isBatchTracked;
+
+                if (!isBatchItem) {
+                    const dbQty = snap.data().qty || 0;
+                    if (dbQty < cartItem.qty) {
+                        throw new Error(`Insufficient stock for "${cartItem.name}"! Real-time Stock: ${dbQty}, Requested: ${cartItem.qty}`);
+                    }
+
+                    // Authoritative Database Expiration Check (flat-qty items only)
+                    const dbExpiry = snap.data().expiry;
+                    if (dbExpiry) {
+                        const dbExpDate = new Date(dbExpiry + 'T00:00:00');
+                        const dbToday = new Date(Date.now() + (window.serverTimeOffsetMs || 0));
+                        dbToday.setHours(0, 0, 0, 0);
+                        if (!isNaN(dbExpDate.getTime()) && dbExpDate < dbToday) {
+                            throw new Error(`Product "${cartItem.name}" has expired (Expiry: ${dbExpiry}) and cannot be sold.`);
+                        }
                     }
                 }
-                
+                // Batch-tracked: expiry enforced per-batch inside checkoutBatches()
+
                 const dbPrice = Number(snap.data().price || 0);
                 if (isNaN(dbPrice) || dbPrice <= 0) {
                     throw new Error(`Product "${cartItem.name}" has an invalid price (₱${dbPrice}) in the database.`);
                 }
-                
+
                 computedSubtotal += dbPrice * cartItem.qty;
                 // Force client-side record to match absolute database truth
                 cartItem.price = dbPrice;
@@ -3409,13 +3555,15 @@ window.processPaymentConfirmed = async function () {
                 });
             }
 
-            // 4. Update inventory stock quantities
+            // 4. Update inventory stock quantities (flat-qty items only)
             for (let i = 0; i < inventorySnaps.length; i++) {
                 const snap = inventorySnaps[i];
                 const itemRef = inventoryDocRefs[i].ref;
                 const cartItem = inventoryDocRefs[i].cartItem;
-                const currentQty = snap.data().qty || 0;
 
+                if (snap.data().isBatchTracked) continue; // already deducted by checkoutBatches()
+
+                const currentQty = snap.data().qty || 0;
                 transaction.update(itemRef, { qty: currentQty - cartItem.qty });
 
                 const movementRef = doc(collection(db, "stockMovements"));
@@ -3431,6 +3579,28 @@ window.processPaymentConfirmed = async function () {
                     time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
                     timestamp: now.getTime()
                 });
+            }
+
+            // 4b. Ledger entries for batch-tracked deductions (qty already committed by checkoutBatches).
+            // One stockMovements doc per batch touched so the ledger shows per-batch traceability.
+            for (const { cartItem, result } of batchCheckoutResults) {
+                for (const deduction of result.deductions) {
+                    const movementRef = doc(collection(db, "stockMovements"));
+                    const now = new Date();
+                    transaction.set(movementRef, {
+                        productId: cartItem.id,
+                        productName: cartItem.name,
+                        batchId: deduction.batchId,
+                        batchExpiryDate: deduction.expiryDate,
+                        changeAmount: -deduction.deducted,
+                        reason: `POS Sale – Batch (${selectedPaymentMethod})`,
+                        userId: localStorage.getItem("userId") || "System",
+                        userName: localStorage.getItem("loggedInUser") || "Unknown",
+                        date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                        time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                        timestamp: now.getTime()
+                    });
+                }
             }
 
             // 5. Save payment document
@@ -3525,6 +3695,19 @@ window.processPaymentConfirmed = async function () {
 
         showToast("Payment Processed Successfully!", "success");
 
+        // Expiry warning: if any batch item sold today expires within 7 days,
+        // flash a persistent operator alert so staff can act (e.g. mark as promo).
+        for (const { cartItem, result } of batchCheckoutResults) {
+            if (result.expiryWarning && result.warningBatch) {
+                const wb = result.warningBatch;
+                const todayWarn = new Date(Date.now() + (window.serverTimeOffsetMs || 0));
+                todayWarn.setHours(0, 0, 0, 0);
+                const expDate = new Date(wb.expiryDate + 'T00:00:00');
+                const daysLeft = Math.ceil((expDate.getTime() - todayWarn.getTime()) / (1000 * 60 * 60 * 24));
+                showBatchExpiryWarning(cartItem.name, wb.expiryDate, daysLeft);
+            }
+        }
+
         posCart = [];
         renderCart();
         if (customerNameInput) customerNameInput.value = '';
@@ -3533,7 +3716,11 @@ window.processPaymentConfirmed = async function () {
 
     } catch (e) {
         console.error("Checkout transaction failed: ", e);
-        showToast(e.message || "Checkout failed. Please try again.", "error");
+        if (selectedPaymentMethod === 'RFID' && memberIdForCredit) {
+            showToast(e.message || "Transaction failed. Please try tapping again.", "warning");
+        } else {
+            showToast(e.message || "Checkout failed. Please try again.", "error");
+        }
     } finally {
         resetProcessingState();
     }
@@ -4158,8 +4345,8 @@ function renderPayments() {
                     <div class="kebab-item" onclick="viewInvoice('${t.id}')"><i class="fas fa-file-invoice"></i> View Invoice</div>
                     <div class="kebab-item" onclick="printReceipt('${t.id}')"><i class="fas fa-print"></i> Print Receipt</div>
                     ${!isVoided ? `
-                        <div class="kebab-item" onclick="processRefund('${t.id}')"><i class="fas fa-undo"></i> Process Refund</div>
-                        <div class="kebab-item" style="color: #991b1b;" onclick="voidTransaction('${t.id}')"><i class="fas fa-ban"></i> Void Transaction</div>
+                        <div class="kebab-item" onclick="processRefund('${t.id}', this)"><i class="fas fa-undo"></i> Process Refund</div>
+                        <div class="kebab-item" style="color: #991b1b;" onclick="voidTransaction('${t.id}', false, this)"><i class="fas fa-ban"></i> Void Transaction</div>
                     ` : ''}
                 </div>
             </div>
@@ -4266,7 +4453,7 @@ window.viewInvoice = function (id) {
 };
 
 window.printReceipt = function (id) { window.viewInvoice(id); setTimeout(() => window.print(), 500); };
-window.processRefund = function (id) { window.voidTransaction(id, true); };
+window.processRefund = function (id, btn) { window.voidTransaction(id, true, btn); };
 
 window.filterPayments = function () {
     paymentCurrentPage = 1;
@@ -4477,12 +4664,12 @@ window.clearFinDateRange = function () {
 };
 
 // Void Transaction & Restock Inventory (also handles Refunds)
-window.voidTransaction = async function (id, isRefund = false) {
+window.voidTransaction = async function (id, isRefund = false, btn) {
     if (window.isPOSProcessingVoid === id) return;
-    
+
     const tx = paymentsData.find(p => p.id === id);
     if (!tx) return;
-    if (tx.status === "Voided") return showToast("This transaction is already voided.", "error");
+    if (tx.status === "Voided" || tx.status === "Refunded") return showToast(`This transaction has already been ${tx.status.toLowerCase()}.`, "error");
 
     const actionName = isRefund ? "REFUND" : "VOID";
 
@@ -4491,19 +4678,39 @@ window.voidTransaction = async function (id, isRefund = false) {
         return showToast(`Action Denied: Only Administrators can perform a ${actionName.toLowerCase()}.`, "error");
     }
 
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    const _rearmBtn = () => {
+        if (btn) {
+            btn.disabled = false;
+            btn.style.pointerEvents = '';
+            btn.innerHTML = _origBtnHtml;
+        }
+    };
+    // ANTI-DUPLICATE LOCK: disable immediately on first click
+    if (btn) {
+        btn.disabled = true;
+        btn.style.pointerEvents = 'none';
+        btn.innerHTML = isRefund
+            ? '<i class="fas fa-spinner fa-spin"></i> Processing Refund...'
+            : '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    }
+
     showPrompt({
         title: `${actionName} Transaction`,
         message: `Please enter a reason for this ${actionName.toLowerCase()} — required for the audit trail:`,
         placeholder: 'e.g. Incorrect order, customer request...',
+        onCancel: _rearmBtn,
         onConfirm: (cancelRemarks) => {
             const remarksClean = (cancelRemarks || '').trim();
             if (!remarksClean) {
+                _rearmBtn();
                 return showToast(`Reason is required to ${actionName.toLowerCase()} a transaction.`, "error");
             }
             if (remarksClean.length < 4) {
+                _rearmBtn();
                 return showToast(`Please provide a more descriptive reason (at least 4 characters).`, "error");
             }
-            showConfirm(`Are you sure you want to ${actionName} this transaction? This will void the transaction, return purchased items to inventory, and refund credit if applicable.`, async () => {
+            showConfirm({ message: `Are you sure you want to ${actionName} this transaction? This will void the transaction, return purchased items to inventory, and refund credit if applicable.`, onCancel: _rearmBtn, onConfirm: async () => {
                 if (window.isPOSProcessingVoid === id) return;
                 window.isPOSProcessingVoid = id;
                 
@@ -4554,8 +4761,8 @@ window.voidTransaction = async function (id, isRefund = false) {
                         }
                         
                         const paymentDbData = paymentSnap.data();
-                        if (paymentDbData.status === "Voided") {
-                            throw new Error("This transaction has already been voided.");
+                        if (paymentDbData.status === "Voided" || paymentDbData.status === "Refunded") {
+                            throw new Error(`This transaction has already been ${(paymentDbData.status || "voided").toLowerCase()}.`);
                         }
                         
                         // 1. Process inventory restocking
@@ -4649,9 +4856,12 @@ window.voidTransaction = async function (id, isRefund = false) {
                                 const memberRef = doc(db, "users", memberId);
                                 const memberSnap = await transaction.get(memberRef);
                                 if (memberSnap.exists()) {
-                                    const currentBalance = memberSnap.data().creditBalance || 0;
+                                    // DATA-TYPE SANITIZATION: explicit Number() cast prevents string concatenation
+                                    const currentBalance = Number(memberSnap.data().creditBalance || 0);
+                                    const refundAmount = Number(paymentDbData.amount || 0);
+                                    const newBalance = currentBalance + refundAmount;
                                     transaction.update(memberRef, {
-                                        creditBalance: currentBalance + paymentDbData.amount
+                                        creditBalance: newBalance
                                     });
                                     
                                     const creditTxRef = doc(collection(db, "creditTransactions"));
@@ -4659,9 +4869,9 @@ window.voidTransaction = async function (id, isRefund = false) {
                                         memberId: memberId,
                                         memberName: memberName || "Member",
                                         type: "refund",
-                                        amount: paymentDbData.amount,
+                                        amount: refundAmount,
                                         balanceBefore: currentBalance,
-                                        balanceAfter: currentBalance + paymentDbData.amount,
+                                        balanceAfter: newBalance,
                                         note: `Refunded POS Transaction: ${id}`,
                                         processedBy: localStorage.getItem("userId") || "System",
                                         timestamp: Date.now()
@@ -4707,8 +4917,8 @@ window.voidTransaction = async function (id, isRefund = false) {
                             }
                         }
 
-                        // 3. Mark transaction as Voided
-                        const voidUpdate = { status: "Voided" };
+                        // 3. Mark transaction as Voided or Refunded (ATOMIC: inside runTransaction)
+                        const voidUpdate = { status: isRefund ? "Refunded" : "Voided" };
                         if (cancelRemarks.trim()) voidUpdate.cancelRemarks = cancelRemarks.trim();
                         voidUpdate.voidedAt = Date.now();
                         voidUpdate.voidedBy = localStorage.getItem("userId") || "";
@@ -4723,8 +4933,9 @@ window.voidTransaction = async function (id, isRefund = false) {
                     showToast(e.message || `Error ${actionName === "REFUND" ? "refunding" : "voiding"} transaction.`, "error");
                 } finally {
                     delete window.isPOSProcessingVoid;
+                    _rearmBtn();
                 }
-            });
+            }});
         }
     });
 };
@@ -5297,7 +5508,7 @@ window.renewMember = async (id) => {
 };
 
 // Confirm Renewal action
-window.confirmRenewal = async function () {
+window.confirmRenewal = async function (btn) {
     const id = document.getElementById('renewMemberId').value;
     const select = document.getElementById('renewPlanSelect');
     const selectedPlanId = select.value;
@@ -5308,6 +5519,9 @@ window.confirmRenewal = async function () {
 
     const member = membersData.find(m => m.id === id);
     if (!member) return showToast("Member not found.", "error");
+
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...'; }
 
     // Recalculate exact total (NaN-guard against bad plan price data)
     let basePrice = Number(plan.price);
@@ -5334,11 +5548,13 @@ window.confirmRenewal = async function () {
         return showToast("Computed renewal price is ₱0 due to high proration. Contact an admin to adjust manually.", "error");
     }
 
+    const _rearmRenewBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
     showConfirm({
         title: 'Confirm Renewal Charge',
         message: `Charge ₱${finalDue.toLocaleString(undefined, { minimumFractionDigits: 2 })} for ${plan.name}${hasLocker ? ' + Locker' : ''}?`,
         tone: 'success',
         confirmText: 'Charge',
+        onCancel: _rearmRenewBtn,
         onConfirm: async () => {
         try {
             // Capture payment method + GCash ref for renewal
@@ -5467,7 +5683,9 @@ window.confirmRenewal = async function () {
             if (window.logActivity) window.logActivity("Membership Renewed", `Renewed ${member.givenName || member.name} ${member.familyName || ''} with ${plan.name} (₱${finalDue}) via ${renewPayMethod}`);
         } catch (err) {
             console.error("Renewal failed:", err);
-            showToast("Error renewing membership. Please try again.", "error");
+            showToast(err.message || "Error renewing membership. Please try again.", "error");
+        } finally {
+            _rearmRenewBtn();
         }
         }
     });
@@ -6081,7 +6299,7 @@ window.toggleLockerGcashRef = function (val) {
     }
 };
 
-window.deleteLocker = async function () {
+window.deleteLocker = async function (btn) {
     // L3 (Sprint 6): fast-fail RBAC — the UI hides the button for non-admins
     // but the function was console-callable on `window`. Admin-only.
     const _r = (localStorage.getItem("userRole") || '').toLowerCase();
@@ -6096,7 +6314,10 @@ window.deleteLocker = async function () {
         return showToast("Cannot delete an occupied locker. Please release it first.", "error");
     }
 
-    showConfirm(`Are you sure you want to permanently delete Locker #${locker.number}?`, async () => {
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...'; }
+    const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
+    showConfirm({ message: `Are you sure you want to permanently delete Locker #${locker.number}?`, onCancel: _rearmBtn, onConfirm: async () => {
         try {
             await deleteDoc(doc(db, "lockers", lockerId));
             if (window.refreshLockers) await window.refreshLockers();
@@ -6106,8 +6327,10 @@ window.deleteLocker = async function () {
         } catch (err) {
             console.error(err);
             showToast("Failed to delete locker.", "error");
+        } finally {
+            _rearmBtn();
         }
-    });
+    }});
 };
 
 
@@ -6294,7 +6517,7 @@ if (document.getElementById('assignLockerForm')) {
     });
 }
 
-window.releaseLocker = async function () {
+window.releaseLocker = async function (btn) {
     // L2 (Sprint 6): fast-fail RBAC — function was console-callable by any role
     // (member/trainer) since it was exposed on `window`. Only admin/staff may release.
     const _r = (localStorage.getItem("userRole") || '').toLowerCase();
@@ -6305,11 +6528,15 @@ window.releaseLocker = async function () {
     const locker = lockersData.find(l => l.id === lockerId);
     if (!locker) return;
 
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Releasing...'; }
+    const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
     showConfirm({
         title: 'Confirm Locker Release',
         message: `Confirm Locker Release & Key Return:\n\nHas the member emptied Locker #${locker.number} and returned the physical locker key to the front desk?`,
         tone: 'success',
         confirmText: 'Confirm Release',
+        onCancel: _rearmBtn,
         onConfirm: async () => {
         try {
             await runTransaction(db, async (transaction) => {
@@ -6344,6 +6571,8 @@ window.releaseLocker = async function () {
         } catch (err) {
             console.error(err);
             showToast(err.message || "Failed to release locker.", "error");
+        } finally {
+            _rearmBtn();
         }
         }
     });
@@ -6488,8 +6717,8 @@ function renderMembers() {
                     <td><a href="javascript:void(0)" onclick="window.openMemberProfile('${m.id}')" style="font-weight: 600; color: var(--text-primary); text-decoration: none; border-bottom: 1px dashed var(--border-color);">${escapeHtml(m.givenName || m.name)}</a></td><td>${escapeHtml(m.mi || '')}</td><td>${escapeHtml(m.familyName || '')}</td>
                     <td>${escapeHtml(m.email)}</td><td><strong>${escapeHtml(plan)}</strong></td><td><span class="status-badge-solid voided">Archived</span></td>
                     <td style="text-align: right;">
-                        <button type="button" class="btn-icon" style="color: #10B981;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
-                        <button type="button" class="btn-icon" style="color: #EF4444;" title="Permanently Delete" onclick="deleteUser('${m.id}')"><i class="fas fa-trash"></i></button>
+                        <button type="button" class="btn-icon" style="color: #10B981;" title="Restore Account" onclick="archiveUser('${m.id}', 'Archived', this)"><i class="fas fa-box-open"></i></button>
+                        <button type="button" class="btn-icon" style="color: #EF4444;" title="Permanently Delete" onclick="deleteUser('${m.id}', this)"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>
             `;
@@ -6507,7 +6736,7 @@ function renderMembers() {
                     <button type="button" class="btn-icon" style="color: #3B82F6;" title="Renew/Extend" onclick="renewMember('${m.id}')"><i class="fa-solid fa-rotate-right"></i></button>
                     <button type="button" class="btn-icon" style="color: var(--dark-black);" title="Edit Profile" onclick="openEditMemberModal('${m.id}')"><i class="fa-solid fa-user-edit"></i></button>
                     <button type="button" class="btn-icon" style="color: #10B981;" title="Top-up Credit" onclick="openAddCreditModal('${m.id}')"><i class="fa-solid fa-wallet"></i></button>
-                    <button type="button" class="btn-icon" style="color: #f39c12;" title="Archive Member" onclick="archiveUser('${m.id}', '${m.status || 'Active'}')"><i class="fas fa-box-archive"></i></button>
+                    <button type="button" class="btn-icon" style="color: #f39c12;" title="Archive Member" onclick="archiveUser('${m.id}', '${m.status || 'Active'}', this)"><i class="fas fa-box-archive"></i></button>
                 </div>
             `;
 
@@ -6698,13 +6927,13 @@ if (document.getElementById('editMemberForm')) {
         const mi = document.getElementById('editMemberMI').value.trim();
         const family = document.getElementById('editMemberFamily').value.trim();
 
-        // Validation (C-02 Fix)
-        const nameRegex = /^[A-Za-z\s\-\u00f1\u00d1]{2,}$/;
+        // Validation (C-02 Fix) \u2014 VULN-02: upper-bound cap added
+        const nameRegex = /^[A-Za-z\s\-\u00f1\u00d1]{2,80}$/;
         if (!given || !nameRegex.test(given)) {
-            return showToast("First Name must contain at least 2 letters (no numbers or special characters).", "error");
+            return showToast("First Name must be 2\u201380 letters (no numbers or special characters).", "error");
         }
         if (!family || !nameRegex.test(family)) {
-            return showToast("Last Name must contain at least 2 letters (no numbers or special characters).", "error");
+            return showToast("Last Name must be 2\u201380 letters (no numbers or special characters).", "error");
         }
         const emergencyVal = document.getElementById('editMemberEmergency') ? document.getElementById('editMemberEmergency').value.trim() : "";
         if (emergencyVal && !/^\+?[0-9]{7,15}$/.test(emergencyVal)) {
@@ -6728,14 +6957,19 @@ if (document.getElementById('editMemberForm')) {
         }
 
         if (document.getElementById('editMemberSessionsRemaining')) {
+            // VULN-04: reject floats, negative values, and unreasonably large integers
             const sessVal = Number(document.getElementById('editMemberSessionsRemaining').value || 0);
-            if (sessVal < 0) return showToast("Sessions remaining cannot be negative.", "error");
+            if (!Number.isInteger(sessVal) || sessVal < 0 || sessVal > 9999) {
+                return showToast("Sessions remaining must be a whole number between 0 and 9999.", "error");
+            }
             updatedData.sessionsRemaining = sessVal;
         }
 
         if (document.getElementById('editMemberSessionsTotal')) {
             const sessVal = Number(document.getElementById('editMemberSessionsTotal').value || 0);
-            if (sessVal < 0) return showToast("Total sessions cannot be negative.", "error");
+            if (!Number.isInteger(sessVal) || sessVal < 0 || sessVal > 9999) {
+                return showToast("Total sessions must be a whole number between 0 and 9999.", "error");
+            }
             updatedData.sessionsTotal = sessVal;
         }
 
@@ -6880,13 +7114,13 @@ function renderStaff() {
 
         let actionBtns = isArchived ? `
             <div class="flex gap-1 justify-end">
-                <button type="button" class="btn-icon" style="color: #10B981;" title="Restore Account" onclick="archiveUser('${u.id}', 'Archived')"><i class="fas fa-box-open"></i></button>
-                <button type="button" class="btn-icon" style="color: #EF4444;" title="Permanently Delete" onclick="deleteUser('${u.id}')"><i class="fas fa-trash"></i></button>
+                <button type="button" class="btn-icon" style="color: #10B981;" title="Restore Account" onclick="archiveUser('${u.id}', 'Archived', this)"><i class="fas fa-box-open"></i></button>
+                <button type="button" class="btn-icon" style="color: #EF4444;" title="Permanently Delete" onclick="deleteUser('${u.id}', this)"><i class="fas fa-trash"></i></button>
             </div>
         ` : `
             <div class="flex gap-1 justify-end">
                 <button type="button" class="btn-icon" style="color: var(--dark-black);" title="Edit Details" onclick="openEditStaffModal('${u.id}')"><i class="fa-solid fa-user-edit"></i></button>
-                <button type="button" class="btn-icon" style="color: #f39c12;" title="Archive Account" onclick="archiveUser('${u.id}', '${statusStr}')"><i class="fas fa-box-archive"></i></button>
+                <button type="button" class="btn-icon" style="color: #f39c12;" title="Archive Account" onclick="archiveUser('${u.id}', '${statusStr}', this)"><i class="fas fa-box-archive"></i></button>
             </div>
         `;
 
@@ -7458,14 +7692,18 @@ if (document.getElementById('editStaffForm')) {
     });
 }
 
-window.archiveUser = async (id, currentStatus) => {
+window.archiveUser = async (id, currentStatus, btn) => {
     const actionText = currentStatus === 'Archived' ? 'Restore' : 'Archive';
     const newStatus = currentStatus === 'Archived' ? 'Active' : 'Archived';
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
     showConfirm({
         title: `${actionText} Account`,
         message: `Are you sure you want to ${actionText.toLowerCase()} this account?`,
         tone: actionText === 'Restore' ? 'success' : 'default',
         confirmText: actionText,
+        onCancel: _rearmBtn,
         onConfirm: async () => {
         try {
             // On archive, also clear member's locker pointer (prevents stale lockerId on unarchive)
@@ -7538,14 +7776,19 @@ window.archiveUser = async (id, currentStatus) => {
         } catch (error) {
             console.error("Archive/restore failed:", error);
             showToast("Operation failed. Please try again.", "error");
+        } finally {
+            _rearmBtn();
         }
         }
     });
 }
 
-window.deleteUser = async (id) => {
+window.deleteUser = async (id, btn) => {
     if (localStorage.getItem("userRole") !== "Admin") { showToast("Action Denied: You do not have permission to delete accounts.", "error"); return; }
     if (window.__isDeletingUser) return;
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
     
     // Show user name in confirmation
     const user = [...membersData, ...allUsersData].find(u => u.id === id);
@@ -7565,10 +7808,12 @@ window.deleteUser = async (id) => {
             // Require ≥ 2 remaining AFTER this deletion (i.e. ≥ 3 currently, since `id` is one of them).
             const remainingAfter = liveAdminIds.filter(aid => aid !== id).length;
             if (remainingAfter < 2) {
+                _rearmBtn();
                 return showToast("At least two active admin accounts must remain. Promote another admin first.", "error");
             }
         } catch (err) {
             console.error("Admin-floor check failed:", err);
+            _rearmBtn();
             return showToast("Could not verify admin count. Aborting for safety.", "error");
         }
     }
@@ -7643,6 +7888,7 @@ window.deleteUser = async (id) => {
             showToast("Failed to delete account. Please try again.", "error");
         } finally {
             window.__isDeletingUser = false;
+            _rearmBtn();
         }
     };
 
@@ -7652,7 +7898,7 @@ window.deleteUser = async (id) => {
     const msg = parts.length
         ? `Remove ${userName}'s account?\n\n${parts.join('. ')}.\n\nThis action cannot be undone.`
         : `Remove ${userName}'s account completely? This action cannot be undone.`;
-    showConfirm(msg, proceed);
+    showConfirm({ message: msg, onCancel: _rearmBtn, onConfirm: proceed });
 }
 
 // ==========================================
@@ -7968,12 +8214,32 @@ if (document.getElementById('memberRegistrationForm')) {
         const given = document.getElementById('regMemberGiven').value.trim();
         const mi = document.getElementById('regMemberMI').value.trim();
         const family = document.getElementById('regMemberFamily').value.trim();
-        const email = document.getElementById('regMemberEmail').value.trim();
+        const email = document.getElementById('regMemberEmail').value.trim().toLowerCase();
         const plan = document.getElementById('regMemberPlan').value;
         const rfidTag = document.getElementById('regMemberRfid').value.trim();
         const emergency = document.getElementById('regMemberEmergency') ? document.getElementById('regMemberEmergency').value.trim() : "";
         const imageFile = document.getElementById('regMemberImageFile').files[0];
         let imageUrl = '';
+
+        // VULN-01: email format validation on final submit
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+            showToast("Please enter a valid email address.", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
+
+        // VULN-02: name length cap
+        const _memberNameRegex = /^[A-Za-z\s\-ñÑ]{2,80}$/;
+        if (!given || !_memberNameRegex.test(given)) {
+            showToast("First Name must be 2–80 letters (no numbers or special characters).", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
+        if (!family || !_memberNameRegex.test(family)) {
+            showToast("Last Name must be 2–80 letters (no numbers or special characters).", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
 
         if (emergency && !/^\+?[0-9\-\s]{7,15}$/.test(emergency)) {
             showToast("Invalid emergency contact format. Must be a valid phone number (7 to 15 digits).", "error");
@@ -8017,13 +8283,15 @@ if (document.getElementById('memberRegistrationForm')) {
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
             return;
         }
-        if (regPayMethod === 'GCash' && regGcashRef.replace(/\s/g, '').length !== 12) {
-            showToast('GCash Reference ID must be exactly 12 digits.', 'error');
+        // VULN-12: strip ALL non-digit chars (not just spaces) before length check
+        const cleanRegGcashRef = regGcashRef.replace(/\D/g, '');
+        if (regPayMethod === 'GCash' && cleanRegGcashRef.length !== 12) {
+            showToast('GCash Reference ID must be exactly 12 digits (numbers only).', 'error');
             if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
             return;
         }
         if (regPayMethod === 'GCash') {
-            try { await window.assertGcashRefUnused(regGcashRef); }
+            try { await window.assertGcashRefUnused(cleanRegGcashRef); }
             catch (e) {
                 showToast(e.message, 'error');
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
@@ -8069,9 +8337,9 @@ if (document.getElementById('memberRegistrationForm')) {
             }
 
             await runTransaction(db, async (tx) => {
-                // C4: reserve GCash ref atomically for registration payments
-                if (regPayMethod === 'GCash' && regGcashRef) {
-                    await window.reserveGcashRefInTxn(tx, regGcashRef);
+                // C4: reserve GCash ref atomically for registration payments (use cleaned digits-only ref)
+                if (regPayMethod === 'GCash' && cleanRegGcashRef) {
+                    await window.reserveGcashRefInTxn(tx, cleanRegGcashRef);
                 }
                 let lockerRef = null;
                 if (lockerId) {
@@ -8151,8 +8419,8 @@ if (document.getElementById('memberRegistrationForm')) {
                     time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
                     timestamp: currentTimestamp
                 };
-                if (regPayMethod === 'GCash' && regGcashRef) {
-                    paymentData.gcashRefId = regGcashRef;
+                if (regPayMethod === 'GCash' && cleanRegGcashRef) {
+                    paymentData.gcashRefId = cleanRegGcashRef;
                 }
                 tx.set(paymentDocRef, paymentData);
             });
@@ -8244,12 +8512,30 @@ if (document.getElementById('batchStaffForm')) {
         const given = document.getElementById('regStaffGiven').value.trim();
         const mi = document.getElementById('regStaffMI').value.trim();
         const family = document.getElementById('regStaffFamily').value.trim();
-        const email = document.getElementById('regStaffEmail').value.trim();
+        const email = document.getElementById('regStaffEmail').value.trim().toLowerCase();
         const rfidTag = document.getElementById('regStaffRfid').value.trim();
         const imageFile = document.getElementById('regStaffImageFile').files[0];
         let imageUrl = '';
         if (imageFile) {
             imageUrl = await window.uploadImage(imageFile, 'staff');
+        }
+
+        // VULN-03: validate name and email — staff registration previously had zero checks
+        const _staffNameRegex = /^[A-Za-z\s\-ñÑ]{2,80}$/;
+        if (!given || !_staffNameRegex.test(given)) {
+            showToast("First Name must be 2–80 letters (no numbers or special characters).", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
+        if (!family || !_staffNameRegex.test(family)) {
+            showToast("Last Name must be 2–80 letters (no numbers or special characters).", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
+        }
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+            showToast("Please enter a valid email address.", "error");
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            return;
         }
 
         const specialtyEl = document.getElementById('regStaffSpecialty');
@@ -8925,8 +9211,10 @@ function renderBookings() {
     const loggedInUserId = localStorage.getItem("userId");
 
     let displayData = [...bookingsData].sort((a, b) => {
-        // Default to newest first
-        return new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`);
+        // Use parseBookingSlotLocal to avoid UTC/local ambiguity in Safari/Chrome
+        const ta = parseBookingSlotLocal(a.date, a.time) || 0;
+        const tb = parseBookingSlotLocal(b.date, b.time) || 0;
+        return tb - ta; // newest first
     });
 
     // --- Update Member Dashboard "Trainers on Floor" Feed ---
@@ -8994,6 +9282,18 @@ function renderBookings() {
         }
     } else if (loggedInRole === "trainer") {
         displayData = displayData.filter(b => b.trainerId === loggedInUserId);
+
+        // Status weight: active bookings float to top, terminal states sink to bottom.
+        // Mirrors the same weight table used in bookings-ui.js applyBookingFilters.
+        const _SW = { 'In Session': 1, 'active': 1, 'Confirmed': 2, 'Pending': 3, 'Completed': 4, 'Cancelled': 5, 'No Show': 5 };
+        displayData.sort((a, b) => {
+            const wDiff = (_SW[a.status] ?? 3) - (_SW[b.status] ?? 3);
+            if (wDiff !== 0) return wDiff;
+            // Within the same weight tier keep chronological order (soonest first)
+            const da = (a.date || '') + 'T' + (a.time || '');
+            const db = (b.date || '') + 'T' + (b.time || '');
+            return da < db ? -1 : da > db ? 1 : 0;
+        });
 
         const notifArea = document.getElementById('trainerNotificationArea');
         if (notifArea) {
@@ -9070,7 +9370,7 @@ function renderBookings() {
                     ? `<button type="button" class="btn-icon btn-edit btn-xs" title="Reschedule Booking" onclick="openRescheduleModal('${b.id}')"><i class="fas fa-rotate"></i></button>`
                     : '';
                 const cancelBtnInner = b.status === "Pending"
-                    ? `<button type="button" class="btn-icon btn-delete btn-xs" title="Cancel Booking" onclick="cancelMemberBooking('${b.id}','${b.memberId}')"><i class="fas fa-times-circle"></i></button>`
+                    ? `<button type="button" class="btn-icon btn-delete btn-xs" title="Cancel Booking" onclick="cancelMemberBooking('${b.id}', this)"><i class="fas fa-times-circle"></i></button>`
                     : '';
                 const actionsCell = (rescheduleBtn || cancelBtnInner)
                     ? `<td>${rescheduleBtn}${cancelBtnInner}</td>`
@@ -9090,8 +9390,8 @@ function renderBookings() {
             if (loggedInRole === "trainer") {
                 if (b.status === "Pending") {
                     actions = `
-                        <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed')"><i class="fas fa-check"></i></button>
-                        <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Declined')"><i class="fas fa-times"></i></button>
+                        <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed', this)"><i class="fas fa-check"></i></button>
+                        <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Declined', this)"><i class="fas fa-times"></i></button>
                      `;
                 } else {
                     actions = `<button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
@@ -9099,7 +9399,7 @@ function renderBookings() {
             } else {
                 actions = `
                     <button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>
-                    <button type="button" class="btn-icon btn-delete" title="Delete Booking" onclick="deleteBooking('${b.id}')"><i class="fas fa-trash"></i></button>
+                    <button type="button" class="btn-icon btn-delete" title="Delete Booking" onclick="deleteBooking('${b.id}', this)"><i class="fas fa-trash"></i></button>
                 `;
             }
 
@@ -9206,7 +9506,18 @@ window.formatBookingSummary = (b) => {
 // Legacy bookings without creditState are not refunded automatically.
 function bookingHoldsCredit(b) { return b && b.creditState === 'held'; }
 
-window.updateBookingStatus = async (id, newStatus) => {
+// BUG-01: Per-booking in-flight guard — prevents concurrent transactions when
+// the action button is clicked repeatedly before the dialog or write resolves.
+if (!window._updateBookingStatusInFlight) window._updateBookingStatusInFlight = new Set();
+
+window.updateBookingStatus = async (id, newStatus, btn) => {
+    if (window._updateBookingStatusInFlight.has(id)) return;
+    window._updateBookingStatusInFlight.add(id);
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
+    const _release = () => { window._updateBookingStatusInFlight.delete(id); _rearmBtn(); };
+
     // Caller identity (used inside transactions to enforce trainer ownership)
     const _callerRole = (localStorage.getItem("userRole") || '').toLowerCase();
     const _callerId   = localStorage.getItem("userId");
@@ -9215,6 +9526,7 @@ window.updateBookingStatus = async (id, newStatus) => {
     // arbitrary bookings to Confirmed / Declined / Completed / No Show via console
     // (which would refund or consume credits on someone else's account).
     if (_callerRole !== 'admin' && _callerRole !== 'staff' && _callerRole !== 'trainer') {
+        _release();
         return showToast("Permission denied.", "error");
     }
     const _assertOwnership = (bData) => {
@@ -9224,11 +9536,15 @@ window.updateBookingStatus = async (id, newStatus) => {
             throw new Error("You can only update bookings assigned to you.");
         }
     };
-    const _assertNotFutureCompleted = (bData) => {
+    // BUG-12: Re-sync server time before writing so a tampered window.serverTimeOffsetMs
+    // cannot bypass the future-Completed guard.
+    const _assertNotFutureCompleted = async (bData) => {
         if (newStatus === 'Completed' && bData && bData.date && bData.time) {
             const sessionAt = new Date(`${bData.date}T${bData.time}`).getTime();
+            if (isNaN(sessionAt)) return;
+            if (typeof syncServerTimeOffset === 'function') await syncServerTimeOffset();
             const offset = window.serverTimeOffsetMs || 0;
-            if (!isNaN(sessionAt) && sessionAt > (Date.now() + offset)) {
+            if (sessionAt > (Date.now() + offset)) {
                 throw new Error("Cannot mark a future session as Completed.");
             }
         }
@@ -9240,22 +9556,28 @@ window.updateBookingStatus = async (id, newStatus) => {
         const currentStatus = currentBooking.status || 'Pending';
         const allowed = window.BOOKING_STATUS_TRANSITIONS[currentStatus] || [];
         if (currentStatus !== newStatus && !allowed.includes(newStatus)) {
+            _release();
             return showToast(`Cannot change status from ${currentStatus} to ${newStatus}.`, "error");
         }
         // Client-side fast-fail for trainer ownership (definitive check is in-txn below)
         if (_callerRole === 'trainer' && currentBooking.trainerId && currentBooking.trainerId !== _callerId) {
+            _release();
             return showToast("You can only update bookings assigned to you.", "error");
         }
         // Block marking future sessions Completed (definitive check is in-txn below)
         if (newStatus === 'Completed' && currentBooking.date && currentBooking.time) {
             const sessionAt = new Date(`${currentBooking.date}T${currentBooking.time}`).getTime();
             if (!isNaN(sessionAt) && sessionAt > Date.now()) {
+                _release();
                 return showToast("Cannot mark a future session as Completed.", "error");
             }
         }
     }
 
     if (newStatus === 'Cancelled' || newStatus === 'Declined') {
+        // BUG-07: release the lock while waiting for dialog input so other booking
+        // rows stay interactive; re-acquire just before the Firestore write.
+        _release();
         showPrompt({
             title: `Confirm ${newStatus}`,
             message: `Please provide a reason for marking this session as ${newStatus.toLowerCase()}:`,
@@ -9264,8 +9586,12 @@ window.updateBookingStatus = async (id, newStatus) => {
                 const template = `I have to decline due to the reason: ${remarks}`;
 
                 showConfirm(`The following message will be sent to the member via chat:\n\n"${template}"\n\nConfirm ${newStatus.toLowerCase()}?`, async () => {
+                    // Re-acquire before the write — safe against a second click between dialogs
+                    if (window._updateBookingStatusInFlight.has(id)) return;
+                    window._updateBookingStatusInFlight.add(id);
+
                     const b = (window.bookingsData || []).find(x => x.id === id);
-                    if (!b) return;
+                    if (!b) { _release(); return; }
 
                     try {
                         await runTransaction(db, async (tx) => {
@@ -9299,6 +9625,7 @@ window.updateBookingStatus = async (id, newStatus) => {
                             }
                         });
                     } catch (err) {
+                        _release();
                         console.error("Status-change transaction failed:", err);
                         // L1: friendlier message when the booking vanished mid-flow.
                         const msg = (err && err.message) || '';
@@ -9326,10 +9653,12 @@ window.updateBookingStatus = async (id, newStatus) => {
                         }
                     }
 
+                    _release();
                     showToast(`Session ${newStatus.toLowerCase()} and message sent.`, "success");
                     if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}. Message sent to ${b.memberName}.`);
                 });
-            }
+            },
+            onCancel: _release,
         });
         return;
     }
@@ -9341,13 +9670,14 @@ window.updateBookingStatus = async (id, newStatus) => {
         confirmText: newStatus,
         onConfirm: async () => {
         try {
+            await _assertNotFutureCompleted(currentBooking); // BUG-12: fresh time sync before write
             await runTransaction(db, async (tx) => {
                 const bookingRef = doc(db, "bookings", id);
                 const bSnap = await tx.get(bookingRef);
                 if (!bSnap.exists()) throw new Error("Booking no longer exists.");
                 const bData = bSnap.data();
                 _assertOwnership(bData);
-                _assertNotFutureCompleted(bData);
+                await _assertNotFutureCompleted(bData);
 
                 if (newStatus === 'Completed' || newStatus === 'No Show') {
                     // Idempotent: a previously-held credit becomes consumed; no balance change
@@ -9377,13 +9707,16 @@ window.updateBookingStatus = async (id, newStatus) => {
                 }
             });
         } catch (err) {
+            _release();
             console.error("Status-change transaction failed:", err);
             return showToast(err.message || "Failed to update session status.", "error");
         }
 
+        _release();
         showToast(`Session marked as ${newStatus}.`, "success");
         if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}.`);
-        }
+        },
+        onCancel: _release,
     });
 }
 
@@ -10374,6 +10707,12 @@ window.openEditBookingModal = (id) => {
 if (document.getElementById('editBookingForm')) {
     document.getElementById('editBookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        // BUG-09: Lock the submit button for the duration of the async write to prevent double-submit.
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const _origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
+        const _rearmBtn = () => { if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = _origBtnHtml; } };
+
         const id = document.getElementById('editBookingId').value;
         const status = document.getElementById('editBookingStatus').value;
         let remarks = document.getElementById('editBookingRemarks') ? document.getElementById('editBookingRemarks').value : "";
@@ -10388,11 +10727,13 @@ if (document.getElementById('editBookingForm')) {
             const currentStatus = currentBooking.status || 'Pending';
             const allowed = window.BOOKING_STATUS_TRANSITIONS[currentStatus] || [];
             if (currentStatus !== status && !allowed.includes(status)) {
+                _rearmBtn();
                 return showToast(`Cannot change status from ${currentStatus} to ${status}.`, "error");
             }
             if (status === 'Completed' && currentBooking.date && currentBooking.time) {
                 const sessionAt = new Date(`${currentBooking.date}T${currentBooking.time}`).getTime();
                 if (!isNaN(sessionAt) && sessionAt > Date.now()) {
+                    _rearmBtn();
                     return showToast("Cannot mark a future session as Completed.", "error");
                 }
             }
@@ -10438,6 +10779,7 @@ if (document.getElementById('editBookingForm')) {
                 tx.update(bookingRef, update);
             });
         } catch (err) {
+            _rearmBtn();
             console.error("Edit booking transaction failed:", err);
             return showToast(err.message || "Failed to update booking.", "error");
         }
@@ -10462,20 +10804,24 @@ if (document.getElementById('editBookingForm')) {
             }
         }
 
+        _rearmBtn();
         window.closeModal('editBookingModal');
         showToast(`Booking updated to ${status}.`, "success");
         if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} status changed to ${status}. ${remarks ? 'Reason: ' + remarks : ''}`);
     });
 }
 
-window.deleteBooking = async (id) => {
+window.deleteBooking = async (id, btn) => {
     // C1: only admin/staff may delete arbitrary bookings; members/trainers
     // must use cancel/decline on their own records.
     const _callerRole = (localStorage.getItem("userRole") || '').toLowerCase();
     if (_callerRole !== 'admin' && _callerRole !== 'staff') {
         return showToast("You do not have permission to delete booking records.", "error");
     }
-    showConfirm("Are you sure you want to delete this booking record?", async () => {
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
+    showConfirm({ message: "Are you sure you want to delete this booking record?", onCancel: _rearmBtn, onConfirm: async () => {
         try {
             await runTransaction(db, async (tx) => {
                 const bookingRef = doc(db, "bookings", id);
@@ -10501,12 +10847,19 @@ window.deleteBooking = async (id) => {
         } catch (error) {
             console.error("Booking delete failed:", error);
             showToast("Failed to delete booking.", "error");
+        } finally {
+            _rearmBtn();
         }
-    });
+    }});
 }
 
-window.cancelMemberBooking = function (bookingId, memberId) {
-    showConfirm("Cancel this booking request? Your session credit will be refunded.", async () => {
+// BUG-11: memberId param removed — ownership is re-verified from localStorage inside the
+// transaction, so the caller cannot supply an arbitrary ID to trigger a foreign refund.
+window.cancelMemberBooking = function (bookingId, btn) {
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+    const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
+    showConfirm({ message: "Cancel this booking request? Your session credit will be refunded.", onCancel: _rearmBtn, onConfirm: async () => {
         try {
             // R2 (Sprint 7): `window.cancelMemberBooking` was console-callable on any
             // bookingId — Member A could cancel Member B's pending booking. Caller must
@@ -10548,8 +10901,10 @@ window.cancelMemberBooking = function (bookingId, memberId) {
         } catch (err) {
             console.error("Cancel booking failed:", err);
             showToast(err.message || "Failed to cancel booking.", "error");
+        } finally {
+            _rearmBtn();
         }
-    });
+    }});
 };
 
 // ==========================================
@@ -10781,7 +11136,7 @@ window.clearBatchSelection = function (type) {
     renderInventory();
 };
 
-window.applyBatchStatus = async function (type) {
+window.applyBatchStatus = async function (type, btn) {
     // S4 (Sprint 8): fast-fail RBAC — admin/staff only.
     const _r = (localStorage.getItem("userRole") || '').toLowerCase();
     if (_r !== 'admin' && _r !== 'staff') {
@@ -10794,6 +11149,9 @@ window.applyBatchStatus = async function (type) {
     if (set.size === 0) return showToast("No items selected.", "error");
     if (!newStatus) return showToast("Please select a status.", "error");
 
+    const _origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying...'; }
+    const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
     const positiveStatuses = ['Operational', 'Available', 'Active', 'Restocked'];
     const batchTone = positiveStatuses.includes(newStatus) ? 'success' : 'warning';
     showConfirm({
@@ -10801,14 +11159,22 @@ window.applyBatchStatus = async function (type) {
         message: `Update status to "${newStatus}" for ${set.size} items?`,
         tone: batchTone,
         confirmText: 'Apply',
+        onCancel: _rearmBtn,
         onConfirm: async () => {
-        const batchPromises = Array.from(set).map(id => updateDoc(doc(db, "inventory", id), { status: newStatus }));
-        await Promise.all(batchPromises);
-        showToast(`Batch updated successfully!`, "success");
-        if (window.logActivity) window.logActivity("Batch Status Update", `Updated ${set.size} items to ${newStatus}`);
-        set.clear();
-        statusSelect.value = "";
-        renderInventory();
+        try {
+            const batchPromises = Array.from(set).map(id => updateDoc(doc(db, "inventory", id), { status: newStatus }));
+            await Promise.all(batchPromises);
+            showToast(`Batch updated successfully!`, "success");
+            if (window.logActivity) window.logActivity("Batch Status Update", `Updated ${set.size} items to ${newStatus}`);
+            set.clear();
+            statusSelect.value = "";
+            renderInventory();
+        } catch (err) {
+            console.error(err);
+            showToast("Batch update failed.", "error");
+        } finally {
+            _rearmBtn();
+        }
         }
     });
 };
@@ -11021,28 +11387,17 @@ window.saveFitnessGoals = async function () {
 
     if (!userId) return;
 
-    try {
-        if (saveBtn) {
-            saveBtn.disabled = true;
-            const originalContent = saveBtn.innerHTML;
-            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-            saveBtn.dataset.original = originalContent;
-        }
+    const origHtml = saveBtn ? saveBtn.innerHTML : '';
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
 
+    try {
         await updateDoc(doc(db, "users", userId), { fitnessGoals: goals });
         showToast("Fitness goals updated successfully!", "success");
-
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = saveBtn.dataset.original || '<i class="fa-solid fa-floppy-disk"></i> Save';
-        }
     } catch (err) {
         console.error("Error saving goals:", err);
         showToast("Failed to save goals.", "error");
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = saveBtn.dataset.original || '<i class="fa-solid fa-floppy-disk"></i> Save';
-        }
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = origHtml; }
     }
 };
 

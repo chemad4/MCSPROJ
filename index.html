@@ -125,8 +125,13 @@
                 return Array.from(buf, b => b.toString(16).padStart(2, '0')).join('');
             }
 
+            // Gate bypass to local/dev environments only — must not be reachable on production.
+            const _isLocal = window.location.hostname === 'localhost' ||
+                             window.location.hostname === '127.0.0.1' ||
+                             window.location.protocol === 'file:' ||
+                             new URLSearchParams(window.location.search).has('dev');
             const urlParams = new URLSearchParams(window.location.search);
-            const bypassRole = urlParams.get('bypass');
+            const bypassRole = _isLocal ? urlParams.get('bypass') : null;
             if (bypassRole) {
                 const roleLower = bypassRole.toLowerCase();
                 let role = "";
@@ -254,6 +259,17 @@
             e.preventDefault();
             const email = document.getElementById('loginEmail').value.trim().toLowerCase();
             const password = document.getElementById('loginPassword').value.trim();
+
+            // VULN-08: reject whitespace-only credentials before hitting Firestore
+            if (!email || !password) {
+                setError("Please enter your email and password.");
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+                setError("Please enter a valid email address.");
+                return;
+            }
+
             await authenticateUser(query(collection(db, "users"), where("email", "==", email)), password);
         });
 
@@ -264,8 +280,9 @@
                 message: 'Enter your email address to receive a new password:',
                 placeholder: 'your.email@example.com',
                 onConfirm: (email) => {
-                    const trimmedEmail = email.trim();
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+                    const trimmedEmail = email.trim().toLowerCase();
+                    // VULN-15: require at least 2-char TLD
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmedEmail)) {
                         return showToast('Please enter a valid email address.', 'error');
                     }
                     resetPasswordFlow(trimmedEmail);

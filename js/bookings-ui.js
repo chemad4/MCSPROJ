@@ -62,7 +62,9 @@ window.sortBookings = function (field) {
 // --- Inline Status Dropdown ---
 window.toggleBkStatusDropdown = function (e, bookingId) {
     e.stopPropagation();
-    const wrapper = e.currentTarget.closest('.bk-status-wrapper');
+    // EH-4: guard against null when a rapid re-render replaces the DOM node during click
+    const wrapper = e.currentTarget?.closest('.bk-status-wrapper');
+    if (!wrapper) return;
     const wasOpen = wrapper.classList.contains('open');
     document.querySelectorAll('.bk-status-wrapper.open').forEach(w => w.classList.remove('open'));
     if (!wasOpen) {
@@ -140,7 +142,7 @@ window.openBookingDrawer = function () {
             trainers.map(t => `<option value="${t.id}">${t.uid ? t.uid + ' - ' : ''}${t.name || (t.givenName + ' ' + t.familyName)}</option>`).join('');
     }
 
-    // Reset manual state
+    // Reset manual state (allowSameDay always starts false so the override must be re-confirmed each time)
     window.manualBookingState = {
         memberId: '',
         memberName: '',
@@ -149,7 +151,8 @@ window.openBookingDrawer = function () {
         date: '',
         time: '',
         month: new Date().getMonth(),
-        year: new Date().getFullYear()
+        year: new Date().getFullYear(),
+        allowSameDay: false
     };
 
     const grid = document.getElementById('manualBookingDateTimeGrid');
@@ -248,8 +251,17 @@ function applyBookingFilters(data) {
     if (dateFrom) filtered = filtered.filter(b => b.date >= dateFrom);
     if (dateTo) filtered = filtered.filter(b => b.date <= dateTo);
 
-    // Sort — newest first by default
+    // Status weight: active bookings float to the top, terminal states sink to the bottom.
+    // Weight 1 = In Session, 2 = Confirmed, 3 = Pending, 4 = Completed, 5 = Cancelled / No Show
+    const STATUS_WEIGHT = { 'In Session': 1, 'active': 1, 'Confirmed': 2, 'Pending': 3, 'Completed': 4, 'Cancelled': 5, 'No Show': 5 };
+    const weightOf = (b) => STATUS_WEIGHT[b.status] ?? 3;
+
     filtered.sort((a, b) => {
+        // Primary: status weight (ascending — lower weight = more urgent, stays on top)
+        const wDiff = weightOf(a) - weightOf(b);
+        if (wDiff !== 0) return wDiff;
+
+        // Secondary: user-selected sort field + direction within the same weight tier
         let va, vb;
         if (bkSortField === 'memberName') { va = (a.memberName || '').toLowerCase(); vb = (b.memberName || '').toLowerCase(); }
         else if (bkSortField === 'time') { va = a.time || ''; vb = b.time || ''; }
@@ -257,7 +269,11 @@ function applyBookingFilters(data) {
 
         if (va < vb) return bkSortDir === 'asc' ? -1 : 1;
         if (va > vb) return bkSortDir === 'asc' ? 1 : -1;
-        return 0;
+
+        // Tertiary: chronological by date+startTime when both primary and secondary are equal
+        const da = a.date + 'T' + (a.time || '');
+        const db = b.date + 'T' + (b.time || '');
+        return da < db ? -1 : da > db ? 1 : 0;
     });
 
     return filtered;
@@ -265,11 +281,16 @@ function applyBookingFilters(data) {
 
 // --- Enhanced Row Renderer ---
 function renderEnhancedBookingRow(b) {
-    const dateObj = new Date(`${b.date}T${b.time}`);
-    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    // SP-3: guard against missing/invalid date+time to prevent "Invalid Date" in rows
+    const rawDt = b.date && b.time ? `${b.date}T${b.time}` : null;
+    const dateObj = rawDt ? new Date(rawDt) : null;
+    const dateStr = (dateObj && !isNaN(dateObj)) ? dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : (b.date || '—');
+    const timeStr = (dateObj && !isNaN(dateObj)) ? dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : (b.time || '—');
 
-    const statusKey = b.status.toLowerCase().replace(' ', '');
+    // SP-4: guard against missing status; SL-4: whitelist to prevent CSS injection
+    const VALID_STATUS_KEYS = new Set(['pending','confirmed','active','completed','cancelled','declined','noshow']);
+    const rawStatusKey = (b.status || 'Pending').toLowerCase().replace(/\s+/g, '');
+    const statusKey = VALID_STATUS_KEYS.has(rawStatusKey) ? rawStatusKey : 'unknown';
     const statusClass = `status-${statusKey === 'noshow' ? 'noshow' : statusKey}`;
 
     const statuses = ['Pending', 'Confirmed', 'active', 'Completed', 'Cancelled', 'Declined', 'No Show'];
@@ -303,8 +324,8 @@ function renderEnhancedBookingRow(b) {
     if (loggedInRole === 'trainer') {
         if (b.status === 'Pending') {
             actions = `
-                <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed')"><i class="fas fa-check"></i></button>
-                <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Declined')"><i class="fas fa-times"></i></button>
+                <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed', this)"><i class="fas fa-check"></i></button>
+                <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Declined', this)"><i class="fas fa-times"></i></button>
             `;
         } else {
             actions = `<button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
@@ -376,10 +397,12 @@ function renderBookingCalendar() {
     });
 
     // Build a lookup: date -> hour -> bookings[] (show all statuses on calendar)
+    // EC-4: skip records with missing/non-string time or NaN/out-of-range parsed hour
     const lookup = {};
     data.forEach(b => {
-        if (!b.date || !b.time) return;
+        if (!b.date || !b.time || typeof b.time !== 'string') return;
         const h = parseInt(b.time.split(':')[0], 10);
+        if (isNaN(h) || h < 0 || h > 23) return;
         const key = `${b.date}_${h}`;
         if (!lookup[key]) lookup[key] = [];
         lookup[key].push(b);
@@ -428,7 +451,12 @@ function renderBookingCalendar() {
 
             try {
                 // Call the original to handle member/trainer notifications, etc.
-                _originalRender();
+                // EH-2: catch original render failures so the enhanced render still runs
+                try {
+                    _originalRender();
+                } catch (e) {
+                    console.error("[bookings-ui] _originalRender failed:", e);
+                }
 
                 // Now for admin/staff, re-render the bookingsBody with enhanced UI + proper sort
                 const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
@@ -443,8 +471,8 @@ function renderBookingCalendar() {
 
                 const filtered = applyBookingFilters(window.bookingsData || []);
                 const totalRecords = filtered.length;
-                const totalPages = Math.ceil(totalRecords / bkItemsPerPage);
-                if (bkCurrentPage > totalPages && totalPages > 0) bkCurrentPage = totalPages;
+                const totalPages = Math.max(1, Math.ceil(totalRecords / bkItemsPerPage));
+                if (bkCurrentPage > totalPages) bkCurrentPage = totalPages;
                 if (bkCurrentPage < 1) bkCurrentPage = 1;
 
                 const startIdx = (bkCurrentPage - 1) * bkItemsPerPage;
@@ -492,7 +520,8 @@ window.manualBookingState = {
     date: '',
     time: '',
     month: new Date().getMonth(),
-    year: new Date().getFullYear()
+    year: new Date().getFullYear(),
+    allowSameDay: false
 };
 
 window.updateManualBookingState = function() {
@@ -505,13 +534,14 @@ window.updateManualBookingState = function() {
     window.manualBookingState.trainerId = tSelect.value;
     window.manualBookingState.trainerName = tSelect.value ? tSelect.options[tSelect.selectedIndex].text : '';
     
-    // Clean up name if it has UID prefix (e.g. "MEM-12345 - Given Family")
-    if (window.manualBookingState.memberName.includes(' - ')) {
-        window.manualBookingState.memberName = window.manualBookingState.memberName.split(' - ').slice(1).join(' - ');
-    }
-    if (window.manualBookingState.trainerName.includes(' - ')) {
-        window.manualBookingState.trainerName = window.manualBookingState.trainerName.split(' - ').slice(1).join(' - ');
-    }
+    // SL-6: strip only the leading UID prefix (e.g. "MEM-001 - Name"), not every " - "
+    // so names that legitimately contain " - " are not silently truncated.
+    const _stripUidPrefix = (text) => {
+        const m = text.match(/^[A-Z]+-\d+\s+-\s+(.+)$/);
+        return m ? m[1] : text;
+    };
+    window.manualBookingState.memberName = _stripUidPrefix(window.manualBookingState.memberName);
+    window.manualBookingState.trainerName = _stripUidPrefix(window.manualBookingState.trainerName);
 
     const summaryMember = document.getElementById('manualSummaryMember');
     const summaryTrainer = document.getElementById('manualSummaryTrainer');
@@ -660,8 +690,12 @@ window.renderManualBookingTimeSlots = (dateStr) => {
         let reason = '';
 
         if (dateStr === todayStr) {
+            // SL-2: disable at sub-hour precision — a slot that started this hour
+            // but is already partially past (e.g. it's 14:45, slot is 14:00) must
+            // be blocked so the server-side future-time check never rejects silently.
             const currentHour = today.getHours();
-            if (h <= currentHour) {
+            const currentMin  = today.getMinutes();
+            if (h < currentHour || (h === currentHour && currentMin > 0)) {
                 disabled = true;
                 reason = 'Past';
             }
@@ -744,10 +778,14 @@ window.updateManualBookingSummary = () => {
 window.setupManualCalNav = () => {
     const prevBtn = document.getElementById('manualCalPrevMonthBtn');
     const nextBtn = document.getElementById('manualCalNextMonthBtn');
-    if (!prevBtn || !nextBtn || window.manualCalNavSetup) return;
-    
-    window.manualCalNavSetup = true;
-    prevBtn.addEventListener('click', () => {
+    if (!prevBtn || !nextBtn) return;
+    // Re-wire listeners on every drawer open by cloning the buttons (removes old listeners).
+    const newPrev = prevBtn.cloneNode(true);
+    const newNext = nextBtn.cloneNode(true);
+    prevBtn.replaceWith(newPrev);
+    nextBtn.replaceWith(newNext);
+    newPrev.addEventListener('click', () => {
+        if (!window.manualBookingState) return;
         window.manualBookingState.month--;
         if (window.manualBookingState.month < 0) {
             window.manualBookingState.month = 11;
@@ -755,8 +793,9 @@ window.setupManualCalNav = () => {
         }
         window.renderManualBookingCalendar();
     });
-    
-    nextBtn.addEventListener('click', () => {
+
+    newNext.addEventListener('click', () => {
+        if (!window.manualBookingState) return;
         window.manualBookingState.month++;
         if (window.manualBookingState.month > 11) {
             window.manualBookingState.month = 0;
@@ -782,8 +821,9 @@ window.executeManualBooking = async () => {
     }
 
     // Same-day pre-confirm: warn (but allow) when the target member already has
-    // a booking on the chosen date. Skipped once after the user clicks Proceed.
-    if (!window._manualBookingSkipSameDayConfirm && typeof window.findSameDayBookings === 'function') {
+    // a booking on the chosen date. The operator must explicitly click "Proceed anyway"
+    // to set allowSameDay on the state — the server also enforces this independently (SL-1).
+    if (!window.manualBookingState.allowSameDay && typeof window.findSameDayBookings === 'function') {
         const sameDay = window.findSameDayBookings(memberId, date);
         if (sameDay.length > 0) {
             const lines = sameDay.map(b => '• ' + window.formatBookingSummary(b)).join('\n');
@@ -794,14 +834,15 @@ window.executeManualBooking = async () => {
                 confirmText: 'Proceed anyway',
                 cancelText: 'Cancel',
                 onConfirm: () => {
-                    window._manualBookingSkipSameDayConfirm = true;
+                    window.manualBookingState.allowSameDay = true;
                     window.executeManualBooking();
                 }
             });
             return;
         }
     }
-    window._manualBookingSkipSameDayConfirm = false;
+    // Reset the override flag after each run so it doesn't persist across bookings
+    if (window.manualBookingState) window.manualBookingState.allowSameDay = false;
 
     confirmBtn.disabled = true;
     confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
@@ -812,7 +853,8 @@ window.executeManualBooking = async () => {
         }
         const offset = window.serverTimeOffsetMs || 0;
         const freshNowMs = Date.now() + offset;
-        const targetBookingTimeMsCheck = new Date(date + 'T' + time).getTime();
+        // EC-3: append :00Z so the string is parsed as UTC, not local timezone
+        const targetBookingTimeMsCheck = new Date(`${date}T${time}:00Z`).getTime();
         if (targetBookingTimeMsCheck < freshNowMs) {
             showToast("Choose a date and time in the future. Past sessions cannot be booked.", "error");
             confirmBtn.disabled = false;
@@ -867,7 +909,7 @@ window.executeManualBooking = async () => {
             if (typeof mData.dateRegistered === 'number') {
                 const planDays = (typeof window.getPlanDays === 'function') ? window.getPlanDays(mData.plan) : 30;
                 const expiryAt = mData.dateRegistered + planDays * 24 * 60 * 60 * 1000;
-                const targetBookingTimeMs = new Date(date + 'T' + time).getTime();
+                const targetBookingTimeMs = new Date(`${date}T${time}:00Z`).getTime();
                 if (targetBookingTimeMs > expiryAt) {
                     throw new Error("Target booking date exceeds the member's membership plan expiration date. Please renew their plan for that period.");
                 }
@@ -875,7 +917,7 @@ window.executeManualBooking = async () => {
 
             // Time-Tampering / Future Date check
             const freshNowMsTx = Date.now() + (window.serverTimeOffsetMs || 0);
-            const targetBookingTimeMsTx = new Date(date + 'T' + time).getTime();
+            const targetBookingTimeMsTx = new Date(`${date}T${time}:00Z`).getTime();
             if (targetBookingTimeMsTx < freshNowMsTx) {
                 throw new Error("Choose a date and time in the future. Past sessions cannot be booked.");
             }
@@ -892,6 +934,22 @@ window.executeManualBooking = async () => {
             const sessionsRemaining = mData.sessionsRemaining !== undefined ? Number(mData.sessionsRemaining) : 0;
             if (sessionsRemaining <= 0) {
                 throw new Error("Member has 0 session credits remaining. Please buy more credits first.");
+            }
+
+            // SL-1: server-side same-day guard — the UI warning is skippable via console,
+            // so we enforce a hard limit of 1 active booking per member per day in the transaction.
+            // Admin/staff may override by passing a truthy `allowSameDay` flag via manualBookingState.
+            if (!window.manualBookingState?.allowSameDay) {
+                const sameDayRef = fb.query(
+                    fb.bookingsCol,
+                    fb.where("memberId", "==", memberId),
+                    fb.where("date", "==", date),
+                    fb.where("status", "in", ["Confirmed", "Pending"])
+                );
+                const sameDaySnap = await fb.getDocs(sameDayRef);
+                if (!sameDaySnap.empty) {
+                    throw new Error(`SAME_DAY_CONFLICT: ${memberName} already has an active booking on ${date}. Set allowSameDay to override.`);
+                }
             }
 
             // Write atomically
@@ -1100,10 +1158,13 @@ window.executeManualBooking = async () => {
                 !_lifecycleTriggered.has(`complete:${b.id}`)
             ) {
                 _lifecycleTriggered.add(`complete:${b.id}`);
+                // EH-3: catch rejects from the async pipeline so the rating write error
+                // doesn't become an unhandled promise rejection
                 _systemFlipStatus(b.id, 'Completed').then(async () => {
                     if (window.logActivity) window.logActivity("Session Completed", `Booking ${b.id} auto-completed after scheduled end time.`);
-                    // Rule 5: queue a rating prompt for the member
                     await _writePendingRating(b);
+                }).catch(err => {
+                    console.error("[SessionEngine] Complete+rate pipeline failed:", err);
                 });
             }
         });
@@ -1205,6 +1266,15 @@ window.executeManualBooking = async () => {
                     setTimeout(() => ratingInput.classList.remove('is-invalid'), 1200);
                     ratingInput.focus();
                 }
+                return;
+            }
+            // VULN-09: cap lengths to prevent Firestore document bloat and potential XSS via innerHTML
+            if (rating.length > 200) {
+                showToast("Rating must be 200 characters or fewer.", "error");
+                return;
+            }
+            if (remarks.length > 500) {
+                showToast("Remarks must be 500 characters or fewer.", "error");
                 return;
             }
             await resolve(rating, remarks);

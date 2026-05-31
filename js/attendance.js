@@ -1,4 +1,4 @@
-import { doc, getDocs, onSnapshot, query, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { doc, getDocs, onSnapshot, query, runTransaction, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const DEFAULT_CLOSING_HOUR = 21; // 9:00 PM
 const DEFAULT_CLOSING_MINUTE = 0;
@@ -28,20 +28,37 @@ export function initAttendance({ db, attendanceCol, servicesChartInstanceGetter,
     if (!dateVal) {
         targetDateStr = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     } else {
-        const [y, m, d] = dateVal.split('-');
+        // SP-1: validate before splitting to prevent "Invalid Date" Firestore queries
+        const parts = dateVal.split('-');
+        if (parts.length !== 3 || parts.some(p => !p || isNaN(Number(p)))) {
+            console.error("[Attendance] filterAttendanceByDate: invalid dateVal", dateVal);
+            return;
+        }
+        const [y, m, d] = parts.map(Number);
         const dateObj = new Date(y, m - 1, d);
+        if (isNaN(dateObj.getTime())) {
+            console.error("[Attendance] filterAttendanceByDate: unparseable date", dateVal);
+            return;
+        }
         targetDateStr = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     }
 
     const q = query(attendanceCol, where("date", "==", targetDateStr));
     if (useLiveAttendance) {
-        currentUnsubscribe = onSnapshot(q, (snapshot) => {
-            attendanceData = [];
-            snapshot.forEach((d) => attendanceData.push({ id: d.id, ...d.data() }));
-            const render = () => renderAttendance(attendanceData, servicesChartInstanceGetter, targetDateStr);
-            if (typeof window.softRender === 'function') window.softRender('attendance', render);
-            else render();
-        });
+        currentUnsubscribe = onSnapshot(q,
+            (snapshot) => {
+                attendanceData = [];
+                snapshot.forEach((d) => attendanceData.push({ id: d.id, ...d.data() }));
+                const render = () => renderAttendance(attendanceData, servicesChartInstanceGetter, targetDateStr);
+                if (typeof window.softRender === 'function') window.softRender('attendance', render);
+                else render();
+            },
+            // EH-1: surface Firestore feed errors instead of silently stalling
+            (err) => {
+                console.error("[Attendance] onSnapshot error:", err);
+                if (typeof showToast === 'function') showToast("Attendance feed disconnected. Refresh the page.", "error");
+            }
+        );
     } else {
         getDocs(q).then(snapshot => {
             attendanceData = [];
@@ -52,6 +69,17 @@ export function initAttendance({ db, attendanceCol, servicesChartInstanceGetter,
   };
 
   window.filterAttendanceByDate(); // Load today initially
+
+  // EC-1: re-subscribe at midnight so the live feed follows the calendar day boundary
+  function _scheduleNextDayReload() {
+    const now = new Date();
+    const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+    setTimeout(() => {
+      window.filterAttendanceByDate();
+      _scheduleNextDayReload();
+    }, msUntilMidnight + 500);
+  }
+  _scheduleNextDayReload();
 
   // Auto force-out at closing (runs once per day per device).
   runAutoForceOutIfClosingPassed({ db, attendanceCol, closingHour: ch, closingMinute: cm }).catch(() => {});
@@ -176,7 +204,7 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDat
             </span>
           </td>
           <td><strong>${g.type}</strong></td>
-          <td>${g.date || today}</td>
+          <td>${g.date || dateFilter}</td>
           <td><span class="badge active"><i class="fa-regular fa-clock"></i> ${latestTimeIn}</span></td>
           <td>${latestTimeOut}</td>
           <td>${latestStatusBadge}</td>
@@ -271,17 +299,26 @@ function renderAttendance(attendanceData, servicesChartInstanceGetter, targetDat
     if (checkinEl) checkinEl.innerText = todayAtt.length;
 
     // Peak Hour Calculation
+    // EC-2: unified parser handles both 12-hour (h:mm AM/PM) and 24-hour (HH:mm) formats
     const hourCounts = Array(24).fill(0);
     todayAtt.forEach(a => {
-        if (a.timeIn || a.time) {
-            const timeStr = a.timeIn || a.time;
-            const hour = parseInt(timeStr.split(':')[0]);
-            const isPM = timeStr.toLowerCase().includes('pm');
-            let hour24 = hour;
-            if (isPM && hour !== 12) hour24 += 12;
-            if (!isPM && hour === 12) hour24 = 0;
-            if (!isNaN(hour24)) hourCounts[hour24]++;
+        const timeStr = a.timeIn || a.time;
+        if (!timeStr || typeof timeStr !== 'string') return;
+        let hour24;
+        const m24 = timeStr.match(/^(\d{1,2}):\d{2}$/);
+        const m12 = timeStr.match(/^(\d{1,2}):\d{2}\s*(AM|PM)$/i);
+        if (m24) {
+            hour24 = parseInt(m24[1], 10);
+        } else if (m12) {
+            let h = parseInt(m12[1], 10);
+            const isPM = m12[2].toUpperCase() === 'PM';
+            if (isPM && h !== 12) h += 12;
+            if (!isPM && h === 12) h = 0;
+            hour24 = h;
+        } else {
+            return;
         }
+        if (hour24 >= 0 && hour24 <= 23) hourCounts[hour24]++;
     });
 
     let peakHour = -1;
@@ -330,13 +367,15 @@ window.renderRecentCheckins = function(attendanceData) {
     }
 
     list.innerHTML = recent.map(a => {
-        const initials = a.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        // SP-2: guard against missing name field to prevent TypeError crash
+        const safeName = (a.name || 'Unknown').trim() || 'Unknown';
+        const initials = safeName.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
         const time = a.timeIn || a.time || '00:00';
         return `
             <div class="checkin-item">
                 <div class="initial-avatar">${initials}</div>
                 <div class="checkin-details">
-                    <div class="checkin-name">${a.name}</div>
+                    <div class="checkin-name">${safeName}</div>
                     <div class="checkin-meta">
                         <span>Plan: ${a.type || 'Standard'}</span>
                         <span>Checked in at: ${time}</span>
@@ -365,7 +404,8 @@ async function runAutoForceOutIfClosingPassed({ db, attendanceCol, closingHour, 
   if (now.getTime() < closing.getTime()) return;
 
   const dayKey = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  const storageKey = `forceOutDone:${dayKey}`;
+  // SL-3: scope key per user so shared terminals don't skip force-out for subsequent logins
+  const storageKey = `forceOutDone:${dayKey}:${localStorage.getItem("userId") || "unknown"}`;
   if (localStorage.getItem(storageKey) === "1") return;
 
   const q = query(attendanceCol, where("date", "==", dayKey), where("status", "==", "Checked In"));
@@ -379,15 +419,22 @@ async function runAutoForceOutIfClosingPassed({ db, attendanceCol, closingHour, 
   const operatorRole = localStorage.getItem("userRole") || "";
   const operatorName = localStorage.getItem("loggedInUser") || "";
 
+  // BUG-03: Wrap each write in a transaction with a status re-check so concurrent
+  // tabs (or incognito windows) cannot double-force-out the same record.
   await Promise.all(
     snap.docs.map((d) =>
-      updateDoc(doc(db, "attendance", d.id), {
-        timeOut: timeStr,
-        status: "Checked Out",
-        forceOutAtClosing: true,
-        forceOutTimestamp: now.getTime(),
-        forceOutByRole: operatorRole,
-        forceOutBy: operatorName,
+      runTransaction(db, async (tx) => {
+        const ref = doc(db, "attendance", d.id);
+        const fresh = await tx.get(ref);
+        if (!fresh.exists() || fresh.data().status === "Checked Out") return;
+        tx.update(ref, {
+          timeOut: timeStr,
+          status: "Checked Out",
+          forceOutAtClosing: true,
+          forceOutTimestamp: now.getTime(),
+          forceOutByRole: operatorRole,
+          forceOutBy: operatorName,
+        });
       })
     )
   );
