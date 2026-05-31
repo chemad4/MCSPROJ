@@ -109,6 +109,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    // Inject Session Rating Modal (member post-session feedback)
+    if (!document.getElementById('sessionRatingModal')) {
+        const ratingModal = document.createElement('div');
+        ratingModal.id = 'sessionRatingModal';
+        ratingModal.className = 'modal';
+        ratingModal.style.display = 'none';
+        ratingModal.setAttribute('role', 'dialog');
+        ratingModal.setAttribute('aria-modal', 'true');
+        ratingModal.setAttribute('aria-labelledby', 'srModalTitle');
+        ratingModal.innerHTML = `
+            <div class="modal-content" style="max-width:480px;">
+                <div class="modal-header">
+                    <h3 id="srModalTitle"><i class="fa-solid fa-star" style="color:var(--primary-red);margin-right:8px;"></i>Rate Your Session</h3>
+                </div>
+                <div class="modal-body" style="padding:20px 24px 8px;">
+                    <p style="margin-bottom:4px;">How was your session with <strong id="srModalTrainerName">your trainer</strong>?</p>
+                    <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:18px;">Session: <span id="srModalSessionDate"></span></p>
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label class="form-label" for="srModalRatingText">Rating <span style="color:var(--primary-red)">*</span></label>
+                        <input type="text" id="srModalRatingText" class="form-control"
+                            placeholder="e.g. Excellent, 5/5, Great experience..."
+                            maxlength="120" autocomplete="off">
+                    </div>
+                    <div class="form-group" style="margin-bottom:6px;">
+                        <label class="form-label" for="srModalRemarksText">Professional Remarks <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>
+                        <textarea id="srModalRemarksText" class="form-control" rows="3"
+                            placeholder="Share details about the session, trainer's professionalism, areas to improve..."
+                            maxlength="500" style="resize:vertical;"></textarea>
+                    </div>
+                </div>
+                <div class="confirm-actions" style="padding:16px 24px 20px;gap:10px;">
+                    <button class="btn-cancel" id="srModalSkipBtn" type="button">Skip</button>
+                    <button class="btn-confirm" id="srModalSubmitBtn" type="button">Submit Feedback</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(ratingModal);
+    }
+
     // Initialize Dark Mode
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {

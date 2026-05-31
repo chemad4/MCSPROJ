@@ -272,8 +272,8 @@ function renderEnhancedBookingRow(b) {
     const statusKey = b.status.toLowerCase().replace(' ', '');
     const statusClass = `status-${statusKey === 'noshow' ? 'noshow' : statusKey}`;
 
-    const statuses = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'Declined', 'No Show'];
-    const dotColors = { Pending: '#F59E0B', Confirmed: '#3B82F6', Completed: '#10B981', Cancelled: '#EF4444', Declined: '#B91C1C', 'No Show': '#7F1D1D' };
+    const statuses = ['Pending', 'Confirmed', 'active', 'Completed', 'Cancelled', 'Declined', 'No Show'];
+    const dotColors = { Pending: '#F59E0B', Confirmed: '#3B82F6', active: '#8B5CF6', Completed: '#10B981', Cancelled: '#EF4444', Declined: '#B91C1C', 'No Show': '#7F1D1D' };
 
     const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
 
@@ -924,3 +924,311 @@ window.executeManualBooking = async () => {
         confirmBtn.innerHTML = originalHtml;
     }
 };
+
+// ============================================
+// SESSION LIFECYCLE WORKFLOW ENGINE
+// ============================================
+// Monitors real-world clock against booking start/end times.
+// Sessions are treated as 1 hour long (matching the slot-lock window).
+// All Firestore mutations go through _fb (set up by script.js).
+//
+// Lifecycle:
+//   Confirmed → (trainer confirms at startTime) → active
+//   Confirmed → (no confirmation within 15 min)  → No Show
+//   active    → (clock passes startTime + 60 min) → Completed
+//   Completed → pending member rating flag written to Firestore
+// ============================================
+
+(function () {
+    // Track in-flight state so we don't double-fire transitions.
+    const _lifecycleTriggered = new Set(); // bookingId → 'start_prompt' | 'noshow' | 'complete' | 'rated'
+
+    // ---- helpers ----
+
+    function _nowMs() {
+        return Date.now() + (window.serverTimeOffsetMs || 0);
+    }
+
+    function _sessionStartMs(b) {
+        return new Date(`${b.date}T${b.time}`).getTime();
+    }
+
+    // Sessions are 1 hour (same constraint the slot-lock enforces).
+    function _sessionEndMs(b) {
+        return _sessionStartMs(b) + 60 * 60 * 1000;
+    }
+
+    // Direct Firestore write for lifecycle transitions — bypasses the
+    // interactive `updateBookingStatus` confirmation dialogs intentionally,
+    // since these are automated system-driven state changes.
+    async function _systemFlipStatus(bookingId, newStatus, extraFields) {
+        const fb = window._fb;
+        if (!fb) return;
+        try {
+            await fb.runTransaction(fb.db, async (tx) => {
+                const bookingRef = fb.doc(fb.db, "bookings", bookingId);
+                const snap = await tx.get(bookingRef);
+                if (!snap.exists()) throw new Error("Booking gone");
+                const bData = snap.data();
+
+                const allowed = (window.BOOKING_STATUS_TRANSITIONS && window.BOOKING_STATUS_TRANSITIONS[bData.status]) || [];
+                if (!allowed.includes(newStatus)) throw new Error(`Transition ${bData.status} → ${newStatus} blocked`);
+
+                const update = { status: newStatus, ...(extraFields || {}) };
+
+                if (newStatus === 'Completed' || newStatus === 'No Show') {
+                    if (bData.creditState === 'consumed') {
+                        // already finalised
+                    } else if (bData.creditState === 'held') {
+                        update.creditState = 'consumed';
+                    } else if (!bData.creditState && bData.memberId) {
+                        tx.update(fb.doc(fb.db, "users", bData.memberId), { sessionsRemaining: fb.increment(-1) });
+                        update.creditState = 'consumed';
+                    }
+                    // Free slot locks
+                    if (bData.trainerId && bData.date && bData.time) {
+                        const { slotIdForTrainer, slotIdForMember } = window;
+                        if (slotIdForTrainer) tx.delete(fb.doc(fb.db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
+                        if (slotIdForMember)  tx.delete(fb.doc(fb.db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, bData.time)));
+                    }
+                }
+
+                tx.update(bookingRef, update);
+            });
+        } catch (err) {
+            console.warn(`[SessionEngine] systemFlipStatus(${bookingId}, ${newStatus}) failed:`, err.message);
+        }
+    }
+
+    // Write a pending-rating flag to Firestore so the member's next
+    // dashboard render can pick it up regardless of which tab they're on.
+    async function _writePendingRating(booking) {
+        const fb = window._fb;
+        if (!fb || !booking.memberId) return;
+        try {
+            const ratingRef = fb.doc(fb.db, "pendingRatings", booking.id);
+            await fb.runTransaction(fb.db, async (tx) => {
+                const snap = await tx.get(ratingRef);
+                if (snap.exists()) return; // already queued
+                tx.set(ratingRef, {
+                    bookingId: booking.id,
+                    memberId: booking.memberId,
+                    memberName: booking.memberName || '',
+                    trainerId: booking.trainerId,
+                    trainerName: booking.trainerName || '',
+                    sessionDate: booking.date,
+                    sessionTime: booking.time,
+                    createdAt: Date.now(),
+                    resolved: false
+                });
+            });
+        } catch (err) {
+            console.warn("[SessionEngine] Failed to write pending rating:", err.message);
+        }
+    }
+
+    // ---- trainer "Confirm and Start Session" modal ----
+
+    function _showStartSessionModal(booking) {
+        const key = `start_prompt:${booking.id}`;
+        if (_lifecycleTriggered.has(key)) return;
+        _lifecycleTriggered.add(key);
+
+        const noShowDeadlineMs = _sessionStartMs(booking) + 15 * 60 * 1000;
+
+        // Build a countdown string for the modal message
+        const minsLeft = Math.max(0, Math.round((noShowDeadlineMs - _nowMs()) / 60000));
+
+        window.showConfirm({
+            title: 'Session Starting Now',
+            message: `Your session with ${booking.memberName} is scheduled to start now.\n\nConfirm to start the session. If you do not confirm within 15 minutes, the session will be automatically marked as a No Show.\n\nTime remaining: ${minsLeft} min`,
+            tone: 'info',
+            confirmText: 'Confirm and Start Session',
+            cancelText: 'Dismiss',
+            onConfirm: async () => {
+                await _systemFlipStatus(booking.id, 'active');
+                if (window.logActivity) window.logActivity("Session Started", `Trainer confirmed session start for ${booking.memberName} on ${booking.date}.`);
+                showToast(`Session with ${booking.memberName} is now active.`, "success");
+            }
+        });
+    }
+
+    // ---- main tick ----
+
+    function _lifecycleTick() {
+        const role = (localStorage.getItem("userRole") || "").toLowerCase();
+        const userId = localStorage.getItem("userId");
+        const now = _nowMs();
+        const bookings = window.bookingsData || [];
+
+        bookings.forEach(b => {
+            if (!b.id || !b.date || !b.time) return;
+
+            const startMs = _sessionStartMs(b);
+            const endMs   = _sessionEndMs(b);
+
+            if (isNaN(startMs)) return;
+
+            // ── Rule 2: Trainer prompt at startTime for Confirmed bookings ──
+            if (
+                b.status === 'Confirmed' &&
+                role === 'trainer' &&
+                b.trainerId === userId &&
+                now >= startMs &&
+                now < startMs + 15 * 60 * 1000 &&
+                !_lifecycleTriggered.has(`start_prompt:${b.id}`)
+            ) {
+                _showStartSessionModal(b);
+            }
+
+            // ── Rule 3: Auto No-Show if trainer never confirmed within 15 min ──
+            if (
+                b.status === 'Confirmed' &&
+                now >= startMs + 15 * 60 * 1000 &&
+                !_lifecycleTriggered.has(`noshow:${b.id}`)
+            ) {
+                _lifecycleTriggered.add(`noshow:${b.id}`);
+                _systemFlipStatus(b.id, 'No Show').then(() => {
+                    if (window.logActivity) window.logActivity("Auto No Show", `Booking ${b.id} auto-marked No Show (trainer did not confirm within 15 min).`);
+                });
+            }
+
+            // ── Rule 4: Auto-Complete when clock crosses endTime ──
+            if (
+                b.status === 'active' &&
+                now >= endMs &&
+                !_lifecycleTriggered.has(`complete:${b.id}`)
+            ) {
+                _lifecycleTriggered.add(`complete:${b.id}`);
+                _systemFlipStatus(b.id, 'Completed').then(async () => {
+                    if (window.logActivity) window.logActivity("Session Completed", `Booking ${b.id} auto-completed after scheduled end time.`);
+                    // Rule 5: queue a rating prompt for the member
+                    await _writePendingRating(b);
+                });
+            }
+        });
+    }
+
+    // Kick off once bookingsData is available, then run every 30 s.
+    const _engineInit = setInterval(() => {
+        if (typeof window.bookingsData === 'undefined') return;
+        clearInterval(_engineInit);
+        _lifecycleTick(); // immediate first pass
+        setInterval(_lifecycleTick, 30_000);
+    }, 500);
+
+    // ---- Rule 5: Member rating prompt on dashboard render ----
+    // Checks Firestore for unresolved pendingRatings for the logged-in member
+    // and shows the rating modal once per session.
+
+    const _shownRatingFor = new Set();
+
+    async function _checkPendingRatingsForMember() {
+        const fb = window._fb;
+        if (!fb) return;
+        const role = (localStorage.getItem("userRole") || "").toLowerCase();
+        const userId = localStorage.getItem("userId");
+        if (role !== 'member' || !userId) return;
+
+        try {
+            const q = fb.query(
+                fb.pendingRatingsCol,
+                fb.where("memberId", "==", userId),
+                fb.where("resolved", "==", false)
+            );
+            const snap = await fb.getDocs(q);
+            snap.forEach(docSnap => {
+                const data = docSnap.data();
+                if (_shownRatingFor.has(data.bookingId)) return;
+                _shownRatingFor.add(data.bookingId);
+                _showMemberRatingModal(data, docSnap.id);
+            });
+        } catch (err) {
+            console.warn("[SessionEngine] Could not load pending ratings:", err.message);
+        }
+    }
+
+    function _showMemberRatingModal(ratingData, docId) {
+        const modal = document.getElementById('sessionRatingModal');
+        if (!modal) return;
+
+        const trainerEl  = document.getElementById('srModalTrainerName');
+        const dateEl     = document.getElementById('srModalSessionDate');
+        const submitBtn  = document.getElementById('srModalSubmitBtn');
+        const skipBtn    = document.getElementById('srModalSkipBtn');
+        const ratingInput = document.getElementById('srModalRatingText');
+        const remarksInput = document.getElementById('srModalRemarksText');
+
+        if (trainerEl)  trainerEl.textContent  = ratingData.trainerName || 'your trainer';
+        if (dateEl)     dateEl.textContent      = `${ratingData.sessionDate || ''} at ${ratingData.sessionTime || ''}`;
+        if (ratingInput)  ratingInput.value     = '';
+        if (remarksInput) remarksInput.value    = '';
+
+        const close = () => {
+            modal.style.display = 'none';
+            if (submitBtn)  submitBtn.onclick = null;
+            if (skipBtn)    skipBtn.onclick   = null;
+        };
+
+        const resolve = async (rating, remarks) => {
+            const fb = window._fb;
+            if (!fb) return;
+            try {
+                await fb.runTransaction(fb.db, async (tx) => {
+                    const ref = fb.doc(fb.db, "pendingRatings", docId);
+                    tx.update(ref, {
+                        resolved: true,
+                        rating: rating || '',
+                        remarks: remarks || '',
+                        resolvedAt: Date.now()
+                    });
+                });
+                if (rating || remarks) {
+                    showToast("Thank you for your feedback!", "success");
+                    if (window.logActivity) window.logActivity("Session Rated", `Member rated session with ${ratingData.trainerName}.`);
+                }
+            } catch (err) {
+                console.warn("[SessionEngine] Failed to resolve rating:", err.message);
+            }
+            close();
+        };
+
+        if (skipBtn) skipBtn.onclick = () => resolve('', '');
+        if (submitBtn) submitBtn.onclick = async () => {
+            const rating  = ratingInput  ? ratingInput.value.trim()  : '';
+            const remarks = remarksInput ? remarksInput.value.trim() : '';
+            if (!rating) {
+                if (ratingInput) {
+                    ratingInput.classList.remove('is-invalid');
+                    void ratingInput.offsetWidth;
+                    ratingInput.classList.add('is-invalid');
+                    setTimeout(() => ratingInput.classList.remove('is-invalid'), 1200);
+                    ratingInput.focus();
+                }
+                return;
+            }
+            await resolve(rating, remarks);
+        };
+
+        modal.style.display = 'flex';
+    }
+
+    // Hook into renderBookings so member sees the prompt on their next render.
+    const _ratingPollInit = setInterval(() => {
+        if (typeof window.renderBookings !== 'function') return;
+        clearInterval(_ratingPollInit);
+        const _origRender = window.renderBookings;
+        window.renderBookings = function (...args) {
+            _origRender.apply(this, args);
+            // Only poll for member role — fires async without blocking the render
+            if ((localStorage.getItem("userRole") || "").toLowerCase() === 'member') {
+                _checkPendingRatingsForMember();
+            }
+        };
+    }, 150);
+
+    window._sessionLifecycleEngine = {
+        triggerTick: _lifecycleTick,
+        checkRatings: _checkPendingRatingsForMember
+    };
+})();

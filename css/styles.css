@@ -4059,6 +4059,12 @@ body.dark-theme .grid-stat-box p {
     border-color: #F871714d;
 }
 
+.bk-status-badge.status-active {
+    background-color: #8B5CF61a;
+    color: #5B21B6;
+    border-color: #8B5CF64d;
+}
+
 .bk-status-dropdown {
     position: fixed;
     background: var(--panel-bg);
@@ -4545,6 +4551,12 @@ body.dark-theme .bk-status-badge.status-noshow {
     background: rgba(153, 27, 27, 0.15);
     color: #fca5a5;
     border-color: rgba(153, 27, 27, 0.3);
+}
+
+body.dark-theme .bk-status-badge.status-active {
+    background: rgba(139, 92, 246, 0.15);
+    color: #c4b5fd;
+    border-color: rgba(139, 92, 246, 0.3);
 }
 
 body.dark-theme .bk-status-badge.status-completed {

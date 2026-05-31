@@ -1154,7 +1154,8 @@ const creditTransactionsCol = collection(db, "creditTransactions"); // Credit Sy
 const lockersCol = collection(db, "lockers"); // Locker System
 
 // Expose Firebase helpers for non-module booking UI script
-window._fb = { bookingsCol, query, where, getDocs, addDoc, db, doc, updateDoc, deleteDoc, runTransaction, increment, getDoc };
+const pendingRatingsCol = collection(db, "pendingRatings");
+window._fb = { bookingsCol, pendingRatingsCol, collection, query, where, getDocs, addDoc, db, doc, updateDoc, deleteDoc, runTransaction, increment, getDoc };
 
 async function logStockMovement(productId, productName, changeAmount, reason) {
     try {
@@ -8757,7 +8758,8 @@ window.filterLedger = () => { ledgerCurrentPage = 1; renderLedger(); };
 // Booking status state machine — blocks illegal transitions like Completed→Pending
 const BOOKING_STATUS_TRANSITIONS = {
     'Pending':   ['Confirmed', 'Declined', 'Cancelled', 'No Show'],
-    'Confirmed': ['Completed', 'Cancelled', 'No Show'],
+    'Confirmed': ['active', 'Completed', 'Cancelled', 'No Show'],
+    'active':    ['Completed', 'No Show'],
     'Completed': [],
     'Declined':  [],
     'Cancelled': [],
