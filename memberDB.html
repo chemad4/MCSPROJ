@@ -48,8 +48,10 @@
                 <i class="fa-solid fa-calendar-check" aria-hidden="true"></i> <span class="menu-text">Bookings</span>
             </li>
 
-            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Gym Directory')" tabindex="0">
-                <i class="fa-solid fa-comments" aria-hidden="true"></i> <span class="menu-text">Messages</span>
+            <li class="nav-item nav-clickable" onclick="openChatTab('all', this, 'Gym Directory'); clearMessagesBadge()" tabindex="0" style="position:relative;">
+                <i class="fa-solid fa-comments" aria-hidden="true" id="navMessagesIcon" style="position:relative;"></i>
+                <span class="menu-text">Messages</span>
+                <span id="messagesBadgeDot" style="display:none; position:absolute; top:8px; right:28px; background:var(--primary-red); width:10px; height:10px; border-radius:50%;"></span>
             </li>
         </ul>
         <div class="sidebar-footer" onclick="openProfileSettingsModal()" style="margin-top: auto; padding: 12px; border-radius: 16px; background: rgba(0, 0, 0, 0.03); display: flex; align-items: center; gap: 10px; border: 0.5px solid rgba(0, 0, 0, 0.05); cursor: pointer; transition: background 0.2s; margin: 12px;">

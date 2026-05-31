@@ -746,7 +746,8 @@
             width: 100%;
         }
 
-        #weekly-sales-report {
+        #weekly-sales-report,
+        #monthly-sales-report {
             padding: 50px;
             max-width: 800px;
             margin: 0 auto;
@@ -1245,6 +1246,11 @@
                                                     style="color: #EF4444; font-size: 8px;"></i> Out of Order</span>
                                             <span class="value" id="detailBrokenCount">0 Units</span>
                                         </div>
+                                        <div class="stat-detail-row" style="border-top: 1px solid var(--border-color); margin-top: 6px; padding-top: 6px;">
+                                            <span class="label"><i class="fa-solid fa-circle"
+                                                    style="color: #f97316; font-size: 8px;"></i> Overdue Maintenance <span style="font-size:10px; color: var(--text-muted);">(>90 days)</span></span>
+                                            <span class="value" id="detailOverdueCount">0 Units</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1390,6 +1396,9 @@
                                     <th class="bk-sortable" onclick="sortEquipment('size')">Size/Weight <i class="fas fa-sort bk-sort-icon"></i></th>
                                     <th class="bk-sortable" onclick="sortEquipment('qty')">Qty <i class="fas fa-sort bk-sort-icon"></i></th>
                                     <th class="bk-sortable" onclick="sortEquipment('currentStatus')">Status <i class="fas fa-sort bk-sort-icon"></i></th>
+                                    <th class="bk-sortable" onclick="sortEquipment('acquisitionDate')">Acquired <i class="fas fa-sort bk-sort-icon"></i></th>
+                                    <th class="bk-sortable" onclick="sortEquipment('maintenanceDate')">Last Maintenance <i class="fas fa-sort bk-sort-icon"></i></th>
+                                    <th class="bk-sortable" onclick="sortEquipment('maintenanceCount')">Sessions <i class="fas fa-sort bk-sort-icon"></i></th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -1617,7 +1626,11 @@
                 <div style="margin-left: auto; display: flex; gap: 8px;">
                     <button class="action-btn is-dark" style="padding: 6px 12px;"
                         onclick="generateWeeklyPDF()">
-                        <i class="fas fa-file-pdf"></i> Export Report
+                        <i class="fas fa-file-pdf"></i> Weekly Report
+                    </button>
+                    <button class="action-btn is-dark" style="padding: 6px 12px;"
+                        onclick="generateMonthlyPDF()">
+                        <i class="fas fa-file-pdf"></i> Monthly Report
                     </button>
                 </div>
             </div>
@@ -1645,7 +1658,6 @@
                                 <th style="width: 250px;">Purchased Items</th>
                                 <th onclick="sortPayments('timestamp')">Date & Time <i class="fas fa-sort"></i></th>
                                 <th onclick="sortPayments('subtotal')">Subtotal <i class="fas fa-sort"></i></th>
-                                <th onclick="sortPayments('vat')">VAT (12%) <i class="fas fa-sort"></i></th>
                                 <th onclick="sortPayments('grandTotal')">Grand Total <i class="fas fa-sort"></i></th>
                                 <th>Status</th>
                                 <th style="width: 50px;"></th>
@@ -2930,7 +2942,7 @@
                     <label class="form-label">Weight / Size (Optional)</label>
                     <input type="text" id="equipSize" placeholder="e.g. 50 lbs">
                 </div>
-                <div class="form-row">
+              <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Quantity</label>
                         <input type="number" id="equipQty" placeholder="1" min="1" required>
@@ -2938,6 +2950,16 @@
                     <div class="form-group">
                         <label class="form-label">Asset Tag (Optional)</label>
                         <input type="text" id="equipAssetTag" placeholder="e.g. TRD-001">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Acquisition Date</label>
+                        <input type="date" id="equipAcquisitionDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Maintenance Date</label>
+                        <input type="date" id="equipMaintenanceDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                 </div>
                 <div class="btn-row">
@@ -2981,7 +3003,7 @@
                     <label class="form-label">Weight / Size</label>
                     <input type="text" id="editEquipSize" placeholder="e.g. 50 lbs">
                 </div>
-                <div class="form-row">
+               <div class="form-row">
                     <div class="form-group">
                         <label class="form-label">Quantity</label>
                         <input type="number" id="editEquipQty" min="0" required>
@@ -2999,11 +3021,71 @@
                     <label class="form-label">Asset Tag</label>
                     <input type="text" id="editEquipAssetTag" placeholder="e.g. TRD-001">
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Acquisition Date</label>
+                        <input type="date" id="editEquipAcquisitionDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Maintenance Date</label>
+                        <input type="date" id="editEquipMaintenanceDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);" onchange="handleMaintenanceDateChange(this)">
+                    </div>
+                </div>
+                <div class="form-group" style="background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 13px; color: var(--text-muted);"><i class="fa-solid fa-wrench" style="margin-right: 6px;"></i>Total Maintenance Sessions</span>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <strong id="editEquipMaintCount" style="font-size: 15px; color: var(--text-primary);">0 times</strong>
+                        <button type="button" class="action-btn is-subtle" style="padding:4px 10px; font-size:12px;" onclick="openMaintenanceLogbookModal(document.getElementById('editEquipId').value)"><i class="fa-solid fa-book-open" style="margin-right:4px;"></i>View Log</button>
+                    </div>
+                </div>
                 <div class="btn-row">
                     <button type="button" class="action-btn is-subtle" onclick="closeModal('editEquipModal')">Cancel</button>
                     <button type="submit" class="action-btn">Save Changes</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Maintenance Logbook Modal -->
+    <div id="maintenanceLogbookModal" class="modal">
+        <div class="modal-content" style="max-width: 580px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-book-open" style="margin-right:8px;"></i>Maintenance Log &mdash; <span id="logbookEquipName"></span></h3>
+                <span class="close-btn" onclick="closeModal('maintenanceLogbookModal')">&times;</span>
+            </div>
+
+            <!-- Summary -->
+            <div class="form-group" style="background:var(--panel-bg); border:1px solid var(--border-color); border-radius:8px; padding:12px 14px; margin-bottom:12px; display:flex; justify-content:space-between;">
+                <span style="font-size:13px; color:var(--text-muted);">Total Sessions: <strong id="logbookTotalCount" style="color:var(--text-primary);">0</strong></span>
+                <span style="font-size:13px; color:var(--text-muted);">Last Maintenance: <strong id="logbookLastDate" style="color:var(--text-primary);">—</strong></span>
+            </div>
+
+            <!-- Add entry form -->
+            <div class="form-group" style="border:1px solid var(--border-color); border-radius:8px; padding:14px; margin-bottom:14px;">
+                <div style="font-weight:600; margin-bottom:10px; font-size:14px;"><i class="fa-solid fa-plus" style="margin-right:6px;"></i>Log New Entry</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Date <span style="color:var(--danger);">*</span></label>
+                        <input type="date" id="logEntryDate" style="width:100%; padding:9px 10px; border:1px solid var(--border-color); border-radius:6px; background:var(--panel-bg); color:var(--text-primary);">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:8px;">
+                    <label class="form-label">Remark <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
+                    <input type="text" id="logEntryRemark" maxlength="200" placeholder="e.g. Replaced belt, lubricated joints..." style="width:100%; padding:9px 10px; border:1px solid var(--border-color); border-radius:6px; background:var(--panel-bg); color:var(--text-primary);">
+                </div>
+                <div class="btn-row" style="margin-top:10px;">
+                    <button type="button" class="action-btn is-primary" onclick="submitMaintenanceLog()">Save Entry</button>
+                </div>
+            </div>
+
+            <!-- Log history list -->
+            <div id="maintenanceLogList" class="mp-session-list" style="max-height:260px; overflow-y:auto;">
+                <div class="mp-empty-state">No maintenance records yet.</div>
+            </div>
+
+            <div class="btn-row" style="margin-top:14px;">
+                <button type="button" class="action-btn is-subtle" onclick="closeModal('maintenanceLogbookModal')">Close</button>
+            </div>
         </div>
     </div>
 
@@ -3508,6 +3590,7 @@
     </div>
 
     <div id="pdf-report-container">
+        <!-- ===== WEEKLY REPORT ===== -->
         <div id="weekly-sales-report">
             <div class="report-header-premium">
                 <div class="brand-info" style="display:flex;align-items:center;gap:14px;">
@@ -3520,46 +3603,204 @@
                 <div class="report-title">
                     <h2>Weekly Financial Report</h2>
                     <p>Period: <strong id="pdfWeekOf">--/--/-- to --/--/--</strong></p>
+                    <p style="margin:2px 0 0;font-size:11px;color:#888;">Generated: <span id="pdfGeneratedAt">—</span></p>
                 </div>
             </div>
 
-            <div class="report-section-title">Revenue Performance Overview</div>
-            <div class="financial-summary-grid">
+            <!-- KPI Row -->
+            <div class="report-section-title">Revenue Summary</div>
+            <div class="financial-summary-grid" style="grid-template-columns: repeat(4, 1fr);">
                 <div class="summary-box">
                     <div class="label">Gross Revenue</div>
                     <div class="value" id="pdfGrossRevenue">₱0.00</div>
                 </div>
                 <div class="summary-box">
-                    <div class="label">VAT (12%)</div>
+                    <div class="label">VAT (12% incl.)</div>
                     <div class="value" id="pdfVATAmount">₱0.00</div>
                 </div>
                 <div class="summary-box">
                     <div class="label">Net Revenue</div>
                     <div class="value" id="pdfNetRevenue">₱0.00</div>
                 </div>
+                <div class="summary-box" style="border-left: 3px solid #991b1b;">
+                    <div class="label">Voided / Refunded</div>
+                    <div class="value" style="color:#991b1b;" id="pdfVoidedAmount">₱0.00</div>
+                </div>
             </div>
 
-            <div class="report-section-title">Revenue Sources Breakdown</div>
+            <!-- Transaction Stats -->
+            <div class="financial-summary-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: -20px;">
+                <div class="summary-box">
+                    <div class="label">Total Transactions</div>
+                    <div class="value" id="pdfTxCount">0</div>
+                </div>
+                <div class="summary-box">
+                    <div class="label">Avg. Transaction Value</div>
+                    <div class="value" id="pdfAvgTx">₱0.00</div>
+                </div>
+                <div class="summary-box">
+                    <div class="label">Voided Transactions</div>
+                    <div class="value" id="pdfVoidedCount">0</div>
+                </div>
+            </div>
+
+            <!-- Revenue by Category -->
+            <div class="report-section-title">Revenue by Category</div>
             <table class="report-table">
                 <thead>
                     <tr>
                         <th>Category</th>
-                        <th style="text-align: right;">Total Amount</th>
+                        <th style="text-align: right;">Transactions</th>
+                        <th style="text-align: right;">Amount</th>
                         <th style="text-align: right;">% of Total</th>
                     </tr>
                 </thead>
-                <tbody id="pdfRevenueSourcesBody">
-                    <!-- Populated by JS -->
-                </tbody>
+                <tbody id="pdfRevenueSourcesBody"></tbody>
+            </table>
+
+            <!-- Payment Method Breakdown -->
+            <div class="report-section-title">Payment Method Breakdown</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th style="text-align: right;">Transactions</th>
+                        <th style="text-align: right;">Amount</th>
+                        <th style="text-align: right;">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfPaymentMethodsBody"></tbody>
+            </table>
+
+            <!-- Daily Breakdown -->
+            <div class="report-section-title">Daily Revenue Breakdown</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Day</th>
+                        <th style="text-align: right;">Transactions</th>
+                        <th style="text-align: right;">Revenue</th>
+                        <th style="text-align: right;">Voided</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfDailyBreakdownBody"></tbody>
             </table>
 
             <div class="report-footer">
                 <div class="signature-block">
                     <div class="signature-line" id="pdfAssociateName">Admin Name</div>
-                    <p>Authorized Signatory</p>
+                    <p>Prepared By</p>
                 </div>
                 <div class="signature-block" style="text-align: right;">
                     <div class="signature-line" id="pdfCompletionDate">--/--/--</div>
+                    <p>Report Date</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== MONTHLY REPORT ===== -->
+        <div id="monthly-sales-report">
+            <div class="report-header-premium">
+                <div class="brand-info" style="display:flex;align-items:center;gap:14px;">
+                    <img src="images/icon-192.png" alt="XFit Track Logo" style="width:56px;height:56px;border-radius:10px;">
+                    <div>
+                        <h1 style="margin:0;">XFIT TRACK</h1>
+                        <p style="margin:2px 0 0;">Financial Management Systems</p>
+                    </div>
+                </div>
+                <div class="report-title">
+                    <h2>Monthly Financial Report</h2>
+                    <p>Period: <strong id="pdfMonthOf">-- ----</strong></p>
+                    <p style="margin:2px 0 0;font-size:11px;color:#888;">Generated: <span id="pdfMonthGeneratedAt">—</span></p>
+                </div>
+            </div>
+
+            <!-- KPI Row -->
+            <div class="report-section-title">Revenue Summary</div>
+            <div class="financial-summary-grid" style="grid-template-columns: repeat(4, 1fr);">
+                <div class="summary-box">
+                    <div class="label">Gross Revenue</div>
+                    <div class="value" id="pdfMonthGrossRevenue">₱0.00</div>
+                </div>
+                <div class="summary-box">
+                    <div class="label">VAT (12% incl.)</div>
+                    <div class="value" id="pdfMonthVATAmount">₱0.00</div>
+                </div>
+                <div class="summary-box">
+                    <div class="label">Net Revenue</div>
+                    <div class="value" id="pdfMonthNetRevenue">₱0.00</div>
+                </div>
+                <div class="summary-box" style="border-left: 3px solid #991b1b;">
+                    <div class="label">Voided / Refunded</div>
+                    <div class="value" style="color:#991b1b;" id="pdfMonthVoidedAmount">₱0.00</div>
+                </div>
+            </div>
+
+            <!-- Transaction Stats -->
+            <div class="financial-summary-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: -20px;">
+                <div class="summary-box">
+                    <div class="label">Total Transactions</div>
+                    <div class="value" id="pdfMonthTxCount">0</div>
+                </div>
+                <div class="summary-box">
+                    <div class="label">Avg. Transaction Value</div>
+                    <div class="value" id="pdfMonthAvgTx">₱0.00</div>
+                </div>
+                <div class="summary-box">
+                    <div class="label">Voided Transactions</div>
+                    <div class="value" id="pdfMonthVoidedCount">0</div>
+                </div>
+            </div>
+
+            <!-- Revenue by Category -->
+            <div class="report-section-title">Revenue by Category</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th style="text-align: right;">Transactions</th>
+                        <th style="text-align: right;">Amount</th>
+                        <th style="text-align: right;">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfMonthRevenueSourcesBody"></tbody>
+            </table>
+
+            <!-- Payment Method Breakdown -->
+            <div class="report-section-title">Payment Method Breakdown</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th style="text-align: right;">Transactions</th>
+                        <th style="text-align: right;">Amount</th>
+                        <th style="text-align: right;">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfMonthPaymentMethodsBody"></tbody>
+            </table>
+
+            <!-- Weekly Breakdown inside month -->
+            <div class="report-section-title">Week-by-Week Breakdown</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Week</th>
+                        <th style="text-align: right;">Transactions</th>
+                        <th style="text-align: right;">Revenue</th>
+                        <th style="text-align: right;">Voided</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfMonthWeeklyBreakdownBody"></tbody>
+            </table>
+
+            <div class="report-footer">
+                <div class="signature-block">
+                    <div class="signature-line" id="pdfMonthAssociateName">Admin Name</div>
+                    <p>Prepared By</p>
+                </div>
+                <div class="signature-block" style="text-align: right;">
+                    <div class="signature-line" id="pdfMonthCompletionDate">--/--/--</div>
                     <p>Report Date</p>
                 </div>
             </div>
@@ -3865,11 +4106,6 @@
                         style="display: flex; width: 220px; justify-content: space-between; font-size: 14px; color: var(--text-muted);">
                         <span>Subtotal</span>
                         <span id="invoiceSubtotal">₱0.00</span>
-                    </div>
-                    <div
-                        style="display: flex; width: 220px; justify-content: space-between; font-size: 14px; color: var(--text-muted);">
-                        <span>VAT (12%)</span>
-                        <span id="invoiceVAT">₱0.00</span>
                     </div>
                     <div
                         style="display: flex; width: 220px; justify-content: space-between; font-size: 20px; font-weight: 700; color: var(--dark-black); margin-top: 10px; padding-top: 10px; border-top: 2px solid var(--border-color);">

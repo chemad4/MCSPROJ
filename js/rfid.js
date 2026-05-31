@@ -267,11 +267,21 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
       if (user.status === "Archived") {
         throw new Error("ACCESS_DENIED: Account is archived.");
       }
-      if (user.status === "Suspended") {
+      // Explicit trainer/staff gate: Suspended or On Leave profiles must never clock in,
+      // even if a prior RFID glitch left shiftStatus as 'On Floor' in the DB.
+      const _role = (user.role || "").toLowerCase();
+      if (_role === "trainer" || _role === "staff" || _role === "admin") {
+        if (user.status === "Suspended") {
+          throw new Error("ACCESS_DENIED: Account Suspended — clock-in blocked.");
+        }
+        if (user.status === "On Leave") {
+          throw new Error("ACCESS_DENIED: Account On Leave — clock-in blocked.");
+        }
+        if ((user.status || "Active") !== "Active") {
+          throw new Error(`ACCESS_DENIED: Shift check-in denied. Your account status is "${user.status || 'Active'}".`);
+        }
+      } else if (user.status === "Suspended") {
         throw new Error("ACCESS_DENIED: Account is suspended.");
-      }
-      if (((user.role || "").toLowerCase() === "trainer" || (user.role || "").toLowerCase() === "staff" || (user.role || "").toLowerCase() === "admin") && (user.status || "Active") !== "Active") {
-        throw new Error(`ACCESS_DENIED: Shift check-in denied. Your account status is "${user.status || 'Active'}".`);
       }
 
       // Check membership expiration authoritatively.

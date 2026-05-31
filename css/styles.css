@@ -989,6 +989,12 @@ body.dark-theme .badge.broken {
     transition: 0.2s;
 }
 
+.btn-icon.btn-xs {
+    font-size: 11px;
+    padding: 3px 7px;
+    margin: 0 2px;
+}
+
 .btn-edit {
     color: #3498db;
 }

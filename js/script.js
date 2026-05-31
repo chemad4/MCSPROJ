@@ -818,15 +818,28 @@ function renderRevenueChart() {
 }
 
 function renderMaintenanceChart() {
-    const ops = inventoryData.filter(i => (i.itemType === 'equipment' || !i.itemType) && i.status === 'Operational').length;
-    const maint = inventoryData.filter(i => (i.itemType === 'equipment' || !i.itemType) && i.status === 'Maintenance').length;
-    const broken = inventoryData.filter(i => (i.itemType === 'equipment' || !i.itemType) && i.status === 'Out of Order').length;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    // Circle chart visual removed from HTML for Maintenance as per user request
+    const equipment = inventoryData.filter(i => i.itemType === 'equipment' || !i.itemType);
+    const ops = equipment.filter(i => i.status === 'Operational').length;
+    const maint = equipment.filter(i => i.status === 'Maintenance').length;
+    const broken = equipment.filter(i => i.status === 'Out of Order').length;
+
+    const overdue = equipment.filter(i => {
+        if (i.status !== 'Operational') return false;
+        if (!i.maintenanceDate) return true; // never logged = overdue
+        const days = Math.floor((today - new Date(i.maintenanceDate)) / (1000 * 60 * 60 * 24));
+        return days > 90;
+    }).length;
 
     if (document.getElementById('detailOpsCount')) document.getElementById('detailOpsCount').innerText = `${ops} Units`;
     if (document.getElementById('detailMaintCount')) document.getElementById('detailMaintCount').innerText = `${maint} Units`;
     if (document.getElementById('detailBrokenCount')) document.getElementById('detailBrokenCount').innerText = `${broken} Units`;
+    if (document.getElementById('detailOverdueCount')) {
+        document.getElementById('detailOverdueCount').innerText = `${overdue} Units`;
+        document.getElementById('detailOverdueCount').style.color = overdue > 0 ? '#f97316' : '';
+    }
 }
 
 function renderCapacityChart() {
@@ -1149,6 +1162,7 @@ const bookingsCol = collection(db, "bookings");
 const guestCardsCol = collection(db, "guestCards");
 const walkinPassesCol = collection(db, "walkinPasses");
 const stockMovementsCol = collection(db, "stockMovements"); // Phase 3: Inventory Ledger
+const maintenanceLogsCol = collection(db, "maintenanceLogs"); // Equipment maintenance history
 const membershipPlansCol = collection(db, "membershipPlans"); // Membership Plans
 const creditTransactionsCol = collection(db, "creditTransactions"); // Credit System
 const lockersCol = collection(db, "lockers"); // Locker System
@@ -1181,6 +1195,147 @@ async function logStockMovement(productId, productName, changeAmount, reason) {
         console.error("Failed to log stock movement:", e);
     }
 }
+
+// ─── Maintenance Logbook ───────────────────────────────────────────────────────
+
+let currentLogbookEquipId = null;
+let currentLogbookEquipName = '';
+let maintenanceLogsData = [];
+
+async function logMaintenanceEntry(equipmentId, equipmentName, maintenanceDate, remark) {
+    try {
+        const now = new Date();
+        const payload = {
+            equipmentId,
+            equipmentName,
+            maintenanceDate,
+            remark: remark || '',
+            loggedBy: localStorage.getItem("loggedInUser") || "Unknown",
+            userId: localStorage.getItem("userId") || "System",
+            date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            timestamp: now.getTime()
+        };
+        const ref = await addDoc(maintenanceLogsCol, payload);
+
+        // Sync the equipment document: update maintenanceDate and increment maintenanceCount
+        const equipDoc = inventoryData.find(i => i.id === equipmentId);
+        const newCount = (equipDoc ? (equipDoc.maintenanceCount || 0) : 0) + 1;
+        await updateDoc(doc(db, "inventory", equipmentId), {
+            maintenanceDate,
+            maintenanceCount: newCount
+        });
+        if (equipDoc) {
+            equipDoc.maintenanceDate = maintenanceDate;
+            equipDoc.maintenanceCount = newCount;
+        }
+
+        if (window.logActivity) {
+            window.logActivity("Maintenance Logged", `${equipmentName} — maintenance #${newCount} recorded on ${maintenanceDate}`);
+        }
+
+        // Optimistic prepend so the list updates instantly
+        maintenanceLogsData.unshift({ id: ref.id, ...payload });
+        renderMaintenanceLog();
+    } catch (e) {
+        console.error("Failed to log maintenance entry:", e);
+        throw e;
+    }
+}
+
+function renderMaintenanceLog() {
+    const list = document.getElementById('maintenanceLogList');
+    if (!list) return;
+
+    if (!maintenanceLogsData.length) {
+        list.innerHTML = '<div class="mp-empty-state">No maintenance records yet.</div>';
+        return;
+    }
+
+    list.innerHTML = maintenanceLogsData.map(entry => `
+        <div class="mp-session-item" style="display:flex; justify-content:space-between; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border-color);">
+            <div>
+                <div style="font-weight:600;">${entry.maintenanceDate}</div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">${entry.remark || '<em>No remark</em>'}</div>
+            </div>
+            <div style="text-align:right; font-size:0.8rem; color:var(--text-muted); white-space:nowrap; margin-left:12px;">
+                <div>${entry.loggedBy}</div>
+                <div>${entry.date} ${entry.time}</div>
+            </div>
+        </div>
+    `).join('');
+
+    // Update summary stats
+    const equipDoc = inventoryData.find(i => i.id === currentLogbookEquipId);
+    const totalCount = equipDoc ? (equipDoc.maintenanceCount || maintenanceLogsData.length) : maintenanceLogsData.length;
+    const lastDate = equipDoc ? (equipDoc.maintenanceDate || '—') : (maintenanceLogsData[0]?.maintenanceDate || '—');
+    const countEl = document.getElementById('logbookTotalCount');
+    const lastEl = document.getElementById('logbookLastDate');
+    if (countEl) countEl.textContent = totalCount;
+    if (lastEl) lastEl.textContent = lastDate;
+}
+
+window.openMaintenanceLogbookModal = async function(equipmentId) {
+    const equip = inventoryData.find(i => i.id === equipmentId);
+    if (!equip) return;
+
+    currentLogbookEquipId = equipmentId;
+    currentLogbookEquipName = equip.name;
+
+    const nameEl = document.getElementById('logbookEquipName');
+    const countEl = document.getElementById('logbookTotalCount');
+    const lastEl = document.getElementById('logbookLastDate');
+    const list = document.getElementById('maintenanceLogList');
+
+    if (nameEl) nameEl.textContent = equip.name;
+    if (countEl) countEl.textContent = equip.maintenanceCount || 0;
+    if (lastEl) lastEl.textContent = equip.maintenanceDate || '—';
+    if (list) list.innerHTML = '<div class="mp-empty-state">Loading...</div>';
+
+    // Reset add-entry form
+    const dateInput = document.getElementById('logEntryDate');
+    const remarkInput = document.getElementById('logEntryRemark');
+    if (dateInput) { dateInput.value = new Date().toISOString().split('T')[0]; }
+    if (remarkInput) remarkInput.value = '';
+
+    document.getElementById('maintenanceLogbookModal').style.display = 'flex';
+
+    // Fetch history from Firestore
+    try {
+        const q = query(maintenanceLogsCol, where("equipmentId", "==", equipmentId), orderBy("timestamp", "desc"));
+        const snap = await getDocs(q);
+        maintenanceLogsData = [];
+        snap.forEach(d => maintenanceLogsData.push({ id: d.id, ...d.data() }));
+        renderMaintenanceLog();
+    } catch (e) {
+        console.error("Failed to fetch maintenance logs:", e);
+        if (list) list.innerHTML = '<div class="mp-empty-state">Failed to load records.</div>';
+    }
+};
+
+window.submitMaintenanceLog = async function() {
+    const dateInput = document.getElementById('logEntryDate');
+    const remarkInput = document.getElementById('logEntryRemark');
+    const btn = document.querySelector('#maintenanceLogbookModal .action-btn.is-primary');
+
+    const maintenanceDate = dateInput ? dateInput.value : '';
+    if (!maintenanceDate) return showToast("Please select a maintenance date.", "error");
+    if (!currentLogbookEquipId) return;
+
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
+    try {
+        await logMaintenanceEntry(currentLogbookEquipId, currentLogbookEquipName, maintenanceDate, remarkInput ? remarkInput.value.trim() : '');
+        if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+        if (remarkInput) remarkInput.value = '';
+        showToast("Maintenance entry saved.", "success");
+    } catch (e) {
+        showToast("Failed to save entry. Please try again.", "error");
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = 'Save Entry'; }
+    }
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
 
 // Ledger is staff-only and rarely viewed — fetch once on load instead of live-syncing.
 // Call window.refreshStockMovements() after any local stock-movement write to refresh the view.
@@ -1291,6 +1446,28 @@ if (currentUserId) {
         const _emitChat = () => {
             messagesData = Array.from(_msgIndex.values());
             renderChatHistory();
+            _updateMessagesBadge();
+        };
+
+        // Track which senders the member has already opened (seen)
+        const _seenSenders = new Set();
+
+        function _updateMessagesBadge() {
+            const badge = document.getElementById('messagesBadgeDot');
+            if (!badge) return;
+            // Count messages received by this user that are from a sender not yet opened
+            const hasUnread = messagesData.some(m => {
+                const isForMe = m.receiver === myName || m.receiverId === currentUserId;
+                const isFromOther = m.sender !== myName && m.senderId !== currentUserId;
+                return isForMe && isFromOther && !_seenSenders.has(m.sender || m.senderId);
+            });
+            badge.style.display = hasUnread ? 'block' : 'none';
+        }
+
+        window.clearMessagesBadge = function () {
+            // Mark current chat partner as seen so badge clears
+            if (currentChatUser) _seenSenders.add(currentChatUser);
+            _updateMessagesBadge();
         };
         const _ingest = (snapshot) => {
             snapshot.docChanges().forEach(ch => {
@@ -1300,10 +1477,16 @@ if (currentUserId) {
             _emitChat();
         };
         // PRESENTATION PROOFING: Lower chat message buffer to 30 for lightweight presentation loads.
-        const sentQ = query(messagesCol, where("sender", "==", myName), orderBy("timestamp", "desc"), limit(30));
-        const recvQ = query(messagesCol, where("receiver", "==", myName), orderBy("timestamp", "desc"), limit(30));
-        onSnapshot(sentQ, _ingest, (err) => console.warn("[messages:sent] listener error", err));
-        onSnapshot(recvQ, _ingest, (err) => console.warn("[messages:recv] listener error", err));
+        // Query by name (manual chat) AND by userId (auto-messages from declined bookings).
+        // Both are needed because manual messages use name strings while auto-messages use IDs.
+        const sentQ    = query(messagesCol, where("sender",     "==", myName),        orderBy("timestamp", "desc"), limit(30));
+        const recvQ    = query(messagesCol, where("receiver",   "==", myName),        orderBy("timestamp", "desc"), limit(30));
+        const sentIdQ  = query(messagesCol, where("senderId",   "==", currentUserId), orderBy("timestamp", "desc"), limit(30));
+        const recvIdQ  = query(messagesCol, where("receiverId", "==", currentUserId), orderBy("timestamp", "desc"), limit(30));
+        onSnapshot(sentQ,   _ingest, (err) => console.warn("[messages:sent] listener error", err));
+        onSnapshot(recvQ,   _ingest, (err) => console.warn("[messages:recv] listener error", err));
+        onSnapshot(sentIdQ, _ingest, (err) => console.warn("[messages:sentId] listener error", err));
+        onSnapshot(recvIdQ, _ingest, (err) => console.warn("[messages:recvId] listener error", err));
     }
 }
 
@@ -1415,6 +1598,8 @@ window.openChat = function (userName) {
     document.querySelectorAll('.chat-user').forEach(el => el.classList.remove('active'));
     document.getElementById(`chat-user-${userName.replace(/[^a-zA-Z0-9]/g, '')}`).classList.add('active');
     renderChatHistory();
+    // Mark this sender's messages as seen and clear badge if no remaining unread
+    if (typeof window.clearMessagesBadge === 'function') window.clearMessagesBadge();
 }
 
 function renderChatHistory() {
@@ -1597,6 +1782,31 @@ function renderInventory() {
         let threshold = item.lowStockThreshold !== undefined ? item.lowStockThreshold : 5;
         let isProblematic = false;
 
+        let maintenanceDueDays = null;  // days since last maintenance (null = never recorded)
+        let equipmentAgeDays = null;    // days since acquisition (null = not recorded)
+        let maintenanceOverdue = false; // Operational but no maintenance in >90 days
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (!isConsumable) {
+            if (item.maintenanceDate) {
+                const mDate = new Date(item.maintenanceDate);
+                maintenanceDueDays = Math.floor((today - mDate) / (1000 * 60 * 60 * 24));
+            }
+            if (item.acquisitionDate) {
+                const aDate = new Date(item.acquisitionDate);
+                equipmentAgeDays = Math.floor((today - aDate) / (1000 * 60 * 60 * 24));
+            }
+            // Equipment is overdue if it's Operational and either has no maintenance record
+            // or the last maintenance was more than 90 days ago.
+            if (currentStatus === 'Operational') {
+                if (maintenanceDueDays === null || maintenanceDueDays > 90) {
+                    maintenanceOverdue = true;
+                }
+            }
+        }
+
         if (isConsumable) {
             if (item.qty === 0) { currentStatus = "Out of Stock"; isProblematic = true; }
             else if (item.qty <= 2) { currentStatus = "Critical Stock"; isProblematic = true; low++; }
@@ -1609,7 +1819,7 @@ function renderInventory() {
         if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
         if (!isConsumable) {
             totalMachines++;
-            equipment.push({ ...item, currentStatus, isProblematic });
+            equipment.push({ ...item, currentStatus, isProblematic, maintenanceDueDays, equipmentAgeDays, maintenanceOverdue });
         } else {
             consumables.push({ ...item, currentStatus, isProblematic });
         }
@@ -1808,6 +2018,25 @@ function renderInventory() {
                             <span>Size/Weight: <strong>${escapeHtml(item.size)}</strong></span>
                         </div>
                     ` : ''}
+                    ${(item.acquisitionDate && item.acquisitionDate !== '') ? `
+                        <div class="inventory-meta-item">
+                            <i class="fa-solid fa-calendar-plus"></i>
+                            <span>Acquired: <strong>${escapeHtml(item.acquisitionDate)}</strong>${item.equipmentAgeDays !== null && item.equipmentAgeDays > 1825 ? ` <span class="expiring-tag" style="background:rgba(100,116,139,0.12);color:#64748b;border:1px solid rgba(100,116,139,0.25);margin-left:4px;"><i class="fa-solid fa-hourglass-half"></i> ${Math.floor(item.equipmentAgeDays/365)}y old</span>` : ''}</span>
+                        </div>
+                    ` : ''}
+                    ${(item.maintenanceDate && item.maintenanceDate !== '') ? `
+                        <div class="inventory-meta-item">
+                            <i class="fa-solid fa-wrench"></i>
+                            <span>Last Maintenance: <strong>${escapeHtml(item.maintenanceDate)}</strong>${item.maintenanceDueDays !== null && item.maintenanceDueDays > 90 ? ` <span class="expiring-tag expiring-soon" style="margin-left:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.maintenanceDueDays}d ago</span>` : ''}</span>
+                        </div>
+                    ` : `
+                        ${item.maintenanceOverdue ? `
+                        <div class="inventory-meta-item">
+                            <i class="fa-solid fa-wrench" style="color:#f97316;"></i>
+                            <span style="color:#f97316;"><strong>No maintenance record</strong> <span class="expiring-tag expiring-soon" style="margin-left:4px;"><i class="fa-solid fa-triangle-exclamation"></i> Overdue</span></span>
+                        </div>
+                        ` : ''}
+                    `}
                 </div>
             `;
         } else {
@@ -1874,7 +2103,13 @@ function renderInventory() {
                 <td><code>${(item.assetTag && item.assetTag !== 'undefined') ? escapeHtml(item.assetTag) : '-'}</code></td>
                 <td>${(item.size && item.size !== 'undefined') ? escapeHtml(item.size) : '-'}</td>
                 <td><strong>${item.qty}</strong></td>
-                <td><span class="badge ${badge}">${escapeHtml(item.currentStatus)}</span></td>
+                <td>
+                    <span class="badge ${badge}">${escapeHtml(item.currentStatus)}</span>
+                    ${item.maintenanceOverdue ? `<span class="badge" style="background:#fff7ed;color:#f97316;border:1px solid #fed7aa;margin-left:4px;font-size:10px;"><i class="fa-solid fa-triangle-exclamation"></i> Overdue</span>` : ''}
+                </td>
+                <td>${(item.acquisitionDate && item.acquisitionDate !== '') ? `${escapeHtml(item.acquisitionDate)}${item.equipmentAgeDays !== null && item.equipmentAgeDays > 1825 ? ` <span style="font-size:10px;color:#64748b;">(${Math.floor(item.equipmentAgeDays/365)}y)</span>` : ''}` : '-'}</td>
+                <td>${(item.maintenanceDate && item.maintenanceDate !== '') ? `${escapeHtml(item.maintenanceDate)}${item.maintenanceDueDays !== null && item.maintenanceDueDays > 90 ? ` <span style="font-size:10px;color:#f97316;">(${item.maintenanceDueDays}d ago)</span>` : ''}` : `<span style="color:#f97316;font-size:11px;">${item.maintenanceOverdue ? 'Never recorded' : '-'}</span>`}</td>
+                <td><strong>${item.maintenanceCount || 0}</strong>×</td>
                 <td>
                     <div style="display:flex; gap:8px;">
                         <button type="button" class="btn-icon" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
@@ -1987,9 +2222,22 @@ window.migrateInventoryDatabase = async function () {
     });
 }
 
-window.openEquipmentModal = () => { 
-    document.getElementById('equipmentForm').reset(); 
-    document.getElementById('equipmentModal').style.display = 'flex'; 
+// When the user sets maintenance date to today while status is Maintenance/Out of Order,
+// automatically flip status to Operational — maintenance just happened.
+window.handleMaintenanceDateChange = function(input) {
+    const today = new Date().toISOString().split('T')[0];
+    if (input.value !== today) return;
+    const statusEl = document.getElementById('editEquipStatus');
+    if (!statusEl) return;
+    if (statusEl.value === 'Maintenance' || statusEl.value === 'Out of Order') {
+        statusEl.value = 'Operational';
+        showToast("Status set to Operational — maintenance date logged as today.", "info");
+    }
+};
+
+window.openEquipmentModal = () => {
+    document.getElementById('equipmentForm').reset();
+    document.getElementById('equipmentModal').style.display = 'flex';
     window.handleEquipCategoryChange('equipCategory', 'equipQty');
 }
 window.openProductModal = () => { document.getElementById('productForm').reset(); document.getElementById('productModal').style.display = 'flex'; }
@@ -2027,10 +2275,18 @@ window.openEditEquipModal = function (id) {
     document.getElementById('editEquipQty').value = item.qty;
     document.getElementById('editEquipStatus').value = item.status || 'Operational';
     document.getElementById('editEquipAssetTag').value = item.assetTag || '';
+    if (document.getElementById('editEquipAcquisitionDate')) document.getElementById('editEquipAcquisitionDate').value = item.acquisitionDate || '';
+    if (document.getElementById('editEquipMaintenanceDate')) document.getElementById('editEquipMaintenanceDate').value = item.maintenanceDate || '';
+    if (document.getElementById('editEquipMaintCount')) {
+        const count = item.maintenanceCount || 0;
+        document.getElementById('editEquipMaintCount').textContent = `${count} time${count !== 1 ? 's' : ''}`;
+    }
     if (document.getElementById('editEquipImage')) document.getElementById('editEquipImage').value = item.image || '';
     if (document.getElementById('editEquipPreview')) {
         document.getElementById('editEquipPreview').src = item.image || 'images/default-equip.png';
     }
+    currentLogbookEquipId = id;
+    currentLogbookEquipName = item.name;
     document.getElementById('editEquipModal').style.display = 'flex';
     window.handleEquipCategoryChange('editEquipCategory', 'editEquipQty');
 }
@@ -2082,6 +2338,8 @@ if (document.getElementById('editEquipForm')) {
                 imageUrl = await window.uploadImage(imageFile, 'equipment');
             }
 
+            const newMaintenanceDate = document.getElementById('editEquipMaintenanceDate') ? document.getElementById('editEquipMaintenanceDate').value || '' : '';
+
             const updatedData = {
                 name: nameStr,
                 cat: document.getElementById('editEquipCategory').value,
@@ -2089,6 +2347,9 @@ if (document.getElementById('editEquipForm')) {
                 qty: qtyVal,
                 status: document.getElementById('editEquipStatus').value,
                 assetTag: assetTagVal,
+                acquisitionDate: document.getElementById('editEquipAcquisitionDate') ? document.getElementById('editEquipAcquisitionDate').value || '' : '',
+                maintenanceDate: newMaintenanceDate,
+                maintenanceCount: oldEquip ? (oldEquip.maintenanceCount || 0) : 0,
                 image: imageUrl || ''
             };
 
@@ -2293,6 +2554,8 @@ async function handleInventorySubmit(e, isProduct) {
                 itemType: isProduct ? 'product' : 'equipment', lowStockThreshold: isProduct ? 5 : 0,
                 assetTag: !isProduct ? (document.getElementById('equipAssetTag').value.trim() || '') : '',
                 serialNumber: isProduct ? (document.getElementById('prodSerialNumber') ? document.getElementById('prodSerialNumber').value.trim() : '') : '',
+                acquisitionDate: !isProduct ? (document.getElementById('equipAcquisitionDate').value || '') : '',
+                maintenanceDate: !isProduct ? (document.getElementById('equipMaintenanceDate').value || '') : '',
                 image: imageUrl || ''
             };
 
@@ -2691,17 +2954,15 @@ function renderCart() {
     window.syncDOM(cartBody, posCart, renderCartItem, 'cart-item');
 
     let subtotal = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    let vat = subtotal * 0.12;
     let discount = 0;
-    updatePOSTotals(subtotal, vat, discount, subtotal + vat - discount);
+    updatePOSTotals(subtotal, discount, subtotal - discount);
 }
 
-function updatePOSTotals(sub, vat, disc, grand) {
+function updatePOSTotals(sub, disc, grand) {
     const totalsDiv = document.querySelector('.pos-totals');
     if (!totalsDiv) return;
     totalsDiv.innerHTML = `
         <div class="total-line"><span>Subtotal:</span> <span>₱${sub.toFixed(2)}</span></div>
-        <div class="total-line"><span>VAT (12%):</span> <span>₱${vat.toFixed(2)}</span></div>
         <div class="total-line grand"><span>TOTAL:</span> <span>₱${grand.toFixed(2)}</span></div>
     `;
 }
@@ -2837,8 +3098,7 @@ window.processPaymentConfirmed = async function () {
 
             // Set dynamic price label based on current cart estimation
             let subtotalEstimate = posCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-            let vatEstimate = subtotalEstimate * 0.12;
-            let grandTotalEstimate = subtotalEstimate + vatEstimate;
+            let grandTotalEstimate = subtotalEstimate;
             statusEl.innerHTML = `Amount Due (Estimate): ₱${grandTotalEstimate.toFixed(2)}`;
             statusEl.style.color = "var(--dark-black)";
             modal.style.display = 'flex';
@@ -3102,9 +3362,8 @@ window.processPaymentConfirmed = async function () {
                 }
             }
 
-            let computedVat = computedSubtotal * 0.12;
             let computedDiscount = 0;
-            let computedGrandTotal = computedSubtotal + computedVat - computedDiscount;
+            let computedGrandTotal = computedSubtotal - computedDiscount;
 
             // 3. Process RFID top-up validation using fresh computed total
             let balanceBefore = 0;
@@ -3189,7 +3448,6 @@ window.processPaymentConfirmed = async function () {
                 items: itemsStr,
                 lineItems: posCart,
                 subtotal: computedSubtotal,
-                vat: computedVat,
                 discount: computedDiscount,
                 amount: computedGrandTotal,
                 paymentMethod: selectedPaymentMethod,
@@ -3395,9 +3653,20 @@ function calculateFinancials() {
 }
 
 function calculateOperationalAlerts() {
-    // Maintenance
-    const maintItems = inventoryData.filter(i => (i.itemType === 'equipment' || !i.itemType) && (i.status === 'Maintenance' || i.status === 'Out of Order'));
-    const maintCount = maintItems.length;
+    // Maintenance — includes equipment actively flagged + overdue for maintenance
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const equipment = inventoryData.filter(i => i.itemType === 'equipment' || !i.itemType);
+    const activelyFlagged = equipment.filter(i => i.status === 'Maintenance' || i.status === 'Out of Order').length;
+    const overdueCount = equipment.filter(i => {
+        if (i.status !== 'Operational') return false;
+        if (!i.maintenanceDate) return true;
+        const days = Math.floor((today - new Date(i.maintenanceDate)) / (1000 * 60 * 60 * 24));
+        return days > 90;
+    }).length;
+
+    const maintCount = activelyFlagged + overdueCount;
     const maintEl = document.getElementById('dashMaintCount');
     const maintText = document.getElementById('maintStatusText');
 
@@ -3406,6 +3675,12 @@ function calculateOperationalAlerts() {
         if (maintCount === 0) {
             maintText.innerText = "System Healthy";
             maintText.style.color = "#27ae60";
+        } else if (overdueCount > 0 && activelyFlagged === 0) {
+            maintText.innerText = `${overdueCount} Overdue Check-up${overdueCount > 1 ? 's' : ''}`;
+            maintText.style.color = "#f97316";
+        } else if (overdueCount > 0) {
+            maintText.innerText = `${activelyFlagged} Flagged, ${overdueCount} Overdue`;
+            maintText.style.color = "var(--primary-red)";
         } else {
             maintText.innerText = `${maintCount} Machine${maintCount > 1 ? 's' : ''} Need Attention`;
             maintText.style.color = "var(--primary-red)";
@@ -3825,9 +4100,6 @@ function renderPayments() {
         } else if (currentPaymentSortField === 'subtotal') {
             valA = Number(a.subtotal || a.amount || 0);
             valB = Number(b.subtotal || b.amount || 0);
-        } else if (currentPaymentSortField === 'vat') {
-            valA = Number(a.vat || 0);
-            valB = Number(b.vat || 0);
         } else if (currentPaymentSortField === 'timestamp') {
             valA = Number(a.timestamp || 0);
             valB = Number(b.timestamp || 0);
@@ -3844,7 +4116,6 @@ function renderPayments() {
     // 3. Render Rows
     const renderPaymentRow = (t) => {
         const amount = Number(t.amount || 0);
-        const vat = (t.vat != null ? Number(t.vat) : (amount / 1.12 * 0.12)).toFixed(2);
         const isVoided = t.status === 'Voided';
 
         // Transaction Reference
@@ -3903,7 +4174,6 @@ function renderPayments() {
                 <td style="${isVoided ? 'text-decoration: line-through;' : ''}">${itemsHtml}</td>
                 <td style="${isVoided ? 'text-decoration: line-through;' : ''}"><span style="white-space: nowrap;">${t.date}</span> <br><small style="color:#94a3b8;">${t.time || ''}</small></td>
                 <td style="${isVoided ? 'text-decoration: line-through;' : ''}">₱${(t.subtotal || amount).toFixed(2)}</td>
-                <td style="${isVoided ? 'text-decoration: line-through;' : ''}">₱${vat}</td>
                 <td style="font-weight:700; ${isVoided ? 'text-decoration: line-through;' : ''}">₱${amount.toFixed(2)}</td>
                 <td>${statusBadge}${remarksHtml}</td>
                 <td style="text-align: right;">${actionHtml}</td>
@@ -3961,12 +4231,10 @@ window.viewInvoice = function (id) {
     document.getElementById('invoiceStatus').className = `status-badge-solid ${tx.status?.toLowerCase() || 'paid'}`;
     document.getElementById('invoiceStatus').style.background = tx.status === 'Voided' ? '#ef4444' : '#27ae60';
 
-    const subtotal = tx.subtotal || (Number(tx.amount || 0) / 1.12);
-    const vat = tx.vat || (Number(tx.amount || 0) - subtotal);
+    const subtotal = tx.subtotal || Number(tx.amount || 0);
     const total = Number(tx.amount || 0);
 
     document.getElementById('invoiceSubtotal').innerText = `₱${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    document.getElementById('invoiceVAT').innerText = `₱${vat.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
     document.getElementById('invoiceTotal').innerText = `₱${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
     const itemsList = document.getElementById('invoiceItemsList');
@@ -4461,126 +4729,229 @@ window.voidTransaction = async function (id, isRefund = false) {
     });
 };
 
+// Shared helper: classify a payment's revenue category
+function _classifyPayment(type) {
+    if (type.includes("Membership") || type.includes("Plan") || type.includes("Annual") || type.includes("Monthly")) return "Membership Fees";
+    if (type.includes("Walk-in") || type.includes("Pass")) return "Walk-in Gym Fees";
+    return "POS Product Sales";
+}
+
+// Shared helper: normalise a payment method label
+function _normMethod(m) {
+    if (!m) return "Cash";
+    const u = m.toUpperCase();
+    if (u.includes("GCASH")) return "GCash";
+    if (u.includes("RFID")) return "RFID Credit";
+    return "Cash";
+}
+
+// Shared helper: build category + payment-method tbody HTML
+function _buildCategoryRows(payments, grossRevenue) {
+    const cats = {};
+    const methods = {};
+    payments.forEach(p => {
+        const amount = Number(p.amount || 0);
+        const cat = _classifyPayment(p.type || "");
+        if (!cats[cat]) cats[cat] = { count: 0, amount: 0 };
+        cats[cat].count++;
+        cats[cat].amount += amount;
+
+        const m = _normMethod(p.paymentMethod);
+        if (!methods[m]) methods[m] = { count: 0, amount: 0 };
+        methods[m].count++;
+        methods[m].amount += amount;
+    });
+
+    const fmt = (n) => `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    const pct = (n) => grossRevenue > 0 ? `${((n / grossRevenue) * 100).toFixed(1)}%` : '0%';
+
+    const catOrder = ["Membership Fees", "Walk-in Gym Fees", "POS Product Sales"];
+    let catHtml = catOrder.map(name => {
+        const d = cats[name] || { count: 0, amount: 0 };
+        return `<tr><td>${name}</td><td style="text-align:right;">${d.count}</td><td style="text-align:right;">${fmt(d.amount)}</td><td style="text-align:right;">${pct(d.amount)}</td></tr>`;
+    }).join('');
+    catHtml += `<tr class="total-row"><td>TOTAL</td><td style="text-align:right;">${payments.length}</td><td style="text-align:right;">${fmt(grossRevenue)}</td><td style="text-align:right;">100%</td></tr>`;
+
+    const methodOrder = ["Cash", "GCash", "RFID Credit"];
+    let methodHtml = methodOrder.map(name => {
+        const d = methods[name] || { count: 0, amount: 0 };
+        return `<tr><td>${name}</td><td style="text-align:right;">${d.count}</td><td style="text-align:right;">${fmt(d.amount)}</td><td style="text-align:right;">${pct(d.amount)}</td></tr>`;
+    }).join('');
+    methodHtml += `<tr class="total-row"><td>TOTAL</td><td style="text-align:right;">${payments.length}</td><td style="text-align:right;">${fmt(grossRevenue)}</td><td style="text-align:right;">100%</td></tr>`;
+
+    return { catHtml, methodHtml };
+}
+
 window.generateWeeklyPDF = function () {
     if (typeof html2pdf === 'undefined') {
         return showToast("PDF library is still loading, please wait a moment and try again.", "info");
     }
 
     const docName = localStorage.getItem("loggedInUser") || "Staff Member";
-
     const today = new Date();
     const dayOfWeek = today.getDay();
     const distanceToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-
     const monday = new Date(today);
     monday.setDate(today.getDate() + distanceToMonday);
     monday.setHours(0, 0, 0, 0);
-
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     sunday.setHours(23, 59, 59, 999);
 
+    const fmt2 = (n) => `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    const fmtDate = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const formatShortDate = (d) => `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear().toString().slice(-2)}`;
 
-    document.getElementById('pdfWeekOf').innerText = `${formatShortDate(monday)} - ${formatShortDate(sunday)}`;
+    document.getElementById('pdfWeekOf').innerText = `${fmtDate(monday)} – ${fmtDate(sunday)}`;
     document.getElementById('pdfAssociateName').innerText = docName;
     document.getElementById('pdfCompletionDate').innerText = formatShortDate(today);
+    document.getElementById('pdfGeneratedAt').innerText = today.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    let productSales = {};
-    let totalMembershipRevenue = 0;
-    let totalPOSRevenue = 0;
-    let totalWalkinRevenue = 0;
-
-    // Filter payments for the selected week and ignore voided ones
-    const weeklyPayments = paymentsData.filter(p => {
-        if (p.status === 'Voided') return false;
+    const allWeek = paymentsData.filter(p => {
         if (!p.date && !p.timestamp) return false;
-        const payDate = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
-        return payDate >= monday && payDate <= sunday;
+        const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
+        return d >= monday && d <= sunday;
     });
+    const paidWeek = allWeek.filter(p => p.status !== 'Voided');
+    const voidedWeek = allWeek.filter(p => p.status === 'Voided');
 
-    weeklyPayments.forEach(payment => {
-        const amount = Number(payment.amount || 0);
-        const type = payment.type || "";
-
-        // Revenue Classification
-        if (type.includes("Membership") || type.includes("Plan") || type.includes("Annual") || type.includes("Monthly")) {
-            totalMembershipRevenue += amount;
-        } else if (type.includes("Walk-in") || type.includes("Pass")) {
-            totalWalkinRevenue += amount;
-        } else {
-            totalPOSRevenue += amount;
-        }
-
-        // Product Consumption Tracking
-        const payDate = payment.timestamp ? new Date(payment.timestamp) : new Date(payment.date);
-        let dayIndex = payDate.getDay() === 0 ? 6 : payDate.getDay() - 1;
-
-        if (payment.lineItems && payment.lineItems.length > 0) {
-            payment.lineItems.forEach(item => {
-                let qty = item.qty;
-                let name = item.name;
-                if (!productSales[name]) productSales[name] = [0, 0, 0, 0, 0, 0, 0];
-                productSales[name][dayIndex] += qty;
-            });
-        } else if (payment.items) {
-            let itemsList = payment.items.split(', ');
-            itemsList.forEach(itemStr => {
-                let match = itemStr.match(/^(\d+)x\s+(.+)$/);
-                if (match) {
-                    let qty = parseInt(match[1]);
-                    let name = match[2];
-                    if (!productSales[name]) productSales[name] = [0, 0, 0, 0, 0, 0, 0];
-                    productSales[name][dayIndex] += qty;
-                }
-            });
-        }
-    });
-
-    const grossRevenue = totalMembershipRevenue + totalPOSRevenue + totalWalkinRevenue;
-    const vatAmount = grossRevenue * 0.107142857; // 12% VAT (if 1.12 is the multiplier) or gross * 0.12 if it's on top. 
-    // In many PH systems, Price is VAT inclusive. Net = Gross / 1.12. VAT = Gross - Net.
+    const grossRevenue = paidWeek.reduce((s, p) => s + Number(p.amount || 0), 0);
+    const voidedAmount = voidedWeek.reduce((s, p) => s + Number(p.amount || 0), 0);
     const netRevenue = grossRevenue / 1.12;
     const calculatedVAT = grossRevenue - netRevenue;
+    const avgTx = paidWeek.length > 0 ? grossRevenue / paidWeek.length : 0;
 
-    document.getElementById('pdfGrossRevenue').innerText = `₱${grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    document.getElementById('pdfVATAmount').innerText = `₱${calculatedVAT.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-    document.getElementById('pdfNetRevenue').innerText = `₱${netRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    document.getElementById('pdfGrossRevenue').innerText = fmt2(grossRevenue);
+    document.getElementById('pdfVATAmount').innerText = fmt2(calculatedVAT);
+    document.getElementById('pdfNetRevenue').innerText = fmt2(netRevenue);
+    document.getElementById('pdfVoidedAmount').innerText = fmt2(voidedAmount);
+    document.getElementById('pdfTxCount').innerText = paidWeek.length;
+    document.getElementById('pdfAvgTx').innerText = fmt2(avgTx);
+    document.getElementById('pdfVoidedCount').innerText = voidedWeek.length;
 
-    // Populate Revenue Sources Table
-    const sourcesBody = document.getElementById('pdfRevenueSourcesBody');
-    const categories = [
-        { name: "Membership Fees", amount: totalMembershipRevenue },
-        { name: "POS Product Sales", amount: totalPOSRevenue },
-        { name: "Walk-in Gym Fees", amount: totalWalkinRevenue }
-    ];
+    const { catHtml, methodHtml } = _buildCategoryRows(paidWeek, grossRevenue);
+    document.getElementById('pdfRevenueSourcesBody').innerHTML = catHtml;
+    document.getElementById('pdfPaymentMethodsBody').innerHTML = methodHtml;
 
-    sourcesBody.innerHTML = categories.map(cat => `
-        <tr>
-            <td>${cat.name}</td>
-            <td style="text-align: right;">₱${cat.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-            <td style="text-align: right;">${grossRevenue > 0 ? ((cat.amount / grossRevenue) * 100).toFixed(1) : 0}%</td>
-        </tr>
-    `).join('') + `
-        <tr class="total-row">
-            <td>TOTAL GROSS REVENUE</td>
-            <td style="text-align: right;">₱${grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-            <td style="text-align: right;">100%</td>
-        </tr>
-    `;
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    let dailyHtml = '';
+    let weekRevTotal = 0, weekVoidTotal = 0, weekTxTotal = 0;
+    for (let i = 0; i < 7; i++) {
+        const day = new Date(monday);
+        day.setDate(monday.getDate() + i);
+        const dayStart = new Date(day); dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(day); dayEnd.setHours(23, 59, 59, 999);
+        const dayPaid = paidWeek.filter(p => { const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date); return d >= dayStart && d <= dayEnd; });
+        const dayVoided = voidedWeek.filter(p => { const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date); return d >= dayStart && d <= dayEnd; });
+        const dayRev = dayPaid.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const dayVoidAmt = dayVoided.reduce((s, p) => s + Number(p.amount || 0), 0);
+        weekRevTotal += dayRev; weekVoidTotal += dayVoidAmt; weekTxTotal += dayPaid.length;
+        const isToday = day.toDateString() === today.toDateString();
+        dailyHtml += `<tr${isToday ? ' style="background:#f0fdf4;"' : ''}>
+            <td>${dayNames[i]}, ${day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${isToday ? ' <strong>(Today)</strong>' : ''}</td>
+            <td style="text-align:right;">${dayPaid.length}</td>
+            <td style="text-align:right;">${fmt2(dayRev)}</td>
+            <td style="text-align:right;${dayVoidAmt > 0 ? 'color:#991b1b;' : ''}">${fmt2(dayVoidAmt)}</td>
+        </tr>`;
+    }
+    dailyHtml += `<tr class="total-row"><td>WEEK TOTAL</td><td style="text-align:right;">${weekTxTotal}</td><td style="text-align:right;">${fmt2(weekRevTotal)}</td><td style="text-align:right;">${fmt2(weekVoidTotal)}</td></tr>`;
+    document.getElementById('pdfDailyBreakdownBody').innerHTML = dailyHtml;
 
-    const element = document.getElementById('weekly-sales-report');
     document.getElementById('pdf-report-container').style.display = 'block';
-
-    let opt = {
+    html2pdf().set({
         margin: 0,
-        filename: `Financial_Report_${formatShortDate(monday).replace(/\//g, '-')}.pdf`,
+        filename: `Weekly_Report_${fmtDate(monday).replace(/[, ]+/g, '_')}.pdf`,
         image: { type: 'jpeg', quality: 1 },
         html2canvas: { scale: 3, useCORS: true, letterRendering: true },
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
+    }).from(document.getElementById('weekly-sales-report')).save().then(() => {
+        document.getElementById('pdf-report-container').style.display = 'none';
+    });
+}
 
-    html2pdf().set(opt).from(element).save().then(() => {
+window.generateMonthlyPDF = function () {
+    if (typeof html2pdf === 'undefined') {
+        return showToast("PDF library is still loading, please wait a moment and try again.", "info");
+    }
+
+    const docName = localStorage.getItem("loggedInUser") || "Staff Member";
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const fmt2 = (n) => `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+    const formatShortDate = (d) => `${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')}/${d.getFullYear().toString().slice(-2)}`;
+
+    document.getElementById('pdfMonthOf').innerText = `${monthNames[today.getMonth()]} ${today.getFullYear()}`;
+    document.getElementById('pdfMonthAssociateName').innerText = docName;
+    document.getElementById('pdfMonthCompletionDate').innerText = formatShortDate(today);
+    document.getElementById('pdfMonthGeneratedAt').innerText = today.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const allMonth = paymentsData.filter(p => {
+        if (!p.date && !p.timestamp) return false;
+        const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
+        return d >= monthStart && d <= monthEnd;
+    });
+    const paidMonth = allMonth.filter(p => p.status !== 'Voided');
+    const voidedMonth = allMonth.filter(p => p.status === 'Voided');
+
+    const grossRevenue = paidMonth.reduce((s, p) => s + Number(p.amount || 0), 0);
+    const voidedAmount = voidedMonth.reduce((s, p) => s + Number(p.amount || 0), 0);
+    const netRevenue = grossRevenue / 1.12;
+    const calculatedVAT = grossRevenue - netRevenue;
+    const avgTx = paidMonth.length > 0 ? grossRevenue / paidMonth.length : 0;
+
+    document.getElementById('pdfMonthGrossRevenue').innerText = fmt2(grossRevenue);
+    document.getElementById('pdfMonthVATAmount').innerText = fmt2(calculatedVAT);
+    document.getElementById('pdfMonthNetRevenue').innerText = fmt2(netRevenue);
+    document.getElementById('pdfMonthVoidedAmount').innerText = fmt2(voidedAmount);
+    document.getElementById('pdfMonthTxCount').innerText = paidMonth.length;
+    document.getElementById('pdfMonthAvgTx').innerText = fmt2(avgTx);
+    document.getElementById('pdfMonthVoidedCount').innerText = voidedMonth.length;
+
+    const { catHtml, methodHtml } = _buildCategoryRows(paidMonth, grossRevenue);
+    document.getElementById('pdfMonthRevenueSourcesBody').innerHTML = catHtml;
+    document.getElementById('pdfMonthPaymentMethodsBody').innerHTML = methodHtml;
+
+    let weeklyHtml = '';
+    let wNum = 1;
+    const cursor = new Date(monthStart);
+    const firstDay = cursor.getDay();
+    cursor.setDate(cursor.getDate() + (firstDay === 0 ? -6 : 1 - firstDay));
+    let mTxTotal = 0, mRevTotal = 0, mVoidTotal = 0;
+
+    while (cursor <= monthEnd) {
+        const wStart = new Date(Math.max(cursor.getTime(), monthStart.getTime()));
+        const wEndRaw = new Date(cursor); wEndRaw.setDate(cursor.getDate() + 6); wEndRaw.setHours(23, 59, 59, 999);
+        const wEnd = new Date(Math.min(wEndRaw.getTime(), monthEnd.getTime()));
+
+        const wPaid = paidMonth.filter(p => { const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date); return d >= wStart && d <= wEnd; });
+        const wVoided = voidedMonth.filter(p => { const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date); return d >= wStart && d <= wEnd; });
+        const wRev = wPaid.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const wVoidAmt = wVoided.reduce((s, p) => s + Number(p.amount || 0), 0);
+        mTxTotal += wPaid.length; mRevTotal += wRev; mVoidTotal += wVoidAmt;
+
+        weeklyHtml += `<tr>
+            <td>Week ${wNum} (${wStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${wEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})</td>
+            <td style="text-align:right;">${wPaid.length}</td>
+            <td style="text-align:right;">${fmt2(wRev)}</td>
+            <td style="text-align:right;${wVoidAmt > 0 ? 'color:#991b1b;' : ''}">${fmt2(wVoidAmt)}</td>
+        </tr>`;
+        cursor.setDate(cursor.getDate() + 7);
+        wNum++;
+    }
+    weeklyHtml += `<tr class="total-row"><td>MONTH TOTAL</td><td style="text-align:right;">${mTxTotal}</td><td style="text-align:right;">${fmt2(mRevTotal)}</td><td style="text-align:right;">${fmt2(mVoidTotal)}</td></tr>`;
+    document.getElementById('pdfMonthWeeklyBreakdownBody').innerHTML = weeklyHtml;
+
+    document.getElementById('pdf-report-container').style.display = 'block';
+    html2pdf().set({
+        margin: 0,
+        filename: `Monthly_Report_${monthNames[today.getMonth()]}_${today.getFullYear()}.pdf`,
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { scale: 3, useCORS: true, letterRendering: true },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    }).from(document.getElementById('monthly-sales-report')).save().then(() => {
         document.getElementById('pdf-report-container').style.display = 'none';
     });
 }
@@ -7039,15 +7410,18 @@ if (document.getElementById('editStaffForm')) {
                             }
 
                             // Best-effort member chat notifications (non-critical).
+                            // Store both name strings and IDs for reliable delivery.
                             let chatFailures = 0;
                             for (const b of cancelledForChat) {
-                                if (!b.memberName || !trainerName) continue;
+                                if (!b.memberId || !id) continue;
                                 try {
                                     await addDoc(messagesCol, {
-                                        sender: trainerName,
-                                        receiver: b.memberName,
-                                        text: b.template,
-                                        timestamp: Date.now()
+                                        sender:     trainerName || "",
+                                        receiver:   b.memberName || "",
+                                        senderId:   id,
+                                        receiverId: b.memberId,
+                                        text:       b.template,
+                                        timestamp:  Date.now()
                                     });
                                 } catch (msgErr) {
                                     chatFailures++;
@@ -7099,6 +7473,9 @@ window.archiveUser = async (id, currentStatus) => {
             if (newStatus === 'Archived') {
                 userUpdates.hasLocker = false;
                 userUpdates.lockerId = null;
+                // Nullify currentSession so any active login for this user is immediately evicted
+                // by the real-time session listener (same mechanism as remote logout).
+                userUpdates.currentSession = null;
             }
             await updateDoc(doc(db, "users", id), userUpdates);
 
@@ -7403,7 +7780,7 @@ window.openMemberModal = () => {
 // ── Registration Wizard Navigation ──
 window.__regWizardStep = 1;
 
-window.regWizardNext = function (currentStep) {
+window.regWizardNext = async function (currentStep) {
     // Validate current step fields before proceeding
     const currentPanel = document.querySelector(`.reg-wizard-panel[data-panel="${currentStep}"]`);
     if (currentPanel) {
@@ -7422,6 +7799,32 @@ window.regWizardNext = function (currentStep) {
         });
         if (!isValid) {
             showToast('Please fill in all required fields.', 'error');
+            return;
+        }
+    }
+
+    // Block step 1 → 2 transition if the email is already registered
+    if (currentStep === 1) {
+        const emailInput = document.getElementById('regMemberEmail');
+        const targetEmail = (emailInput ? emailInput.value : '').trim().toLowerCase();
+        try {
+            const emailSnap = await getDocs(query(usersCol, where("email", "==", targetEmail)));
+            if (!emailSnap.empty) {
+                showToast('This email is already registered.', 'error');
+                if (emailInput) {
+                    emailInput.style.borderColor = '#ef4444';
+                    emailInput.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.12)';
+                    setTimeout(() => {
+                        emailInput.style.borderColor = '';
+                        emailInput.style.boxShadow = '';
+                    }, 3000);
+                    emailInput.focus();
+                }
+                return;
+            }
+        } catch (err) {
+            console.error('Email uniqueness check failed:', err);
+            showToast('Could not verify email. Please try again.', 'error');
             return;
         }
     }
@@ -8664,10 +9067,10 @@ function renderBookings() {
                 const canReschedule = ["Pending", "Confirmed"].includes(b.status)
                     && (bookingMs - nowMs > 2 * 60 * 60 * 1000);
                 const rescheduleBtn = canReschedule
-                    ? `<button type="button" class="btn-icon btn-edit" title="Reschedule Booking" onclick="openRescheduleModal('${b.id}')"><i class="fas fa-rotate"></i> Reschedule</button>`
+                    ? `<button type="button" class="btn-icon btn-edit btn-xs" title="Reschedule Booking" onclick="openRescheduleModal('${b.id}')"><i class="fas fa-rotate"></i></button>`
                     : '';
                 const cancelBtnInner = b.status === "Pending"
-                    ? `<button type="button" class="btn-icon btn-delete" title="Cancel Booking" onclick="cancelMemberBooking('${b.id}','${b.memberId}')"><i class="fas fa-times-circle"></i> Cancel</button>`
+                    ? `<button type="button" class="btn-icon btn-delete btn-xs" title="Cancel Booking" onclick="cancelMemberBooking('${b.id}','${b.memberId}')"><i class="fas fa-times-circle"></i></button>`
                     : '';
                 const actionsCell = (rescheduleBtn || cancelBtnInner)
                     ? `<td>${rescheduleBtn}${cancelBtnInner}</td>`
@@ -8906,13 +9309,17 @@ window.updateBookingStatus = async (id, newStatus) => {
                     }
 
                     // Send chat message to the member (outside tx — non-critical)
-                    if (b.memberName && b.trainerName) {
+                    // Store both name strings (for manual-chat compat) and IDs (for reliable auto-message delivery)
+                    if (b.memberId && b.trainerId) {
                         try {
+                            const _callerName = localStorage.getItem("loggedInUser") || b.trainerName || "Trainer";
                             await addDoc(messagesCol, {
-                                sender: b.trainerName,
-                                receiver: b.memberName,
-                                text: template,
-                                timestamp: Date.now()
+                                sender:     _callerName,
+                                receiver:   b.memberName || "",
+                                senderId:   b.trainerId,
+                                receiverId: b.memberId,
+                                text:       template,
+                                timestamp:  Date.now()
                             });
                         } catch (msgErr) {
                             console.error("Chat message failed:", msgErr);
@@ -9019,10 +9426,12 @@ window.openMemberBookingModal = () => {
 
     const trainerSelect = document.getElementById('memberBookTrainer');
     if (trainerSelect) {
-        // Only Active trainers may be booked — exclude On Leave, Suspended, and Archived.
+        // Only Active + On Floor trainers may be booked — On Leave, Suspended, and Archived
+        // are excluded regardless of their RFID-reported shiftStatus to prevent glitch access.
         const trainers = allUsersData.filter(u =>
             (u.role || "").toLowerCase() === 'trainer' &&
-            (u.status || 'Active') === 'Active'
+            (u.status || 'Active') === 'Active' &&
+            u.shiftStatus === 'On Floor'
         );
         trainerSelect.innerHTML = '<option value="" disabled selected>Select a Trainer...</option>' +
             trainers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name || `${t.givenName || ''} ${t.familyName || ''}`.trim())}</option>`).join('');
@@ -9773,9 +10182,10 @@ window.openBookingModal = () => {
         return (m.status || 'Active') === 'Active' && !isArchived && !isSuspended && !isExpired;
     });
     memberSelect.innerHTML = '<option value="" disabled selected>Select a Member...</option>' + activeMembers.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name || `${m.givenName || ''} ${m.familyName || ''}`.trim())}</option>`).join('');
-    const trainers = allUsersData.filter(u => 
-        (u.role || "").toLowerCase() === 'trainer' && 
-        (u.status || 'Active') === 'Active'
+    const trainers = allUsersData.filter(u =>
+        (u.role || "").toLowerCase() === 'trainer' &&
+        (u.status || 'Active') === 'Active' &&
+        u.shiftStatus === 'On Floor'
     );
     trainerSelect.innerHTML = '<option value="" disabled selected>Select an Assigned Trainer...</option>' + trainers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name || `${t.givenName || ''} ${t.familyName || ''}`.trim())}</option>`).join('');
 
@@ -10033,15 +10443,18 @@ if (document.getElementById('editBookingForm')) {
         }
 
         // Send as chat message if cancelled/declined
+        // Store both name strings and IDs for reliable delivery.
         if ((status === 'Cancelled' || status === 'Declined') && remarks) {
             const b = (window.bookingsData || []).find(x => x.id === id);
-            if (b && b.memberName && b.trainerName) {
+            if (b && b.memberId && b.trainerId) {
                 try {
                     await addDoc(messagesCol, {
-                        sender: b.trainerName,
-                        receiver: b.memberName,
-                        text: remarks,
-                        timestamp: Date.now()
+                        sender:     b.trainerName || "",
+                        receiver:   b.memberName || "",
+                        senderId:   b.trainerId,
+                        receiverId: b.memberId,
+                        text:       remarks,
+                        timestamp:  Date.now()
                     });
                 } catch (msgErr) {
                     console.error("Chat message failed from modal:", msgErr);
