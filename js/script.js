@@ -10026,7 +10026,13 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
                     ? window.buildBookingDeclineAutoMessage(reason, bPreview?.date, bPreview?.time || bPreview?.startTime)
                     : `I have to decline due to the reason: ${reason}`;
 
-                showConfirm(`The following message will be sent to the member via chat:\n\n"${previewMessage}"\n\nConfirm ${newStatus.toLowerCase()}?`, async () => {
+                // V-07 FIX: pass the object form so onCancel releases the in-flight guard.
+                // The positional-arg form had no cancel callback, leaving _updateBookingStatusInFlight
+                // permanently engaged when the operator dismissed the second confirmation dialog.
+                showConfirm({
+                    message: `The following message will be sent to the member via chat:\n\n"${previewMessage}"\n\nConfirm ${newStatus.toLowerCase()}?`,
+                    onCancel: _release,
+                    onConfirm: async () => {
                     if (window._updateBookingStatusInFlight.has(id)) return;
                     window._updateBookingStatusInFlight.add(id);
 
@@ -10154,10 +10160,8 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
                     } finally {
                         _release();
                     }
-                });
-            },
-            onCancel: _release,
-        });
+                    }  // end onConfirm async arrow
+                }); // end showConfirm (V-07 object form)
         return;
     }
 

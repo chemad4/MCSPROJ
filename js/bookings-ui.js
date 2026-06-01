@@ -1146,8 +1146,11 @@ window.executeManualBooking = async function () {
         }
         const offset = window.serverTimeOffsetMs || 0;
         const freshNowMs = Date.now() + offset;
-        const targetBookingTimeMsCheck = new Date(`${date}T${time}:00Z`).getTime();
-        if (targetBookingTimeMsCheck < freshNowMs) {
+        // V-01 FIX: Do NOT append 'Z' (UTC) — the gym operates in local time.
+        // Using 'Z' shifts the parsed timestamp by the local UTC offset and
+        // lets operators in UTC+8 book slots that have already passed on the server.
+        const targetBookingTimeMsCheck = new Date(`${date}T${time}:00`).getTime();
+        if (isNaN(targetBookingTimeMsCheck) || targetBookingTimeMsCheck < freshNowMs) {
             throw new Error('Choose a date and time in the future. Past sessions cannot be booked.');
         }
 
@@ -1157,14 +1160,11 @@ window.executeManualBooking = async function () {
         const trainerConflict = await window.queryTrainerScheduleConflict(trainerId, date, time);
         if (trainerConflict) throw new Error(TRAINER_CONFLICT_MSG);
 
-        let sameDayConflict = false;
-        if (!window.manualBookingState?.allowSameDay) {
-            const sameDaySnap = await fb.getDocs(fb.query(fb.bookingsCol, fb.where('date', '==', date)));
-            sameDayConflict = sameDaySnap.docs.some(docSnap => {
-                const b = docSnap.data();
-                return b.memberId === memberId && (b.status === 'Confirmed' || b.status === 'Pending');
-            });
-        }
+        // V-03 FIX: same-day pre-check was done outside the transaction (TOCTOU risk).
+        // The authoritative guard is now purely the trainerSlotRef / memberSlotRef
+        // existence checks inside the transaction — those are lock-held by Firestore
+        // and cannot be raced. The UI pre-check (findSameDayBookings) remains as a
+        // fast UX hint before the round-trip, but is no longer load-bearing.
 
         await fb.runTransaction(fb.db, async (tx) => {
             // ── PHASE 1: ALL READS ──
@@ -1208,15 +1208,17 @@ window.executeManualBooking = async function () {
             if (typeof mData.dateRegistered === 'number') {
                 const planDays = (typeof window.getPlanDays === 'function') ? window.getPlanDays(mData.plan) : 30;
                 const expiryAt = mData.dateRegistered + planDays * 24 * 60 * 60 * 1000;
-                const targetBookingTimeMs = new Date(`${date}T${time}:00Z`).getTime();
-                if (targetBookingTimeMs > expiryAt) {
+                // V-01 FIX: local time, no 'Z' suffix
+                const targetBookingTimeMs = new Date(`${date}T${time}:00`).getTime();
+                if (!isNaN(targetBookingTimeMs) && targetBookingTimeMs > expiryAt) {
                     throw new Error("Target booking date exceeds the member's membership plan expiration date. Please renew their plan for that period.");
                 }
             }
 
             const freshNowMsTx = Date.now() + (window.serverTimeOffsetMs || 0);
-            const targetBookingTimeMsTx = new Date(`${date}T${time}:00Z`).getTime();
-            if (targetBookingTimeMsTx < freshNowMsTx) {
+            // V-01 FIX: local time, no 'Z' suffix — consistent with slot-ID generation
+            const targetBookingTimeMsTx = new Date(`${date}T${time}:00`).getTime();
+            if (isNaN(targetBookingTimeMsTx) || targetBookingTimeMsTx < freshNowMsTx) {
                 throw new Error('Choose a date and time in the future. Past sessions cannot be booked.');
             }
 
@@ -1226,9 +1228,6 @@ window.executeManualBooking = async function () {
             if (trainerSlotSnap.exists()) throw new Error(TRAINER_CONFLICT_MSG);
             if (memberSlotSnap.exists()) throw new Error('Member already has a booking at this hour.');
 
-            if (sameDayConflict) {
-                throw new Error(`SAME_DAY_CONFLICT: ${memberName} already has an active booking on ${date}. Set allowSameDay to override.`);
-            }
 
             const newBookingRef = fb.doc(fb.bookingsCol);
             const bookingPayload = {
