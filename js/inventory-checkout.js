@@ -1,15 +1,11 @@
 // js/inventory-checkout.js — Batch-aware FEFO (First-Expiry-First-Out) checkout pipeline
 // Firestore data model expected:
-//   products/{productId}                   — product document
-//   products/{productId}/batches/{batchId} — batch subcollection
+//   inventory/{productId}                   — product document
+//   inventory/{productId}/batches/{batchId} — batch subcollection
 //     Fields: expiryDate (string "YYYY-MM-DD"), currentQuantity (number), ...
 
 import {
-    getFirestore,
     collection,
-    query,
-    where,
-    orderBy,
     getDocs,
     doc,
     runTransaction,
@@ -64,20 +60,9 @@ export async function checkoutBatches(db, productId, requested) {
     const today = todayString();
     const warningThreshold = dateOffsetString(EXPIRY_WARNING_DAYS);
 
-    // ── Step 1: Query valid batches sorted by expiryDate ASC (FEFO order) ──────
-    // Firestore compound query: expiryDate > today AND currentQuantity > 0.
-    // The `where('currentQuantity', '>', 0)` filter requires a composite index on
-    // (expiryDate ASC, currentQuantity) — create it in the Firebase console or
-    // deploy via firestore.indexes.json if the query throws an index error.
-    const batchesRef = collection(db, "products", productId, "batches");
-    const batchQuery = query(
-        batchesRef,
-        where("expiryDate", ">", today),       // Step 2: exclude expired batches
-        where("currentQuantity", ">", 0),       // Step 2: exclude empty batches
-        orderBy("expiryDate", "asc")            // Step 1: oldest expiry first
-    );
-
-    const snapshot = await getDocs(batchQuery);
+    // Read all batches and filter/sort client-side — no composite Firestore index needed.
+    const batchesRef = collection(db, "inventory", productId, "batches");
+    const snapshot = await fetchValidBatches(batchesRef, today);
 
     if (snapshot.empty) {
         return {
@@ -91,7 +76,7 @@ export async function checkoutBatches(db, productId, requested) {
 
     // Build an ordered list of { ref, data } to feed into the transaction.
     const batches = snapshot.docs.map(d => ({
-        ref: doc(db, "products", productId, "batches", d.id),
+        ref: doc(db, "inventory", productId, "batches", d.id),
         id: d.id,
         expiryDate: d.data().expiryDate,
         currentQuantity: d.data().currentQuantity,
@@ -178,4 +163,64 @@ export async function checkoutBatches(db, productId, requested) {
         warningBatch,
         message: `Successfully deducted ${requested} unit(s) across ${deductions.length} batch(es).`,
     };
+}
+
+/** Load batches subcollection; filter expired/empty and sort FEFO in memory. */
+async function fetchValidBatches(batchesRef, today) {
+    const snap = await getDocs(batchesRef);
+    const filtered = snap.docs
+        .map(d => ({ ref: d.ref, id: d.id, data: d.data() }))
+        .filter(({ data }) => {
+            const exp = data.expiryDate || "";
+            const qty = data.currentQuantity || 0;
+            return exp > today && qty > 0;
+        })
+        .sort((a, b) => String(a.data.expiryDate).localeCompare(String(b.data.expiryDate)));
+
+    return {
+        empty: filtered.length === 0,
+        docs: filtered.map(({ ref, id, data }) => ({
+            id,
+            ref,
+            data: () => data,
+            exists: () => true,
+        })),
+    };
+}
+
+/**
+ * Reverse batch deductions (POS rollback on payment failure, or void/refund restock).
+ */
+export async function restoreBatchDeductions(db, productId, deductions) {
+    if (!Array.isArray(deductions) || deductions.length === 0) return;
+
+    await runTransaction(db, async (txn) => {
+        const invRef = doc(db, "inventory", productId);
+        const invSnap = await txn.get(invRef);
+
+        const batchSnaps = await Promise.all(
+            deductions.map(d =>
+                txn.get(doc(db, "inventory", productId, "batches", d.batchId))
+            )
+        );
+
+        let totalRestored = 0;
+        for (let i = 0; i < deductions.length; i++) {
+            const { batchId, deducted } = deductions[i];
+            const snap = batchSnaps[i];
+            if (!snap.exists()) {
+                console.warn(`[restoreBatchDeductions] Batch ${batchId} missing for product ${productId}`);
+                continue;
+            }
+            const liveQty = snap.data().currentQuantity || 0;
+            txn.update(doc(db, "inventory", productId, "batches", batchId), {
+                currentQuantity: liveQty + deducted,
+            });
+            totalRestored += deducted;
+        }
+
+        if (invSnap.exists() && totalRestored > 0) {
+            txn.update(invRef, { qty: (invSnap.data().qty || 0) + totalRestored });
+        }
+    });
 }

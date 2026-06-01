@@ -1,6 +1,28 @@
 // js/ui.js
 // Handles UI interactions like Toast notifications, Custom Confirms, and Dark Mode
 
+const MODAL_OVERLAY_TW =
+    'modal fixed inset-0 z-[10000] items-end sm:items-center justify-center ' +
+    'p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto';
+
+const MODAL_SHELL_TW =
+    'modal-content relative w-[95%] sm:w-full max-w-md mx-auto bg-white ' +
+    'rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 ' +
+    'p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto';
+
+const MODAL_BTN_CANCEL_TW =
+    'btn-cancel inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold ' +
+    'text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 ' +
+    'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200';
+
+const MODAL_BTN_PRIMARY_TW =
+    'btn-confirm inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white ' +
+    'bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none ' +
+    'focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200';
+
+const MODAL_FOOTER_TW =
+    'confirm-actions flex flex-col-reverse sm:flex-row gap-3 justify-end sm:justify-stretch mt-6 pt-5 border-t border-gray-100';
+
 document.addEventListener('DOMContentLoaded', () => {
     // Inject Toast Container
     if (!document.getElementById('toast-container')) {
@@ -13,16 +35,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('customConfirmModal')) {
         const confirmModal = document.createElement('div');
         confirmModal.id = 'customConfirmModal';
+        confirmModal.className = MODAL_OVERLAY_TW;
+        confirmModal.setAttribute('role', 'dialog');
+        confirmModal.setAttribute('aria-modal', 'true');
+        confirmModal.setAttribute('aria-labelledby', 'customConfirmTitle');
         confirmModal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-icon">
-                    <i id="customConfirmIcon" class="fas fa-question-circle"></i>
+            <div class="${MODAL_SHELL_TW} text-center">
+                <div class="modal-icon mb-4">
+                    <i id="customConfirmIcon" class="fas fa-question-circle text-4xl text-red-800"></i>
                 </div>
-                <h3 id="customConfirmTitle">Confirmation</h3>
-                <p id="customConfirmMessage">Are you sure?</p>
-                <div class="confirm-actions">
-                    <button class="btn-cancel" id="customConfirmCancel">Cancel</button>
-                    <button class="btn-confirm" id="customConfirmOk">Confirm</button>
+                <h3 id="customConfirmTitle" class="text-lg font-semibold text-gray-900 mb-2">Confirmation</h3>
+                <p id="customConfirmMessage" class="text-sm text-gray-600 leading-relaxed mb-2">Are you sure?</p>
+                <div class="${MODAL_FOOTER_TW}">
+                    <button class="${MODAL_BTN_CANCEL_TW}" id="customConfirmCancel" type="button">Cancel</button>
+                    <button class="${MODAL_BTN_PRIMARY_TW}" id="customConfirmOk" type="button">Confirm</button>
                 </div>
             </div>
         `;
@@ -33,17 +59,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('customPromptModal')) {
         const promptModal = document.createElement('div');
         promptModal.id = 'customPromptModal';
+        promptModal.className = MODAL_OVERLAY_TW;
+        promptModal.setAttribute('role', 'dialog');
+        promptModal.setAttribute('aria-modal', 'true');
+        promptModal.setAttribute('aria-labelledby', 'customPromptTitle');
         promptModal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-icon">
-                    <i class="fas fa-comment-dots"></i>
+            <div class="${MODAL_SHELL_TW}">
+                <div class="modal-icon mb-4 text-center">
+                    <i class="fas fa-comment-dots text-4xl text-red-800"></i>
                 </div>
-                <h3 id="customPromptTitle">Required Remarks</h3>
-                <p id="customPromptMessage">Please provide details below:</p>
-                <textarea id="customPromptInput" placeholder="Type your remarks here..."></textarea>
-                <div class="confirm-actions">
-                    <button class="btn-cancel" id="customPromptCancel">Cancel</button>
-                    <button class="btn-confirm" id="customPromptOk">Submit</button>
+                <h3 id="customPromptTitle" class="text-lg font-semibold text-gray-900 mb-2 text-center">Required Remarks</h3>
+                <p id="customPromptMessage" class="text-sm text-gray-600 leading-relaxed mb-4 text-center">Please provide details below:</p>
+                <textarea id="customPromptInput" class="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl bg-white text-gray-900 min-h-[100px] mb-4 resize-none focus:outline-none focus:ring-2 focus:ring-red-700/30 focus:border-red-800 transition-all duration-200" placeholder="Type your remarks here..."></textarea>
+                <div class="${MODAL_FOOTER_TW}">
+                    <button class="${MODAL_BTN_CANCEL_TW}" id="customPromptCancel" type="button">Cancel</button>
+                    <button class="${MODAL_BTN_PRIMARY_TW}" id="customPromptOk" type="button">Submit</button>
                 </div>
             </div>
         `;
@@ -54,12 +84,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('profileSettingsModal')) {
         const pModal = document.createElement('div');
         pModal.id = 'profileSettingsModal';
-        pModal.className = 'modal';
+        pModal.className = MODAL_OVERLAY_TW;
+        pModal.setAttribute('role', 'dialog');
+        pModal.setAttribute('aria-modal', 'true');
         pModal.innerHTML = `
-            <div class="modal-content profile-settings-modal">
-                <div class="modal-header">
-                    <h3><i class="fa-solid fa-user-gear"></i> Edit Profile</h3>
-                    <span class="close-btn" onclick="document.getElementById('profileSettingsModal').style.display='none'" aria-label="Close">&times;</span>
+            <div class="modal-content profile-settings-modal ${MODAL_SHELL_TW.replace('max-w-md', 'max-w-lg')}">
+                <div class="modal-header flex items-center justify-between gap-4 mb-6">
+                    <h3 class="text-lg font-semibold text-gray-900 flex items-center gap-2 m-0"><i class="fa-solid fa-user-gear text-red-800"></i> Edit Profile</h3>
+                    <button type="button" class="close-btn" onclick="document.getElementById('profileSettingsModal').style.display='none'" aria-label="Close">&times;</button>
                 </div>
 
                 <div class="profile-upload-wrapper">
@@ -95,9 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         <label class="form-label" for="userProfilePasswordConfirm">Confirm New Password</label>
                         <input type="password" id="userProfilePasswordConfirm" placeholder="Repeat new password" maxlength="64" autocomplete="new-password">
                     </div>
-                    <div class="btn-row">
-                        <button type="button" class="btn-cancel" onclick="document.getElementById('profileSettingsModal').style.display='none'">Cancel</button>
-                        <button type="submit" class="btn-submit">Save Changes</button>
+                    <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                        <button type="button" class="${MODAL_BTN_CANCEL_TW}" onclick="document.getElementById('profileSettingsModal').style.display='none'">Cancel</button>
+                        <button type="submit" class="btn-submit ${MODAL_BTN_PRIMARY_TW.replace('btn-confirm', 'btn-submit')}">Save Changes</button>
                     </div>
                     <button type="button" class="btn-logout" onclick="handleLogout()">
                         <i class="fa-solid fa-power-off"></i> Log Out
@@ -113,40 +145,43 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('sessionRatingModal')) {
         const ratingModal = document.createElement('div');
         ratingModal.id = 'sessionRatingModal';
-        ratingModal.className = 'modal';
+        ratingModal.className = MODAL_OVERLAY_TW;
         ratingModal.style.display = 'none';
         ratingModal.setAttribute('role', 'dialog');
         ratingModal.setAttribute('aria-modal', 'true');
         ratingModal.setAttribute('aria-labelledby', 'srModalTitle');
         ratingModal.innerHTML = `
-            <div class="modal-content" style="max-width:480px;">
-                <div class="modal-header">
-                    <h3 id="srModalTitle"><i class="fa-solid fa-star" style="color:var(--primary-red);margin-right:8px;"></i>Rate Your Session</h3>
+            <div class="${MODAL_SHELL_TW.replace('max-w-md', 'max-w-lg')}">
+                <div class="modal-header flex items-center justify-between gap-4 mb-4 pb-4 border-b border-gray-100">
+                    <h3 id="srModalTitle" class="text-lg font-semibold text-gray-900 flex items-center gap-2 m-0"><i class="fa-solid fa-star text-red-800"></i>Rate Your Session</h3>
                 </div>
-                <div class="modal-body" style="padding:20px 24px 8px;">
-                    <p style="margin-bottom:4px;">How was your session with <strong id="srModalTrainerName">your trainer</strong>?</p>
-                    <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:18px;">Session: <span id="srModalSessionDate"></span></p>
-                    <div class="form-group" style="margin-bottom:14px;">
-                        <label class="form-label" for="srModalRatingText">Rating <span style="color:var(--primary-red)">*</span></label>
+                <div class="modal-body">
+                    <p class="text-sm text-gray-700 mb-1">How was your session with <strong id="srModalTrainerName">your trainer</strong>?</p>
+                    <p class="text-xs text-gray-500 mb-5">Session: <span id="srModalSessionDate"></span></p>
+                    <div class="form-group mb-4">
+                        <label class="form-label" for="srModalRatingText">Rating <span class="text-red-800">*</span></label>
                         <input type="text" id="srModalRatingText" class="form-control"
                             placeholder="e.g. Excellent, 5/5, Great experience..."
                             maxlength="120" autocomplete="off">
                     </div>
-                    <div class="form-group" style="margin-bottom:6px;">
-                        <label class="form-label" for="srModalRemarksText">Professional Remarks <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>
+                    <div class="form-group mb-2">
+                        <label class="form-label" for="srModalRemarksText">Professional Remarks <span class="font-normal text-gray-500">(optional)</span></label>
                         <textarea id="srModalRemarksText" class="form-control" rows="3"
                             placeholder="Share details about the session, trainer's professionalism, areas to improve..."
                             maxlength="500" style="resize:vertical;"></textarea>
                     </div>
                 </div>
-                <div class="confirm-actions" style="padding:16px 24px 20px;gap:10px;">
-                    <button class="btn-cancel" id="srModalSkipBtn" type="button">Skip</button>
-                    <button class="btn-confirm" id="srModalSubmitBtn" type="button">Submit Feedback</button>
+                <div class="${MODAL_FOOTER_TW}">
+                    <button class="${MODAL_BTN_CANCEL_TW}" id="srModalSkipBtn" type="button">Skip</button>
+                    <button class="${MODAL_BTN_PRIMARY_TW}" id="srModalSubmitBtn" type="button">Submit Feedback</button>
                 </div>
             </div>
         `;
         document.body.appendChild(ratingModal);
     }
+
+    // Global backdrop-click + Escape for system modals (UI layer only)
+    initModalAccessibility();
 
     // Initialize Dark Mode
     const savedTheme = localStorage.getItem('theme');
@@ -156,6 +191,61 @@ document.addEventListener('DOMContentLoaded', () => {
         if (toggleIcon) toggleIcon.className = 'fas fa-sun';
     }
 });
+
+/** Backdrop dismiss + Escape — respects membershipExpiredModal lockout. */
+function initModalAccessibility() {
+    const NON_DISMISSABLE = new Set(['membershipExpiredModal']);
+
+    document.addEventListener('click', (e) => {
+        const modal = e.target.closest('.modal, #customConfirmModal, #customPromptModal');
+        if (!modal || e.target !== modal) return;
+        if (NON_DISMISSABLE.has(modal.id)) return;
+        if (modal.id === 'customConfirmModal') {
+            document.getElementById('customConfirmCancel')?.click();
+            return;
+        }
+        if (modal.id === 'customPromptModal') {
+            document.getElementById('customPromptCancel')?.click();
+            return;
+        }
+        if (modal.id && typeof window.closeModal === 'function') {
+            window.closeModal(modal.id);
+        } else {
+            modal.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const openModals = [];
+        document.querySelectorAll('.modal, #customConfirmModal, #customPromptModal').forEach((m) => {
+            if (!m.isConnected) return;
+            const cs = window.getComputedStyle(m);
+            if (cs.display === 'none' || cs.visibility === 'hidden') return;
+            openModals.push(m);
+        });
+        if (!openModals.length) return;
+        const top = openModals[openModals.length - 1];
+        if (NON_DISMISSABLE.has(top.id)) return;
+        if (top.id === 'customConfirmModal') {
+            e.preventDefault();
+            document.getElementById('customConfirmCancel')?.click();
+            return;
+        }
+        if (top.id === 'customPromptModal') {
+            e.preventDefault();
+            document.getElementById('customPromptCancel')?.click();
+            return;
+        }
+        if (top.id && typeof window.closeModal === 'function') {
+            e.preventDefault();
+            window.closeModal(top.id);
+        } else if (top.id) {
+            e.preventDefault();
+            top.style.display = 'none';
+        }
+    });
+}
 
 // Global showToast function
 // M13: dedup identical messages within a short window so duplicate fast events
@@ -277,11 +367,11 @@ window.showConfirm = function(arg1, arg2) {
 
     // Tone → icon + class
     const toneMap = {
-        default: { icon: 'fa-question-circle', color: 'var(--primary-red)' },
-        danger:  { icon: 'fa-exclamation-circle', color: 'var(--color-danger)' },
-        warning: { icon: 'fa-exclamation-triangle', color: 'var(--color-warning)' },
-        info:    { icon: 'fa-info-circle', color: 'var(--color-info)' },
-        success: { icon: 'fa-check-circle', color: 'var(--color-success)' }
+        default: { icon: 'fa-question-circle', color: 'text-red-800' },
+        danger:  { icon: 'fa-exclamation-circle', color: 'text-red-600' },
+        warning: { icon: 'fa-exclamation-triangle', color: 'text-amber-500' },
+        info:    { icon: 'fa-info-circle', color: 'text-blue-500' },
+        success: { icon: 'fa-check-circle', color: 'text-emerald-500' }
     };
     const t = toneMap[tone] || toneMap.default;
 
@@ -291,7 +381,7 @@ window.showConfirm = function(arg1, arg2) {
 
     if (titleEl) titleEl.innerText = title;
     if (iconEl) {
-        iconEl.className = `fas ${icon || t.icon}`;
+        iconEl.className = `fas ${icon || t.icon} text-4xl ${t.color}`;
     }
     msgEl.innerText = message;
     msgEl.style.whiteSpace = 'pre-line';

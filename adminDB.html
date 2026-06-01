@@ -33,6 +33,8 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+    <link rel="stylesheet" href="css/styles.css">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -41,8 +43,6 @@
             }
         }
     </script>
-
-    <link rel="stylesheet" href="css/styles.css">
     <script src="js/ui.js"></script>
 
     <style>
@@ -1356,7 +1356,7 @@
                         <button class="view-toggle-btn" onclick="toggleInventoryView('list', this)" title="List View"><i
                                 class="fas fa-list"></i></button>
                     </div>
-                    <button class="action-btn" onclick="openEquipmentModal()"><i class="fas fa-plus"></i> Add
+                    <button class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="openEquipmentModal()"<i class="fas fa-plus"></i> Add
                         Machine</button>
                 </div>
             </div>
@@ -1420,7 +1420,7 @@
                     <input type="text" id="productSearch" placeholder="Search products..."
                         onkeyup="prodCurrentPage=1; filterProducts()">
                 </div>
-                <button class="action-btn" onclick="openProductModal()"><i class="fas fa-plus"></i> Add Product</button>
+                <button class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="openProductModal()"<i class="fas fa-plus"></i> Add Product</button>
             </div>
 
             <!-- Product Category Quantity Summary -->
@@ -1624,12 +1624,12 @@
                 </div>
 
                 <div style="margin-left: auto; display: flex; gap: 8px;">
-                    <button class="action-btn is-dark" style="padding: 6px 12px;"
-                        onclick="generateWeeklyPDF()">
+                    <button class="action-btn is-dark inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" style="padding: 6px 12px;"
+                        onclick="generateWeeklyPDF()"
                         <i class="fas fa-file-pdf"></i> Weekly Report
                     </button>
-                    <button class="action-btn is-dark" style="padding: 6px 12px;"
-                        onclick="generateMonthlyPDF()">
+                    <button class="action-btn is-dark inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" style="padding: 6px 12px;"
+                        onclick="generateMonthlyPDF()"
                         <i class="fas fa-file-pdf"></i> Monthly Report
                     </button>
                 </div>
@@ -1732,7 +1732,7 @@
                 </div>
 
                 <div style="margin-left: auto; display: flex; gap: 8px;">
-                    <button class="action-btn" onclick="openMemberModal()">
+                    <button class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="openMemberModal()"
                         <i class="fas fa-user-plus"></i> Register Member
                     </button>
                 </div>
@@ -1899,7 +1899,7 @@
                 </div>
 
                 <div style="margin-left: auto; display: flex; gap: 8px;">
-                    <button class="action-btn" onclick="openStaffModal('Staff')">
+                    <button class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="openStaffModal('Staff')"
                         <i class="fas fa-user-plus"></i> Register Staff
                     </button>
                 </div>
@@ -2012,7 +2012,7 @@
                 </div>
 
                 <div style="margin-left: auto; display: flex; gap: 8px;">
-                    <button class="action-btn" onclick="openStaffModal('Trainer')">
+                    <button class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="openStaffModal('Trainer')"
                         <i class="fas fa-user-plus"></i> Register Trainer
                     </button>
                 </div>
@@ -2218,7 +2218,7 @@
             <div class="bk-drawer-header">
                 <h3><i class="fa-solid fa-bell" style="margin-right: 8px; color: var(--primary-red);"></i>Notifications
                 </h3>
-                <button class="bk-drawer-close" onclick="toggleNotifSidebar()"
+                <button class="bk-drawer-close" onclick="toggleNotifSidebar()">
                     aria-label="Close drawer">&times;</button>
             </div>
             <div class="bk-drawer-body">
@@ -2249,8 +2249,8 @@
         </aside>
 
         <!-- Booking Slide-Over Drawer replaced with Premium Member-style Modal -->
-        <div id="bookingModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="bookingModalTitle" style="display: none;">
-            <div class="modal-content booking-modal-content" style="max-width: 900px; width: 90%; padding: 0;">
+        <div id="bookingModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" role="dialog" aria-modal="true" aria-labelledby="bookingModalTitle" style="display: none;" onclick="if(event.target===this)closeModal('bookingModal')">
+            <div class="modal-content booking-modal-content relative w-[95%] sm:w-full max-w-4xl mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-0 overflow-hidden transition-all duration-300 ease-out max-h-[92vh] max-w-4xl !p-0">
                 <div class="modal-header" style="padding: 20px;">
                     <h3 id="bookingModalTitle">Book Personal Training Session</h3>
                     <span class="close-btn" onclick="closeModal('bookingModal')" aria-label="Close booking dialog">&times;</span>
@@ -2627,8 +2627,8 @@
     <!-- ═══════════════════════════════════════════ -->
     <!-- MEMBERSHIP PLAN CREATE / EDIT MODAL        -->
     <!-- ═══════════════════════════════════════════ -->
-    <div id="planModal" class="modal">
-        <div class="modal-content" style="max-width: 520px;">
+    <div id="planModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('planModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-lg">
             <div class="modal-header">
                 <h3 id="planModalTitle"><i class="fa-solid fa-tags"></i> Create Membership Plan</h3>
                 <span class="close-btn" onclick="closeModal('planModal')">&times;</span>
@@ -2672,9 +2672,9 @@
                         <!-- Dynamic feature inputs go here -->
                     </div>
                 </div>
-                <div class="btn-row">
-                    <button type="button" class="btn-cancel" onclick="closeModal('planModal')">Cancel</button>
-                    <button type="submit" class="action-btn">Save Plan</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="btn-cancel inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('planModal')">Cancel</button>
+                    <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Save Plan</button>
                 </div>
             </form>
         </div>
@@ -2683,8 +2683,8 @@
     <!-- ═══════════════════════════════════════════ -->
     <!-- MEMBERSHIP RENEWAL MODAL                   -->
     <!-- ═══════════════════════════════════════════ -->
-    <div id="renewMemberModal" class="modal">
-        <div class="modal-content" style="max-width: 520px;">
+    <div id="renewMemberModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('renewMemberModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-lg">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-rotate"></i> Renew Membership</h3>
                 <span class="close-btn" onclick="closeModal('renewMemberModal')">&times;</span>
@@ -2756,17 +2756,17 @@
                     </div>
                 </div>
 
-                <div class="btn-row">
-                    <button type="button" class="btn-cancel" onclick="closeModal('renewMemberModal')">Cancel</button>
-                    <button type="button" class="btn-submit is-success"
-                        onclick="confirmRenewal(this)"><i class="fa-solid fa-check"></i> Confirm & Renew</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="btn-cancel inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('renewMemberModal')">Cancel</button>
+                    <button type="button" class="btn-submit is-success inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
+                        onclick="confirmRenewal(this)"<i class="fa-solid fa-check"></i> Confirm & Renew</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="walkinIssueModal" class="modal">
-        <div class="modal-content" style="max-width: 520px;">
+    <div id="walkinIssueModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('walkinIssueModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-lg">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-id-card"></i> Issue Walk-in Day Pass</h3>
                 <span class="close-btn" onclick="closeModal('walkinIssueModal')">&times;</span>
@@ -2779,12 +2779,12 @@
                 <input type="text" id="walkinIssueRfidInput" class="rfid-register-input"
                     placeholder="Tap guest RFID card..." autocomplete="off" inputmode="none" style="width: 100%;">
                 <div style="display: flex; gap: 10px; margin-top: 12px;">
-                    <button type="button" class="action-btn"
+                    <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
                         style="flex: 1; background: #f1f2f6; color: var(--dark-black);"
                         onclick="closeModal('walkinIssueModal')">
                         Cancel
                     </button>
-                    <button type="button" class="action-btn" id="walkinIssueRetryBtn"
+                    <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" id="walkinIssueRetryBtn"
                         style="flex: 1; background: var(--dark-black);"
                         onclick="window.__walkinIssueRetry && window.__walkinIssueRetry()">
                         Retry
@@ -2797,8 +2797,8 @@
     <!-- ═══════════════════════════════════════════ -->
     <!-- ADD LOCKER MODAL                           -->
     <!-- ═══════════════════════════════════════════ -->
-    <div id="addLockerModal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
+    <div id="addLockerModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('addLockerModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-sm">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-lock mr-2"></i> Add New Locker</h3>
                 <span class="close-btn" onclick="closeModal('addLockerModal')">&times;</span>
@@ -2812,7 +2812,7 @@
                     <label class="form-label">Location / Section</label>
                     <input type="text" id="lockerLocationInput" placeholder="e.g. Male Locker Room" required>
                 </div>
-                <button type="submit" class="action-btn is-block">Create Locker</button>
+                <button type="submit" class="action-btn is-block inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Create Locker</button>
             </form>
         </div>
     </div>
@@ -2820,8 +2820,8 @@
     <!-- ═══════════════════════════════════════════ -->
     <!-- ASSIGN LOCKER MODAL                        -->
     <!-- ═══════════════════════════════════════════ -->
-    <div id="assignLockerModal" class="modal">
-        <div class="modal-content" style="max-width: 450px;">
+    <div id="assignLockerModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('assignLockerModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-md">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-user-tag mr-2"></i> Locker Assignment</h3>
                 <span class="close-btn" onclick="closeModal('assignLockerModal')">&times;</span>
@@ -2868,10 +2868,10 @@
                             style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
                     </div>
                     <div class="flex gap-3 mt-6">
-                        <button type="button" class="btn-cancel is-flex"
+                        <button type="button" class="btn-cancel is-flex inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200"
                             onclick="closeModal('assignLockerModal')">Cancel</button>
                         <div style="display: flex; flex-direction: column; gap: 8px; flex: 1.5;">
-                            <button type="submit" class="action-btn is-block">Assign Locker</button>
+                            <button type="submit" class="action-btn is-block inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Assign Locker</button>
                         </div>
                     </div>
                 </form>
@@ -2895,22 +2895,22 @@
                         </div>
                     </div>
                     <div class="flex gap-2">
-                        <button type="button" class="action-btn"
+                        <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
                             style="flex: 1; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;"
                             onclick="releaseLocker(this)">Release Locker</button>
-                        <button type="button" class="action-btn is-dark"
+                        <button type="button" class="action-btn is-dark inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
                             onclick="printLockerReceipt()">Print</button>
                     </div>
                 </div>
                 <div id="deleteLockerBtnWrapper" style="margin-top: 16px; border-top: 1px dashed var(--border-color); padding-top: 12px; display: none;">
-                    <button type="button" class="action-btn is-block w-full" style="background: #ef4444; color: white;" onclick="deleteLocker(this)">Delete Locker</button>
+                    <button type="button" class="action-btn is-block w-full inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" style="background: #ef4444; color: white;" onclick="deleteLocker(this)">Delete Locker</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="equipmentModal" class="modal">
-        <div class="modal-content" style="max-width: 480px;">
+    <div id="equipmentModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('equipmentModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-md">
             <div class="modal-header">
                 <h3>Register New Equipment</h3><span class="close-btn"
                     onclick="closeModal('equipmentModal')">&times;</span>
@@ -2962,16 +2962,16 @@
                         <input type="date" id="equipMaintenanceDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                 </div>
-                <div class="btn-row">
-                    <button type="button" class="action-btn is-subtle" onclick="closeModal('equipmentModal')">Cancel</button>
-                    <button type="submit" class="action-btn">Register Equipment</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('equipmentModal')">Cancel</button>
+                    <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Register Equipment</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="editEquipModal" class="modal">
-        <div class="modal-content" style="max-width: 480px;">
+    <div id="editEquipModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('editEquipModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-md">
             <div class="modal-header">
                 <h3>Edit Equipment</h3><span class="close-btn" onclick="closeModal('editEquipModal')">&times;</span>
             </div>
@@ -3035,20 +3035,20 @@
                     <span style="font-size: 13px; color: var(--text-muted);"><i class="fa-solid fa-wrench" style="margin-right: 6px;"></i>Total Maintenance Sessions</span>
                     <div style="display:flex; align-items:center; gap:10px;">
                         <strong id="editEquipMaintCount" style="font-size: 15px; color: var(--text-primary);">0 times</strong>
-                        <button type="button" class="action-btn is-subtle" style="padding:4px 10px; font-size:12px;" onclick="openMaintenanceLogbookModal(document.getElementById('editEquipId').value)"><i class="fa-solid fa-book-open" style="margin-right:4px;"></i>View Log</button>
+                        <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" style="padding:4px 10px; font-size:12px;" onclick="openMaintenanceLogbookModal(document.getElementById('editEquipId').value)"<i class="fa-solid fa-book-open" style="margin-right:4px;"></i>View Log</button>
                     </div>
                 </div>
-                <div class="btn-row">
-                    <button type="button" class="action-btn is-subtle" onclick="closeModal('editEquipModal')">Cancel</button>
-                    <button type="submit" class="action-btn">Save Changes</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('editEquipModal')">Cancel</button>
+                    <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Save Changes</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Maintenance Logbook Modal -->
-    <div id="maintenanceLogbookModal" class="modal">
-        <div class="modal-content" style="max-width: 580px;">
+    <div id="maintenanceLogbookModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('maintenanceLogbookModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-xl">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-book-open" style="margin-right:8px;"></i>Maintenance Log &mdash; <span id="logbookEquipName"></span></h3>
                 <span class="close-btn" onclick="closeModal('maintenanceLogbookModal')">&times;</span>
@@ -3073,8 +3073,8 @@
                     <label class="form-label">Remark <span style="color:var(--text-muted); font-weight:400;">(optional)</span></label>
                     <input type="text" id="logEntryRemark" maxlength="200" placeholder="e.g. Replaced belt, lubricated joints..." style="width:100%; padding:9px 10px; border:1px solid var(--border-color); border-radius:6px; background:var(--panel-bg); color:var(--text-primary);">
                 </div>
-                <div class="btn-row" style="margin-top:10px;">
-                    <button type="button" class="action-btn is-primary" onclick="submitMaintenanceLog()">Save Entry</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100" style="margin-top:10px;">
+                    <button type="button" class="action-btn is-primary inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="submitMaintenanceLog()">Save Entry</button>
                 </div>
             </div>
 
@@ -3083,14 +3083,14 @@
                 <div class="mp-empty-state">No maintenance records yet.</div>
             </div>
 
-            <div class="btn-row" style="margin-top:14px;">
-                <button type="button" class="action-btn is-subtle" onclick="closeModal('maintenanceLogbookModal')">Close</button>
+            <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100" style="margin-top:14px;">
+                <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('maintenanceLogbookModal')">Close</button>
             </div>
         </div>
     </div>
 
-    <div id="editProductModal" class="modal">
-        <div class="modal-content" style="max-width: 480px;">
+    <div id="editProductModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('editProductModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-md">
             <div class="modal-header">
                 <h3>Edit Product</h3><span class="close-btn" onclick="closeModal('editProductModal')">&times;</span>
             </div>
@@ -3146,16 +3146,16 @@
                     </label>
                     <p style="margin:6px 0 0 28px;font-size:12px;color:var(--text-muted);">Stock is managed per expiry batch (FEFO). Qty &amp; single expiry date are replaced by the Batch Manager.</p>
                 </div>
-                <div class="btn-row">
-                    <button type="button" class="action-btn is-subtle" onclick="closeModal('editProductModal')">Cancel</button>
-                    <button type="submit" class="action-btn">Save Changes</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('editProductModal')">Cancel</button>
+                    <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Save Changes</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="productModal" class="modal">
-        <div class="modal-content" style="max-width: 480px;">
+    <div id="productModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('productModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-md">
             <div class="modal-header">
                 <h3>Register New Product</h3><span class="close-btn" onclick="closeModal('productModal')">&times;</span>
             </div>
@@ -3210,17 +3210,17 @@
                     </label>
                     <p style="margin:6px 0 0 28px;font-size:12px;color:var(--text-muted);">Stock is managed per expiry batch (FEFO). Qty &amp; single expiry date fields are hidden — add batches after saving.</p>
                 </div>
-                <div class="btn-row">
-                    <button type="button" class="action-btn is-subtle" onclick="closeModal('productModal')">Cancel</button>
-                    <button type="submit" class="action-btn">Register Product</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('productModal')">Cancel</button>
+                    <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Register Product</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Batch Manager Modal -->
-    <div id="batchManagerModal" class="modal">
-        <div class="modal-content" style="max-width:560px;">
+    <div id="batchManagerModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('batchManagerModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-xl">
             <div class="modal-header">
                 <h3><i class="fas fa-layer-group" style="margin-right:8px;color:var(--accent-blue,#3b82f6);"></i>Batch Manager — <span id="batchManagerProductName"></span></h3>
                 <span class="close-btn" onclick="closeModal('batchManagerModal')">&times;</span>
@@ -3240,7 +3240,7 @@
                             <input type="date" id="newBatchExpiry" style="width:100%;" onfocus="this.min=new Date().toISOString().split('T')[0]">
                         </div>
                     </div>
-                    <button type="button" class="action-btn" style="width:100%;margin-top:4px;" onclick="saveNewBatch()">
+                    <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" style="width:100%;margin-top:4px;" onclick="saveNewBatch()"
                         <i class="fas fa-plus"></i> Add Batch
                     </button>
                 </div>
@@ -3248,8 +3248,8 @@
         </div>
     </div>
 
-    <div id="memberModal" class="modal">
-        <div class="modal-content" style="max-width: 540px; padding: 0; overflow: hidden;">
+    <div id="memberModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('memberModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-lg !p-0 overflow-hidden">
             <!-- Wizard Header -->
             <div style="padding: 24px 32px 0 32px;">
                 <div class="modal-header" style="margin-bottom: 8px;">
@@ -3300,9 +3300,9 @@
                     <input type="email" id="regMemberEmail" placeholder="Email Address" required>
                     <input type="text" id="regMemberEmergency" placeholder="Emergency Contact Number" required>
 
-                    <div class="btn-row" style="margin-top: 8px;">
-                        <button type="button" class="action-btn is-subtle" onclick="closeModal('memberModal')">Cancel</button>
-                        <button type="button" class="action-btn" onclick="regWizardNext(1)">Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i></button>
+                    <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100" style="margin-top: 8px;">
+                        <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('memberModal')">Cancel</button>
+                        <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="regWizardNext(1)"Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i></button>
                     </div>
                 </div>
 
@@ -3335,9 +3335,9 @@
                         <input type="text" id="regMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card..." required style="margin-bottom: 0;">
                     </div>
 
-                    <div class="btn-row" style="margin-top: 16px;">
-                        <button type="button" class="action-btn is-subtle" onclick="regWizardBack(2)"><i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
-                        <button type="button" class="action-btn" onclick="regWizardNext(2)">Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i></button>
+                    <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100" style="margin-top: 16px;">
+                        <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="regWizardBack(2)"<i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
+                        <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="regWizardNext(2)"Next <i class="fas fa-arrow-right" style="margin-left: 6px;"></i></button>
                     </div>
                 </div>
 
@@ -3412,17 +3412,17 @@
                         </div>
                     </div>
 
-                    <div class="btn-row" style="margin-top: 16px;">
-                        <button type="button" class="action-btn is-subtle" onclick="regWizardBack(3)"><i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
-                        <button type="submit" class="action-btn is-success"><i class="fas fa-check-circle" style="margin-right: 6px;"></i> Confirm & Register</button>
+                    <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100" style="margin-top: 16px;">
+                        <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="regWizardBack(3)"<i class="fas fa-arrow-left" style="margin-right: 6px;"></i> Back</button>
+                        <button type="submit" class="action-btn is-success inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"><i class="fas fa-check-circle" style="margin-right: 6px;"></i> Confirm & Register</button>
                     </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="editMemberModal" class="modal">
-        <div class="modal-content" style="max-width: 520px;">
+    <div id="editMemberModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('editMemberModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-lg">
             <div class="modal-header">
                 <h3>Edit Member Details</h3><span class="close-btn"
                     onclick="closeModal('editMemberModal')">&times;</span>
@@ -3480,16 +3480,16 @@
                     <input type="text" id="editMemberRfid" class="rfid-register-input" placeholder="Tap RFID Card...">
                 </div>
 
-                <div class="btn-row">
-                    <button type="button" class="action-btn is-subtle" onclick="closeModal('editMemberModal')">Cancel</button>
-                    <button type="submit" class="action-btn"><i class="fas fa-save"></i> Save Changes</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('editMemberModal')">Cancel</button>
+                    <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"><i class="fas fa-save"></i> Save Changes</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="staffModal" class="modal">
-        <div class="modal-content" style="max-width: 520px;">
+    <div id="staffModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('staffModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-lg">
             <div class="modal-header">
                 <h3 id="staffModalTitle">Register Staff</h3><span class="close-btn"
                     onclick="closeModal('staffModal')">&times;</span>
@@ -3534,16 +3534,16 @@
                 <input type="text" id="regStaffRfid" class="rfid-register-input" placeholder="Tap RFID Card..."
                     required>
 
-                <div class="btn-row">
-                    <button type="button" class="action-btn is-subtle" onclick="closeModal('staffModal')">Cancel</button>
-                    <button type="submit" class="action-btn"><i class="fas fa-user-plus"></i> Register Staff</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('staffModal')">Cancel</button>
+                    <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"><i class="fas fa-user-plus"></i> Register Staff</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div id="editStaffModal" class="modal">
-        <div class="modal-content" style="max-width: 520px;">
+    <div id="editStaffModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('editStaffModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-lg">
             <div class="modal-header">
                 <h3 id="editStaffModalTitle">Edit Staff Details</h3><span class="close-btn"
                     onclick="closeModal('editStaffModal')">&times;</span>
@@ -3592,9 +3592,9 @@
                 </p>
                 <input type="text" id="editStaffRfid" class="rfid-register-input" placeholder="Tap RFID Card...">
 
-                <div class="btn-row">
-                    <button type="button" class="action-btn is-subtle" onclick="closeModal('editStaffModal')">Cancel</button>
-                    <button type="submit" class="action-btn"><i class="fas fa-save"></i> Save Changes</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('editStaffModal')">Cancel</button>
+                    <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"><i class="fas fa-save"></i> Save Changes</button>
                 </div>
             </form>
         </div>
@@ -3602,8 +3602,8 @@
 
 
 
-    <div id="editBookingModal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
+    <div id="editBookingModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('editBookingModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-sm">
             <div class="modal-header">
                 <h3>Update Session Status</h3><span class="close-btn"
                     onclick="closeModal('editBookingModal')">&times;</span>
@@ -3625,9 +3625,9 @@
                     <textarea id="editBookingRemarks" placeholder="Enter reason for cancellation or status change..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary); min-height: 80px;"></textarea>
                 </div>
 
-                <div class="btn-row">
-                    <button type="button" class="action-btn is-subtle" onclick="closeModal('editBookingModal')">Cancel</button>
-                    <button type="submit" class="action-btn">Save Changes</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
+                    <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('editBookingModal')">Cancel</button>
+                    <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -3851,17 +3851,17 @@
         </div>
     </div>
 
-    <div id="imageSourceModal" class="modal" style="z-index: 12000;">
-        <div class="modal-content" style="max-width: 350px; text-align: center;">
+    <div id="imageSourceModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" style="z-index: 12000;" onclick="if(event.target===this)closeModal('imageSourceModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-xs text-center">
             <div class="modal-header">
                 <h3>Select Image Source</h3>
                 <span class="close-btn" onclick="closeModal('imageSourceModal')">&times;</span>
             </div>
             <div style="padding: 20px; display: flex; flex-direction: column; gap: 12px;">
-                <button class="action-btn is-block" onclick="chooseImageUpload()">
+                <button class="action-btn is-block inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="chooseImageUpload()"
                     <i class="fas fa-upload"></i> Upload from Device
                 </button>
-                <button class="action-btn is-block is-soft" onclick="chooseImageUrl()">
+                <button class="action-btn is-block is-soft inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="chooseImageUrl()"
                     <i class="fas fa-link"></i> Paste Image URL
                 </button>
             </div>
@@ -3869,8 +3869,8 @@
     </div>
 
     <!-- Member Profile Modal — Premium Redesign -->
-    <div id="memberProfileModal" class="modal">
-        <div class="modal-content mp-modal-shell">
+    <div id="memberProfileModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('memberProfileModal')">
+        <div class="modal-content mp-modal-shell relative w-[95%] sm:w-full max-w-2xl mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-0 overflow-hidden transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto">
             <!-- Header Banner -->
             <div class="mp-banner">
                 <button class="mp-close-btn" onclick="closeModal('memberProfileModal')" title="Close">
@@ -3999,8 +3999,8 @@
             if (chatContainer) chatContainer.classList.remove('mobile-chat-open');
         }
     </script>
-    <div id="addCreditModal" class="modal">
-        <div class="modal-content" style="max-width: 400px;">
+    <div id="addCreditModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('addCreditModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-sm">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-wallet"></i> Top-Up Credit</h3>
                 <span class="close-btn" onclick="closeModal('addCreditModal')">&times;</span>
@@ -4025,18 +4025,18 @@
                     </div>
 
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
-                        <button type="button" class="action-btn"
+                        <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
                             style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);"
-                            onclick="document.getElementById('addCreditAmount').value=100">₱100</button>
-                        <button type="button" class="action-btn"
+                            onclick="document.getElementById('addCreditAmount').value=100"₱100</button>
+                        <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
                             style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);"
-                            onclick="document.getElementById('addCreditAmount').value=200">₱200</button>
-                        <button type="button" class="action-btn"
+                            onclick="document.getElementById('addCreditAmount').value=200"₱200</button>
+                        <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
                             style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);"
-                            onclick="document.getElementById('addCreditAmount').value=500">₱500</button>
-                        <button type="button" class="action-btn"
+                            onclick="document.getElementById('addCreditAmount').value=500"₱500</button>
+                        <button type="button" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
                             style="padding: 8px; justify-content: center; background: #eee; color: var(--dark-black);"
-                            onclick="document.getElementById('addCreditAmount').value=1000">₱1000</button>
+                            onclick="document.getElementById('addCreditAmount').value=1000"₱1000</button>
                     </div>
 
                     <div class="form-group">
@@ -4056,17 +4056,17 @@
                         <input type="text" id="addCreditNote" placeholder="e.g. Counter top-up">
                     </div>
 
-                    <div class="btn-row" style="margin-top: 20px;">
-                        <button type="button" class="action-btn is-subtle" onclick="closeModal('addCreditModal')">Cancel</button>
-                        <button type="submit" class="action-btn">Add Credit</button>
+                    <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100" style="margin-top: 20px;">
+                        <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200" onclick="closeModal('addCreditModal')">Cancel</button>
+                        <button type="submit" class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Add Credit</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <div id="rfidTxnConfirmModal" class="modal" style="display:none;">
-        <div class="modal-content" style="max-width: 420px; text-align: center;">
+    <div id="rfidTxnConfirmModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" style="display:none;" onclick="if(event.target===this)closeModal('rfidTxnConfirmModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-md text-center">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-shield-halved"></i> Confirm RFID Payment</h3>
             </div>
@@ -4087,13 +4087,13 @@
                         <span id="rfidTxnConfirmAmount" style="font-size: 18px; font-weight: 800; color: var(--primary-red);"></span>
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div class="flex flex-col-reverse sm:flex-row gap-3 justify-end mt-2">
                     <button id="rfidTxnCancelBtn" type="button"
-                        style="flex: 1; padding: 11px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--panel-bg); color: var(--text-color); font-weight: 600; cursor: pointer; font-size: 14px;">
+                        class="inline-flex flex-1 items-center justify-center px-4 py-2.5 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-all duration-200">
                         Cancel
                     </button>
                     <button id="rfidTxnConfirmBtn" type="button"
-                        style="flex: 2; padding: 11px; border-radius: 6px; border: none; background: #16a34a; color: #fff; font-weight: 700; cursor: pointer; font-size: 14px;">
+                        class="inline-flex flex-[2] items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-green-600 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-600 transition-all duration-200">
                         Confirm Payment
                     </button>
                 </div>
@@ -4101,8 +4101,8 @@
         </div>
     </div>
 
-    <div id="rfidPaymentModal" class="modal">
-        <div class="modal-content" style="max-width: 400px; text-align: center;">
+    <div id="rfidPaymentModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('rfidPaymentModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-sm text-center">
             <div class="modal-header">
                 <h3><i class="fa-solid fa-id-card"></i> RFID Payment</h3>
                 <span class="close-btn" onclick="closeModal('rfidPaymentModal')">&times;</span>
@@ -4126,8 +4126,8 @@
         </div>
     </div>
 
-    <div id="invoiceModal" class="modal">
-        <div class="modal-content" style="max-width: 600px; padding: 0; overflow: hidden; border-radius: 12px;">
+    <div id="invoiceModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('invoiceModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto max-w-2xl !p-0 overflow-hidden">
             <div
                 style="background: linear-gradient(135deg, #1a1a1a 0%, #333 100%); color: white; padding: 30px; position: relative;">
                 <span class="close-btn" onclick="closeModal('invoiceModal')"
@@ -4197,12 +4197,12 @@
 
             <div
                 style="padding: 20px 30px; background: rgba(0,0,0,0.03); display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="action-btn"
+                <button class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
                     style="background: var(--panel-bg); border: 1px solid var(--border-color); color: var(--dark-black);"
-                    onclick="window.print()">
+                    onclick="window.print()"
                     <i class="fas fa-print"></i> Print
                 </button>
-                <button class="action-btn is-dark"
+                <button class="action-btn is-dark inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200"
                     onclick="closeModal('invoiceModal')">
                     Done
                 </button>

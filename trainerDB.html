@@ -25,6 +25,11 @@
 
 
     <link rel="stylesheet" href="css/styles.css">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { corePlugins: { preflight: false } }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="js/ui.js"></script>
@@ -332,8 +337,8 @@
 
     </main>
 
-    <div id="editBookingModal" class="modal">
-        <div class="modal-content">
+    <div id="editBookingModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('editBookingModal')">
+        <div class="modal-content relative w-[95%] sm:w-full max-w-lg mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto">
             <div class="modal-header">
                 <h3>Update Session Status</h3>
                 <span class="close-btn" onclick="closeModal('editBookingModal')">&times;</span>
@@ -356,16 +361,16 @@
                     <label class="form-label">Remarks / Cancellation Reason</label>
                     <textarea id="editBookingRemarks" placeholder="Enter reason for cancellation..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary); min-height: 80px;"></textarea>
                 </div>
-                <div class="btn-row" style="margin-top: 15px;">
-                    <button type="submit" class="btn-submit is-dark">Save Changes</button>
+                <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100" style="margin-top: 15px;">
+                    <button type="submit" class="btn-submit is-dark inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200">Save Changes</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Member Profile Modal — Premium Redesign -->
-    <div id="memberProfileModal" class="modal">
-        <div class="modal-content mp-modal-shell">
+    <div id="memberProfileModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" onclick="if(event.target===this)closeModal('memberProfileModal')">
+        <div class="modal-content mp-modal-shell relative w-[95%] sm:w-full max-w-2xl mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-0 overflow-hidden transition-all duration-300 ease-out max-h-[92vh] overflow-y-auto">
             <!-- Header Banner -->
             <div class="mp-banner">
                 <button class="mp-close-btn" onclick="closeModal('memberProfileModal')" title="Close">

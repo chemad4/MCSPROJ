@@ -154,16 +154,13 @@ window.queryTrainerScheduleConflict = async function (trainerId, date, time, exc
     const targetHour = window._bookingHourKey(time);
     if (!targetHour) return false;
 
-    const q = fb.query(
-        fb.bookingsCol,
-        fb.where('trainerId', '==', trainerId),
-        fb.where('date', '==', date),
-        fb.where('status', 'in', BOOKING_ACTIVE_SLOT_STATUSES)
-    );
-    const snap = await fb.getDocs(q);
+    const snap = await fb.getDocs(fb.query(fb.bookingsCol, fb.where('date', '==', date)));
     for (const docSnap of snap.docs) {
         if (excludeBookingId && docSnap.id === excludeBookingId) continue;
-        if (window._bookingHourKey(docSnap.data().time) === targetHour) return true;
+        const data = docSnap.data();
+        if (data.trainerId !== trainerId) continue;
+        if (!BOOKING_ACTIVE_SLOT_STATUSES.includes(data.status)) continue;
+        if (window._bookingHourKey(data.time) === targetHour) return true;
     }
     return false;
 };
@@ -1162,14 +1159,11 @@ window.executeManualBooking = async function () {
 
         let sameDayConflict = false;
         if (!window.manualBookingState?.allowSameDay) {
-            const sameDayRef = fb.query(
-                fb.bookingsCol,
-                fb.where('memberId', '==', memberId),
-                fb.where('date', '==', date),
-                fb.where('status', 'in', ['Confirmed', 'Pending'])
-            );
-            const sameDaySnap = await fb.getDocs(sameDayRef);
-            sameDayConflict = !sameDaySnap.empty;
+            const sameDaySnap = await fb.getDocs(fb.query(fb.bookingsCol, fb.where('date', '==', date)));
+            sameDayConflict = sameDaySnap.docs.some(docSnap => {
+                const b = docSnap.data();
+                return b.memberId === memberId && (b.status === 'Confirmed' || b.status === 'Pending');
+            });
         }
 
         await fb.runTransaction(fb.db, async (tx) => {
@@ -1500,14 +1494,10 @@ window.executeManualBooking = async function () {
         if (role !== 'member' || !userId) return;
 
         try {
-            const q = fb.query(
-                fb.pendingRatingsCol,
-                fb.where("memberId", "==", userId),
-                fb.where("resolved", "==", false)
-            );
-            const snap = await fb.getDocs(q);
+            const snap = await fb.getDocs(fb.query(fb.pendingRatingsCol, fb.where("memberId", "==", userId)));
             snap.forEach(docSnap => {
                 const data = docSnap.data();
+                if (data.resolved) return;
                 if (_shownRatingFor.has(data.bookingId)) return;
                 _shownRatingFor.add(data.bookingId);
                 _showMemberRatingModal(data, docSnap.id);

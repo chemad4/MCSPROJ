@@ -117,9 +117,7 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
     // Walk-in guest card handling (reusable cards issued by POS after payment).
     const offset = window.serverTimeOffsetMs || 0;
     const now = new Date(Date.now() + offset);
-    // EC-5: use ISO-8601 (YYYY-MM-DD) for all date keys so locale differences
-    // between devices (en-US vs en-PH etc.) never cause string mismatches.
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
     const guestCardsCol = collection(db, "guestCards");
@@ -147,10 +145,13 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
       return;
     }
 
-    const attQuery = query(attendanceCol, where("guestRfid", "==", scannedTag), where("date", "==", dateStr), where("status", "==", "Checked In"));
-    const attSnapshot = await getDocs(attQuery);
+    const attSnap = await getDocs(query(attendanceCol, where("guestRfid", "==", scannedTag)));
+    const attDoc = attSnap.docs.find(d => {
+      const a = d.data() || {};
+      return a.date === dateStr && a.status === "Checked In";
+    });
 
-    if (attSnapshot.empty) {
+    if (!attDoc) {
       playRfidBuzzer(120, 400);
       if (typeof showToast === "function") {
         showToast("No active walk-in session found for this guest card.", "error");
@@ -158,7 +159,6 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
       return;
     }
 
-    const attDoc = attSnapshot.docs[0];
     const attData = attDoc.data() || {};
     const checkInAt = typeof attData.timestamp === "number" ? attData.timestamp : null;
     const msSinceIn = checkInAt !== null ? now.getTime() - checkInAt : null;
@@ -215,10 +215,13 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
 
                 try {
                   const passesCol = collection(db, "walkinPasses");
-                  const passQ = query(passesCol, where("rfid", "==", scannedTag), where("date", "==", dateStr), where("status", "==", "Active"));
-                  const passSnap = await getDocs(passQ);
-                  if (!passSnap.empty) {
-                    await updateDoc(doc(db, "walkinPasses", passSnap.docs[0].id), { status: "Used", usedAt: now.getTime() });
+                  const passSnap = await getDocs(query(passesCol, where("rfid", "==", scannedTag)));
+                  const passDoc = passSnap.docs.find(d => {
+                    const p = d.data() || {};
+                    return p.date === dateStr && p.status === "Active";
+                  });
+                  if (passDoc) {
+                    await updateDoc(doc(db, "walkinPasses", passDoc.id), { status: "Used", usedAt: now.getTime() });
                   }
                 } catch (_) {}
 
@@ -252,10 +255,13 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
     // Mark the most recent active walk-in pass as used (best-effort, pre-queried outside batch).
     try {
       const passesCol = collection(db, "walkinPasses");
-      const passQ = query(passesCol, where("rfid", "==", scannedTag), where("date", "==", dateStr), where("status", "==", "Active"));
-      const passSnap = await getDocs(passQ);
-      if (!passSnap.empty) {
-        batch.update(doc(db, "walkinPasses", passSnap.docs[0].id), { status: "Used", usedAt: now.getTime() });
+      const passSnap = await getDocs(query(passesCol, where("rfid", "==", scannedTag)));
+      const passDoc = passSnap.docs.find(d => {
+        const p = d.data() || {};
+        return p.date === dateStr && p.status === "Active";
+      });
+      if (passDoc) {
+        batch.update(doc(db, "walkinPasses", passDoc.id), { status: "Used", usedAt: now.getTime() });
       }
     } catch (_) {
       // ignore — pass cleanup is best-effort
@@ -271,10 +277,13 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
   const now = new Date(Date.now() + offset);
   const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
-  // 1. Pre-query for legacy active check-in record for today (since queries aren't allowed inside a transaction)
-  const attQuery = query(attendanceCol, where("rfid", "==", scannedTag), where("date", "==", dateStr), where("status", "==", "Checked In"));
-  const attSnapshot = await getDocs(attQuery);
-  const legacyActiveId = !attSnapshot.empty ? attSnapshot.docs[0].id : null;
+  // Pre-query for active check-in today (single-field query + client filter)
+  const attSnap = await getDocs(query(attendanceCol, where("rfid", "==", scannedTag)));
+  const legacyDoc = attSnap.docs.find(d => {
+    const a = d.data() || {};
+    return a.date === dateStr && a.status === "Checked In";
+  });
+  const legacyActiveId = legacyDoc ? legacyDoc.id : null;
 
   try {
     const checkinResult = await runTransaction(db, async (transaction) => {

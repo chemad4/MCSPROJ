@@ -25,6 +25,11 @@
 
 
     <link rel="stylesheet" href="css/styles.css">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { corePlugins: { preflight: false } }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="js/ui.js"></script>
@@ -182,7 +187,7 @@
                     <label for="myBookingSearch" class="sr-only">Search bookings</label>
                     <input type="text" id="myBookingSearch" placeholder="Search sessions..." onkeyup="filterMyBookings()" autocomplete="off">
                 </div>
-                <button class="action-btn" onclick="openMemberBookingModal()"><i class="fas fa-calendar-plus" aria-hidden="true"></i> Book a Session</button>
+                <button class="action-btn inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="openMemberBookingModal()"<i class="fas fa-calendar-plus" aria-hidden="true"></i> Book a Session</button>
             </div>
 
             <div class="panel">
@@ -250,11 +255,11 @@
 
     </main>
 
-    <div id="memberBookingModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="memberBookingModalTitle" aria-hidden="true">
-        <div class="modal-content booking-modal-content">
+    <div id="memberBookingModal" class="modal fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto" role="dialog" aria-modal="true" aria-labelledby="memberBookingModalTitle" aria-hidden="true" onclick="if(event.target===this)closeModal('memberBookingModal')">
+        <div class="modal-content booking-modal-content relative w-[95%] sm:w-full max-w-4xl mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-0 overflow-hidden transition-all duration-300 ease-out max-h-[92vh]">
             <div class="modal-header">
                 <h3 id="memberBookingModalTitle">Request a Training Session</h3>
-                <button type="button" class="close-btn" onclick="closeModal('memberBookingModal')" aria-label="Close booking dialog">&times;</button>
+                <button type="button" class="close-btn" onclick="closeModal('memberBookingModal')"> aria-label="Close booking dialog">&times;</button>
             </div>
             <div class="booking-layout-wrapper">
                 <!-- Left/Main Column: Selection Steps -->
@@ -343,8 +348,8 @@
         </div>
     </div>
 
-    <div id="membershipExpiredModal" class="modal modal-expired">
-        <div class="modal-content expired-modal">
+    <div id="membershipExpiredModal" class="modal modal-expired fixed inset-0 z-[2000] items-end sm:items-center justify-center p-0 sm:p-6 bg-gray-900/50 backdrop-blur-sm overflow-auto">
+        <div class="modal-content expired-modal relative w-[95%] sm:w-full max-w-md mx-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl ring-1 ring-gray-900/5 border border-gray-100 p-6 sm:p-8 transition-all duration-300 ease-out text-center">
             <div class="expired-modal-body">
                 <div class="expired-modal-icon">
                     <i class="fa-solid fa-hourglass-end"></i>

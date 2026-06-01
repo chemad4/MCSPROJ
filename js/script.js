@@ -8,7 +8,7 @@ import { initAttendance } from "./attendance.js";
 import { initRfid } from "./rfid.js";
 import { escapeHtml, formatCurrency } from "./utils.js";
 import { firebaseConfig } from "./firebase-config.js";
-import { checkoutBatches } from "./inventory-checkout.js";
+import { checkoutBatches, restoreBatchDeductions } from "./inventory-checkout.js";
 
 // Expose utilities globally for inline handlers & other scripts
 window.escapeHtml = escapeHtml;
@@ -369,6 +369,15 @@ const currentUserRole = localStorage.getItem("userRole");
 const roleNorm = (currentUserRole || "").toLowerCase();
 const isStaffSide = roleNorm === "admin" || roleNorm === "staff";
 const isAdmin = roleNorm === "admin";
+
+/** Case-insensitive admin check for RBAC gates (Firestore role may be Admin or admin). */
+window.isCallerAdmin = function () {
+    return (localStorage.getItem("userRole") || "").toLowerCase() === "admin";
+};
+window.isCallerStaffOrAdmin = function () {
+    const r = (localStorage.getItem("userRole") || "").toLowerCase();
+    return r === "admin" || r === "staff";
+};
 
 if (currentUserId && currentSessionId) {
     onSnapshot(doc(db, "users", currentUserId), (docSnap) => {
@@ -1117,7 +1126,85 @@ let stockMovementsData = [];
 let lockersData = [];
 
 let currentChatUser = null;
+let currentChatUserId = null;
 let currentChatRoleFilter = 'all';
+
+function getUserDisplayName(u) {
+    if (!u) return '';
+    return (u.name || `${u.givenName || ''} ${u.familyName || ''}`.trim() || 'User');
+}
+
+function getAllMessagingUsers() {
+    const byId = new Map();
+    const add = (u) => { if (u && u.id) byId.set(u.id, u); };
+    (chatUsers || []).forEach(add);
+    (membersData || []).forEach(add);
+    (allUsersData || []).forEach(add);
+    return Array.from(byId.values());
+}
+
+function findUserForChat(nameOrId) {
+    if (!nameOrId) return null;
+    const pool = getAllMessagingUsers();
+    const byId = pool.find(u => u.id === nameOrId);
+    if (byId) return byId;
+    const byUid = pool.find(u => u.uid === nameOrId);
+    if (byUid) return byUid;
+    const target = String(nameOrId).trim().toLowerCase();
+    return pool.find(u => {
+        const display = getUserDisplayName(u).toLowerCase();
+        const legacy = (u.name || '').trim().toLowerCase();
+        return display === target || (legacy && legacy === target);
+    }) || null;
+}
+
+function cacheMessagingUser(user) {
+    if (!user || !user.id) return user;
+    if (!(chatUsers || []).some(u => u.id === user.id)) {
+        chatUsers.push(user);
+        const roleStr = (user.role || "").trim().toLowerCase();
+        if (roleStr === 'member') {
+            if (!(membersData || []).some(m => m.id === user.id)) membersData.push(user);
+        } else if (roleStr !== 'admin') {
+            if (!(allUsersData || []).some(u => u.id === user.id)) allUsersData.push(user);
+        }
+    }
+    return user;
+}
+
+async function resolveUserForChat(nameOrId) {
+    const local = findUserForChat(nameOrId);
+    if (local) return local;
+
+    const key = String(nameOrId).trim();
+    if (!key) return null;
+
+    try {
+        const snap = await getDoc(doc(db, "users", key));
+        if (snap.exists()) {
+            const data = snap.data();
+            delete data.password;
+            return cacheMessagingUser({ ...data, id: snap.id });
+        }
+    } catch (_) { /* not a valid doc id */ }
+
+    try {
+        const uidSnap = await getDocs(query(usersCol, where("uid", "==", key), limit(1)));
+        if (!uidSnap.empty) {
+            const d = uidSnap.docs[0];
+            const data = d.data();
+            delete data.password;
+            return cacheMessagingUser({ ...data, id: d.id });
+        }
+    } catch (e) {
+        console.warn("resolveUserForChat uid lookup failed:", e);
+    }
+    return null;
+}
+
+window.getUserDisplayName = getUserDisplayName;
+window.findUserForChat = findUserForChat;
+window.resolveUserForChat = resolveUserForChat;
 
 const inventoryCol = collection(db, "inventory");
 const paymentsCol = collection(db, "payments");
@@ -1307,16 +1394,18 @@ window.openMaintenanceLogbookModal = async function(equipmentId) {
 
     document.getElementById('maintenanceLogbookModal').style.display = 'flex';
 
-    // Fetch history from Firestore
+    // Fetch history from Firestore (sort client-side to avoid a composite index on equipmentId + timestamp)
     try {
-        const q = query(maintenanceLogsCol, where("equipmentId", "==", equipmentId), orderBy("timestamp", "desc"));
+        const q = query(maintenanceLogsCol, where("equipmentId", "==", equipmentId));
         const snap = await getDocs(q);
         maintenanceLogsData = [];
         snap.forEach(d => maintenanceLogsData.push({ id: d.id, ...d.data() }));
+        maintenanceLogsData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         renderMaintenanceLog();
     } catch (e) {
-        console.error("Failed to fetch maintenance logs:", e);
+        console.error("Failed to fetch maintenance logs:", e.code || e.message || e);
         if (list) list.innerHTML = '<div class="mp-empty-state">Failed to load records.</div>';
+        showToast("Could not load maintenance history.", "error");
     }
 };
 
@@ -1363,6 +1452,11 @@ window.refreshStockMovements = function () {
         snapshot.forEach(doc => stockMovementsData.push({ id: doc.id, ...doc.data() }));
         stockMovementsData.sort((a, b) => b.timestamp - a.timestamp);
         renderLedger();
+    }).catch(err => {
+        console.error("Failed to load stock movements:", err.code || err.message || err);
+        if (typeof showToast === 'function') {
+            showToast("Could not load inventory ledger.", "error");
+        }
     });
 };
 if (isStaffSide) window.refreshStockMovements();
@@ -1437,6 +1531,7 @@ window.openChatTab = function (role, element, title) {
     currentChatRoleFilter = role;
     document.getElementById('chatDirectoryTitle').innerHTML = `<i class="fa-solid fa-address-book"></i> ${title}`;
     currentChatUser = null;
+    currentChatUserId = null;
     document.getElementById('chatHeader').innerText = 'Select a user to start chatting';
     document.getElementById('chatHistory').innerHTML = '<div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;"><i class="fa-regular fa-comments" style="font-size: 3rem; opacity: 0.2; margin-bottom: 10px;"></i><p>No chat selected</p></div>';
     document.getElementById('chatInput').disabled = true;
@@ -1457,7 +1552,8 @@ if (currentUserId) {
     if (myName) {
         const _msgIndex = new Map();
         const _emitChat = () => {
-            messagesData = Array.from(_msgIndex.values());
+            messagesData = Array.from(_msgIndex.values())
+                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             renderChatHistory();
             _updateMessagesBadge();
         };
@@ -1492,20 +1588,19 @@ if (currentUserId) {
         // PRESENTATION PROOFING: Lower chat message buffer to 30 for lightweight presentation loads.
         // Query by name (manual chat) AND by userId (auto-messages from declined bookings).
         // Both are needed because manual messages use name strings while auto-messages use IDs.
-        const sentQ    = query(messagesCol, where("sender",     "==", myName),        orderBy("timestamp", "desc"), limit(30));
-        const recvQ    = query(messagesCol, where("receiver",   "==", myName),        orderBy("timestamp", "desc"), limit(30));
-        const sentIdQ  = query(messagesCol, where("senderId",   "==", currentUserId), orderBy("timestamp", "desc"), limit(30));
-        const recvIdQ  = query(messagesCol, where("receiverId", "==", currentUserId), orderBy("timestamp", "desc"), limit(30));
+        // Single-field queries only; sort newest-first in _emitChat (no composite index).
+        const sentQ    = query(messagesCol, where("sender",     "==", myName));
+        const recvQ    = query(messagesCol, where("receiver",   "==", myName));
+        const sentIdQ  = query(messagesCol, where("senderId",   "==", currentUserId));
+        const recvIdQ  = query(messagesCol, where("receiverId", "==", currentUserId));
         const _chatErrHandler = (err) => {
             console.error("Messaging snapshot listener failed:", err);
-            if (err.message && err.message.includes("requires an index")) {
-                if (typeof showToast === 'function') showToast("Chat Index Required! Check your browser console log link to deploy.", "error");
-            }
+            if (typeof showToast === 'function') showToast("Could not load messages.", "error");
         };
         onSnapshot(sentQ,   _ingest, _chatErrHandler);
         onSnapshot(recvQ,   _ingest, _chatErrHandler);
-        onSnapshot(sentIdQ, _ingest, (err) => console.warn("[messages:sentId] listener error", err));
-        onSnapshot(recvIdQ, _ingest, (err) => console.warn("[messages:recvId] listener error", err));
+        onSnapshot(sentIdQ, _ingest, _chatErrHandler);
+        onSnapshot(recvIdQ, _ingest, _chatErrHandler);
     }
 }
 
@@ -1519,34 +1614,19 @@ function renderChatUserList() {
     if (!list) return;
 
     const myName = localStorage.getItem("loggedInUser");
+    const myId = localStorage.getItem("userId");
     let html = "";
 
     let admins = [];
     if (currentChatRoleFilter === 'staff' || currentChatRoleFilter === 'all') {
-        admins = chatUsers.filter(u => (u.role || "").toLowerCase() === 'admin' && u.name !== myName);
-    }
-
-    // H4: when the current user is a trainer, only allow messaging members the trainer has
-    // at least one (Pending/Confirmed/Completed) booking with. Trainer↔staff/admin/other-trainer is still open.
-    const myRole = (localStorage.getItem("userRole") || "").toLowerCase();
-    const myId = localStorage.getItem("userId");
-    let trainerAssignedMemberIds = null;
-    if (myRole === 'trainer') {
-        const bks = window.bookingsData || [];
-        trainerAssignedMemberIds = new Set(
-            bks.filter(b => b.trainerId === myId && b.memberId).map(b => b.memberId)
-        );
+        admins = chatUsers.filter(u => (u.role || "").toLowerCase() === 'admin' && getUserDisplayName(u) !== myName && u.id !== myId);
     }
 
     const targetUsers = chatUsers.filter(u => {
-        if (u.name === myName) return false;
+        if (getUserDisplayName(u) === myName || u.id === myId) return false;
         // M10: hide archived users from the chat picker
         if ((u.status || '').toLowerCase() === 'archived') return false;
         const uRole = (u.role || "").toLowerCase();
-        // H4: restrict trainers to members they've worked with
-        if (trainerAssignedMemberIds && uRole === 'member' && !trainerAssignedMemberIds.has(u.id)) {
-            return false;
-        }
         if (currentChatRoleFilter === 'all') return uRole !== 'admin';
         return uRole === currentChatRoleFilter;
     });
@@ -1558,13 +1638,12 @@ function renderChatUserList() {
         if (admins.length > 0) {
             html += `<div class="chat-category">Admins</div>`;
             admins.forEach(u => {
-                let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
-                let escapedName = escapeHtml(u.name);
-                _chatNameIndex.set(idSafeName, u.name); // raw name for openChat lookup
-                // Pass idSafeName to openChat — it resolves the raw name from _chatNameIndex,
-                // keeping all special chars out of the inline event attribute entirely.
+                const displayName = getUserDisplayName(u);
+                let idSafeName = displayName.replace(/[^a-zA-Z0-9]/g, '');
+                let escapedName = escapeHtml(displayName);
+                _chatNameIndex.set(idSafeName, displayName);
                 html += `
-                    <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat(_chatNameIndex.get('${idSafeName}'))">
+                    <div class="chat-user chat-user-item" data-name="${displayName.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.id}')">
                         <div class="chat-avatar" style="background: var(--primary-red);">
                             <i class="fa-solid fa-crown" style="font-size: 14px;"></i>
                         </div>
@@ -1584,15 +1663,16 @@ function renderChatUserList() {
             if (currentChatRoleFilter !== 'all') html += `<div class="chat-category">${catTitle}</div>`;
 
             targetUsers.forEach(u => {
-                let idSafeName = u.name.replace(/[^a-zA-Z0-9]/g, '');
-                let escapedName = escapeHtml(u.name);
-                _chatNameIndex.set(idSafeName, u.name); // raw name for openChat lookup
+                const displayName = getUserDisplayName(u);
+                let idSafeName = displayName.replace(/[^a-zA-Z0-9]/g, '');
+                let escapedName = escapeHtml(displayName);
+                _chatNameIndex.set(idSafeName, displayName);
                 let avatarContent = `${escapedName.charAt(0).toUpperCase()}`;
                 if ((u.role || "").toLowerCase() === 'member') {
                     avatarContent = `<i class="fa-solid fa-user" style="font-size: 14px;"></i>`;
                 }
                 html += `
-                    <div class="chat-user chat-user-item" data-name="${u.name.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat(_chatNameIndex.get('${idSafeName}'))">
+                    <div class="chat-user chat-user-item" data-name="${displayName.toLowerCase()}" id="chat-user-${idSafeName}" onclick="openChat('${u.id}')">
                         <div class="chat-avatar">${avatarContent}</div>
                         <div>
                             <div style="font-weight: bold; color: var(--dark-black); font-size: 14px;">${escapedName}</div>
@@ -1616,16 +1696,24 @@ window.filterChatUsers = function () {
     });
 }
 
-window.openChat = function (userName) {
-    currentChatUser = userName;
-    document.getElementById('chatHeader').innerText = `Chatting with ${userName}`;
+window.openChat = async function (userNameOrId) {
+    const user = await resolveUserForChat(userNameOrId);
+    if (!user) {
+        showToast("Recipient not found.", "error");
+        return;
+    }
+    const displayName = getUserDisplayName(user);
+    currentChatUser = displayName;
+    currentChatUserId = user.id;
+    document.getElementById('chatHeader').innerText = `Chatting with ${displayName}`;
     document.getElementById('chatInput').disabled = false;
     document.getElementById('chatSendBtn').disabled = false;
 
     document.querySelectorAll('.chat-user').forEach(el => el.classList.remove('active'));
-    document.getElementById(`chat-user-${userName.replace(/[^a-zA-Z0-9]/g, '')}`).classList.add('active');
+    const idSafeName = displayName.replace(/[^a-zA-Z0-9]/g, '');
+    const activeEl = document.getElementById(`chat-user-${idSafeName}`);
+    if (activeEl) activeEl.classList.add('active');
     renderChatHistory();
-    // Mark this sender's messages as seen and clear badge if no remaining unread
     if (typeof window.clearMessagesBadge === 'function') window.clearMessagesBadge();
 }
 
@@ -1634,10 +1722,16 @@ function renderChatHistory() {
     if (!hist || !currentChatUser) return;
 
     const myName = localStorage.getItem("loggedInUser");
-    const relevantMsgs = messagesData.filter(m =>
-        (m.sender === myName && m.receiver === currentChatUser) ||
-        (m.sender === currentChatUser && m.receiver === myName)
-    ).sort((a, b) => a.timestamp - b.timestamp);
+    const myId = localStorage.getItem("userId");
+    const relevantMsgs = messagesData.filter(m => {
+        const byId = myId && currentChatUserId && (
+            (m.senderId === myId && m.receiverId === currentChatUserId) ||
+            (m.senderId === currentChatUserId && m.receiverId === myId)
+        );
+        const byName = (m.sender === myName && m.receiver === currentChatUser) ||
+            (m.sender === currentChatUser && m.receiver === myName);
+        return byId || byName;
+    }).sort((a, b) => a.timestamp - b.timestamp);
 
     if (relevantMsgs.length === 0) {
         hist.innerHTML = `<div style="text-align: center; color: var(--text-muted); margin-top: auto; margin-bottom: auto;"><p>Say hello to ${currentChatUser}!</p></div>`;
@@ -1645,7 +1739,7 @@ function renderChatHistory() {
     }
 
     hist.innerHTML = relevantMsgs.map(m => {
-        const isMe = m.sender === myName;
+        const isMe = (myId && m.senderId === myId) || m.sender === myName;
         const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         return `
             <div class="msg-bubble ${isMe ? 'msg-sent' : 'msg-received'}">
@@ -1677,23 +1771,30 @@ window.sendMessage = async function () {
     window.__msgRateBuf.push(nowMs);
 
     const myName = localStorage.getItem("loggedInUser");
+    const myId = localStorage.getItem("userId");
     if (currentChatUser === myName) return showToast("You can't message yourself.", "error");
 
-    // Validate recipient exists and is not archived (prevents orphan messages to deleted users)
-    const recipient = (window.allUsersData || []).find(u =>
-        (u.name && u.name === currentChatUser) ||
-        (`${u.givenName || ''} ${u.familyName || ''}`.trim() === currentChatUser)
-    );
+    const recipient = await resolveUserForChat(currentChatUserId || currentChatUser);
     if (!recipient) return showToast("Recipient not found.", "error");
     if ((recipient.status || '').toLowerCase() === 'archived') {
         return showToast("Cannot send messages to an archived account.", "error");
     }
+    const receiverName = getUserDisplayName(recipient);
+    currentChatUser = receiverName;
+    currentChatUserId = recipient.id;
 
     input.disabled = true;
     sendBtn.disabled = true;
 
     try {
-        await addDoc(messagesCol, { sender: myName, receiver: currentChatUser, text: text, timestamp: new Date().getTime() });
+        await addDoc(messagesCol, {
+            sender: myName,
+            receiver: receiverName,
+            senderId: myId || "",
+            receiverId: recipient.id,
+            text,
+            timestamp: Date.now()
+        });
         input.value = "";
     } catch (err) {
         console.error("sendMessage failed:", err);
@@ -2729,10 +2830,12 @@ async function refreshBatchList(productId) {
 
     try {
         const batchesRef = collection(db, 'inventory', productId, 'batches');
-        const q = query(batchesRef, orderBy('expiryDate', 'asc'));
-        const snap = await getDocs(q);
+        const snap = await getDocs(batchesRef);
+        const batchDocs = snap.docs.slice().sort((a, b) =>
+            String(a.data().expiryDate || '').localeCompare(String(b.data().expiryDate || ''))
+        );
 
-        if (snap.empty) {
+        if (batchDocs.length === 0) {
             listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px 0;">No batches yet. Add the first batch below.</p>';
             return;
         }
@@ -2744,7 +2847,7 @@ async function refreshBatchList(productId) {
 
         let totalQty = 0;
         const rows = [];
-        snap.forEach(d => {
+        batchDocs.forEach(d => {
             const data = d.data();
             const qty = data.currentQuantity || 0;
             const exp = data.expiryDate || '';
@@ -2774,7 +2877,7 @@ async function refreshBatchList(productId) {
 
         listEl.innerHTML = rows.join('') +
             `<div style="padding:10px 14px;border-radius:10px;background:var(--accent-blue-soft,rgba(59,130,246,0.07));border:1px solid rgba(59,130,246,0.2);font-size:13px;font-weight:600;color:var(--accent-blue,#3b82f6);">
-                Total available: ${totalQty} units across ${snap.size} batch${snap.size === 1 ? '' : 'es'}
+                Total available: ${totalQty} units across ${batchDocs.length} batch${batchDocs.length === 1 ? '' : 'es'}
              </div>`;
 
     } catch (err) {
@@ -2800,13 +2903,12 @@ window.saveNewBatch = async function () {
 
     try {
         await runTransaction(db, async (txn) => {
-            const batchRef = doc(collection(db, 'inventory', _batchMgrProductId, 'batches'));
-            txn.set(batchRef, { expiryDate: expiry, currentQuantity: qty, addedAt: Date.now() });
-
-            // Keep the parent inventory doc qty in sync (sum of all batches)
             const invRef = doc(db, 'inventory', _batchMgrProductId);
             const invSnap = await txn.get(invRef);
             const currentTotal = invSnap.exists() ? (invSnap.data().qty || 0) : 0;
+
+            const batchRef = doc(collection(db, 'inventory', _batchMgrProductId, 'batches'));
+            txn.set(batchRef, { expiryDate: expiry, currentQuantity: qty, addedAt: Date.now() });
             txn.update(invRef, { qty: currentTotal + qty });
         });
 
@@ -3295,6 +3397,8 @@ window.processPaymentConfirmed = async function () {
     const customerNameInput = document.getElementById('posCustomerName');
     const posGcashRefInput = document.getElementById('posGcashRefId');
     const posGcashRefWrapper = document.getElementById('posGcashRefWrapper');
+    let batchCheckoutResults = [];
+    let memberIdForCredit = null;
 
     try {
         // Cart integrity guard: reject empty cart and any non-positive / non-finite qty or price
@@ -3344,8 +3448,6 @@ window.processPaymentConfirmed = async function () {
         }
 
         let customerName = (customerNameInput && customerNameInput.value.trim() !== '') ? customerNameInput.value.trim() : "Walk-in POS Customer";
-
-        let memberIdForCredit = null;
 
         if (selectedPaymentMethod === 'RFID') {
             const modal = document.getElementById('rfidPaymentModal');
@@ -3569,11 +3671,12 @@ window.processPaymentConfirmed = async function () {
             // Force close any legacy "Checked In" attendance logs for the scanned tags to prevent collisions
             try {
                 for (let tag of scannedTags) {
-                    const attQ = query(attendanceCol, where("guestRfid", "==", tag), where("status", "==", "Checked In"));
+                    const attQ = query(attendanceCol, where("guestRfid", "==", tag));
                     const attSnap = await getDocs(attQ);
-                    if (!attSnap.empty) {
+                    const activeDocs = attSnap.docs.filter(d => d.data().status === "Checked In");
+                    if (activeDocs.length > 0) {
                         const timeStr = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-                        const batchPromises = attSnap.docs.map(d => updateDoc(d.ref, {
+                        const batchPromises = activeDocs.map(d => updateDoc(d.ref, {
                             status: "Checked Out",
                             timeOut: timeStr,
                             autoCheckedOutOnReissue: true,
@@ -3592,8 +3695,8 @@ window.processPaymentConfirmed = async function () {
         // their batches subcollection by checkoutBatches(). We run this BEFORE the
         // main payment transaction so the batch writes are already committed when
         // the payment record is created.  If checkoutBatches throws, the entire
-        // checkout aborts before any payment doc is written.
-        const batchCheckoutResults = []; // { cartItem, result } per batch-tracked item
+        // checkout aborts before any payment doc is written. On payment failure, catch block rolls back.
+        batchCheckoutResults = [];
         for (const cartItem of posCart) {
             if (cartItem.id === 'WALKIN' || cartItem.isPlan) continue;
             const invObj = inventoryData.find(i => i.id === cartItem.id);
@@ -3781,6 +3884,13 @@ window.processPaymentConfirmed = async function () {
             // 4b. Ledger entries for batch-tracked deductions (qty already committed by checkoutBatches).
             // One stockMovements doc per batch touched so the ledger shows per-batch traceability.
             for (const { cartItem, result } of batchCheckoutResults) {
+                const totalDeducted = result.deductions.reduce((sum, d) => sum + d.deducted, 0);
+                const invIdx = inventoryDocRefs.findIndex(x => x.cartItem.id === cartItem.id);
+                if (invIdx >= 0 && totalDeducted > 0) {
+                    const snap = inventorySnaps[invIdx];
+                    const currentQty = snap.exists() ? (snap.data().qty || 0) : 0;
+                    transaction.update(inventoryDocRefs[invIdx].ref, { qty: currentQty - totalDeducted });
+                }
                 for (const deduction of result.deductions) {
                     const movementRef = doc(collection(db, "stockMovements"));
                     const now = new Date();
@@ -3829,6 +3939,17 @@ window.processPaymentConfirmed = async function () {
             }
             if (selectedPaymentMethod === 'RFID' && memberIdForCredit) {
                 paymentData.memberId = memberIdForCredit;
+            }
+            if (batchCheckoutResults.length > 0) {
+                paymentData.batchDeductions = batchCheckoutResults.map(({ cartItem, result }) => ({
+                    productId: cartItem.id,
+                    productName: cartItem.name,
+                    deductions: result.deductions.map(d => ({
+                        batchId: d.batchId,
+                        expiryDate: d.expiryDate,
+                        deducted: d.deducted,
+                    })),
+                }));
             }
 
             transaction.set(paymentDocRef, paymentData);
@@ -3913,7 +4034,20 @@ window.processPaymentConfirmed = async function () {
 
     } catch (e) {
         console.error("Checkout transaction failed: ", e);
-        if (selectedPaymentMethod === 'RFID' && memberIdForCredit) {
+        // Roll back batch deductions committed before the payment transaction.
+        if (batchCheckoutResults.length > 0) {
+            for (const { cartItem, result } of batchCheckoutResults) {
+                try {
+                    await restoreBatchDeductions(db, cartItem.id, result.deductions);
+                } catch (rollbackErr) {
+                    console.error(`Batch rollback failed for ${cartItem.name}:`, rollbackErr);
+                }
+            }
+            showToast(
+                (e.message || "Checkout failed.") + " Batch stock was restored.",
+                "error"
+            );
+        } else if (selectedPaymentMethod === 'RFID' && memberIdForCredit) {
             showToast(e.message || "Transaction failed. Please try tapping again.", "warning");
         } else {
             showToast(e.message || "Checkout failed. Please try again.", "error");
@@ -4871,7 +5005,7 @@ window.voidTransaction = async function (id, isRefund = false, btn) {
     const actionName = isRefund ? "REFUND" : "VOID";
 
     const userRole = localStorage.getItem("userRole");
-    if (userRole !== "Admin") {
+    if (!window.isCallerAdmin()) {
         return showToast(`Action Denied: Only Administrators can perform a ${actionName.toLowerCase()}.`, "error");
     }
 
@@ -4938,13 +5072,17 @@ window.voidTransaction = async function (id, isRefund = false, btn) {
                             const uniqTags = Array.from(new Set(_walkinPassTags));
                             for (let i = 0; i < uniqTags.length; i += 10) {
                                 const chunk = uniqTags.slice(i, i + 10);
+                                const chunkSet = new Set(chunk);
                                 const attSnap = await getDocs(query(
                                     collection(db, "attendance"),
-                                    where("guestRfid", "in", chunk),
-                                    where("date", "==", todayStr),
-                                    where("status", "==", "Checked In")
+                                    where("date", "==", todayStr)
                                 ));
-                                attSnap.forEach(d => _walkinAttRefs.push(d.ref));
+                                attSnap.forEach(d => {
+                                    const data = d.data() || {};
+                                    if (chunkSet.has(data.guestRfid) && data.status === "Checked In") {
+                                        _walkinAttRefs.push(d.ref);
+                                    }
+                                });
                             }
                         } catch (_) { /* best-effort */ }
                     }
@@ -4963,6 +5101,38 @@ window.voidTransaction = async function (id, isRefund = false, btn) {
                         // Collect all inventory refs and read them upfront
                         const _walkinTagsToInvalidate = [];
                         const invReads = []; // { invRef, invSnap, item, qty, isLegacy }
+                        const batchProductIds = new Set();
+                        const batchRestockPlan = []; // batch-tracked void restock
+
+                        if (Array.isArray(paymentDbData.batchDeductions)) {
+                            for (const entry of paymentDbData.batchDeductions) {
+                                if (!entry.productId) continue;
+                                batchProductIds.add(entry.productId);
+                                const invRef = doc(db, "inventory", entry.productId);
+                                const invSnap = await transaction.get(invRef);
+                                if (!invSnap.exists()) {
+                                    throw new Error(`Cannot ${actionName.toLowerCase()}: batch product "${entry.productName || entry.productId}" no longer exists in inventory.`);
+                                }
+                                const deductions = [];
+                                for (const d of entry.deductions || []) {
+                                    if (!d.batchId || !d.deducted) continue;
+                                    const batchRef = doc(db, "inventory", entry.productId, "batches", d.batchId);
+                                    deductions.push({
+                                        batchRef,
+                                        batchSnap: await transaction.get(batchRef),
+                                        deducted: d.deducted,
+                                    });
+                                }
+                                batchRestockPlan.push({
+                                    productId: entry.productId,
+                                    productName: entry.productName || entry.productId,
+                                    invRef,
+                                    invSnap,
+                                    deductions,
+                                });
+                            }
+                        }
+
                         if (paymentDbData.type === "POS Sale") {
                             if (paymentDbData.lineItems && paymentDbData.lineItems.length > 0) {
                                 for (const item of paymentDbData.lineItems) {
@@ -4970,6 +5140,7 @@ window.voidTransaction = async function (id, isRefund = false, btn) {
                                         if (Array.isArray(item.scannedTags)) _walkinTagsToInvalidate.push(...item.scannedTags);
                                         continue;
                                     }
+                                    if (batchProductIds.has(item.id)) continue;
                                     const invRef = doc(db, "inventory", item.id);
                                     const invSnap = await transaction.get(invRef);
                                     // H6: deleted product — block the action, admin must reconcile first
@@ -5043,7 +5214,7 @@ window.voidTransaction = async function (id, isRefund = false, btn) {
                         const voidTimeStr = new Date(nowTs + (window.serverTimeOffsetMs || 0))
                             .toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
-                        // 1. Inventory restock + movement log
+                        // 1. Inventory restock + movement log (flat-qty items)
                         for (const { invRef, invSnap, item, qty, isLegacy } of invReads) {
                             const currentQty = Number(invSnap.data().qty || 0);
                             transaction.update(invRef, { qty: currentQty + qty });
@@ -5058,6 +5229,33 @@ window.voidTransaction = async function (id, isRefund = false, btn) {
                                 time: nowTime,
                                 timestamp: nowTs
                             });
+                        }
+
+                        // 1b. Batch-tracked restock (subcollection + parent qty)
+                        for (const plan of batchRestockPlan) {
+                            let totalRestored = 0;
+                            for (const { batchRef, batchSnap, deducted } of plan.deductions) {
+                                if (!batchSnap.exists()) continue;
+                                const liveQty = Number(batchSnap.data().currentQuantity || 0);
+                                transaction.update(batchRef, { currentQuantity: liveQty + deducted });
+                                totalRestored += deducted;
+                                transaction.set(doc(collection(db, "stockMovements")), {
+                                    productId: plan.productId,
+                                    productName: plan.productName,
+                                    batchId: batchRef.id,
+                                    changeAmount: deducted,
+                                    reason: `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"} – Batch`,
+                                    userId: localStorage.getItem("userId") || "System",
+                                    userName: localStorage.getItem("loggedInUser") || "Unknown",
+                                    date: nowDate,
+                                    time: nowTime,
+                                    timestamp: nowTs
+                                });
+                            }
+                            if (totalRestored > 0) {
+                                const parentQty = Number(plan.invSnap.data().qty || 0);
+                                transaction.update(plan.invRef, { qty: parentQty + totalRestored });
+                            }
                         }
 
                         // 2. Wallet credit refund (RFID payments only)
@@ -5354,9 +5552,8 @@ window.generateMonthlyPDF = function () {
 // ==========================================
 initAttendance({ db, attendanceCol, servicesChartInstanceGetter: () => servicesChartInstance });
 
-// Members only need the trainer list (for booking) + their own chat counterparts.
-// Staff/admin/trainer need the full user directory live.
-if (isStaffSide || roleNorm === "trainer") {
+// Full user directory for messaging — all dashboard roles need every user in chatUsers.
+if (isStaffSide || roleNorm === "trainer" || roleNorm === "member") {
     onSnapshot(usersCol, (snapshot) => {
         allUsersData = []; membersData = []; chatUsers = [];
         snapshot.forEach(docSnap => {
@@ -5369,47 +5566,22 @@ if (isStaffSide || roleNorm === "trainer") {
             }
 
             const roleStr = (data.role || "").trim().toLowerCase();
-            chatUsers.push({ id: docSnap.id, ...data });
-            if (roleStr === 'member') membersData.push({ id: docSnap.id, ...data });
-            else if (roleStr !== 'admin') allUsersData.push({ id: docSnap.id, ...data });
+            const user = { ...data, id: docSnap.id };
+            chatUsers.push(user);
+            if (roleStr === 'member') membersData.push(user);
+            else if (roleStr !== 'admin') allUsersData.push(user);
         });
         window.allUsersData = allUsersData;
         window.membersData = membersData;
         softRender('users', () => {
-            renderStaff();
-            renderMembers();
+            if (isStaffSide || roleNorm === "trainer") {
+                renderStaff();
+                renderMembers();
+            }
             renderMemberTrainers();
             if (document.getElementById('chatUserList')) renderChatUserList();
         });
     });
-} else if (roleNorm === "member") {
-    // QUOTA FIX: Query ONLY staff, admins, and trainers. 
-    // Regular gym members do not need to download the details of other members,
-    // which previously burned thousands of reads on every member login.
-    const staffAndTrainersQ = query(
-        usersCol,
-        where("role", "in", ["Trainer", "Staff", "Admin", "trainer", "staff", "admin"])
-    );
-    getDocs(staffAndTrainersQ).then(snapshot => {
-        allUsersData = []; membersData = []; chatUsers = [];
-        snapshot.forEach(docSnap => {
-            const data = docSnap.data();
-            delete data.password; // Prevent plaintext password leak in global trainers/staff arrays
-            
-            const roleStr = (data.role || "").trim().toLowerCase();
-            // Chat list: include trainers and staff (not other members) to keep payload small
-            if (roleStr === 'trainer' || roleStr === 'staff' || roleStr === 'admin') {
-                chatUsers.push({ id: docSnap.id, ...data });
-            }
-            if (roleStr !== 'admin' && roleStr !== 'member') {
-                allUsersData.push({ id: docSnap.id, ...data });
-            }
-        });
-        window.allUsersData = allUsersData;
-        window.membersData = membersData;
-        renderMemberTrainers();
-        if (document.getElementById('chatUserList')) renderChatUserList();
-    }).catch(e => console.error(e));
 }
 
 // Change Password Logic - Moved outside onSnapshot (Bug Fix)
@@ -6461,8 +6633,7 @@ window.openAssignLockerModal = function (id) {
 
     const deleteWrapper = document.getElementById('deleteLockerBtnWrapper');
     if (deleteWrapper) {
-        const isAdmin = localStorage.getItem("userRole") === "Admin";
-        deleteWrapper.style.display = isAdmin ? 'block' : 'none';
+        deleteWrapper.style.display = window.isCallerAdmin() ? 'block' : 'none';
     }
 
     if (document.getElementById('assignLockerPayMethod')) {
@@ -7035,8 +7206,10 @@ function renderMembers() {
 }
 
 // Member UI Helpers
-window.sendMessageToMember = function (id) {
-    showToast("Opening messaging interface for member ID: " + id, "info");
+window.sendMessageToMember = async function (id) {
+    if (window.openChatTab) window.openChatTab('all', null, 'Internal Messages');
+    if (window.openChat) await window.openChat(id);
+    else showToast("Chat is not available on this dashboard.", "info");
 };
 
 window.filterMembers = function () {
@@ -8005,7 +8178,7 @@ window.archiveUser = async (id, currentStatus, btn) => {
 }
 
 window.deleteUser = async (id, btn) => {
-    if (localStorage.getItem("userRole") !== "Admin") { showToast("Action Denied: You do not have permission to delete accounts.", "error"); return; }
+    if (!window.isCallerAdmin()) { showToast("Action Denied: You do not have permission to delete accounts.", "error"); return; }
     if (window.__isDeletingUser) return;
     const _origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
@@ -8713,7 +8886,7 @@ window.addStaffBatchRow = function () {
 }
 
 window.openStaffModal = (role) => {
-    if (localStorage.getItem("userRole") !== "Admin") return showToast("Action Denied: Only Admins can register Staff and Trainers.", "error");
+    if (!window.isCallerAdmin()) return showToast("Action Denied: Only Admins can register Staff and Trainers.", "error");
 
     document.getElementById('hiddenStaffRole').value = role;
     document.getElementById('staffModalTitle').innerText = `Register ${role}`;
@@ -8739,7 +8912,7 @@ window.openStaffModal = (role) => {
 if (document.getElementById('batchStaffForm')) {
     document.getElementById('batchStaffForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (localStorage.getItem("userRole") !== "Admin") return;
+        if (!window.isCallerAdmin()) return;
 
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
@@ -9437,6 +9610,9 @@ function bindBookingsListener() {
                 window.renderManualBookingTimeSlots(window.manualBookingState.date);
             }
         }
+    }, (err) => {
+        console.error("Bookings listener failed:", err.code || err.message || err);
+        showToast("Could not load bookings.", "error");
     });
 }
 window.rebindBookingsListener = bindBookingsListener;
@@ -10615,22 +10791,26 @@ window.setupBookingModalListeners = () => {
             let memberConflict = false;
 
             try {
-                const trainerQ = query(bookingsCol, where("trainerId", "==", trainerId), where("date", "==", bookDate), where("status", "in", ["Confirmed", "Pending"]));
-                const trainerSnap = await getDocs(trainerQ);
+                const trainerSnap = await getDocs(query(bookingsCol, where("date", "==", bookDate)));
                 trainerSnap.forEach(docSnap => {
-                    if (rescheduleId && docSnap.id === rescheduleId) return; // exclude self
-                    const timeStr = docSnap.data().time;
+                    if (rescheduleId && docSnap.id === rescheduleId) return;
+                    const data = docSnap.data();
+                    if (data.trainerId !== trainerId) return;
+                    if (data.status !== "Confirmed" && data.status !== "Pending") return;
+                    const timeStr = data.time;
                     if (timeStr) {
                         const [eH, eM] = timeStr.split(':').map(Number);
                         if (Math.abs(bookMins - (eH * 60 + eM)) < 60) trainerConflict = true;
                     }
                 });
 
-                const memberQ = query(bookingsCol, where("memberId", "==", memberId), where("date", "==", bookDate), where("status", "in", ["Confirmed", "Pending"]));
-                const memberSnap = await getDocs(memberQ);
+                const memberSnap = await getDocs(query(bookingsCol, where("date", "==", bookDate)));
                 memberSnap.forEach(docSnap => {
-                    if (rescheduleId && docSnap.id === rescheduleId) return; // exclude self
-                    const timeStr = docSnap.data().time;
+                    if (rescheduleId && docSnap.id === rescheduleId) return;
+                    const data = docSnap.data();
+                    if (data.memberId !== memberId) return;
+                    if (data.status !== "Confirmed" && data.status !== "Pending") return;
+                    const timeStr = data.time;
                     if (timeStr) {
                         const [eH, eM] = timeStr.split(':').map(Number);
                         if (Math.abs(bookMins - (eH * 60 + eM)) < 60) memberConflict = true;
@@ -10944,11 +11124,10 @@ if (document.getElementById('bookingForm')) {
         const memberId = memberSelect.value, trainerId = trainerSelect.value, bookDate = dateEl.value, bookTime = timeEl.value;
         const memberName = memberSelect.options[memberSelect.selectedIndex].text, trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
 
-        // 1. Conflict Detection Pre-query (queries are not supported inside transactions)
-        const q = query(bookingsCol, where("trainerId", "==", trainerId), where("date", "==", bookDate), where("status", "in", ["Confirmed", "Pending"]));
+        // Single-field query + in-memory filter (no composite index)
         let snap;
         try {
-            snap = await getDocs(q);
+            snap = await getDocs(query(bookingsCol, where("date", "==", bookDate)));
         } catch (err) {
             console.error("Conflict pre-query failed:", err);
             showToast("Failed to check schedule conflicts.", "error");
@@ -10961,7 +11140,10 @@ if (document.getElementById('bookingForm')) {
         const bookMins = bH * 60 + bM;
 
         snap.forEach(docSnap => {
-            const timeStr = docSnap.data().time;
+            const data = docSnap.data();
+            if (data.trainerId !== trainerId) return;
+            if (data.status !== "Confirmed" && data.status !== "Pending") return;
+            const timeStr = data.time;
             if (timeStr) {
                 const [eH, eM] = timeStr.split(':').map(Number);
                 const existingMins = eH * 60 + eM;
@@ -11787,6 +11969,9 @@ window.renderTodayBookings = function () {
     }).join('');
 };
 window.openAddCreditModal = function (memberId) {
+    if (!window.isCallerStaffOrAdmin()) {
+        return showToast("Permission denied.", "error");
+    }
     const member = membersData.find(m => m.id === memberId);
     if (!member) return;
 
@@ -11832,6 +12017,9 @@ if (document.getElementById('addCreditForm')) {
 
     document.getElementById('addCreditForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!window.isCallerStaffOrAdmin()) {
+            return showToast("Permission denied.", "error");
+        }
         const memberId = document.getElementById('addCreditMemberId').value;
         const amount = Number(document.getElementById('addCreditAmount').value);
         const paymentMethod = document.getElementById('addCreditPaymentMethod').value;
@@ -12139,15 +12327,11 @@ window.openMemberProfile = async function (memberId) {
         // --- Message Button ---
         const messageBtn = document.getElementById('mpMessageBtn');
         if (messageBtn) {
-            messageBtn.onclick = () => {
+            messageBtn.onclick = async () => {
                 if (window.closeModal) window.closeModal('memberProfileModal');
-                // Open chat with the member by name
-                if (window.openChat) {
-                    window.openChatTab('all', null, 'Internal Messages');
-                    setTimeout(() => { window.openChat(fullName); }, 300);
-                } else {
-                    showToast("Chat is not available on this dashboard.", "info");
-                }
+                if (window.openChatTab) window.openChatTab('all', null, 'Internal Messages');
+                if (window.openChat) await window.openChat(memberId);
+                else showToast("Chat is not available on this dashboard.", "info");
             };
         }
 

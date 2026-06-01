@@ -408,9 +408,10 @@ async function runAutoForceOutIfClosingPassed({ db, attendanceCol, closingHour, 
   const storageKey = `forceOutDone:${dayKey}:${localStorage.getItem("userId") || "unknown"}`;
   if (localStorage.getItem(storageKey) === "1") return;
 
-  const q = query(attendanceCol, where("date", "==", dayKey), where("status", "==", "Checked In"));
+  const q = query(attendanceCol, where("date", "==", dayKey));
   const snap = await getDocs(q);
-  if (snap.empty) {
+  const checkedInDocs = snap.docs.filter(d => d.data().status === "Checked In");
+  if (checkedInDocs.length === 0) {
     localStorage.setItem(storageKey, "1");
     return;
   }
@@ -422,7 +423,7 @@ async function runAutoForceOutIfClosingPassed({ db, attendanceCol, closingHour, 
   // BUG-03: Wrap each write in a transaction with a status re-check so concurrent
   // tabs (or incognito windows) cannot double-force-out the same record.
   await Promise.all(
-    snap.docs.map((d) =>
+    checkedInDocs.map((d) =>
       runTransaction(db, async (tx) => {
         const ref = doc(db, "attendance", d.id);
         const fresh = await tx.get(ref);
