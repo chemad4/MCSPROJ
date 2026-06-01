@@ -9,6 +9,7 @@ import {
     getDocs,
     doc,
     runTransaction,
+    increment,
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -53,7 +54,9 @@ function dateOffsetString(days) {
  * }>}
  */
 export async function checkoutBatches(db, productId, requested) {
-    if (!Number.isInteger(requested) || requested <= 0) {
+    // Strict integer normalization prevents string-collision issues in downstream math.
+    const requestedQty = parseInt(requested, 10) || 0;
+    if (!Number.isInteger(requestedQty) || requestedQty <= 0) {
         throw new Error("requested quantity must be a positive integer");
     }
 
@@ -70,6 +73,7 @@ export async function checkoutBatches(db, productId, requested) {
             deductions: [],
             expiryWarning: false,
             warningBatch: null,
+            currentStock: 0,
             message: "No valid stock batches available for this product.",
         };
     }
@@ -79,7 +83,7 @@ export async function checkoutBatches(db, productId, requested) {
         ref: doc(db, "inventory", productId, "batches", d.id),
         id: d.id,
         expiryDate: d.data().expiryDate,
-        currentQuantity: d.data().currentQuantity,
+        currentQuantity: parseInt(d.data().currentQuantity, 10) || 0,
     }));
 
     // ── Step 4: Expiry-warning check (done outside the transaction; read-only) ──
@@ -90,14 +94,15 @@ export async function checkoutBatches(db, productId, requested) {
         : null;
 
     // Pre-flight: ensure there is enough total stock before entering the transaction
-    const totalAvailable = batches.reduce((sum, b) => sum + b.currentQuantity, 0);
-    if (totalAvailable < requested) {
+    const totalAvailable = batches.reduce((sum, b) => sum + (parseInt(b.currentQuantity, 10) || 0), 0);
+    if (totalAvailable < requestedQty) {
         return {
             success: false,
             deductions: [],
             expiryWarning,
             warningBatch,
-            message: `Insufficient stock. Requested ${requested}, available ${totalAvailable}.`,
+            currentStock: totalAvailable,
+            message: `Insufficient stock. Requested ${requestedQty}, available ${totalAvailable}.`,
         };
     }
 
@@ -108,6 +113,16 @@ export async function checkoutBatches(db, productId, requested) {
 
     await runTransaction(db, async (txn) => {
         deductions.length = 0; // reset on retry
+        const invRef = doc(db, "inventory", productId);
+        const invSnap = await txn.get(invRef);
+        if (!invSnap.exists()) {
+            throw new Error("Product no longer exists in inventory.");
+        }
+        const invData = invSnap.data() || {};
+        const qtyRaw = invData.qty ?? 0;
+        const totalRaw = invData.totalStock ?? qtyRaw;
+        const stockRaw = invData.stock ?? qtyRaw;
+        const currentRaw = invData.currentStock ?? qtyRaw;
 
         // Re-read every batch document inside the transaction to get consistent,
         // lock-held snapshots — prevents TOCTOU races on concurrent checkouts.
@@ -115,7 +130,7 @@ export async function checkoutBatches(db, productId, requested) {
             batches.map(b => txn.get(b.ref))
         );
 
-        let remaining = requested;
+        let remaining = requestedQty;
 
         for (let i = 0; i < txnSnapshots.length; i++) {
             if (remaining <= 0) break;
@@ -123,7 +138,7 @@ export async function checkoutBatches(db, productId, requested) {
             const snap = txnSnapshots[i];
             if (!snap.exists()) continue;
 
-            const liveQty = snap.data().currentQuantity;
+            const liveQty = parseInt(snap.data().currentQuantity, 10) || 0;
             const liveExpiry = snap.data().expiryDate;
 
             // Re-apply filters inside the transaction against live data (Step 2).
@@ -154,6 +169,26 @@ export async function checkoutBatches(db, productId, requested) {
                 `Stock depleted mid-transaction. Could not deduct ${remaining} more unit(s).`
             );
         }
+
+        // Normalize aggregate fields when legacy writes stored numbers as strings.
+        const qty = parseInt(qtyRaw, 10) || 0;
+        const total = parseInt(totalRaw, 10) || 0;
+        const stock = parseInt(stockRaw, 10) || 0;
+        const current = parseInt(currentRaw, 10) || 0;
+        const numericSeed = {};
+        if (!(typeof qtyRaw === "number" && Number.isFinite(qtyRaw))) numericSeed.qty = qty;
+        if (!(typeof totalRaw === "number" && Number.isFinite(totalRaw))) numericSeed.totalStock = total;
+        if (!(typeof stockRaw === "number" && Number.isFinite(stockRaw))) numericSeed.stock = stock;
+        if (!(typeof currentRaw === "number" && Number.isFinite(currentRaw))) numericSeed.currentStock = current;
+        if (Object.keys(numericSeed).length) txn.update(invRef, numericSeed);
+
+        // Keep root aggregate stock synchronized with FEFO batch decrements.
+        txn.update(invRef, {
+            qty: increment(-requestedQty),
+            totalStock: increment(-requestedQty),
+            stock: increment(-requestedQty),
+            currentStock: increment(-requestedQty),
+        });
     });
 
     return {
@@ -161,7 +196,7 @@ export async function checkoutBatches(db, productId, requested) {
         deductions,
         expiryWarning,
         warningBatch,
-        message: `Successfully deducted ${requested} unit(s) across ${deductions.length} batch(es).`,
+        message: `Successfully deducted ${requestedQty} unit(s) across ${deductions.length} batch(es).`,
     };
 }
 
@@ -172,7 +207,7 @@ async function fetchValidBatches(batchesRef, today) {
         .map(d => ({ ref: d.ref, id: d.id, data: d.data() }))
         .filter(({ data }) => {
             const exp = data.expiryDate || "";
-            const qty = data.currentQuantity || 0;
+            const qty = parseInt(data.currentQuantity, 10) || 0;
             return exp > today && qty > 0;
         })
         .sort((a, b) => String(a.data.expiryDate).localeCompare(String(b.data.expiryDate)));
@@ -212,15 +247,38 @@ export async function restoreBatchDeductions(db, productId, deductions) {
                 console.warn(`[restoreBatchDeductions] Batch ${batchId} missing for product ${productId}`);
                 continue;
             }
-            const liveQty = snap.data().currentQuantity || 0;
+            const liveQty = parseInt(snap.data().currentQuantity, 10) || 0;
+            const delta = parseInt(deducted, 10) || 0;
             txn.update(doc(db, "inventory", productId, "batches", batchId), {
-                currentQuantity: liveQty + deducted,
+                currentQuantity: liveQty + delta,
             });
-            totalRestored += deducted;
+            totalRestored += delta;
         }
 
         if (invSnap.exists() && totalRestored > 0) {
-            txn.update(invRef, { qty: (invSnap.data().qty || 0) + totalRestored });
+            const invData = invSnap.data() || {};
+            const qtyRaw = invData.qty ?? 0;
+            const totalRaw = invData.totalStock ?? qtyRaw;
+            const stockRaw = invData.stock ?? qtyRaw;
+            const currentRaw = invData.currentStock ?? qtyRaw;
+
+            const qty = parseInt(qtyRaw, 10) || 0;
+            const total = parseInt(totalRaw, 10) || 0;
+            const stock = parseInt(stockRaw, 10) || 0;
+            const current = parseInt(currentRaw, 10) || 0;
+            const numericSeed = {};
+            if (!(typeof qtyRaw === "number" && Number.isFinite(qtyRaw))) numericSeed.qty = qty;
+            if (!(typeof totalRaw === "number" && Number.isFinite(totalRaw))) numericSeed.totalStock = total;
+            if (!(typeof stockRaw === "number" && Number.isFinite(stockRaw))) numericSeed.stock = stock;
+            if (!(typeof currentRaw === "number" && Number.isFinite(currentRaw))) numericSeed.currentStock = current;
+            if (Object.keys(numericSeed).length) txn.update(invRef, numericSeed);
+
+            txn.update(invRef, {
+                qty: increment(totalRestored),
+                totalStock: increment(totalRestored),
+                stock: increment(totalRestored),
+                currentStock: increment(totalRestored),
+            });
         }
     });
 }

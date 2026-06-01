@@ -2,7 +2,7 @@
 // 1. IMPORT FIREBASE DEPENDENCIES
 // ==========================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, enableIndexedDbPersistence, collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where, orderBy, limit, getDocs, getDoc, increment, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, enableIndexedDbPersistence, collection, addDoc, deleteDoc, doc, updateDoc, setDoc, onSnapshot, query, where, orderBy, limit, getDocs, getDoc, increment, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 // Firebase Storage removed — images stored as Base64 in Firestore (free tier compatible)
 import { initAttendance } from "./attendance.js";
 import { initRfid } from "./rfid.js";
@@ -797,7 +797,7 @@ function renderRevenueChart() {
     let posRev = 0;
 
     paymentsData.forEach(p => {
-        if (p.status === 'Voided') return;
+        if (p.status === 'Voided' || p.status === 'Refunded') return;
         if (p.date === todayStr) {
             const pAmount = Number(p.amount || 0);
             if (p.type === 'POS Sale') posRev += pAmount;
@@ -842,9 +842,17 @@ function renderMaintenanceChart() {
 
     const overdue = equipment.filter(i => {
         if (i.status !== 'Operational') return false;
-        if (!i.maintenanceDate) return true; // never logged = overdue
-        const days = Math.floor((today - new Date(i.maintenanceDate)) / (1000 * 60 * 60 * 24));
-        return days > 90;
+        let dueDateForSchedule = i.maintenanceDueDate || '';
+        if (!dueDateForSchedule && i.maintenanceDate) {
+            const base = new Date(`${i.maintenanceDate}T00:00:00`);
+            if (!Number.isNaN(base.getTime())) {
+                base.setDate(base.getDate() + 90);
+                dueDateForSchedule = base.toISOString().split('T')[0];
+            }
+        }
+        if (!dueDateForSchedule) return true; // never recorded/scheduled = overdue
+        const daysOverdue = Math.floor((today - new Date(dueDateForSchedule)) / (1000 * 60 * 60 * 24));
+        return daysOverdue > 0;
     }).length;
 
     if (document.getElementById('detailOpsCount')) document.getElementById('detailOpsCount').innerText = `${ops} Units`;
@@ -1263,7 +1271,7 @@ const lockersCol = collection(db, "lockers"); // Locker System
 
 // Expose Firebase helpers for non-module booking UI script
 const pendingRatingsCol = collection(db, "pendingRatings");
-window._fb = { bookingsCol, pendingRatingsCol, collection, query, where, getDocs, addDoc, db, doc, updateDoc, deleteDoc, runTransaction, increment, getDoc };
+window._fb = { bookingsCol, pendingRatingsCol, collection, query, where, getDocs, addDoc, db, doc, updateDoc, setDoc, deleteDoc, runTransaction, increment, getDoc };
 
 async function logStockMovement(productId, productName, changeAmount, reason) {
     try {
@@ -1312,15 +1320,28 @@ async function logMaintenanceEntry(equipmentId, equipmentName, maintenanceDate, 
         };
         const ref = await addDoc(maintenanceLogsCol, payload);
 
-        // Sync the equipment document: update maintenanceDate and increment maintenanceCount
+        // Sync the equipment document:
+        // - maintenanceDate = last maintenance performed (history)
+        // - maintenanceDueDate = scheduled due date derived from last maintenance (+90 days)
         const equipDoc = inventoryData.find(i => i.id === equipmentId);
         const newCount = (equipDoc ? (equipDoc.maintenanceCount || 0) : 0) + 1;
+
+        const maintenanceDueDate = (() => {
+            if (!maintenanceDate) return '';
+            const base = new Date(`${maintenanceDate}T00:00:00`);
+            if (Number.isNaN(base.getTime())) return '';
+            base.setDate(base.getDate() + 90);
+            return base.toISOString().split('T')[0];
+        })();
+
         await updateDoc(doc(db, "inventory", equipmentId), {
             maintenanceDate,
+            maintenanceDueDate,
             maintenanceCount: newCount
         });
         if (equipDoc) {
             equipDoc.maintenanceDate = maintenanceDate;
+            equipDoc.maintenanceDueDate = maintenanceDueDate;
             equipDoc.maintenanceCount = newCount;
         }
 
@@ -1362,7 +1383,7 @@ function renderMaintenanceLog() {
     // Update summary stats
     const equipDoc = inventoryData.find(i => i.id === currentLogbookEquipId);
     const totalCount = equipDoc ? (equipDoc.maintenanceCount || maintenanceLogsData.length) : maintenanceLogsData.length;
-    const lastDate = equipDoc ? (equipDoc.maintenanceDate || '—') : (maintenanceLogsData[0]?.maintenanceDate || '—');
+    const lastDate = equipDoc ? (equipDoc.maintenanceDueDate || '—') : '—';
     const countEl = document.getElementById('logbookTotalCount');
     const lastEl = document.getElementById('logbookLastDate');
     if (countEl) countEl.textContent = totalCount;
@@ -1383,7 +1404,7 @@ window.openMaintenanceLogbookModal = async function(equipmentId) {
 
     if (nameEl) nameEl.textContent = equip.name;
     if (countEl) countEl.textContent = equip.maintenanceCount || 0;
-    if (lastEl) lastEl.textContent = equip.maintenanceDate || '—';
+    if (lastEl) lastEl.textContent = equip.maintenanceDueDate || '—';
     if (list) list.innerHTML = '<div class="mp-empty-state">Loading...</div>';
 
     // Reset add-entry form
@@ -1919,28 +1940,34 @@ function renderInventory() {
         let threshold = item.lowStockThreshold !== undefined ? item.lowStockThreshold : 5;
         let isProblematic = false;
 
-        let maintenanceDueDays = null;  // days since last maintenance (null = never recorded)
+        let maintenanceDueDays = null;  // days overdue relative to the due date schedule
         let equipmentAgeDays = null;    // days since acquisition (null = not recorded)
-        let maintenanceOverdue = false; // Operational but no maintenance in >90 days
+        let maintenanceOverdue = false; // Operational but past due
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
         if (!isConsumable) {
-            if (item.maintenanceDate) {
-                const mDate = new Date(item.maintenanceDate);
-                maintenanceDueDays = Math.floor((today - mDate) / (1000 * 60 * 60 * 24));
+            // If only legacy maintenanceDate exists, derive maintenanceDueDate as +90 days.
+            let maintenanceDueDateForSchedule = item.maintenanceDueDate || '';
+            if (!maintenanceDueDateForSchedule && item.maintenanceDate) {
+                const base = new Date(`${item.maintenanceDate}T00:00:00`);
+                if (!Number.isNaN(base.getTime())) {
+                    base.setDate(base.getDate() + 90);
+                    maintenanceDueDateForSchedule = base.toISOString().split('T')[0];
+                }
+            }
+
+            if (maintenanceDueDateForSchedule) {
+                const dDate = new Date(maintenanceDueDateForSchedule);
+                maintenanceDueDays = Math.floor((today - dDate) / (1000 * 60 * 60 * 24));
             }
             if (item.acquisitionDate) {
                 const aDate = new Date(item.acquisitionDate);
                 equipmentAgeDays = Math.floor((today - aDate) / (1000 * 60 * 60 * 24));
             }
-            // Equipment is overdue if it's Operational and either has no maintenance record
-            // or the last maintenance was more than 90 days ago.
             if (currentStatus === 'Operational') {
-                if (maintenanceDueDays === null || maintenanceDueDays > 90) {
-                    maintenanceOverdue = true;
-                }
+                maintenanceOverdue = maintenanceDueDays === null ? true : maintenanceDueDays > 0;
             }
         }
 
@@ -1956,7 +1983,17 @@ function renderInventory() {
         if (currentStatus === 'Operational' || currentStatus === 'In Stock') ops++;
         if (!isConsumable) {
             totalMachines++;
-            equipment.push({ ...item, currentStatus, isProblematic, maintenanceDueDays, equipmentAgeDays, maintenanceOverdue });
+            // Preserve a derived maintenanceDueDate so sorting and UI labels stay consistent.
+            const derivedMaintenanceDueDate = item.maintenanceDueDate || (item.maintenanceDate
+                ? (() => {
+                    const base = new Date(`${item.maintenanceDate}T00:00:00`);
+                    if (Number.isNaN(base.getTime())) return '';
+                    base.setDate(base.getDate() + 90);
+                    return base.toISOString().split('T')[0];
+                })()
+                : ''
+            );
+            equipment.push({ ...item, currentStatus, isProblematic, maintenanceDueDays, equipmentAgeDays, maintenanceOverdue, maintenanceDueDate: derivedMaintenanceDueDate });
         } else {
             consumables.push({ ...item, currentStatus, isProblematic });
         }
@@ -2167,10 +2204,15 @@ function renderInventory() {
                             <span>Acquired: <strong>${escapeHtml(item.acquisitionDate)}</strong>${item.equipmentAgeDays !== null && item.equipmentAgeDays > 1825 ? ` <span class="expiring-tag" style="background:rgba(100,116,139,0.12);color:#64748b;border:1px solid rgba(100,116,139,0.25);margin-left:4px;"><i class="fa-solid fa-hourglass-half"></i> ${Math.floor(item.equipmentAgeDays/365)}y old</span>` : ''}</span>
                         </div>
                     ` : ''}
-                    ${(item.maintenanceDate && item.maintenanceDate !== '') ? `
+                    ${(item.maintenanceDueDate && item.maintenanceDueDate !== '') ? `
                         <div class="inventory-meta-item">
                             <i class="fa-solid fa-wrench"></i>
-                            <span>Last Maintenance: <strong>${escapeHtml(item.maintenanceDate)}</strong>${item.maintenanceDueDays !== null && item.maintenanceDueDays > 90 ? ` <span class="expiring-tag expiring-soon" style="margin-left:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.maintenanceDueDays}d ago</span>` : ''}</span>
+                            <span>Maintenance Due: <strong>${escapeHtml(item.maintenanceDueDate)}</strong>${item.maintenanceDueDays !== null && item.maintenanceDueDays > 0 ? ` <span class="expiring-tag expiring-soon" style="margin-left:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.maintenanceDueDays}d overdue</span>` : (item.maintenanceDueDays !== null && item.maintenanceDueDays < 0 ? ` <span class="expiring-tag" style="margin-left:4px;"><i class="fa-solid fa-hourglass-half"></i> due in ${Math.abs(item.maintenanceDueDays)}d</span>` : '')}</span>
+                        </div>
+                    ` : (item.maintenanceDate && item.maintenanceDate !== '') ? `
+                        <div class="inventory-meta-item">
+                            <i class="fa-solid fa-wrench"></i>
+                            <span>Maintenance Due: <strong>${escapeHtml(item.maintenanceDueDate || '')}</strong>${item.maintenanceDueDays !== null && item.maintenanceDueDays > 0 ? ` <span class="expiring-tag expiring-soon" style="margin-left:4px;"><i class="fa-solid fa-triangle-exclamation"></i> ${item.maintenanceDueDays}d overdue</span>` : (item.maintenanceDueDays !== null && item.maintenanceDueDays < 0 ? ` <span class="expiring-tag" style="margin-left:4px;"><i class="fa-solid fa-hourglass-half"></i> due in ${Math.abs(item.maintenanceDueDays)}d</span>` : '')}</span>
                         </div>
                     ` : `
                         ${item.maintenanceOverdue ? `
@@ -2254,7 +2296,7 @@ function renderInventory() {
                     ${item.maintenanceOverdue ? `<span class="badge" style="background:#fff7ed;color:#f97316;border:1px solid #fed7aa;margin-left:4px;font-size:10px;"><i class="fa-solid fa-triangle-exclamation"></i> Overdue</span>` : ''}
                 </td>
                 <td>${(item.acquisitionDate && item.acquisitionDate !== '') ? `${escapeHtml(item.acquisitionDate)}${item.equipmentAgeDays !== null && item.equipmentAgeDays > 1825 ? ` <span style="font-size:10px;color:#64748b;">(${Math.floor(item.equipmentAgeDays/365)}y)</span>` : ''}` : '-'}</td>
-                <td>${(item.maintenanceDate && item.maintenanceDate !== '') ? `${escapeHtml(item.maintenanceDate)}${item.maintenanceDueDays !== null && item.maintenanceDueDays > 90 ? ` <span style="font-size:10px;color:#f97316;">(${item.maintenanceDueDays}d ago)</span>` : ''}` : `<span style="color:#f97316;font-size:11px;">${item.maintenanceOverdue ? 'Never recorded' : '-'}</span>`}</td>
+                <td>${(item.maintenanceDueDate && item.maintenanceDueDate !== '') ? `${escapeHtml(item.maintenanceDueDate)}${item.maintenanceDueDays !== null && item.maintenanceDueDays > 0 ? ` <span style="font-size:10px;color:#f97316;">(${item.maintenanceDueDays}d overdue)</span>` : (item.maintenanceDueDays !== null && item.maintenanceDueDays < 0 ? ` <span style="font-size:10px;color:#64748b;">(in ${Math.abs(item.maintenanceDueDays)}d)</span>` : '')}` : ((item.maintenanceDate && item.maintenanceDate !== '') ? `${escapeHtml(item.maintenanceDate)}${item.maintenanceDueDays !== null && item.maintenanceDueDays > 90 ? ` <span style="font-size:10px;color:#f97316;">(${item.maintenanceDueDays}d ago)</span>` : ''}` : `<span style="color:#f97316;font-size:11px;">${item.maintenanceOverdue ? 'Never recorded' : '-'}</span>`)}</td>
                 <td><strong>${item.maintenanceCount || 0}</strong>×</td>
                 <td>
                     <div style="display:flex; gap:8px;">
@@ -2381,8 +2423,22 @@ window.handleMaintenanceDateChange = function(input) {
     }
 };
 
+window.ensureMaintenanceDueLabels = function() {
+    const addDueLabel = document.getElementById('equipMaintenanceDueDate')
+        ?.closest('.form-group')
+        ?.querySelector('.form-label');
+    if (addDueLabel) addDueLabel.textContent = 'Maintenance Due Date';
+
+    const editDueLabel = document.getElementById('editEquipMaintenanceDueDate')
+        ?.closest('.form-group')
+        ?.querySelector('.form-label');
+    if (editDueLabel) editDueLabel.textContent = 'Maintenance Due Date';
+};
+window.ensureMaintenanceDueLabels();
+
 window.openEquipmentModal = () => {
     document.getElementById('equipmentForm').reset();
+    window.ensureMaintenanceDueLabels();
     document.getElementById('equipmentModal').style.display = 'flex';
     window.handleEquipCategoryChange('equipCategory', 'equipQty');
 }
@@ -2423,6 +2479,7 @@ window.deleteInventoryItem = async (id, btn) => {
 window.openEditEquipModal = function (id) {
     const item = inventoryData.find(i => i.id === id);
     if (!item) return;
+    window.ensureMaintenanceDueLabels();
     document.getElementById('editEquipId').value = item.id;
     document.getElementById('editEquipName').value = item.name;
     document.getElementById('editEquipCategory').value = item.cat;
@@ -2431,7 +2488,9 @@ window.openEditEquipModal = function (id) {
     document.getElementById('editEquipStatus').value = item.status || 'Operational';
     document.getElementById('editEquipAssetTag').value = item.assetTag || '';
     if (document.getElementById('editEquipAcquisitionDate')) document.getElementById('editEquipAcquisitionDate').value = item.acquisitionDate || '';
-    if (document.getElementById('editEquipMaintenanceDate')) document.getElementById('editEquipMaintenanceDate').value = item.maintenanceDate || '';
+    if (document.getElementById('editEquipMaintenanceDueDate')) {
+        document.getElementById('editEquipMaintenanceDueDate').value = item.maintenanceDueDate || item.maintenanceDate || '';
+    }
     if (document.getElementById('editEquipMaintCount')) {
         const count = item.maintenanceCount || 0;
         document.getElementById('editEquipMaintCount').textContent = `${count} time${count !== 1 ? 's' : ''}`;
@@ -2505,7 +2564,7 @@ if (document.getElementById('editEquipForm')) {
                 imageUrl = await window.uploadImage(imageFile, 'equipment');
             }
 
-            const newMaintenanceDate = document.getElementById('editEquipMaintenanceDate') ? document.getElementById('editEquipMaintenanceDate').value || '' : '';
+            const newMaintenanceDueDate = document.getElementById('editEquipMaintenanceDueDate') ? document.getElementById('editEquipMaintenanceDueDate').value || '' : '';
 
             const updatedData = {
                 name: nameStr,
@@ -2515,7 +2574,7 @@ if (document.getElementById('editEquipForm')) {
                 status: document.getElementById('editEquipStatus').value,
                 assetTag: assetTagVal,
                 acquisitionDate: document.getElementById('editEquipAcquisitionDate') ? document.getElementById('editEquipAcquisitionDate').value || '' : '',
-                maintenanceDate: newMaintenanceDate,
+                maintenanceDueDate: newMaintenanceDueDate,
                 maintenanceCount: oldEquip ? (oldEquip.maintenanceCount || 0) : 0,
                 image: imageUrl || ''
             };
@@ -2623,6 +2682,24 @@ if (document.getElementById('editProductForm')) {
             }
 
             const isBatchTracked = !!(document.getElementById('editProdBatchTracked')?.checked);
+            const expiryInputVal = (document.getElementById('editProdExpiry')?.value || '').trim();
+            if (!isBatchTracked) {
+                if (!expiryInputVal) {
+                    showToast("Expiration date is required for non-batch products.", "error");
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                    return;
+                }
+                const todayStr = new Date().toISOString().split('T')[0];
+                if (expiryInputVal < todayStr) {
+                    showToast("Expiry date cannot be in the past.", "error");
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                    return;
+                }
+            }
+            const wasBatchTracked = !!(oldProd?.isBatchTracked);
+            const switchingToBatchMode = !wasBatchTracked && isBatchTracked;
+            const oldQty = parseInt(oldProd?.qty, 10) || 0;
+            const oldExpiry = (oldProd?.expiry || '').trim();
             const updatedData = {
                 name: nameStr,
                 cat: document.getElementById('editProdCategory').value,
@@ -2630,14 +2707,52 @@ if (document.getElementById('editProductForm')) {
                 qty: isBatchTracked ? (oldProd?.qty || 0) : qtyVal, // batch items keep computed qty from batches
                 size: document.getElementById('editProdVol').value,
                 image: imageUrl || '',
-                expiry: isBatchTracked ? null : (document.getElementById('editProdExpiry') ? document.getElementById('editProdExpiry').value : (oldProd?.expiry || null)),
+                expiry: isBatchTracked ? null : expiryInputVal,
                 serialNumber: document.getElementById('editProdSerialNumber') ? document.getElementById('editProdSerialNumber').value.trim() : (oldProd?.serialNumber || ''),
                 isBatchTracked
             };
 
             const qtyDiff = updatedData.qty - (oldProd ? oldProd.qty : 0);
 
-            await updateDoc(doc(db, "inventory", id), updatedData);
+            if (switchingToBatchMode) {
+                const existingBatchSnap = await getDocs(query(collection(db, "inventory", id, "batches"), limit(1)));
+                const hasExistingBatch = !existingBatchSnap.empty;
+                await runTransaction(db, async (txn) => {
+                    const invRef = doc(db, "inventory", id);
+                    const invSnap = await txn.get(invRef);
+                    if (!invSnap.exists()) throw new Error("Product no longer exists.");
+
+                    const liveQty = parseInt(invSnap.data()?.qty, 10) || 0;
+                    const seedQty = Math.max(oldQty, liveQty, 0);
+                    const seedExpiry = oldExpiry || "9999-12-31";
+
+                    const batchesRef = collection(db, "inventory", id, "batches");
+
+                    // Seed first batch from pre-batch root stock/expiry when converting legacy products.
+                    if (seedQty > 0 && !hasExistingBatch) {
+                        txn.set(doc(batchesRef), {
+                            expiryDate: seedExpiry,
+                            currentQuantity: seedQty,
+                            addedAt: Date.now(),
+                            isLegacyInitialBatch: true,
+                            notes: "Auto-migrated from pre-batch product qty during batch-mode conversion.",
+                        });
+                    }
+
+                    txn.update(invRef, updatedData);
+                });
+
+                if (oldQty > 0) {
+                    await logStockMovement(
+                        id,
+                        updatedData.name,
+                        oldQty,
+                        `Batch Mode Migration (Initial Batch, Expiry: ${oldExpiry || 'No Expiry'})`
+                    );
+                }
+            } else {
+                await updateDoc(doc(db, "inventory", id), updatedData);
+            }
             if (qtyDiff !== 0) await logStockMovement(id, updatedData.name, qtyDiff, "Manual Edit");
             window.closeModal('editProductModal');
             showToast("Product updated successfully!", "success");
@@ -2712,7 +2827,13 @@ async function handleInventorySubmit(e, isProduct) {
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
                 return;
             }
-            const expiryCheck = document.getElementById('prodExpiry') ? document.getElementById('prodExpiry').value : '';
+            const regIsBatchTracked = !!(document.getElementById('prodBatchTracked')?.checked);
+            const expiryCheck = (document.getElementById('prodExpiry')?.value || '').trim();
+            if (!regIsBatchTracked && !expiryCheck) {
+                showToast("Expiration date is required for non-batch products.", "error");
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+                return;
+            }
             if (expiryCheck) {
                 const todayStr = new Date().toISOString().split('T')[0];
                 if (expiryCheck < todayStr) {
@@ -2750,7 +2871,7 @@ async function handleInventorySubmit(e, isProduct) {
                 assetTag: !isProduct ? (document.getElementById('equipAssetTag').value.trim() || '') : '',
                 serialNumber: isProduct ? (document.getElementById('prodSerialNumber') ? document.getElementById('prodSerialNumber').value.trim() : '') : '',
                 acquisitionDate: !isProduct ? (document.getElementById('equipAcquisitionDate').value || '') : '',
-                maintenanceDate: !isProduct ? (document.getElementById('equipMaintenanceDate').value || '') : '',
+                maintenanceDueDate: !isProduct ? (document.getElementById('equipMaintenanceDueDate')?.value || '') : '',
                 image: imageUrl || ''
             };
 
@@ -2786,25 +2907,75 @@ if (document.getElementById('productForm')) document.getElementById('productForm
 // ==========================================
 // BATCH TRACKING UI HELPERS
 // ==========================================
+function updateBatchToggleUi(kind, enabled) {
+    const stateEl = document.getElementById(kind === 'reg' ? 'regBatchToggleState' : 'editBatchToggleState');
+    const trackEl = document.getElementById(kind === 'reg' ? 'regBatchToggleTrack' : 'editBatchToggleTrack');
+    const knobEl = document.getElementById(kind === 'reg' ? 'regBatchToggleKnob' : 'editBatchToggleKnob');
+    if (stateEl) {
+        stateEl.textContent = enabled ? 'ON' : 'OFF';
+        stateEl.style.background = enabled ? 'rgba(59,130,246,0.15)' : '#e2e8f0';
+        stateEl.style.color = enabled ? '#1d4ed8' : '#475569';
+    }
+    if (trackEl) {
+        trackEl.style.background = enabled ? 'var(--accent-blue,#3b82f6)' : '#cbd5e1';
+    }
+    if (knobEl) {
+        knobEl.style.left = enabled ? '23px' : '3px';
+    }
+}
 
 // Show/hide qty+expiry fields in the Register Product modal based on batch mode
 window.toggleRegBatchMode = function (enabled) {
+    const qtyInput = document.getElementById('prodQty');
+    const expiryInput = document.getElementById('prodExpiry');
     const qtyRow = document.getElementById('prodQty')?.closest('.form-row');
     const expiryGroup = document.getElementById('prodExpiry')?.closest('.form-group');
     if (qtyRow) qtyRow.style.display = enabled ? 'none' : '';
     if (expiryGroup) expiryGroup.style.display = enabled ? 'none' : '';
+    if (qtyInput) {
+        qtyInput.required = !enabled;
+        qtyInput.disabled = !!enabled;
+        if (enabled) qtyInput.value = '';
+    }
+    if (expiryInput) {
+        expiryInput.required = !enabled;
+        expiryInput.disabled = !!enabled;
+        if (enabled) expiryInput.value = '';
+    }
+    updateBatchToggleUi('reg', !!enabled);
 };
 
 // Show/hide qty+expiry fields in the Edit Product modal based on batch mode
 window.toggleEditBatchMode = function (enabled) {
+    const qtyInput = document.getElementById('editProdQty');
+    const expiryInput = document.getElementById('editProdExpiry');
     const qtyRow = document.getElementById('editProdQty')?.closest('.form-row');
     const expiryGroup = document.getElementById('editProdExpiry')?.closest('.form-group');
     if (qtyRow) qtyRow.style.display = enabled ? 'none' : '';
     if (expiryGroup) expiryGroup.style.display = enabled ? 'none' : '';
+    if (qtyInput) {
+        qtyInput.required = !enabled;
+        qtyInput.disabled = !!enabled;
+    }
+    if (expiryInput) {
+        expiryInput.required = !enabled;
+        expiryInput.disabled = !!enabled;
+    }
+    updateBatchToggleUi('edit', !!enabled);
 };
+
+// Ensure toggle visuals and required flags are in sync at startup.
+setTimeout(() => {
+    const regCb = document.getElementById('prodBatchTracked');
+    const editCb = document.getElementById('editProdBatchTracked');
+    if (regCb) window.toggleRegBatchMode(!!regCb.checked);
+    if (editCb) window.toggleEditBatchMode(!!editCb.checked);
+}, 0);
 
 // ── Batch Manager ──────────────────────────────────────────────────────────────
 let _batchMgrProductId = null;
+let _batchEditProductId = null;
+let _batchEditId = null;
 
 window.openBatchManager = async function (productId) {
     const item = inventoryData.find(i => i.id === productId);
@@ -2818,6 +2989,7 @@ window.openBatchManager = async function (productId) {
     const expIn = document.getElementById('newBatchExpiry');
     if (qtyIn) qtyIn.value = '';
     if (expIn) expIn.value = '';
+    window.cancelBatchEdit();
 
     await refreshBatchList(productId);
     document.getElementById('batchManagerModal').style.display = 'flex';
@@ -2866,11 +3038,17 @@ async function refreshBatchList(productId) {
                         <div style="font-weight:600;font-size:13px;">Expiry: ${escapeHtml(exp)}${tagHtml}</div>
                         <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Current qty: <strong>${qty}</strong> units</div>
                     </div>
-                    <button type="button" title="Delete batch" onclick="deleteBatch('${productId}','${d.id}',${qty})"
-                        style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:16px;padding:4px 8px;border-radius:6px;"
-                        ${qty > 0 ? 'disabled title="Cannot delete — batch still has stock. Zero it out first."' : ''}>
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <div style="display:flex;align-items:center;gap:4px;">
+                        <button type="button" title="Edit batch" onclick="startBatchEdit('${productId}','${d.id}',${qty},'${escapeHtml(exp)}')"
+                            style="background:none;border:none;cursor:pointer;color:var(--accent-blue,#3b82f6);font-size:16px;padding:4px 8px;border-radius:6px;">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button type="button" title="Delete batch" onclick="deleteBatch('${productId}','${d.id}',${qty})"
+                            style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:16px;padding:4px 8px;border-radius:6px;"
+                            ${qty > 0 ? 'disabled title="Cannot delete — batch still has stock. Zero it out first."' : ''}>
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `);
         });
@@ -2889,10 +3067,11 @@ window.saveNewBatch = async function () {
     if (!_batchMgrProductId) return;
     const qtyInput = document.getElementById('newBatchQty');
     const expInput = document.getElementById('newBatchExpiry');
-    const qty = parseInt(qtyInput?.value, 10);
+    // Strict integer normalization prevents string-collision issues (e.g. "0" + "5" => "05").
+    const newBatchQty = parseInt(qtyInput?.value, 10) || 0;
     const expiry = expInput?.value || '';
 
-    if (!qty || qty <= 0) return showToast('Enter a valid quantity.', 'error');
+    if (!Number.isFinite(newBatchQty) || newBatchQty <= 0) return showToast('Enter a valid quantity.', 'error');
     if (!expiry) return showToast('Select an expiry date.', 'error');
 
     const today = new Date(Date.now() + (window.serverTimeOffsetMs || 0)).toISOString().slice(0, 10);
@@ -2905,14 +3084,64 @@ window.saveNewBatch = async function () {
         await runTransaction(db, async (txn) => {
             const invRef = doc(db, 'inventory', _batchMgrProductId);
             const invSnap = await txn.get(invRef);
-            const currentTotal = invSnap.exists() ? (invSnap.data().qty || 0) : 0;
+            if (!invSnap.exists()) {
+                throw new Error('Inventory product no longer exists. Please refresh and try again.');
+            }
 
-            const batchRef = doc(collection(db, 'inventory', _batchMgrProductId, 'batches'));
-            txn.set(batchRef, { expiryDate: expiry, currentQuantity: qty, addedAt: Date.now() });
-            txn.update(invRef, { qty: currentTotal + qty });
+            const invData = invSnap.data() || {};
+            // Support legacy schemas that stored root stock as qty/stock/currentStock/totalStock.
+            const rootQtyRaw = invData.qty ?? 0;
+            const rootTotalRaw = invData.totalStock ?? rootQtyRaw;
+            const rootStockRaw = invData.stock ?? rootQtyRaw;
+            const rootCurrentRaw = invData.currentStock ?? rootQtyRaw;
+            const rootQty = parseInt(rootQtyRaw, 10) || 0;
+            const rootTotalStock = parseInt(rootTotalRaw, 10) || 0;
+            const rootStock = parseInt(rootStockRaw, 10) || 0;
+            const rootCurrentStock = parseInt(rootCurrentRaw, 10) || 0;
+            const strandedRootStock = Math.max(rootQty, rootTotalStock, rootStock, rootCurrentStock, 0);
+
+            const batchesRef = collection(db, 'inventory', _batchMgrProductId, 'batches');
+            const existingBatchSnap = await txn.get(query(batchesRef, limit(1)));
+            const hasAnyBatch = !existingBatchSnap.empty;
+
+            // Rescue stranded legacy stock by creating a synthetic initial batch first.
+            if (!hasAnyBatch && strandedRootStock > 0) {
+                const legacyBatchRef = doc(batchesRef);
+                txn.set(legacyBatchRef, {
+                    expiryDate: '9999-12-31',
+                    currentQuantity: strandedRootStock,
+                    addedAt: Date.now(),
+                    isLegacyInitialBatch: true,
+                    notes: 'Auto-migrated from root stock during first batch creation.',
+                });
+            }
+
+            const batchRef = doc(batchesRef);
+            txn.set(batchRef, { expiryDate: expiry, currentQuantity: newBatchQty, addedAt: Date.now() });
+
+            // Keep aggregate stock fields race-safe and numeric before increments.
+            const numericSeed = {};
+            if (!(typeof rootQtyRaw === 'number' && Number.isFinite(rootQtyRaw))) numericSeed.qty = rootQty;
+            if (!(typeof rootTotalRaw === 'number' && Number.isFinite(rootTotalRaw))) numericSeed.totalStock = rootTotalStock;
+            if (!(typeof rootStockRaw === 'number' && Number.isFinite(rootStockRaw))) numericSeed.stock = rootStock;
+            if (!(typeof rootCurrentRaw === 'number' && Number.isFinite(rootCurrentRaw))) numericSeed.currentStock = rootCurrentStock;
+            if (Object.keys(numericSeed).length) txn.update(invRef, numericSeed);
+
+            // Master aggregate: add only the NEW batch quantity (legacy rescue qty already existed at root).
+            txn.update(invRef, {
+                qty: increment(newBatchQty),
+                totalStock: increment(newBatchQty),
+                stock: increment(newBatchQty),
+                currentStock: increment(newBatchQty),
+            });
         });
 
-        await logStockMovement(_batchMgrProductId, inventoryData.find(i => i.id === _batchMgrProductId)?.name || '', qty, `Batch Received (Expiry: ${expiry})`);
+        await logStockMovement(
+            _batchMgrProductId,
+            inventoryData.find(i => i.id === _batchMgrProductId)?.name || '',
+            newBatchQty,
+            `Batch Received (Expiry: ${expiry})`
+        );
         if (qtyInput) qtyInput.value = '';
         if (expInput) expInput.value = '';
         await refreshBatchList(_batchMgrProductId);
@@ -2945,6 +3174,98 @@ window.deleteBatch = async function (productId, batchId, currentQty) {
         }
     });
 };
+
+window.startBatchEdit = function (productId, batchId, currentQty, currentExpiry) {
+    _batchEditProductId = productId;
+    _batchEditId = batchId;
+    const panel = document.getElementById('batchEditPanel');
+    const idIn = document.getElementById('editBatchId');
+    const qtyIn = document.getElementById('editBatchQty');
+    const expIn = document.getElementById('editBatchExpiry');
+    if (idIn) idIn.value = batchId;
+    if (qtyIn) qtyIn.value = String(parseInt(currentQty, 10) || 0);
+    if (expIn) expIn.value = String(currentExpiry || '9999-12-31');
+    if (panel) panel.style.display = 'block';
+    if (qtyIn) qtyIn.focus();
+};
+
+window.cancelBatchEdit = function () {
+    _batchEditProductId = null;
+    _batchEditId = null;
+    const panel = document.getElementById('batchEditPanel');
+    const idIn = document.getElementById('editBatchId');
+    const qtyIn = document.getElementById('editBatchQty');
+    const expIn = document.getElementById('editBatchExpiry');
+    if (idIn) idIn.value = '';
+    if (qtyIn) qtyIn.value = '';
+    if (expIn) expIn.value = '';
+    if (panel) panel.style.display = 'none';
+};
+
+window.saveBatchEdit = async function () {
+    const productId = _batchEditProductId || _batchMgrProductId;
+    const batchId = _batchEditId || document.getElementById('editBatchId')?.value || '';
+    const newQty = parseInt(document.getElementById('editBatchQty')?.value, 10);
+    const newExpiry = String(document.getElementById('editBatchExpiry')?.value || '').trim();
+    if (!productId || !batchId) return showToast('Select a batch to edit first.', 'error');
+    if (!Number.isInteger(newQty) || newQty < 0) return showToast('Quantity must be a non-negative integer.', 'error');
+    if (!newExpiry) return showToast('Select an expiry date.', 'error');
+
+    try {
+        await runTransaction(db, async (txn) => {
+            const invRef = doc(db, 'inventory', productId);
+            const batchRef = doc(db, 'inventory', productId, 'batches', batchId);
+
+            const [invSnap, batchSnap] = await Promise.all([txn.get(invRef), txn.get(batchRef)]);
+            if (!invSnap.exists()) throw new Error('Inventory product no longer exists.');
+            if (!batchSnap.exists()) throw new Error('Batch no longer exists.');
+
+            const batchData = batchSnap.data() || {};
+            const oldQty = parseInt(batchData.currentQuantity, 10) || 0;
+            const qtyDelta = newQty - oldQty;
+
+            txn.update(batchRef, {
+                currentQuantity: newQty,
+                expiryDate: newExpiry,
+                updatedAt: Date.now(),
+            });
+
+            if (qtyDelta !== 0) {
+                const invData = invSnap.data() || {};
+                const qtyRaw = invData.qty ?? 0;
+                const totalRaw = invData.totalStock ?? qtyRaw;
+                const stockRaw = invData.stock ?? qtyRaw;
+                const currentRaw = invData.currentStock ?? qtyRaw;
+                const qty = parseInt(qtyRaw, 10) || 0;
+                const total = parseInt(totalRaw, 10) || 0;
+                const stock = parseInt(stockRaw, 10) || 0;
+                const current = parseInt(currentRaw, 10) || 0;
+                const numericSeed = {};
+                if (!(typeof qtyRaw === 'number' && Number.isFinite(qtyRaw))) numericSeed.qty = qty;
+                if (!(typeof totalRaw === 'number' && Number.isFinite(totalRaw))) numericSeed.totalStock = total;
+                if (!(typeof stockRaw === 'number' && Number.isFinite(stockRaw))) numericSeed.stock = stock;
+                if (!(typeof currentRaw === 'number' && Number.isFinite(currentRaw))) numericSeed.currentStock = current;
+                if (Object.keys(numericSeed).length) txn.update(invRef, numericSeed);
+
+                txn.update(invRef, {
+                    qty: increment(qtyDelta),
+                    totalStock: increment(qtyDelta),
+                    stock: increment(qtyDelta),
+                    currentStock: increment(qtyDelta),
+                });
+            }
+        });
+
+        await refreshBatchList(productId);
+        window.cancelBatchEdit();
+        showToast('Batch updated successfully.', 'success');
+    } catch (err) {
+        showToast('Failed to update batch: ' + err.message, 'error');
+    }
+};
+
+// Backward compatibility for any stale onclick references.
+window.editBatch = window.startBatchEdit;
 
 // ==========================================
 // 8. POINT OF SALE (POS) LOGIC
@@ -3373,7 +3694,9 @@ window.processPayment = async function () {
             message: `"${expiringSoonItem.name}" in your cart is expiring in ${expiringSoonDays} day${expiringSoonDays === 1 ? '' : 's'} (on ${expiryDate}).\n\nDo you still want to proceed with the purchase?`,
             tone: 'warning',
             confirmText: 'Proceed with Purchase',
-            onConfirm: () => window.processPaymentConfirmed()
+            // Do not return the Promise here; let the confirm modal close first,
+            // then continue checkout so RFID modal can render normally.
+            onConfirm: () => { void window.processPaymentConfirmed(); }
         });
         return;
     }
@@ -3466,27 +3789,30 @@ window.processPaymentConfirmed = async function () {
 
             const rfidData = await new Promise(resolve => {
                 let lastVal = '';
+                let inputHandler = null;
+                let checkInterval = null;
+                let timeoutId = null;
                 const handleClose = () => {
                     clearInterval(checkInterval);
                     clearTimeout(timeoutId);
-                    input.removeEventListener('input', inputHandler);
+                    if (inputHandler) input.removeEventListener('input', inputHandler);
                     delete window.selectMemberForPayment;
                     resolve(null);
                 };
                 if (closeBtn) closeBtn.addEventListener('click', handleClose, { once: true });
 
-                const timeoutId = setTimeout(() => {
+                timeoutId = setTimeout(() => {
                     showToast("RFID scan timed out.", "info");
                     modal.style.display = 'none';
                     clearInterval(checkInterval);
                     if (closeBtn) closeBtn.removeEventListener('click', handleClose);
-                    input.removeEventListener('input', inputHandler);
+                    if (inputHandler) input.removeEventListener('input', inputHandler);
                     delete window.selectMemberForPayment;
                     resolve(null);
                 }, 120 * 1000); // 120 seconds timeout
 
                 let debounceTimer;
-                const inputHandler = (e) => {
+                inputHandler = (e) => {
                     clearTimeout(debounceTimer);
                     debounceTimer = setTimeout(async () => {
                         const q = e.target.value.trim().toLowerCase();
@@ -3530,7 +3856,7 @@ window.processPaymentConfirmed = async function () {
                     resolve({ id, rfid, name });
                 };
 
-                const checkInterval = setInterval(async () => {
+                checkInterval = setInterval(async () => {
                     if (modal.style.display === 'none') {
                         clearTimeout(timeoutId);
                         clearInterval(checkInterval);
@@ -3583,27 +3909,57 @@ window.processPaymentConfirmed = async function () {
 
                 const confirmBtn = document.getElementById('rfidTxnConfirmBtn');
                 const cancelBtn = document.getElementById('rfidTxnCancelBtn');
+                if (!confirmBtn || !cancelBtn) {
+                    resolve(true);
+                    return;
+                }
+                const defaultConfirmText = 'Confirm Payment';
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = defaultConfirmText;
 
-                const cleanup = () => {
-                    modal.style.display = 'none';
-                    confirmBtn.replaceWith(confirmBtn.cloneNode(true));
-                    cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+                let isResolved = false;
+                const finalize = (result) => {
+                    if (isResolved) return;
+                    isResolved = true;
+                    modal.removeEventListener('click', backdropHandler);
+                    clearInterval(closeWatchTimer);
+                    confirmBtn.removeEventListener('click', confirmHandler);
+                    cancelBtn.removeEventListener('click', cancelHandler);
+                    if (!result) {
+                        // Ensure next RFID attempt does not inherit a stale loading state.
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = defaultConfirmText;
+                    }
+                    resolve(result);
                 };
 
-                // Re-query after cloneNode
-                modal.querySelector('#rfidTxnConfirmBtn').addEventListener('click', () => {
-                    const btn = modal.querySelector('#rfidTxnConfirmBtn');
-                    btn.disabled = true;
-                    btn.textContent = 'Processing...';
+                const confirmHandler = () => {
+                    confirmBtn.disabled = true;
+                    confirmBtn.textContent = 'Processing...';
                     modal.style.display = 'none';
-                    resolve(true);
-                }, { once: true });
+                    finalize(true);
+                };
 
-                modal.querySelector('#rfidTxnCancelBtn').addEventListener('click', () => {
-                    cleanup();
-                    resolve(false);
-                }, { once: true });
+                const cancelHandler = () => {
+                    modal.style.display = 'none';
+                    finalize(false);
+                };
 
+                // Handle backdrop dismiss so the promise always resolves.
+                const backdropHandler = (event) => {
+                    if (event.target === modal) {
+                        finalize(false);
+                    }
+                };
+
+                // Catch programmatic closes (e.g., inline closeModal onclick).
+                const closeWatchTimer = setInterval(() => {
+                    if (modal.style.display === 'none') finalize(false);
+                }, 150);
+
+                confirmBtn.addEventListener('click', confirmHandler);
+                cancelBtn.addEventListener('click', cancelHandler);
+                modal.addEventListener('click', backdropHandler);
                 modal.style.display = 'flex';
             });
 
@@ -3640,21 +3996,19 @@ window.processPaymentConfirmed = async function () {
                     continue;
                 }
 
-                const memberQuery = query(usersCol, where("rfid", "==", tag));
-                const memberSnap = await getDocs(memberQuery);
-                if (!memberSnap.empty) {
+                // Use the already-loaded in-memory users list so the UI
+                // doesn't break if Firestore reads are blocked/slow.
+                const isRegisteredUserCard = (allUsersData || []).some(u => (u.rfid || "") === tag);
+                if (isRegisteredUserCard) {
                     showToast("This card belongs to a registered member and cannot be used as a reusable guest card.", "error");
                     w--;
                     closeWalkinIssueModal();
                     continue;
                 }
 
-                if (await isGuestCardIssuedToday(tag, dateStrTemp)) {
-                    showToast("That guest card is already issued for today. Please tap a different card.", "error");
-                    w--;
-                    closeWalkinIssueModal();
-                    continue;
-                }
+                // Skip guest-card "already issued today" pre-check here.
+                // The checkout transaction does the authoritative race-free check
+                // (reads guestCards inside the tx before any writes).
 
                 scannedTags.push(tag);
                 closeWalkinIssueModal();
@@ -3703,7 +4057,8 @@ window.processPaymentConfirmed = async function () {
             if (!invObj || !invObj.isBatchTracked) continue;
             const result = await checkoutBatches(db, cartItem.id, cartItem.qty);
             if (!result.success) {
-                throw new Error(`Batch stock error for "${cartItem.name}": ${result.message}`);
+                const currentStock = parseInt(result.currentStock, 10) || 0;
+                throw new Error(`Transaction Denied: Insufficient stock. Current stock is reading as ${currentStock}.`);
             }
             batchCheckoutResults.push({ cartItem, result });
         }
@@ -3760,16 +4115,31 @@ window.processPaymentConfirmed = async function () {
                     throw new Error(`Product "${cartItem.name}" no longer exists in inventory.`);
                 }
 
-                const isBatchItem = !!snap.data().isBatchTracked;
+                const productRef = inventoryDocRefs[i].ref;
+                // Explicitly read the fresh product snapshot first (guards against stale/partial local data).
+                const productDoc = await transaction.get(productRef);
+                if (!productDoc.exists()) {
+                    throw new Error(`Product "${cartItem.name}" no longer exists in inventory.`);
+                }
+
+                const productData = productDoc.data() || {};
+                const isBatchItem = !!productData.isBatchTracked;
+
+                // Normalize requested qty as an integer before any numeric ops.
+                const requestedQty = parseInt(cartItem.qty, 10) || 0;
 
                 if (!isBatchItem) {
-                    const dbQty = snap.data().qty || 0;
-                    if (dbQty < cartItem.qty) {
-                        throw new Error(`Insufficient stock for "${cartItem.name}"! Real-time Stock: ${dbQty}, Requested: ${cartItem.qty}`);
+                    // Read-0 bug guard: normalize master qty as an integer from Firestore.
+                    const currentStock = parseInt(productData.qty, 10) || 0;
+
+                    if (currentStock <= 0 || currentStock < requestedQty) {
+                        throw new Error(
+                            `Transaction Denied: Insufficient stock. Current stock is reading as ${currentStock}.`
+                        );
                     }
 
                     // Authoritative Database Expiration Check (flat-qty items only)
-                    const dbExpiry = snap.data().expiry;
+                    const dbExpiry = productData.expiry;
                     if (dbExpiry) {
                         const dbExpDate = new Date(dbExpiry + 'T00:00:00');
                         const dbToday = new Date(Date.now() + (window.serverTimeOffsetMs || 0));
@@ -3781,12 +4151,12 @@ window.processPaymentConfirmed = async function () {
                 }
                 // Batch-tracked: expiry enforced per-batch inside checkoutBatches()
 
-                const dbPrice = Number(snap.data().price || 0);
+                const dbPrice = Number(productData.price || 0);
                 if (isNaN(dbPrice) || dbPrice <= 0) {
                     throw new Error(`Product "${cartItem.name}" has an invalid price (₱${dbPrice}) in the database.`);
                 }
 
-                computedSubtotal += dbPrice * cartItem.qty;
+                computedSubtotal += dbPrice * requestedQty;
                 // Force client-side record to match absolute database truth
                 cartItem.price = dbPrice;
             }
@@ -3863,8 +4233,9 @@ window.processPaymentConfirmed = async function () {
 
                 if (snap.data().isBatchTracked) continue; // already deducted by checkoutBatches()
 
-                const currentQty = snap.data().qty || 0;
-                transaction.update(itemRef, { qty: currentQty - cartItem.qty });
+                const currentStock = parseInt(snap.data().qty, 10) || 0;
+                const requestedQty = parseInt(cartItem.qty, 10) || 0;
+                transaction.update(itemRef, { qty: currentStock - requestedQty });
 
                 const movementRef = doc(collection(db, "stockMovements"));
                 const now = new Date();
@@ -3884,12 +4255,12 @@ window.processPaymentConfirmed = async function () {
             // 4b. Ledger entries for batch-tracked deductions (qty already committed by checkoutBatches).
             // One stockMovements doc per batch touched so the ledger shows per-batch traceability.
             for (const { cartItem, result } of batchCheckoutResults) {
-                const totalDeducted = result.deductions.reduce((sum, d) => sum + d.deducted, 0);
+                const totalDeducted = result.deductions.reduce((sum, d) => sum + (parseInt(d.deducted, 10) || 0), 0);
                 const invIdx = inventoryDocRefs.findIndex(x => x.cartItem.id === cartItem.id);
                 if (invIdx >= 0 && totalDeducted > 0) {
                     const snap = inventorySnaps[invIdx];
-                    const currentQty = snap.exists() ? (snap.data().qty || 0) : 0;
-                    transaction.update(inventoryDocRefs[invIdx].ref, { qty: currentQty - totalDeducted });
+                    const currentStock = snap.exists() ? (parseInt(snap.data().qty, 10) || 0) : 0;
+                    transaction.update(inventoryDocRefs[invIdx].ref, { qty: currentStock - totalDeducted });
                 }
                 for (const deduction of result.deductions) {
                     const movementRef = doc(collection(db, "stockMovements"));
@@ -4109,7 +4480,7 @@ function calculateFinancials() {
     const lastWeekEnd = new Date(monday);
 
     paymentsData.forEach(p => {
-        if (p.status === 'Voided') return;
+        if (p.status === 'Voided' || p.status === 'Refunded') return;
         const pDate = new Date(p.date);
         const pAmount = Number(p.amount || 0);
 
@@ -4179,9 +4550,17 @@ function calculateOperationalAlerts() {
     const activelyFlagged = equipment.filter(i => i.status === 'Maintenance' || i.status === 'Out of Order').length;
     const overdueCount = equipment.filter(i => {
         if (i.status !== 'Operational') return false;
-        if (!i.maintenanceDate) return true;
-        const days = Math.floor((today - new Date(i.maintenanceDate)) / (1000 * 60 * 60 * 24));
-        return days > 90;
+        let dueDateForSchedule = i.maintenanceDueDate || '';
+        if (!dueDateForSchedule && i.maintenanceDate) {
+            const base = new Date(`${i.maintenanceDate}T00:00:00`);
+            if (!Number.isNaN(base.getTime())) {
+                base.setDate(base.getDate() + 90);
+                dueDateForSchedule = base.toISOString().split('T')[0];
+            }
+        }
+        if (!dueDateForSchedule) return true;
+        const daysOverdue = Math.floor((today - new Date(dueDateForSchedule)) / (1000 * 60 * 60 * 24));
+        return daysOverdue > 0;
     }).length;
 
     const maintCount = activelyFlagged + overdueCount;
@@ -4291,7 +4670,7 @@ function renderWeeklyRevenueChart() {
         const dStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         let dayRev = 0;
         paymentsData.forEach(p => {
-            if (p.status !== 'Voided' && p.date === dStr) {
+            if (p.status !== 'Voided' && p.status !== 'Refunded' && p.date === dStr) {
                 dayRev += Number(p.amount || 0);
             }
         });
@@ -4497,6 +4876,11 @@ function renderPayments() {
     const payTbody = document.querySelector('#paymentTable tbody');
     if (!payTbody) return;
 
+    const isCancelledTxStatus = (s) => {
+        const v = (s || 'Paid');
+        return v === 'Voided' || v === 'Refunded';
+    };
+
     // 1. Calculate KPI Metrics (Always based on full data)
     let totalRevenue = 0;
     let todayRevenue = 0;
@@ -4505,7 +4889,7 @@ function renderPayments() {
 
     paymentsData.forEach(t => {
         const amount = Number(t.amount || 0);
-        if (t.status === 'Voided') {
+        if (isCancelledTxStatus(t.status)) {
             totalVoided += amount;
         } else {
             totalRevenue += amount;
@@ -4634,7 +5018,8 @@ function renderPayments() {
     // 3. Render Rows
     const renderPaymentRow = (t) => {
         const amount = Number(t.amount || 0);
-        const isVoided = t.status === 'Voided';
+        const status = (t.status || 'Paid');
+        const isCancelled = isCancelledTxStatus(status);
 
         // Transaction Reference
         const refDisplay = t.transactionRef
@@ -4642,12 +5027,14 @@ function renderPayments() {
             : `<span class="txn-ref">${t.id.slice(0, 8).toUpperCase()}</span>`;
 
         // Status Badge
-        const statusBadge = isVoided
-            ? '<span class="status-badge-solid voided">Voided</span>'
-            : '<span class="status-badge-solid paid">Paid</span>';
+        const statusBadge = isCancelled
+            ? (status === 'Refunded'
+                ? '<span class="status-badge-solid refunded bg-red-100 text-red-800 border border-red-200">Refunded</span>'
+                : '<span class="status-badge-solid voided bg-red-100 text-red-800 border border-red-200">Voided</span>')
+            : '<span class="status-badge-solid paid bg-green-100 text-green-800 border border-green-200">Paid</span>';
 
         // Cancel Remarks
-        const remarksHtml = (isVoided && t.cancelRemarks)
+        const remarksHtml = (isCancelled && t.cancelRemarks)
             ? `<div class="cancel-remarks-badge"><i class="fas fa-comment-dots"></i> ${escapeHtml(t.cancelRemarks)}</div>`
             : '';
 
@@ -4675,7 +5062,7 @@ function renderPayments() {
                 <div class="kebab-dropdown" id="kebab-${t.id}">
                     <div class="kebab-item" onclick="viewInvoice('${t.id}')"><i class="fas fa-file-invoice"></i> View Invoice</div>
                     <div class="kebab-item" onclick="printReceipt('${t.id}')"><i class="fas fa-print"></i> Print Receipt</div>
-                    ${!isVoided ? `
+                    ${!isCancelled ? `
                         <div class="kebab-item" onclick="processRefund('${t.id}', this)"><i class="fas fa-undo"></i> Process Refund</div>
                         <div class="kebab-item" style="color: #991b1b;" onclick="voidTransaction('${t.id}', false, this)"><i class="fas fa-ban"></i> Void Transaction</div>
                     ` : ''}
@@ -4683,16 +5070,17 @@ function renderPayments() {
             </div>
         `;
 
+        const cancelledRowClass = isCancelled ? 'line-through text-gray-400 opacity-70' : '';
         return `
-            <tr style="${isVoided ? 'color: #94a3b8;' : ''}">
-                <td style="font-weight: 500; ${isVoided ? 'text-decoration: line-through;' : ''}">
+            <tr style="${isCancelled ? 'color: #94a3b8;' : ''}">
+                <td class="${cancelledRowClass}" style="font-weight: 500; ${isCancelled ? 'text-decoration: line-through;' : ''}">
                     ${t.name}
                     <div>${refDisplay}</div>
                 </td>
-                <td style="${isVoided ? 'text-decoration: line-through;' : ''}">${itemsHtml}</td>
-                <td style="${isVoided ? 'text-decoration: line-through;' : ''}"><span style="white-space: nowrap;">${t.date}</span> <br><small style="color:#94a3b8;">${t.time || ''}</small></td>
-                <td style="${isVoided ? 'text-decoration: line-through;' : ''}">₱${(t.subtotal || amount).toFixed(2)}</td>
-                <td style="font-weight:700; ${isVoided ? 'text-decoration: line-through;' : ''}">₱${amount.toFixed(2)}</td>
+                <td class="${cancelledRowClass}" style="${isCancelled ? 'text-decoration: line-through;' : ''}">${itemsHtml}</td>
+                <td class="${cancelledRowClass}" style="${isCancelled ? 'text-decoration: line-through;' : ''}"><span style="white-space: nowrap;">${t.date}</span> <br><small style="color:#94a3b8;">${t.time || ''}</small></td>
+                <td class="${cancelledRowClass}" style="${isCancelled ? 'text-decoration: line-through;' : ''}">₱${(t.subtotal || amount).toFixed(2)}</td>
+                <td class="${cancelledRowClass}" style="font-weight:700; ${isCancelled ? 'text-decoration: line-through;' : ''}">₱${amount.toFixed(2)}</td>
                 <td>${statusBadge}${remarksHtml}</td>
                 <td style="text-align: right;">${actionHtml}</td>
             </tr>
@@ -4747,7 +5135,7 @@ window.viewInvoice = function (id) {
     document.getElementById('invoiceMethod').innerText = tx.paymentMethod || "Cash";
     document.getElementById('invoiceStatus').innerText = tx.status || "Paid";
     document.getElementById('invoiceStatus').className = `status-badge-solid ${tx.status?.toLowerCase() || 'paid'}`;
-    document.getElementById('invoiceStatus').style.background = tx.status === 'Voided' ? '#ef4444' : '#27ae60';
+    document.getElementById('invoiceStatus').style.background = (tx.status === 'Voided' || tx.status === 'Refunded') ? '#ef4444' : '#27ae60';
 
     const subtotal = tx.subtotal || Number(tx.amount || 0);
     const total = Number(tx.amount || 0);
@@ -4844,7 +5232,7 @@ window.renderWeeklyReport = function () {
         let dayTxCount = 0;
 
         paymentsData.forEach(p => {
-            if (p.status === 'Voided') return;
+            if (p.status === 'Voided' || p.status === 'Refunded') return;
             const pDate = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
             if (pDate.toDateString() === dayDate.toDateString()) {
                 dayRevenue += Number(p.amount || 0);
@@ -5305,6 +5693,22 @@ window.voidTransaction = async function (id, isRefund = false, btn) {
                         voidUpdate.voidedBy = localStorage.getItem("userId") || "";
                         transaction.update(paymentRef, voidUpdate);
                     });
+
+                    // UI + local cache hard-sync (covers pages without an active payments listener)
+                    try {
+                        const localIdx = paymentsData.findIndex(p => p.id === id);
+                        if (localIdx !== -1) {
+                            const nextStatus = isRefund ? "Refunded" : "Voided";
+                            paymentsData[localIdx] = {
+                                ...paymentsData[localIdx],
+                                status: nextStatus,
+                                cancelRemarks: (cancelRemarks || '').trim(),
+                                voidedAt: Date.now(),
+                                voidedBy: localStorage.getItem("userId") || ""
+                            };
+                        }
+                        if (typeof renderPayments === 'function') renderPayments();
+                    } catch (_) { /* best-effort UI sync */ }
                     
                     showToast(`Transaction successfully ${actionName === "REFUND" ? "refunded" : "voided"}!`, "success");
                     if (window.logActivity) window.logActivity(`Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`, `${actionName === "REFUND" ? "Refunded" : "Voided"} transaction ${id} for ${tx.name || 'Unknown'} (₱${tx.amount})${cancelRemarks ? ' — Reason: ' + cancelRemarks : ''}`);
@@ -5403,17 +5807,16 @@ window.generateWeeklyPDF = function () {
         const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
         return d >= monday && d <= sunday;
     });
-    const paidWeek = allWeek.filter(p => p.status !== 'Voided');
-    const voidedWeek = allWeek.filter(p => p.status === 'Voided');
+    const paidWeek = allWeek.filter(p => p.status !== 'Voided' && p.status !== 'Refunded');
+    const voidedWeek = allWeek.filter(p => p.status === 'Voided' || p.status === 'Refunded');
 
     const grossRevenue = paidWeek.reduce((s, p) => s + Number(p.amount || 0), 0);
     const voidedAmount = voidedWeek.reduce((s, p) => s + Number(p.amount || 0), 0);
-    const netRevenue = grossRevenue / 1.12;
-    const calculatedVAT = grossRevenue - netRevenue;
+    // VAT removed from weekly financial report: treat revenue as-is (gross == net)
+    const netRevenue = grossRevenue;
     const avgTx = paidWeek.length > 0 ? grossRevenue / paidWeek.length : 0;
 
     document.getElementById('pdfGrossRevenue').innerText = fmt2(grossRevenue);
-    document.getElementById('pdfVATAmount').innerText = fmt2(calculatedVAT);
     document.getElementById('pdfNetRevenue').innerText = fmt2(netRevenue);
     document.getElementById('pdfVoidedAmount').innerText = fmt2(voidedAmount);
     document.getElementById('pdfTxCount').innerText = paidWeek.length;
@@ -5484,17 +5887,16 @@ window.generateMonthlyPDF = function () {
         const d = p.timestamp ? new Date(p.timestamp) : new Date(p.date);
         return d >= monthStart && d <= monthEnd;
     });
-    const paidMonth = allMonth.filter(p => p.status !== 'Voided');
-    const voidedMonth = allMonth.filter(p => p.status === 'Voided');
+    const paidMonth = allMonth.filter(p => p.status !== 'Voided' && p.status !== 'Refunded');
+    const voidedMonth = allMonth.filter(p => p.status === 'Voided' || p.status === 'Refunded');
 
     const grossRevenue = paidMonth.reduce((s, p) => s + Number(p.amount || 0), 0);
     const voidedAmount = voidedMonth.reduce((s, p) => s + Number(p.amount || 0), 0);
-    const netRevenue = grossRevenue / 1.12;
-    const calculatedVAT = grossRevenue - netRevenue;
+    // VAT removed from monthly financial report: treat revenue as-is (gross == net)
+    const netRevenue = grossRevenue;
     const avgTx = paidMonth.length > 0 ? grossRevenue / paidMonth.length : 0;
 
     document.getElementById('pdfMonthGrossRevenue').innerText = fmt2(grossRevenue);
-    document.getElementById('pdfMonthVATAmount').innerText = fmt2(calculatedVAT);
     document.getElementById('pdfMonthNetRevenue').innerText = fmt2(netRevenue);
     document.getElementById('pdfMonthVoidedAmount').innerText = fmt2(voidedAmount);
     document.getElementById('pdfMonthTxCount').innerText = paidMonth.length;
@@ -7353,12 +7755,16 @@ if (document.getElementById('editMemberForm')) {
 
         try {
             if (updatedData.rfid) {
-                const rfidCheck = await getDocs(query(collection(db, "users"), where("rfid", "==", updatedData.rfid)));
+                // Use in-memory user cache to avoid failing the write flow
+                // when Firestore reads for uniqueness checks are blocked/slow.
                 // M1: archived users don't count — their card is reusable.
-                const duplicate = rfidCheck.docs.find(d => d.id !== id && ((d.data() || {}).status || '').toLowerCase() !== 'archived');
+                const duplicate = (window.allUsersData || []).find(u =>
+                    u.id !== id &&
+                    (u.rfid || "") === updatedData.rfid &&
+                    ((u.status || "").toLowerCase() !== "archived")
+                );
                 if (duplicate) {
-                    const dupData = duplicate.data();
-                    const dupName = dupData.name || `${dupData.givenName || ''} ${dupData.familyName || ''}`.trim();
+                    const dupName = duplicate.name || `${duplicate.givenName || ''} ${duplicate.familyName || ''}`.trim();
                     return showToast(`RFID tag collision! This RFID is already assigned to ${dupName || 'another user'}.`, "error");
                 }
             }
@@ -7908,12 +8314,16 @@ if (document.getElementById('editStaffForm')) {
 
         try {
             if (updatedData.rfid) {
-                const rfidCheck = await getDocs(query(collection(db, "users"), where("rfid", "==", updatedData.rfid)));
+                // Use in-memory user cache to avoid failing the write flow
+                // when Firestore reads for uniqueness checks are blocked/slow.
                 // M1: archived users don't count — their card is reusable.
-                const duplicate = rfidCheck.docs.find(d => d.id !== id && ((d.data() || {}).status || '').toLowerCase() !== 'archived');
+                const duplicate = (window.allUsersData || []).find(u =>
+                    u.id !== id &&
+                    (u.rfid || "") === updatedData.rfid &&
+                    ((u.status || "").toLowerCase() !== "archived")
+                );
                 if (duplicate) {
-                    const dupData = duplicate.data();
-                    const dupName = dupData.name || `${dupData.givenName || ''} ${dupData.familyName || ''}`.trim();
+                    const dupName = duplicate.name || `${duplicate.givenName || ''} ${duplicate.familyName || ''}`.trim();
                     return showToast(`RFID tag collision! This RFID is already assigned to ${dupName || 'another user'}.`, "error");
                 }
             }
@@ -8655,15 +9065,15 @@ if (document.getElementById('memberRegistrationForm')) {
         const randomPassword = generatePassword();
         const currentTimestamp = new Date().getTime();
 
-        const emailQuery = query(usersCol, where("email", "==", email));
-        const emailSnap = await getDocs(emailQuery);
-        let isDuplicate = !emailSnap.empty;
+        const existingUsers = (window.allUsersData || []);
+        let isDuplicate = existingUsers.some(u => ((u.email || "").toLowerCase() === email));
 
         // M1: ignore RFID matches on archived users — their card should be reusable.
         if (!isDuplicate && rfidTag !== "") {
-            const rfidQuery = query(usersCol, where("rfid", "==", rfidTag));
-            const rfidSnap = await getDocs(rfidQuery);
-            const activeMatch = rfidSnap.docs.find(d => ((d.data() || {}).status || '').toLowerCase() !== 'archived');
+            const activeMatch = existingUsers.find(u =>
+                (u.rfid || "") === rfidTag &&
+                ((u.status || "").toLowerCase() !== "archived")
+            );
             if (activeMatch) isDuplicate = true;
         }
 
@@ -8955,15 +9365,15 @@ if (document.getElementById('batchStaffForm')) {
         const specialty = specialtyEl ? specialtyEl.value.trim() : '';
         const randomPassword = generatePassword();
 
-        const emailQuery = query(usersCol, where("email", "==", email));
-        const emailSnap = await getDocs(emailQuery);
-        let isDuplicate = !emailSnap.empty;
+        const existingUsers = (window.allUsersData || []);
+        let isDuplicate = existingUsers.some(u => ((u.email || "").toLowerCase() === email));
 
         if (!isDuplicate && rfidTag !== "") {
-            const rfidQuery = query(usersCol, where("rfid", "==", rfidTag));
-            const rfidSnap = await getDocs(rfidQuery);
             // M1: ignore RFID matches on archived users — card should be reusable.
-            const activeMatch = rfidSnap.docs.find(d => ((d.data() || {}).status || '').toLowerCase() !== 'archived');
+            const activeMatch = existingUsers.find(u =>
+                (u.rfid || "") === rfidTag &&
+                ((u.status || "").toLowerCase() !== "archived")
+            );
             if (activeMatch) isDuplicate = true;
         }
 
@@ -9916,6 +10326,8 @@ function slotIdForMember(memberId, date, time) {
 window.slotIdForTrainer = slotIdForTrainer;
 window.slotIdForMember  = slotIdForMember;
 
+window.SAME_DAY_BOOKING_STATUSES = ['Pending', 'Confirmed', 'Completed'];
+
 // Returns the member's other bookings on the same date (active or just-finished).
 // Used to warn the booker (or rescheduler) that a session already exists that day.
 window.findSameDayBookings = (memberId, dateStr, excludeBookingId = null) =>
@@ -10162,6 +10574,8 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
                     }
                     }  // end onConfirm async arrow
                 }); // end showConfirm (V-07 object form)
+            }
+        });
         return;
     }
 

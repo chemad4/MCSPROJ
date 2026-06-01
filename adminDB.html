@@ -1248,7 +1248,7 @@
                                         </div>
                                         <div class="stat-detail-row" style="border-top: 1px solid var(--border-color); margin-top: 6px; padding-top: 6px;">
                                             <span class="label"><i class="fa-solid fa-circle"
-                                                    style="color: #f97316; font-size: 8px;"></i> Overdue Maintenance <span style="font-size:10px; color: var(--text-muted);">(>90 days)</span></span>
+                                                    style="color: #f97316; font-size: 8px;"></i> Overdue Maintenance <span style="font-size:10px; color: var(--text-muted);">(Past due)</span></span>
                                             <span class="value" id="detailOverdueCount">0 Units</span>
                                         </div>
                                     </div>
@@ -1397,7 +1397,7 @@
                                     <th class="bk-sortable" onclick="sortEquipment('qty')">Qty <i class="fas fa-sort bk-sort-icon"></i></th>
                                     <th class="bk-sortable" onclick="sortEquipment('currentStatus')">Status <i class="fas fa-sort bk-sort-icon"></i></th>
                                     <th class="bk-sortable" onclick="sortEquipment('acquisitionDate')">Acquired <i class="fas fa-sort bk-sort-icon"></i></th>
-                                    <th class="bk-sortable" onclick="sortEquipment('maintenanceDate')">Last Maintenance <i class="fas fa-sort bk-sort-icon"></i></th>
+                                    <th class="bk-sortable" onclick="sortEquipment('maintenanceDueDate')">Maintenance Due <i class="fas fa-sort bk-sort-icon"></i></th>
                                     <th class="bk-sortable" onclick="sortEquipment('maintenanceCount')">Sessions <i class="fas fa-sort bk-sort-icon"></i></th>
                                     <th>Actions</th>
                                 </tr>
@@ -2958,8 +2958,8 @@
                         <input type="date" id="equipAcquisitionDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Last Maintenance Date</label>
-                        <input type="date" id="equipMaintenanceDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
+                        <label class="form-label">Maintenance Due Date</label>
+                        <input type="date" id="equipMaintenanceDueDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                 </div>
                 <div class="btn-row flex flex-col-reverse sm:flex-row gap-3 justify-end mt-6 pt-5 border-t border-gray-100">
@@ -3027,8 +3027,8 @@
                         <input type="date" id="editEquipAcquisitionDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Last Maintenance Date</label>
-                        <input type="date" id="editEquipMaintenanceDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);" onchange="handleMaintenanceDateChange(this)">
+                        <label class="form-label">Maintenance Due Date</label>
+                        <input type="date" id="editEquipMaintenanceDueDate" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--panel-bg); color: var(--text-primary);" onchange="handleMaintenanceDateChange(this)">
                     </div>
                 </div>
                 <div class="form-group" style="background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;">
@@ -3057,7 +3057,7 @@
             <!-- Summary -->
             <div class="form-group" style="background:var(--panel-bg); border:1px solid var(--border-color); border-radius:8px; padding:12px 14px; margin-bottom:12px; display:flex; justify-content:space-between;">
                 <span style="font-size:13px; color:var(--text-muted);">Total Sessions: <strong id="logbookTotalCount" style="color:var(--text-primary);">0</strong></span>
-                <span style="font-size:13px; color:var(--text-muted);">Last Maintenance: <strong id="logbookLastDate" style="color:var(--text-primary);">—</strong></span>
+                <span style="font-size:13px; color:var(--text-muted);">Maintenance Due: <strong id="logbookLastDate" style="color:var(--text-primary);">—</strong></span>
             </div>
 
             <!-- Add entry form -->
@@ -3132,7 +3132,7 @@
                     <input type="text" id="editProdVol" placeholder="e.g. 500ml">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Expiration Date <span class="optional-indicator">(Optional)</span></label>
+                    <label class="form-label">Expiration Date <span class="required-asterisk">*</span></label>
                     <input type="date" id="editProdExpiry" onfocus="this.min=new Date().toISOString().split('T')[0]">
                 </div>
                 <div class="form-group">
@@ -3140,9 +3140,15 @@
                     <input type="text" id="editProdSerialNumber" placeholder="e.g. SN-998877">
                 </div>
                 <div class="form-group" style="background:var(--card-bg,#f8fafc);border:1px solid var(--border-color,#e2e8f0);border-radius:10px;padding:14px 16px;">
-                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
-                        <input type="checkbox" id="editProdBatchTracked" style="width:18px;height:18px;accent-color:var(--accent-blue,#3b82f6);cursor:pointer;" onchange="toggleEditBatchMode(this.checked)">
+                    <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;margin:0;">
                         <span style="font-weight:600;font-size:13px;">Enable Batch Tracking</span>
+                        <span style="display:flex;align-items:center;gap:8px;">
+                            <span id="editBatchToggleState" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#475569;">OFF</span>
+                            <span id="editBatchToggleTrack" style="position:relative;display:inline-block;width:44px;height:24px;border-radius:999px;background:#cbd5e1;transition:background 0.2s ease;">
+                                <input type="checkbox" id="editProdBatchTracked" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" onchange="toggleEditBatchMode(this.checked)">
+                                <span id="editBatchToggleKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s ease;"></span>
+                            </span>
+                        </span>
                     </label>
                     <p style="margin:6px 0 0 28px;font-size:12px;color:var(--text-muted);">Stock is managed per expiry batch (FEFO). Qty &amp; single expiry date are replaced by the Batch Manager.</p>
                 </div>
@@ -3196,7 +3202,7 @@
                     <input type="text" id="prodVol" placeholder="Optional">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Expiration Date <span class="optional-indicator">(Optional)</span></label>
+                    <label class="form-label">Expiration Date <span class="required-asterisk">*</span></label>
                     <input type="date" id="prodExpiry" onfocus="this.min=new Date().toISOString().split('T')[0]">
                 </div>
                 <div class="form-group">
@@ -3204,9 +3210,15 @@
                     <input type="text" id="prodSerialNumber" placeholder="e.g. SN-998877">
                 </div>
                 <div class="form-group" style="background:var(--card-bg,#f8fafc);border:1px solid var(--border-color,#e2e8f0);border-radius:10px;padding:14px 16px;">
-                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
-                        <input type="checkbox" id="prodBatchTracked" style="width:18px;height:18px;accent-color:var(--accent-blue,#3b82f6);cursor:pointer;" onchange="toggleRegBatchMode(this.checked)">
+                    <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;margin:0;">
                         <span style="font-weight:600;font-size:13px;">Enable Batch Tracking</span>
+                        <span style="display:flex;align-items:center;gap:8px;">
+                            <span id="regBatchToggleState" style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#e2e8f0;color:#475569;">OFF</span>
+                            <span id="regBatchToggleTrack" style="position:relative;display:inline-block;width:44px;height:24px;border-radius:999px;background:#cbd5e1;transition:background 0.2s ease;">
+                                <input type="checkbox" id="prodBatchTracked" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" onchange="toggleRegBatchMode(this.checked)">
+                                <span id="regBatchToggleKnob" style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s ease;"></span>
+                            </span>
+                        </span>
                     </label>
                     <p style="margin:6px 0 0 28px;font-size:12px;color:var(--text-muted);">Stock is managed per expiry batch (FEFO). Qty &amp; single expiry date fields are hidden — add batches after saving.</p>
                 </div>
@@ -3228,6 +3240,24 @@
             <div id="batchManagerBody" style="padding:4px 0 8px;">
                 <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">Batches are deducted oldest-expiry-first (FEFO) at checkout. Add a new batch each time stock with a different expiry date arrives.</p>
                 <div id="batchList" style="display:flex;flex-direction:column;gap:10px;max-height:260px;overflow-y:auto;margin-bottom:16px;"></div>
+                <div id="batchEditPanel" style="display:none;border:1px solid var(--border-color,#e2e8f0);border-radius:10px;padding:12px;margin-bottom:16px;background:var(--card-bg,#fff);">
+                    <p style="font-weight:600;font-size:13px;margin:0 0 10px;">Edit Batch</p>
+                    <input type="hidden" id="editBatchId">
+                    <div class="form-row" style="gap:12px;">
+                        <div class="form-group" style="flex:1;">
+                            <label class="form-label">Quantity <span class="required-asterisk">*</span></label>
+                            <input type="number" id="editBatchQty" min="0" placeholder="Units" style="width:100%;">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label class="form-label">Expiry Date <span class="required-asterisk">*</span></label>
+                            <input type="date" id="editBatchExpiry" style="width:100%;">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:4px;">
+                        <button type="button" class="action-btn is-subtle inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-gray-600 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-all duration-200" style="flex:1;" onclick="cancelBatchEdit()">Cancel</button>
+                        <button type="button" class="action-btn inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-red-800 rounded-xl hover:brightness-110 transition-all duration-200" style="flex:1;" onclick="saveBatchEdit()">Save Batch Changes</button>
+                    </div>
+                </div>
                 <div style="border-top:1px solid var(--border-color,#e2e8f0);padding-top:16px;">
                     <p style="font-weight:600;font-size:13px;margin:0 0 10px;">Add New Batch</p>
                     <div class="form-row" style="gap:12px;">
@@ -3653,14 +3683,10 @@
 
             <!-- KPI Row -->
             <div class="report-section-title">Revenue Summary</div>
-            <div class="financial-summary-grid" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="financial-summary-grid" style="grid-template-columns: repeat(3, 1fr);">
                 <div class="summary-box">
                     <div class="label">Gross Revenue</div>
                     <div class="value" id="pdfGrossRevenue">₱0.00</div>
-                </div>
-                <div class="summary-box">
-                    <div class="label">VAT (12% incl.)</div>
-                    <div class="value" id="pdfVATAmount">₱0.00</div>
                 </div>
                 <div class="summary-box">
                     <div class="label">Net Revenue</div>
@@ -3761,14 +3787,10 @@
 
             <!-- KPI Row -->
             <div class="report-section-title">Revenue Summary</div>
-            <div class="financial-summary-grid" style="grid-template-columns: repeat(4, 1fr);">
+            <div class="financial-summary-grid" style="grid-template-columns: repeat(3, 1fr);">
                 <div class="summary-box">
                     <div class="label">Gross Revenue</div>
                     <div class="value" id="pdfMonthGrossRevenue">₱0.00</div>
-                </div>
-                <div class="summary-box">
-                    <div class="label">VAT (12% incl.)</div>
-                    <div class="value" id="pdfMonthVATAmount">₱0.00</div>
                 </div>
                 <div class="summary-box">
                     <div class="label">Net Revenue</div>

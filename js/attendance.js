@@ -64,7 +64,10 @@ export function initAttendance({ db, attendanceCol, servicesChartInstanceGetter,
             attendanceData = [];
             snapshot.forEach((d) => attendanceData.push({ id: d.id, ...d.data() }));
             renderAttendance(attendanceData, servicesChartInstanceGetter, targetDateStr);
-        }).catch(e => console.error("Attendance fetch failed:", e));
+        }).catch(e => {
+            console.error("Attendance fetch failed:", e);
+            if (typeof showToast === 'function') showToast("Could not load attendance records. Refresh the page.", "error");
+        });
     }
   };
 

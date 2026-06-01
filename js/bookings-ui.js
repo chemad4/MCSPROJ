@@ -965,7 +965,8 @@ window.renderManualBookingTimeSlots = (dateStr) => {
     const startHour = 8;
     const endHour = 20;
 
-    const today = new Date();
+    const offset = window.serverTimeOffsetMs || 0;
+    const today = new Date(Date.now() + offset);
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     const bookings = window.bookingsData || [];
@@ -1135,7 +1136,9 @@ window.executeManualBooking = async function () {
             return;
         }
     }
-    if (window.manualBookingState) window.manualBookingState.allowSameDay = false;
+
+    // Captured before finally resets allowSameDay — true only after staff clicks "Proceed anyway".
+    const sameDayBypass = !!(window.manualBookingState && window.manualBookingState.allowSameDay);
 
     try {
         confirmBtn.disabled = true;
@@ -1160,11 +1163,8 @@ window.executeManualBooking = async function () {
         const trainerConflict = await window.queryTrainerScheduleConflict(trainerId, date, time);
         if (trainerConflict) throw new Error(TRAINER_CONFLICT_MSG);
 
-        // V-03 FIX: same-day pre-check was done outside the transaction (TOCTOU risk).
-        // The authoritative guard is now purely the trainerSlotRef / memberSlotRef
-        // existence checks inside the transaction — those are lock-held by Firestore
-        // and cannot be raced. The UI pre-check (findSameDayBookings) remains as a
-        // fast UX hint before the round-trip, but is no longer load-bearing.
+        // V-02: trainerConflict pre-check above is advisory UX only (TOCTOU window).
+        // Authoritative slot collision guard is trainerSlotRef.exists() inside the tx below.
 
         await fb.runTransaction(fb.db, async (tx) => {
             // ── PHASE 1: ALL READS ──
@@ -1173,12 +1173,25 @@ window.executeManualBooking = async function () {
             const trainerSlotRef = fb.doc(fb.db, 'bookingSlots', window.slotIdForTrainer(trainerId, date, time));
             const memberSlotRef = fb.doc(fb.db, 'bookingSlots', window.slotIdForMember(memberId, date, time));
 
-            const [memberSnap, trainerSnap, trainerSlotSnap, memberSlotSnap] = await Promise.all([
+            const readPromises = [
                 tx.get(memberRef),
                 tx.get(trainerRef),
                 tx.get(trainerSlotRef),
-                tx.get(memberSlotRef)
-            ]);
+                tx.get(memberSlotRef),
+            ];
+            // Same-day query only when staff has NOT confirmed bypass — avoids extra reads on happy path.
+            let sameDayQ = null;
+            if (!sameDayBypass) {
+                sameDayQ = fb.query(fb.bookingsCol, fb.where('memberId', '==', memberId), fb.where('date', '==', date));
+                readPromises.push(tx.get(sameDayQ));
+            }
+
+            const readSnaps = await Promise.all(readPromises);
+            const memberSnap = readSnaps[0];
+            const trainerSnap = readSnaps[1];
+            const trainerSlotSnap = readSnaps[2];
+            const memberSlotSnap = readSnaps[3];
+            const sameDaySnap = sameDayQ ? readSnaps[4] : null;
 
             // ── PHASE 2: VALIDATION & BUSINESS LOGIC ──
             if (!memberSnap.exists()) throw new Error('Member record does not exist.');
@@ -1228,6 +1241,17 @@ window.executeManualBooking = async function () {
             if (trainerSlotSnap.exists()) throw new Error(TRAINER_CONFLICT_MSG);
             if (memberSlotSnap.exists()) throw new Error('Member already has a booking at this hour.');
 
+            // V-03: enforce same-day inside tx unless staff explicitly confirmed "Proceed anyway".
+            // Manual booking is staff-only — the bypass flag is set only by the confirm dialog.
+            if (!sameDayBypass && sameDaySnap) {
+                const sameDayStatuses = window.SAME_DAY_BOOKING_STATUSES || ['Pending', 'Confirmed', 'Completed'];
+                const hasSameDayBooking = sameDaySnap.docs.some(d =>
+                    sameDayStatuses.includes((d.data() || {}).status)
+                );
+                if (hasSameDayBooking) {
+                    throw new Error('Member already has a session on this date.');
+                }
+            }
 
             const newBookingRef = fb.doc(fb.bookingsCol);
             const bookingPayload = {
@@ -1256,6 +1280,7 @@ window.executeManualBooking = async function () {
         console.error('Manual Booking failed:', err);
         window.bookingActionFailedToast(err);
     } finally {
+        if (window.manualBookingState) window.manualBookingState.allowSameDay = false;
         confirmBtn.disabled = false;
         confirmBtn.innerHTML = originalHtml;
     }
@@ -1531,6 +1556,9 @@ window.executeManualBooking = async function () {
         const resolve = async (rating, remarks) => {
             const fb = window._fb;
             if (!fb) return;
+            // V-05: enforce caps inside resolve so programmatic/XSS-injected values cannot bypass the UI check
+            const safeRating = (rating || '').slice(0, 200);
+            const safeRemarks = (remarks || '').slice(0, 500);
             const submitBtnLocal = submitBtn;
             const skipBtnLocal = skipBtn;
             const origSubmitHtml = submitBtnLocal ? submitBtnLocal.innerHTML : '';
@@ -1548,12 +1576,12 @@ window.executeManualBooking = async function () {
                     if (snap.data().resolved) return;
                     tx.update(ref, {
                         resolved: true,
-                        rating: rating || '',
-                        remarks: remarks || '',
+                        rating: safeRating,
+                        remarks: safeRemarks,
                         resolvedAt: Date.now()
                     });
                 });
-                if (rating || remarks) {
+                if (safeRating || safeRemarks) {
                     showToast('Thank you for your feedback!', 'success');
                     if (window.logActivity) window.logActivity('Session Rated', `Member rated session with ${ratingData.trainerName || 'trainer'}.`);
                 }

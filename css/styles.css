@@ -3444,6 +3444,12 @@ body.dark-theme .dense-table tr:hover {
     border: 1px solid #fecaca;
 }
 
+.status-badge-solid.refunded {
+    background-color: #f3f4f6;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+}
+
 .kebab-menu {
     position: relative;
     display: inline-block;
@@ -4786,6 +4792,12 @@ body.dark-theme .status-badge-solid.voided {
     background-color: rgba(239, 68, 68, 0.15);
     color: #FCA5A5;
     border-color: #991B1B;
+}
+
+body.dark-theme .status-badge-solid.refunded {
+    background-color: rgba(148, 163, 184, 0.15);
+    color: #CBD5E1;
+    border-color: rgba(148, 163, 184, 0.35);
 }
 
 body.dark-theme .bk-cal-corner {

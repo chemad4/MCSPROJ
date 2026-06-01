@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, query, updateDoc, where, runTransaction, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, doc, getDocs, query, updateDoc, where, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 export function initRfid({ db, usersCol, attendanceCol, onShiftLogout } = {}) {
   if (!db || !usersCol || !attendanceCol) return;
@@ -109,6 +109,64 @@ function playRfidBuzzer(frequency = 150, duration = 300) {
   }
 }
 
+async function commitGuestCheckout({ db, attId, guestId, dateStr, timeStr, now, overrideFields = null }) {
+  await runTransaction(db, async (transaction) => {
+    const attRef = doc(db, "attendance", attId);
+    const guestRef = doc(db, "guestCards", guestId);
+    const [attSnap, guestSnap] = await Promise.all([
+      transaction.get(attRef),
+      transaction.get(guestRef),
+    ]);
+
+    if (!attSnap.exists()) {
+      throw new Error("GUEST_CHECKOUT_NO_SESSION");
+    }
+    const att = attSnap.data() || {};
+    if (att.date !== dateStr || att.status !== "Checked In") {
+      throw new Error("GUEST_CHECKOUT_ALREADY_DONE");
+    }
+
+    if (!guestSnap.exists()) {
+      throw new Error("GUEST_CARD_MISSING");
+    }
+    const guest = guestSnap.data() || {};
+    if (guest.status !== "Issued" || guest.issuedForDate !== dateStr) {
+      throw new Error("GUEST_CARD_NOT_ISSUED");
+    }
+
+    transaction.update(attRef, {
+      timeOut: timeStr,
+      status: "Checked Out",
+      ...(overrideFields || {}),
+    });
+    transaction.update(guestRef, {
+      status: "Available",
+      checkedOutAt: now.getTime(),
+      checkedOutByRole: localStorage.getItem("userRole") || "",
+      checkedOutBy: localStorage.getItem("loggedInUser") || "",
+      lastUsedDate: dateStr,
+      issuedForDate: "",
+      paymentId: "",
+    });
+  });
+}
+
+async function markActiveWalkinPassUsed({ db, scannedTag, dateStr, now }) {
+  try {
+    const passesCol = collection(db, "walkinPasses");
+    const passSnap = await getDocs(query(passesCol, where("rfid", "==", scannedTag)));
+    const passDoc = passSnap.docs.find(d => {
+      const p = d.data() || {};
+      return p.date === dateStr && p.status === "Active";
+    });
+    if (passDoc) {
+      await updateDoc(doc(db, "walkinPasses", passDoc.id), { status: "Used", usedAt: now.getTime() });
+    }
+  } catch (_) {
+    // best-effort — pass cleanup is non-blocking
+  }
+}
+
 async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }) {
   const q = query(usersCol, where("rfid", "==", scannedTag));
   const snapshot = await getDocs(q);
@@ -193,43 +251,32 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
               }
               const sanitizedReason = reason.trim();
               try {
-                await updateDoc(doc(db, "attendance", attDoc.id), {
-                  timeOut: timeStr,
-                  status: "Checked Out",
-                  overrideTapOut: true,
-                  overrideByRole: localStorage.getItem("userRole") || "",
-                  overrideBy: localStorage.getItem("loggedInUser") || "",
-                  overrideReason: sanitizedReason,
-                  overrideTimestamp: now.getTime(),
+                await commitGuestCheckout({
+                  db,
+                  attId: attDoc.id,
+                  guestId: guestDoc.id,
+                  dateStr,
+                  timeStr,
+                  now,
+                  overrideFields: {
+                    overrideTapOut: true,
+                    overrideByRole: localStorage.getItem("userRole") || "",
+                    overrideBy: localStorage.getItem("loggedInUser") || "",
+                    overrideReason: sanitizedReason,
+                    overrideTimestamp: now.getTime(),
+                  },
                 });
-
-                await updateDoc(doc(db, "guestCards", guestDoc.id), {
-                  status: "Available",
-                  checkedOutAt: now.getTime(),
-                  checkedOutByRole: localStorage.getItem("userRole") || "",
-                  checkedOutBy: localStorage.getItem("loggedInUser") || "",
-                  lastUsedDate: dateStr,
-                  issuedForDate: "",
-                  paymentId: "",
-                });
-
-                try {
-                  const passesCol = collection(db, "walkinPasses");
-                  const passSnap = await getDocs(query(passesCol, where("rfid", "==", scannedTag)));
-                  const passDoc = passSnap.docs.find(d => {
-                    const p = d.data() || {};
-                    return p.date === dateStr && p.status === "Active";
-                  });
-                  if (passDoc) {
-                    await updateDoc(doc(db, "walkinPasses", passDoc.id), { status: "Used", usedAt: now.getTime() });
-                  }
-                } catch (_) {}
+                await markActiveWalkinPassUsed({ db, scannedTag, dateStr, now });
 
                 playRfidBuzzer(150, 300);
                 showToast("Early guest tap-out override successful.", "success");
               } catch (e) {
                 console.error(e);
-                showToast("Failed to perform override check-out.", "error");
+                if (e.message === "GUEST_CHECKOUT_ALREADY_DONE") {
+                  showToast("Guest session was already checked out.", "error");
+                } else {
+                  showToast("Failed to perform override check-out.", "error");
+                }
               }
             }
           });
@@ -238,36 +285,33 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
       return;
     }
 
-    // BUG-08: Use a batch so all three writes succeed or fail together.
-    // Sequential updateDoc calls left the guest card stuck as "Issued" on network dropout.
-    const batch = writeBatch(db);
-    batch.update(doc(db, "attendance", attDoc.id), { timeOut: timeStr, status: "Checked Out" });
-    batch.update(doc(db, "guestCards", guestDoc.id), {
-      status: "Available",
-      checkedOutAt: now.getTime(),
-      checkedOutByRole: localStorage.getItem("userRole") || "",
-      checkedOutBy: localStorage.getItem("loggedInUser") || "",
-      lastUsedDate: dateStr,
-      issuedForDate: "",
-      paymentId: "",
-    });
-
-    // Mark the most recent active walk-in pass as used (best-effort, pre-queried outside batch).
+    // V-06: runTransaction re-reads attendance + guest card so concurrent scans
+    // cannot double-checkout the same walk-in session (batch alone is not atomic).
     try {
-      const passesCol = collection(db, "walkinPasses");
-      const passSnap = await getDocs(query(passesCol, where("rfid", "==", scannedTag)));
-      const passDoc = passSnap.docs.find(d => {
-        const p = d.data() || {};
-        return p.date === dateStr && p.status === "Active";
+      await commitGuestCheckout({
+        db,
+        attId: attDoc.id,
+        guestId: guestDoc.id,
+        dateStr,
+        timeStr,
+        now,
       });
-      if (passDoc) {
-        batch.update(doc(db, "walkinPasses", passDoc.id), { status: "Used", usedAt: now.getTime() });
+      await markActiveWalkinPassUsed({ db, scannedTag, dateStr, now });
+      playRfidBuzzer(150, 300);
+      if (typeof showToast === "function") {
+        showToast("Guest checked out successfully.", "success");
       }
-    } catch (_) {
-      // ignore — pass cleanup is best-effort
+    } catch (e) {
+      console.error(e);
+      playRfidBuzzer(120, 400);
+      if (e.message === "GUEST_CHECKOUT_ALREADY_DONE") {
+        if (typeof showToast === "function") {
+          showToast("Guest session was already checked out.", "error");
+        }
+      } else if (typeof showToast === "function") {
+        showToast("Guest check-out failed. Please try again.", "error");
+      }
     }
-
-    await batch.commit();
     return;
   }
 
