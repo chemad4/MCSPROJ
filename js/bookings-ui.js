@@ -228,9 +228,11 @@ window.changeBkPage = function (dir) {
 window.switchBookingView = function (view, btn) {
     bkCurrentView = view;
     document.querySelectorAll('.bk-toggle-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('bkListPanel').style.display = view === 'list' ? '' : 'none';
-    document.getElementById('bkCalendarPanel').style.display = view === 'calendar' ? '' : 'none';
+    if (btn) btn.classList.add('active');
+    const listPanel = document.getElementById('bkListPanel');
+    const calPanel = document.getElementById('bkCalendarPanel');
+    if (listPanel) listPanel.style.display = view === 'list' ? '' : 'none';
+    if (calPanel) calPanel.style.display = view === 'calendar' ? '' : 'none';
     if (view === 'calendar') renderBookingCalendar();
 };
 
@@ -843,21 +845,21 @@ window.updateManualBookingState = function() {
     const summaryMember = document.getElementById('manualSummaryMember');
     const summaryTrainer = document.getElementById('manualSummaryTrainer');
     const creditsDisplay = document.getElementById('manualMemberCreditsDisplay');
-    
+
     if (window.manualBookingState.memberId) {
         const mData = (window.membersData || []).find(m => m.id === window.manualBookingState.memberId);
         const creds = mData ? (mData.sessionsRemaining !== undefined ? mData.sessionsRemaining : 0) : 0;
-        summaryMember.innerText = window.manualBookingState.memberName;
-        creditsDisplay.innerText = `Credits remaining: ${creds}`;
+        if (summaryMember) summaryMember.innerText = window.manualBookingState.memberName;
+        if (creditsDisplay) creditsDisplay.innerText = `Credits remaining: ${creds}`;
     } else {
-        summaryMember.innerText = "Member Not Selected";
-        creditsDisplay.innerText = "Credits: -";
+        if (summaryMember) summaryMember.innerText = "Member Not Selected";
+        if (creditsDisplay) creditsDisplay.innerText = "Credits: -";
     }
-    
+
     if (window.manualBookingState.trainerId) {
-        summaryTrainer.innerText = window.manualBookingState.trainerName;
+        if (summaryTrainer) summaryTrainer.innerText = window.manualBookingState.trainerName;
     } else {
-        summaryTrainer.innerText = "Trainer Not Selected";
+        if (summaryTrainer) summaryTrainer.innerText = "Trainer Not Selected";
     }
     
     const grid = document.getElementById('manualBookingDateTimeGrid');
@@ -1001,9 +1003,11 @@ window.renderManualBookingTimeSlots = (dateStr) => {
 
         const slotMins = h * 60;
         const hasTrainerConflict = trainerBookings.some(tb => {
+            if (!tb.time) return false;
             const [tbH, tbM] = tb.time.split(':').map(Number);
-            const tbMins = tbH * 60 + tbM;
-            return Math.abs(slotMins - tbMins) < 60; 
+            if (isNaN(tbH)) return false;
+            const tbMins = tbH * 60 + (tbM || 0);
+            return Math.abs(slotMins - tbMins) < 60;
         });
 
         if (hasTrainerConflict) {
@@ -1012,9 +1016,11 @@ window.renderManualBookingTimeSlots = (dateStr) => {
         }
 
         const hasMemberConflict = memberBookings.some(mb => {
+            if (!mb.time) return false;
             const [mbH, mbM] = mb.time.split(':').map(Number);
-            const mbMins = mbH * 60 + mbM;
-            return Math.abs(slotMins - mbMins) < 60; 
+            if (isNaN(mbH)) return false;
+            const mbMins = mbH * 60 + (mbM || 0);
+            return Math.abs(slotMins - mbMins) < 60;
         });
 
         if (hasMemberConflict) {
@@ -1516,6 +1522,10 @@ window.executeManualBooking = async function () {
         const role = (localStorage.getItem("userRole") || "").toLowerCase();
         const userId = localStorage.getItem("userId");
         if (role !== 'member' || !userId) return;
+        if (!fb.pendingRatingsCol) {
+            console.warn("[SessionEngine] fb.pendingRatingsCol not available yet.");
+            return;
+        }
 
         try {
             const snap = await fb.getDocs(fb.query(fb.pendingRatingsCol, fb.where("memberId", "==", userId)));

@@ -404,10 +404,17 @@
         /* Report Styles */
         #pdf-report-container {
             display: none;
-            padding: 40px;
-            background: white;
-            color: black;
-            font-family: Arial, sans-serif;
+            background: #fff;
+            color: #000;
+            font-family: 'Inter', Arial, sans-serif;
+            width: 100%;
+        }
+
+        #weekly-sales-report,
+        #monthly-sales-report {
+            padding: 50px;
+            max-width: 800px;
+            margin: 0 auto;
         }
 
         .report-header {
@@ -417,22 +424,123 @@
             margin-bottom: 30px;
         }
 
+        .report-header-premium {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #111;
+            padding-bottom: 30px;
+            margin-bottom: 40px;
+        }
+
+        .report-header-premium .brand-info h1 {
+            font-size: 28px;
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -0.02em;
+            color: #000;
+        }
+
+        .report-header-premium .brand-info p {
+            margin: 4px 0;
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .report-header-premium .report-title {
+            text-align: right;
+        }
+
+        .report-header-premium .report-title h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin: 0;
+            color: #111;
+        }
+
+        .report-header-premium .report-title p {
+            margin: 4px 0;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .financial-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .summary-box {
+            background: #f8fafc;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+        }
+
+        .summary-box .label {
+            font-size: 11px;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .summary-box .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .report-section-title {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 15px;
+            color: #1e293b;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 8px;
+        }
+
         .report-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 30px;
-        }
-
-        .report-table th,
-        .report-table td {
-            border: 1px solid #000;
-            padding: 10px;
-            text-align: center;
+            margin-bottom: 40px;
         }
 
         .report-table th {
-            background-color: #f2f2f2;
-            font-weight: bold;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+        }
+
+        .report-table td {
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            font-size: 12px;
+            color: #334155;
+        }
+
+        .report-table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .total-row {
+            background: #f1f5f9 !important;
+            font-weight: 700;
+        }
+
+        .total-row td {
+            color: #0f172a;
+            font-size: 13px;
         }
 
         .report-footer {
@@ -1127,6 +1235,8 @@
 
                 <button class="action-btn is-dark inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="generateWeeklyPDF()"<i
                         class="fas fa-file-pdf"></i> Generate Weekly Report</button>
+                <button class="action-btn is-dark inline-flex items-center justify-center px-5 py-2.5 text-sm font-semibold text-white bg-red-800 shadow-sm rounded-xl hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-700 transition-all duration-200" onclick="generateMonthlyPDF()" style="padding: 6px 12px;"><i
+                        class="fas fa-file-pdf"></i> Monthly Report</button>
             </div>
             <div class="panel">
                 <div class="panel-header"><i class="fa-solid fa-receipt"></i> Transaction History</div>
@@ -2123,6 +2233,110 @@
                 </div>
                 <div class="signature-block" style="text-align: right;">
                     <div class="signature-line" id="pdfCompletionDate">--/--/--</div>
+                    <p>Report Date</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== MONTHLY REPORT ===== -->
+        <div id="monthly-sales-report">
+            <div class="report-header-premium">
+                <div class="brand-info" style="display:flex;align-items:center;gap:14px;">
+                    <img src="images/icon-192.png" alt="XFit Track Logo" style="width:56px;height:56px;border-radius:10px;">
+                    <div>
+                        <h1 style="margin:0;">XFIT TRACK</h1>
+                        <p style="margin:2px 0 0;">Financial Management Systems</p>
+                    </div>
+                </div>
+                <div class="report-title">
+                    <h2>Monthly Financial Report</h2>
+                    <p>Period: <strong id="pdfMonthOf">-- ----</strong></p>
+                    <p style="margin:2px 0 0;font-size:11px;color:#888;">Generated: <span id="pdfMonthGeneratedAt">—</span></p>
+                </div>
+            </div>
+
+            <!-- KPI Row -->
+            <div class="report-section-title">Revenue Summary</div>
+            <div class="financial-summary-grid" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="summary-box">
+                    <div class="label">Gross Revenue</div>
+                    <div class="value" id="pdfMonthGrossRevenue">₱0.00</div>
+                </div>
+                <div class="summary-box">
+                    <div class="label">Net Revenue</div>
+                    <div class="value" id="pdfMonthNetRevenue">₱0.00</div>
+                </div>
+                <div class="summary-box" style="border-left: 3px solid #991b1b;">
+                    <div class="label">Voided / Refunded</div>
+                    <div class="value" style="color:#991b1b;" id="pdfMonthVoidedAmount">₱0.00</div>
+                </div>
+            </div>
+
+            <!-- Transaction Stats -->
+            <div class="financial-summary-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: -20px;">
+                <div class="summary-box">
+                    <div class="label">Total Transactions</div>
+                    <div class="value" id="pdfMonthTxCount">0</div>
+                </div>
+                <div class="summary-box">
+                    <div class="label">Avg. Transaction Value</div>
+                    <div class="value" id="pdfMonthAvgTx">₱0.00</div>
+                </div>
+                <div class="summary-box">
+                    <div class="label">Voided Transactions</div>
+                    <div class="value" id="pdfMonthVoidedCount">0</div>
+                </div>
+            </div>
+
+            <!-- Revenue by Category -->
+            <div class="report-section-title">Revenue by Category</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th style="text-align: right;">Transactions</th>
+                        <th style="text-align: right;">Amount</th>
+                        <th style="text-align: right;">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfMonthRevenueSourcesBody"></tbody>
+            </table>
+
+            <!-- Payment Method Breakdown -->
+            <div class="report-section-title">Payment Method Breakdown</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th style="text-align: right;">Transactions</th>
+                        <th style="text-align: right;">Amount</th>
+                        <th style="text-align: right;">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfMonthPaymentMethodsBody"></tbody>
+            </table>
+
+            <!-- Weekly Breakdown inside month -->
+            <div class="report-section-title">Week-by-Week Breakdown</div>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Week</th>
+                        <th style="text-align: right;">Transactions</th>
+                        <th style="text-align: right;">Revenue</th>
+                        <th style="text-align: right;">Voided</th>
+                    </tr>
+                </thead>
+                <tbody id="pdfMonthWeeklyBreakdownBody"></tbody>
+            </table>
+
+            <div class="report-footer">
+                <div class="signature-block">
+                    <div class="signature-line" id="pdfMonthAssociateName">Staff Member</div>
+                    <p>Prepared By</p>
+                </div>
+                <div class="signature-block" style="text-align: right;">
+                    <div class="signature-line" id="pdfMonthCompletionDate">--/--/--</div>
                     <p>Report Date</p>
                 </div>
             </div>

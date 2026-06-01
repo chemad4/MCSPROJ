@@ -3711,7 +3711,7 @@ window.processPaymentConfirmed = async function () {
     window.isPOSProcessing = true;
 
     const payBtn = document.querySelector('.pos-pay-btn') || document.getElementById('posPayBtn');
-    const originalBtnText = payBtn ? payBtn.innerHTML : '';
+    const originalBtnText = (payBtn && payBtn.innerHTML) ? payBtn.innerHTML : '<i class="fas fa-cash-register"></i> Process Payment';
     if (payBtn) {
         payBtn.disabled = true;
         payBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
@@ -10740,7 +10740,7 @@ window.openMemberBookingModal = () => {
     if (trainerSelect) {
         // Only Active + On Floor trainers may be booked — On Leave, Suspended, and Archived
         // are excluded regardless of their RFID-reported shiftStatus to prevent glitch access.
-        const trainers = allUsersData.filter(u =>
+        const trainers = (allUsersData || []).filter(u =>
             (u.role || "").toLowerCase() === 'trainer' &&
             (u.status || 'Active') === 'Active' &&
             u.shiftStatus === 'On Floor'
@@ -10754,7 +10754,7 @@ window.openMemberBookingModal = () => {
     const sidebarEl = document.getElementById('bookingDetailsSidebar');
     if (gridEl) gridEl.style.display = 'none';
     if (sidebarEl) sidebarEl.style.display = 'none';
-    
+
     // Clear and disable confirm button
     const confirmBtn = document.getElementById('confirmBookingBtn');
     if (confirmBtn) {
@@ -10769,15 +10769,17 @@ window.openMemberBookingModal = () => {
         trainerName: '',
         month: now.getMonth(),
         year: now.getFullYear(),
-        date: '', 
-        time: ''  
+        date: '',
+        time: ''
     };
 
     // Reset any leftover reschedule-mode UI from a previous open
     window._resetBookingModalForCreate();
 
     // Open Modal
-    document.getElementById('memberBookingModal').style.display = 'flex';
+    const memberBookingModal = document.getElementById('memberBookingModal');
+    if (!memberBookingModal) { console.error('[openMemberBookingModal] #memberBookingModal not found'); return; }
+    memberBookingModal.style.display = 'flex';
 
     // Auto-setup listeners exactly once
     if (!window.bookingListenersInitialized) {
@@ -10864,7 +10866,9 @@ window.openRescheduleModal = (bookingId) => {
         time: ''
     };
 
-    document.getElementById('memberBookingModal').style.display = 'flex';
+    const rescheduleModalEl = document.getElementById('memberBookingModal');
+    if (!rescheduleModalEl) { console.error('[openRescheduleModal] #memberBookingModal not found'); return; }
+    rescheduleModalEl.style.display = 'flex';
 
     if (!window.bookingListenersInitialized) {
         window.setupBookingModalListeners();
@@ -10950,6 +10954,7 @@ window.renderBookingTimeSlots = (dateStr) => {
     const slotsGrid = document.getElementById('timeSlotsGrid');
     const selectedDateHeader = document.getElementById('selectedDateHeader');
     if (!slotsGrid || !selectedDateHeader || !window.bookingState) return;
+    if (!dateStr) return;
 
     const [y, m, d] = dateStr.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
@@ -10961,11 +10966,16 @@ window.renderBookingTimeSlots = (dateStr) => {
     const startHour = 8;
     const endHour = 20;
 
-    const today = new Date();
+    // Use server-synced clock so past-slot detection matches transaction validation
+    const offset = window.serverTimeOffsetMs || 0;
+    const today = new Date(Date.now() + offset);
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     const bookings = window.bookingsData || [];
-    const trainerBookings = bookings.filter(b => b.date === dateStr && b.trainerId === window.bookingState.trainerId && ["Confirmed", "Pending"].includes(b.status));
+    const currentTrainerId = window.bookingState ? window.bookingState.trainerId : '';
+    const trainerBookings = currentTrainerId
+        ? bookings.filter(b => b.date === dateStr && b.trainerId === currentTrainerId && ["Confirmed", "Pending"].includes(b.status))
+        : [];
     const memberBookings = bookings.filter(b => b.date === dateStr && b.memberId === localStorage.getItem("userId") && ["Confirmed", "Pending"].includes(b.status));
 
     for (let h = startHour; h <= endHour; h++) {
@@ -10983,8 +10993,11 @@ window.renderBookingTimeSlots = (dateStr) => {
         let reason = '';
 
         if (dateStr === todayStr) {
+            // Disable at sub-hour precision — slot that started this hour but is
+            // already partially past must be blocked to match server-side future check.
             const currentHour = today.getHours();
-            if (h <= currentHour) {
+            const currentMin  = today.getMinutes();
+            if (h < currentHour || (h === currentHour && currentMin > 0)) {
                 disabled = true;
                 reason = 'Past';
             }
@@ -10992,9 +11005,11 @@ window.renderBookingTimeSlots = (dateStr) => {
 
         const slotMins = h * 60;
         const hasTrainerConflict = trainerBookings.some(tb => {
+            if (!tb.time) return false;
             const [tbH, tbM] = tb.time.split(':').map(Number);
-            const tbMins = tbH * 60 + tbM;
-            return Math.abs(slotMins - tbMins) < 60; 
+            if (isNaN(tbH)) return false;
+            const tbMins = tbH * 60 + (tbM || 0);
+            return Math.abs(slotMins - tbMins) < 60;
         });
 
         if (hasTrainerConflict) {
@@ -11003,9 +11018,11 @@ window.renderBookingTimeSlots = (dateStr) => {
         }
 
         const hasMemberConflict = memberBookings.some(mb => {
+            if (!mb.time) return false;
             const [mbH, mbM] = mb.time.split(':').map(Number);
-            const mbMins = mbH * 60 + mbM;
-            return Math.abs(slotMins - mbMins) < 60; 
+            if (isNaN(mbH)) return false;
+            const mbMins = mbH * 60 + (mbM || 0);
+            return Math.abs(slotMins - mbMins) < 60;
         });
 
         if (hasMemberConflict) {
@@ -11017,7 +11034,7 @@ window.renderBookingTimeSlots = (dateStr) => {
             slotBtn.disabled = true;
             slotBtn.innerText = `${displayTime} (${reason})`;
         } else {
-            if (timeStr === window.bookingState.time) {
+            if (window.bookingState && timeStr === window.bookingState.time) {
                 slotBtn.classList.add('selected');
             }
 
@@ -11491,27 +11508,34 @@ window.setupBookingModalListeners = () => {
 }
 
 window.openBookingModal = () => {
-    const memberSelect = document.getElementById('bookMember'), trainerSelect = document.getElementById('bookTrainer');
-    const activeMembers = membersData.filter(m => {
+    const memberSelect = document.getElementById('bookMember');
+    const trainerSelect = document.getElementById('bookTrainer');
+    const bookingModal = document.getElementById('bookingModal');
+    const bookingForm = document.getElementById('bookingForm');
+    if (!memberSelect || !trainerSelect || !bookingModal || !bookingForm) {
+        console.error('[openBookingModal] Required DOM elements missing');
+        return;
+    }
+    const activeMembers = (membersData || []).filter(m => {
         const isArchived = (m.status || "").toLowerCase() === 'archived';
         const isSuspended = (m.status || "").toLowerCase() === 'suspended';
         const isExpired = window.isMemberPlanExpired && window.isMemberPlanExpired(m);
         return (m.status || 'Active') === 'Active' && !isArchived && !isSuspended && !isExpired;
     });
     memberSelect.innerHTML = '<option value="" disabled selected>Select a Member...</option>' + activeMembers.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name || `${m.givenName || ''} ${m.familyName || ''}`.trim())}</option>`).join('');
-    const trainers = allUsersData.filter(u =>
+    const trainers = (allUsersData || []).filter(u =>
         (u.role || "").toLowerCase() === 'trainer' &&
         (u.status || 'Active') === 'Active' &&
         u.shiftStatus === 'On Floor'
     );
     trainerSelect.innerHTML = '<option value="" disabled selected>Select an Assigned Trainer...</option>' + trainers.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.name || `${t.givenName || ''} ${t.familyName || ''}`.trim())}</option>`).join('');
 
-    document.getElementById('bookingForm').reset();
+    bookingForm.reset();
     const bd = document.getElementById('bookDate');
     const bt = document.getElementById('bookTime');
     setBookingDateMin(bd);
     updateBookingTimeMinForToday(bd, bt);
-    document.getElementById('bookingModal').style.display = 'flex';
+    bookingModal.style.display = 'flex';
 }
 
 if (document.getElementById('bookingForm')) {
