@@ -1957,7 +1957,9 @@ function renderInventory() {
         }
 
         let expiryHtml = '';
-        if (isConsumable && item.expiry) {
+        if (isConsumable && item.isBatchTracked) {
+            expiryHtml = ` <span class="expiring-tag" style="margin-left:6px;background:rgba(59,130,246,0.1);color:#3b82f6;border:1px solid rgba(59,130,246,0.25);"><i class="fas fa-layer-group"></i> Batch Tracked</span>`;
+        } else if (isConsumable && item.expiry) {
             let expDate = new Date(item.expiry);
             let daysLeft = (expDate - new Date()) / (1000 * 60 * 60 * 24);
             if (daysLeft <= 7 && daysLeft >= 0) expiryHtml = ` <span class="expiring-tag expiring-soon" style="margin-left:6px;"><i class="fa-solid fa-triangle-exclamation"></i> Expiring Soon</span>`;
@@ -1999,6 +2001,10 @@ function renderInventory() {
 
         let actionButtons = !isConsumable ? `
             <button type="button" class="btn-icon btn-edit" title="Edit" onclick="openEditEquipModal('${item.id}')"><i class="fas fa-edit"></i></button>
+            <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}', this)"><i class="fas fa-trash"></i></button>
+        ` : item.isBatchTracked ? `
+            <button type="button" class="btn-icon" title="Manage Batches" style="color:var(--accent-blue,#3b82f6);" onclick="openBatchManager('${item.id}')"><i class="fas fa-layer-group"></i></button>
+            <button type="button" class="btn-icon btn-edit" title="Edit" onclick="openEditProductModal('${item.id}')"><i class="fas fa-edit"></i></button>
             <button type="button" class="btn-icon btn-delete" title="Delete" onclick="deleteInventoryItem('${item.id}', this)"><i class="fas fa-trash"></i></button>
         ` : `
             <button type="button" class="btn-icon btn-restock" style="color: var(--accent-green);" title="Quick Restock" onclick="quickRestock('${item.id}')"><i class="fas fa-plus-circle"></i></button>
@@ -2107,7 +2113,10 @@ function renderInventory() {
                         
                         <div style="margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
                             <div style="font-size: 13px; color: var(--text-primary); font-weight: 500;">
-                                Qty: <strong style="font-size: 14px; font-weight: 700;">${item.qty} units</strong>
+                                ${isConsumable && item.isBatchTracked
+                                    ? `Batch Stock: <strong style="font-size:14px;font-weight:700;">${item.qty} units</strong> <button type="button" onclick="openBatchManager('${item.id}')" style="font-size:11px;padding:2px 8px;border-radius:6px;border:1px solid var(--accent-blue,#3b82f6);background:transparent;color:var(--accent-blue,#3b82f6);cursor:pointer;margin-left:4px;">Manage</button>`
+                                    : `Qty: <strong style="font-size: 14px; font-weight: 700;">${item.qty} units</strong>`
+                                }
                             </div>
                             <span class="live-status-badge ${liveStatusClass}">
                                 <span class="live-status-dot"></span>
@@ -2449,6 +2458,11 @@ window.openEditProductModal = function (id) {
     if (document.getElementById('editProdSerialNumber')) {
         document.getElementById('editProdSerialNumber').value = item.serialNumber || '';
     }
+    const batchCb = document.getElementById('editProdBatchTracked');
+    if (batchCb) {
+        batchCb.checked = !!item.isBatchTracked;
+        toggleEditBatchMode(!!item.isBatchTracked);
+    }
     document.getElementById('editProductModal').style.display = 'flex';
 }
 
@@ -2505,15 +2519,17 @@ if (document.getElementById('editProductForm')) {
                 imageUrl = await window.uploadImage(imageFile, 'products');
             }
 
+            const isBatchTracked = !!(document.getElementById('editProdBatchTracked')?.checked);
             const updatedData = {
                 name: nameStr,
                 cat: document.getElementById('editProdCategory').value,
                 price: priceVal,
-                qty: qtyVal,
+                qty: isBatchTracked ? (oldProd?.qty || 0) : qtyVal, // batch items keep computed qty from batches
                 size: document.getElementById('editProdVol').value,
                 image: imageUrl || '',
-                expiry: document.getElementById('editProdExpiry') ? document.getElementById('editProdExpiry').value : (oldProd?.expiry || null),
-                serialNumber: document.getElementById('editProdSerialNumber') ? document.getElementById('editProdSerialNumber').value.trim() : (oldProd?.serialNumber || '')
+                expiry: isBatchTracked ? null : (document.getElementById('editProdExpiry') ? document.getElementById('editProdExpiry').value : (oldProd?.expiry || null)),
+                serialNumber: document.getElementById('editProdSerialNumber') ? document.getElementById('editProdSerialNumber').value.trim() : (oldProd?.serialNumber || ''),
+                isBatchTracked
             };
 
             const qtyDiff = updatedData.qty - (oldProd ? oldProd.qty : 0);
@@ -2621,10 +2637,13 @@ async function handleInventorySubmit(e, isProduct) {
                 imageUrl = await window.uploadImage(imageFile, isProduct ? 'products' : 'equipment');
             }
 
+            const regIsBatchTracked = isProduct && !!(document.getElementById('prodBatchTracked')?.checked);
             const newItem = {
                 name: nameStr, cat: document.getElementById(isProduct ? 'prodCategory' : 'equipCategory').value, size: document.getElementById(isProduct ? 'prodVol' : 'equipSize').value,
-                qty: addQty, status: isProduct ? 'In Stock' : 'Operational', price: isProduct ? Number(document.getElementById('prodPrice').value) : 0, expiry: isProduct ? document.getElementById('prodExpiry').value : null,
+                qty: regIsBatchTracked ? 0 : addQty, status: isProduct ? 'In Stock' : 'Operational', price: isProduct ? Number(document.getElementById('prodPrice').value) : 0,
+                expiry: (isProduct && !regIsBatchTracked) ? document.getElementById('prodExpiry').value : null,
                 itemType: isProduct ? 'product' : 'equipment', lowStockThreshold: isProduct ? 5 : 0,
+                isBatchTracked: regIsBatchTracked,
                 assetTag: !isProduct ? (document.getElementById('equipAssetTag').value.trim() || '') : '',
                 serialNumber: isProduct ? (document.getElementById('prodSerialNumber') ? document.getElementById('prodSerialNumber').value.trim() : '') : '',
                 acquisitionDate: !isProduct ? (document.getElementById('equipAcquisitionDate').value || '') : '',
@@ -2660,6 +2679,168 @@ async function handleInventorySubmit(e, isProduct) {
 
 if (document.getElementById('equipmentForm')) document.getElementById('equipmentForm').addEventListener('submit', (e) => handleInventorySubmit(e, false));
 if (document.getElementById('productForm')) document.getElementById('productForm').addEventListener('submit', (e) => handleInventorySubmit(e, true));
+
+// ==========================================
+// BATCH TRACKING UI HELPERS
+// ==========================================
+
+// Show/hide qty+expiry fields in the Register Product modal based on batch mode
+window.toggleRegBatchMode = function (enabled) {
+    const qtyRow = document.getElementById('prodQty')?.closest('.form-row');
+    const expiryGroup = document.getElementById('prodExpiry')?.closest('.form-group');
+    if (qtyRow) qtyRow.style.display = enabled ? 'none' : '';
+    if (expiryGroup) expiryGroup.style.display = enabled ? 'none' : '';
+};
+
+// Show/hide qty+expiry fields in the Edit Product modal based on batch mode
+window.toggleEditBatchMode = function (enabled) {
+    const qtyRow = document.getElementById('editProdQty')?.closest('.form-row');
+    const expiryGroup = document.getElementById('editProdExpiry')?.closest('.form-group');
+    if (qtyRow) qtyRow.style.display = enabled ? 'none' : '';
+    if (expiryGroup) expiryGroup.style.display = enabled ? 'none' : '';
+};
+
+// ── Batch Manager ──────────────────────────────────────────────────────────────
+let _batchMgrProductId = null;
+
+window.openBatchManager = async function (productId) {
+    const item = inventoryData.find(i => i.id === productId);
+    if (!item) return;
+    _batchMgrProductId = productId;
+
+    const nameEl = document.getElementById('batchManagerProductName');
+    if (nameEl) nameEl.textContent = item.name;
+
+    const qtyIn = document.getElementById('newBatchQty');
+    const expIn = document.getElementById('newBatchExpiry');
+    if (qtyIn) qtyIn.value = '';
+    if (expIn) expIn.value = '';
+
+    await refreshBatchList(productId);
+    document.getElementById('batchManagerModal').style.display = 'flex';
+};
+
+async function refreshBatchList(productId) {
+    const listEl = document.getElementById('batchList');
+    if (!listEl) return;
+    listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px 0;">Loading batches…</p>';
+
+    try {
+        const batchesRef = collection(db, 'inventory', productId, 'batches');
+        const q = query(batchesRef, orderBy('expiryDate', 'asc'));
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+            listEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:8px 0;">No batches yet. Add the first batch below.</p>';
+            return;
+        }
+
+        const today = new Date(Date.now() + (window.serverTimeOffsetMs || 0));
+        today.setHours(0, 0, 0, 0);
+        const todayStr = today.toISOString().slice(0, 10);
+        const warnStr = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+        let totalQty = 0;
+        const rows = [];
+        snap.forEach(d => {
+            const data = d.data();
+            const qty = data.currentQuantity || 0;
+            const exp = data.expiryDate || '';
+            totalQty += qty;
+
+            let tagHtml = '';
+            if (exp && exp <= todayStr) {
+                tagHtml = '<span style="font-size:11px;padding:2px 7px;border-radius:5px;background:rgba(239,68,68,0.1);color:#ef4444;border:1px solid rgba(239,68,68,0.25);margin-left:6px;">Expired</span>';
+            } else if (exp && exp <= warnStr) {
+                tagHtml = '<span style="font-size:11px;padding:2px 7px;border-radius:5px;background:rgba(245,158,11,0.1);color:#d97706;border:1px solid rgba(245,158,11,0.25);margin-left:6px;"><i class="fas fa-clock"></i> Expiring Soon</span>';
+            }
+
+            rows.push(`
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;border:1px solid var(--border-color,#e2e8f0);background:var(--card-bg,#fff);gap:12px;">
+                    <div style="flex:1;">
+                        <div style="font-weight:600;font-size:13px;">Expiry: ${escapeHtml(exp)}${tagHtml}</div>
+                        <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Current qty: <strong>${qty}</strong> units</div>
+                    </div>
+                    <button type="button" title="Delete batch" onclick="deleteBatch('${productId}','${d.id}',${qty})"
+                        style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:16px;padding:4px 8px;border-radius:6px;"
+                        ${qty > 0 ? 'disabled title="Cannot delete — batch still has stock. Zero it out first."' : ''}>
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `);
+        });
+
+        listEl.innerHTML = rows.join('') +
+            `<div style="padding:10px 14px;border-radius:10px;background:var(--accent-blue-soft,rgba(59,130,246,0.07));border:1px solid rgba(59,130,246,0.2);font-size:13px;font-weight:600;color:var(--accent-blue,#3b82f6);">
+                Total available: ${totalQty} units across ${snap.size} batch${snap.size === 1 ? '' : 'es'}
+             </div>`;
+
+    } catch (err) {
+        listEl.innerHTML = `<p style="color:#ef4444;font-size:13px;">Failed to load batches: ${escapeHtml(err.message)}</p>`;
+    }
+}
+
+window.saveNewBatch = async function () {
+    if (!_batchMgrProductId) return;
+    const qtyInput = document.getElementById('newBatchQty');
+    const expInput = document.getElementById('newBatchExpiry');
+    const qty = parseInt(qtyInput?.value, 10);
+    const expiry = expInput?.value || '';
+
+    if (!qty || qty <= 0) return showToast('Enter a valid quantity.', 'error');
+    if (!expiry) return showToast('Select an expiry date.', 'error');
+
+    const today = new Date(Date.now() + (window.serverTimeOffsetMs || 0)).toISOString().slice(0, 10);
+    if (expiry <= today) return showToast('Expiry date must be in the future.', 'error');
+
+    const saveBtn = document.querySelector('#batchManagerModal .action-btn[onclick="saveNewBatch()"]');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…'; }
+
+    try {
+        await runTransaction(db, async (txn) => {
+            const batchRef = doc(collection(db, 'inventory', _batchMgrProductId, 'batches'));
+            txn.set(batchRef, { expiryDate: expiry, currentQuantity: qty, addedAt: Date.now() });
+
+            // Keep the parent inventory doc qty in sync (sum of all batches)
+            const invRef = doc(db, 'inventory', _batchMgrProductId);
+            const invSnap = await txn.get(invRef);
+            const currentTotal = invSnap.exists() ? (invSnap.data().qty || 0) : 0;
+            txn.update(invRef, { qty: currentTotal + qty });
+        });
+
+        await logStockMovement(_batchMgrProductId, inventoryData.find(i => i.id === _batchMgrProductId)?.name || '', qty, `Batch Received (Expiry: ${expiry})`);
+        if (qtyInput) qtyInput.value = '';
+        if (expInput) expInput.value = '';
+        await refreshBatchList(_batchMgrProductId);
+        showToast('Batch added successfully.', 'success');
+    } catch (err) {
+        showToast('Failed to add batch: ' + err.message, 'error');
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fas fa-plus"></i> Add Batch'; }
+    }
+};
+
+window.deleteBatch = async function (productId, batchId, currentQty) {
+    if (currentQty > 0) {
+        showToast('Cannot delete a batch that still has stock.', 'error');
+        return;
+    }
+    showConfirm({
+        title: 'Delete Batch',
+        message: 'Delete this empty batch record? This cannot be undone.',
+        tone: 'danger',
+        confirmText: 'Delete',
+        onConfirm: async () => {
+            try {
+                await deleteDoc(doc(db, 'inventory', productId, 'batches', batchId));
+                await refreshBatchList(productId);
+                showToast('Batch deleted.', 'success');
+            } catch (err) {
+                showToast('Failed to delete batch: ' + err.message, 'error');
+            }
+        }
+    });
+};
 
 // ==========================================
 // 8. POINT OF SALE (POS) LOGIC
@@ -4753,98 +4934,58 @@ window.voidTransaction = async function (id, isRefund = false, btn) {
                     }
 
                     await runTransaction(db, async (transaction) => {
+                        // ── PHASE 1: ALL READS (Firestore requires all reads before any writes) ──
+
                         const paymentRef = doc(db, "payments", id);
                         const paymentSnap = await transaction.get(paymentRef);
-
-                        if (!paymentSnap.exists()) {
-                            throw new Error("Transaction record no longer exists.");
-                        }
-                        
+                        if (!paymentSnap.exists()) throw new Error("Transaction record no longer exists.");
                         const paymentDbData = paymentSnap.data();
                         if (paymentDbData.status === "Voided" || paymentDbData.status === "Refunded") {
                             throw new Error(`This transaction has already been ${(paymentDbData.status || "voided").toLowerCase()}.`);
                         }
-                        
-                        // 1. Process inventory restocking
+
+                        // Collect all inventory refs and read them upfront
                         const _walkinTagsToInvalidate = [];
+                        const invReads = []; // { invRef, invSnap, item, qty, isLegacy }
                         if (paymentDbData.type === "POS Sale") {
                             if (paymentDbData.lineItems && paymentDbData.lineItems.length > 0) {
-                                for (let item of paymentDbData.lineItems) {
-                                    // H7: track walk-in tags so we can invalidate the issued guest cards / passes
+                                for (const item of paymentDbData.lineItems) {
                                     if (item.id === "WALKIN" || item.isPlan) {
                                         if (Array.isArray(item.scannedTags)) _walkinTagsToInvalidate.push(...item.scannedTags);
                                         continue;
                                     }
-
                                     const invRef = doc(db, "inventory", item.id);
                                     const invSnap = await transaction.get(invRef);
-                                    // H6: if inventory item was deleted, refuse the refund instead of silently
-                                    // skipping stock restoration — admin must manually reconcile first.
-                                    if (!invSnap.exists()) {
-                                        throw new Error(`Cannot ${actionName === "REFUND" ? "refund" : "void"}: product "${item.name}" no longer exists in inventory. Please recreate the product (or adjust stock manually) before retrying.`);
-                                    }
-                                    const currentQty = invSnap.data().qty || 0;
-                                    transaction.update(invRef, { qty: currentQty + item.qty });
-
-                                    const movementRef = doc(collection(db, "stockMovements"));
-                                    const now = new Date();
-                                    transaction.set(movementRef, {
-                                        productId: item.id,
-                                        productName: item.name,
-                                        changeAmount: item.qty,
-                                        reason: `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}`,
-                                        userId: localStorage.getItem("userId") || "System",
-                                        userName: localStorage.getItem("loggedInUser") || "Unknown",
-                                        date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                                        time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-                                        timestamp: now.getTime()
-                                    });
+                                    // H6: deleted product — block the action, admin must reconcile first
+                                    if (!invSnap.exists()) throw new Error(`Cannot ${actionName === "REFUND" ? "refund" : "void"}: product "${item.name}" no longer exists in inventory. Please recreate the product (or adjust stock manually) before retrying.`);
+                                    invReads.push({ invRef, invSnap, item, qty: item.qty, isLegacy: false });
                                 }
                             } else if (paymentDbData.items) {
-                                const itemList = paymentDbData.items.split(', ');
-                                for (let itemStr of itemList) {
+                                for (const itemStr of paymentDbData.items.split(', ')) {
                                     const match = itemStr.match(/^(\d+)x\s+(.+)$/);
-                                    if (match) {
-                                        const qtyRefunded = parseInt(match[1]);
-                                        const itemName = match[2];
-                                        if (itemName.includes("Walk-in Gym Access")) continue;
-
-                                        const invItem = inventoryData.find(i => i.name.toLowerCase() === itemName.toLowerCase());
-                                        if (invItem) {
-                                            const invRef = doc(db, "inventory", invItem.id);
-                                            const invSnap = await transaction.get(invRef);
-                                            if (invSnap.exists()) {
-                                                const currentQty = invSnap.data().qty || 0;
-                                                transaction.update(invRef, { qty: currentQty + qtyRefunded });
-                                                
-                                                const movementRef = doc(collection(db, "stockMovements"));
-                                                const now = new Date();
-                                                transaction.set(movementRef, {
-                                                    productId: invItem.id,
-                                                    productName: invItem.name,
-                                                    changeAmount: qtyRefunded,
-                                                    reason: `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"} (Legacy)`,
-                                                    userId: localStorage.getItem("userId") || "System",
-                                                    userName: localStorage.getItem("loggedInUser") || "Unknown",
-                                                    date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                                                    time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-                                                    timestamp: now.getTime()
-                                                });
-                                            }
-                                        }
+                                    if (!match) continue;
+                                    const qtyRefunded = parseInt(match[1]);
+                                    const itemName = match[2];
+                                    if (itemName.includes("Walk-in Gym Access")) continue;
+                                    const invItem = inventoryData.find(i => i.name.toLowerCase() === itemName.toLowerCase());
+                                    if (invItem) {
+                                        const invRef = doc(db, "inventory", invItem.id);
+                                        const invSnap = await transaction.get(invRef);
+                                        if (invSnap.exists()) invReads.push({ invRef, invSnap, item: invItem, qty: qtyRefunded, isLegacy: true });
                                     }
                                 }
                             }
                         }
 
-                        // 2. Refund credit if paid via RFID
-                        if ((paymentDbData.paymentMethod === 'RFID' || paymentDbData.paymentMethod === 'RFID Card' || paymentDbData.paymentMethod === 'RFID Credit') && paymentDbData.amount > 0) {
-                            let memberId = paymentDbData.memberId;
-                            let memberName = paymentDbData.name;
+                        // Read member doc for RFID wallet refund
+                        let memberRef = null, memberSnap = null, memberId = null, memberName = null;
+                        const isRfidPayment = (paymentDbData.paymentMethod === 'RFID' || paymentDbData.paymentMethod === 'RFID Card' || paymentDbData.paymentMethod === 'RFID Credit') && paymentDbData.amount > 0;
+                        if (isRfidPayment) {
+                            memberId = paymentDbData.memberId;
+                            memberName = paymentDbData.name;
                             if (!memberId) {
-                                // legacy name lookup fallback
-                                const member = membersData.find(m => 
-                                    m.name === paymentDbData.name || 
+                                const member = membersData.find(m =>
+                                    m.name === paymentDbData.name ||
                                     `${m.givenName || ''} ${m.familyName || ''}`.trim() === paymentDbData.name
                                 );
                                 if (member) {
@@ -4853,76 +4994,101 @@ window.voidTransaction = async function (id, isRefund = false, btn) {
                                 }
                             }
                             if (memberId) {
-                                const memberRef = doc(db, "users", memberId);
-                                const memberSnap = await transaction.get(memberRef);
-                                if (memberSnap.exists()) {
-                                    // DATA-TYPE SANITIZATION: explicit Number() cast prevents string concatenation
-                                    const currentBalance = Number(memberSnap.data().creditBalance || 0);
-                                    const refundAmount = Number(paymentDbData.amount || 0);
-                                    const newBalance = currentBalance + refundAmount;
-                                    transaction.update(memberRef, {
-                                        creditBalance: newBalance
-                                    });
-                                    
-                                    const creditTxRef = doc(collection(db, "creditTransactions"));
-                                    transaction.set(creditTxRef, {
-                                        memberId: memberId,
-                                        memberName: memberName || "Member",
-                                        type: "refund",
-                                        amount: refundAmount,
-                                        balanceBefore: currentBalance,
-                                        balanceAfter: newBalance,
-                                        note: `Refunded POS Transaction: ${id}`,
-                                        processedBy: localStorage.getItem("userId") || "System",
-                                        timestamp: Date.now()
-                                    });
-                                }
+                                memberRef = doc(db, "users", memberId);
+                                memberSnap = await transaction.get(memberRef);
                             }
                         }
 
-                        // H7: invalidate walk-in guest cards & passes issued by this transaction
+                        // Read guest card docs
+                        const gcReads = []; // { guestCardRef, gcSnap }
                         for (const tag of _walkinTagsToInvalidate) {
                             const guestCardRef = doc(db, "guestCards", guestCardDocId(tag));
-                            const gcSnap = await transaction.get(guestCardRef);
-                            if (gcSnap.exists() && gcSnap.data().paymentId === id) {
-                                transaction.update(guestCardRef, {
-                                    status: "Voided",
-                                    issuedForDate: "",
-                                    paymentId: "",
-                                    voidedAt: Date.now()
-                                });
-                            }
+                            gcReads.push({ guestCardRef, gcSnap: await transaction.get(guestCardRef) });
                         }
+
+                        // Read walk-in pass docs
+                        const wpReads = []; // { wpRef, wpSnap }
                         for (const wpRef of _walkinPassRefs) {
-                            const wpSnap = await transaction.get(wpRef);
-                            if (wpSnap.exists() && wpSnap.data().status === "Active") {
-                                transaction.update(wpRef, { status: "Voided", voidedAt: Date.now() });
-                            }
+                            wpReads.push({ wpRef, wpSnap: await transaction.get(wpRef) });
                         }
 
-                        // O3 (Sprint 9): close out any still-active walk-in attendance records
-                        // for tags whose pass we just voided. Without this, the guest stays
-                        // "Checked In" indefinitely — the void doesn't reach the attendance log.
-                        const _voidTimeStr = new Date(Date.now() + (window.serverTimeOffsetMs || 0))
-                            .toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+                        // Read attendance docs for open walk-in sessions
+                        const attReads = []; // { attRef, attSnap }
                         for (const attRef of _walkinAttRefs) {
-                            const attSnap = await transaction.get(attRef);
-                            if (attSnap.exists() && attSnap.data().status === "Checked In") {
-                                transaction.update(attRef, {
-                                    status: "Checked Out",
-                                    timeOut: _voidTimeStr,
-                                    voidedByPayment: id,
-                                    voidedAt: Date.now()
-                                });
+                            attReads.push({ attRef, attSnap: await transaction.get(attRef) });
+                        }
+
+                        // ── PHASE 2: ALL WRITES ──
+
+                        const now = new Date();
+                        const nowTs = now.getTime();
+                        const nowDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                        const nowTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                        const voidTimeStr = new Date(nowTs + (window.serverTimeOffsetMs || 0))
+                            .toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+                        // 1. Inventory restock + movement log
+                        for (const { invRef, invSnap, item, qty, isLegacy } of invReads) {
+                            const currentQty = Number(invSnap.data().qty || 0);
+                            transaction.update(invRef, { qty: currentQty + qty });
+                            transaction.set(doc(collection(db, "stockMovements")), {
+                                productId: item.id,
+                                productName: item.name,
+                                changeAmount: qty,
+                                reason: `Transaction ${actionName === "REFUND" ? "Refunded" : "Voided"}${isLegacy ? " (Legacy)" : ""}`,
+                                userId: localStorage.getItem("userId") || "System",
+                                userName: localStorage.getItem("loggedInUser") || "Unknown",
+                                date: nowDate,
+                                time: nowTime,
+                                timestamp: nowTs
+                            });
+                        }
+
+                        // 2. Wallet credit refund (RFID payments only)
+                        if (isRfidPayment && memberRef && memberSnap && memberSnap.exists()) {
+                            const currentBalance = Number(memberSnap.data().creditBalance || 0);
+                            const refundAmount = Number(paymentDbData.amount || 0);
+                            const newBalance = currentBalance + refundAmount;
+                            transaction.update(memberRef, { creditBalance: newBalance });
+                            transaction.set(doc(collection(db, "creditTransactions")), {
+                                memberId,
+                                memberName: memberName || "Member",
+                                type: "refund",
+                                amount: refundAmount,
+                                balanceBefore: currentBalance,
+                                balanceAfter: newBalance,
+                                note: `Refunded POS Transaction: ${id}`,
+                                processedBy: localStorage.getItem("userId") || "System",
+                                timestamp: nowTs
+                            });
+                        }
+
+                        // 3. Invalidate guest cards
+                        for (const { guestCardRef, gcSnap } of gcReads) {
+                            if (gcSnap.exists() && gcSnap.data().paymentId === id) {
+                                transaction.update(guestCardRef, { status: "Voided", issuedForDate: "", paymentId: "", voidedAt: nowTs });
                             }
                         }
 
-                        // 3. Mark transaction as Voided or Refunded (ATOMIC: inside runTransaction)
+                        // 4. Void walk-in passes
+                        for (const { wpRef, wpSnap } of wpReads) {
+                            if (wpSnap.exists() && wpSnap.data().status === "Active") {
+                                transaction.update(wpRef, { status: "Voided", voidedAt: nowTs });
+                            }
+                        }
+
+                        // 5. Close orphaned walk-in attendance records
+                        for (const { attRef, attSnap } of attReads) {
+                            if (attSnap.exists() && attSnap.data().status === "Checked In") {
+                                transaction.update(attRef, { status: "Checked Out", timeOut: voidTimeStr, voidedByPayment: id, voidedAt: nowTs });
+                            }
+                        }
+
+                        // 6. Mark payment as Voided / Refunded
                         const voidUpdate = { status: isRefund ? "Refunded" : "Voided" };
                         if (cancelRemarks.trim()) voidUpdate.cancelRemarks = cancelRemarks.trim();
-                        voidUpdate.voidedAt = Date.now();
+                        voidUpdate.voidedAt = nowTs;
                         voidUpdate.voidedBy = localStorage.getItem("userId") || "";
-                        
                         transaction.update(paymentRef, voidUpdate);
                     });
                     
@@ -7564,12 +7730,11 @@ if (document.getElementById('editStaffForm')) {
                 try {
                     const snap = await getDocs(query(
                         collection(db, "bookings"),
-                        where("trainerId", "==", id),
-                        where("status", "in", ["Confirmed", "Pending"]),
-                        where("date", ">=", todayIso)
+                        where("trainerId", "==", id)
                     ));
                     affected = snap.docs
                         .map(d => ({ id: d.id, ...d.data() }))
+                        .filter(b => (b.status === 'Confirmed' || b.status === 'Pending') && (b.date || '') >= todayIso)
                         .sort((a, b) => ((a.date || '') + (a.time || '')).localeCompare((b.date || '') + (b.time || '')));
                 } catch (qErr) {
                     console.error("Affected-bookings query failed:", qErr);

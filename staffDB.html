@@ -1527,6 +1527,13 @@
                     <label class="form-label">Serial Number / Asset ID <span class="optional-indicator">(Optional)</span></label>
                     <input type="text" id="editProdSerialNumber" placeholder="e.g. SN-998877">
                 </div>
+                <div class="form-group" style="background:var(--card-bg,#f8fafc);border:1px solid var(--border-color,#e2e8f0);border-radius:10px;padding:14px 16px;">
+                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                        <input type="checkbox" id="editProdBatchTracked" style="width:18px;height:18px;accent-color:var(--accent-blue,#3b82f6);cursor:pointer;" onchange="toggleEditBatchMode(this.checked)">
+                        <span style="font-weight:600;font-size:13px;">Enable Batch Tracking</span>
+                    </label>
+                    <p style="margin:6px 0 0 28px;font-size:12px;color:var(--text-muted);">Stock is managed per expiry batch (FEFO). Qty &amp; single expiry date are replaced by the Batch Manager.</p>
+                </div>
                 <div class="btn-row">
                     <button type="button" class="action-btn is-subtle" onclick="closeModal('editProductModal')">Cancel</button>
                     <button type="submit" class="action-btn">Save Changes</button>
@@ -1583,11 +1590,48 @@
                     <label class="form-label">Serial Number / Asset ID <span class="optional-indicator">(Optional)</span></label>
                     <input type="text" id="prodSerialNumber" placeholder="e.g. SN-998877">
                 </div>
+                <div class="form-group" style="background:var(--card-bg,#f8fafc);border:1px solid var(--border-color,#e2e8f0);border-radius:10px;padding:14px 16px;">
+                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+                        <input type="checkbox" id="prodBatchTracked" style="width:18px;height:18px;accent-color:var(--accent-blue,#3b82f6);cursor:pointer;" onchange="toggleRegBatchMode(this.checked)">
+                        <span style="font-weight:600;font-size:13px;">Enable Batch Tracking</span>
+                    </label>
+                    <p style="margin:6px 0 0 28px;font-size:12px;color:var(--text-muted);">Stock is managed per expiry batch (FEFO). Qty &amp; single expiry date fields are hidden — add batches after saving.</p>
+                </div>
                 <div class="btn-row">
                     <button type="button" class="action-btn is-subtle" onclick="closeModal('productModal')">Cancel</button>
                     <button type="submit" class="action-btn">Register Product</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Batch Manager Modal -->
+    <div id="batchManagerModal" class="modal">
+        <div class="modal-content" style="max-width:560px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-layer-group" style="margin-right:8px;color:var(--accent-blue,#3b82f6);"></i>Batch Manager — <span id="batchManagerProductName"></span></h3>
+                <span class="close-btn" onclick="closeModal('batchManagerModal')">&times;</span>
+            </div>
+            <div id="batchManagerBody" style="padding:4px 0 8px;">
+                <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">Batches are deducted oldest-expiry-first (FEFO) at checkout. Add a new batch each time stock with a different expiry date arrives.</p>
+                <div id="batchList" style="display:flex;flex-direction:column;gap:10px;max-height:260px;overflow-y:auto;margin-bottom:16px;"></div>
+                <div style="border-top:1px solid var(--border-color,#e2e8f0);padding-top:16px;">
+                    <p style="font-weight:600;font-size:13px;margin:0 0 10px;">Add New Batch</p>
+                    <div class="form-row" style="gap:12px;">
+                        <div class="form-group" style="flex:1;">
+                            <label class="form-label">Quantity <span class="required-asterisk">*</span></label>
+                            <input type="number" id="newBatchQty" min="1" placeholder="Units received" style="width:100%;">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label class="form-label">Expiry Date <span class="required-asterisk">*</span></label>
+                            <input type="date" id="newBatchExpiry" style="width:100%;" onfocus="this.min=new Date().toISOString().split('T')[0]">
+                        </div>
+                    </div>
+                    <button type="button" class="action-btn" style="width:100%;margin-top:4px;" onclick="saveNewBatch()">
+                        <i class="fas fa-plus"></i> Add Batch
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
