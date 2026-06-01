@@ -9796,21 +9796,31 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
             message: `Please provide a reason for marking this session as ${newStatus.toLowerCase()}:`,
             placeholder: "e.g. Schedule conflict, personal emergency...",
             onConfirm: (remarks) => {
-                const template = `I have to decline due to the reason: ${remarks}`;
+                const reason = (remarks || '').trim();
+                const bPreview = (window.bookingsData || []).find(x => x.id === id);
+                const previewMessage = (newStatus === 'Declined' && typeof window.buildBookingDeclineAutoMessage === 'function')
+                    ? window.buildBookingDeclineAutoMessage(reason, bPreview?.date, bPreview?.time || bPreview?.startTime)
+                    : `I have to decline due to the reason: ${reason}`;
 
-                showConfirm(`The following message will be sent to the member via chat:\n\n"${template}"\n\nConfirm ${newStatus.toLowerCase()}?`, async () => {
-                    // Re-acquire before the write — safe against a second click between dialogs
+                showConfirm(`The following message will be sent to the member via chat:\n\n"${previewMessage}"\n\nConfirm ${newStatus.toLowerCase()}?`, async () => {
                     if (window._updateBookingStatusInFlight.has(id)) return;
                     window._updateBookingStatusInFlight.add(id);
 
                     const b = (window.bookingsData || []).find(x => x.id === id);
                     if (!b) { _release(); return; }
                     const uiStatusAtPrompt = b.status || 'Pending';
+                    const _processingLabel = newStatus === 'Declined' ? 'Declining...' : 'Cancelling...';
 
                     try {
-                        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
+                        if (btn) {
+                            btn.disabled = true;
+                            btn.innerText = _processingLabel;
+                        }
+
                         await runTransaction(db, async (tx) => {
                             const bookingRef = doc(db, "bookings", id);
+
+                            // PHASE 1 — hoisted reads
                             const bSnap = await tx.get(bookingRef);
                             if (!bSnap.exists()) throw new Error("Booking no longer exists.");
                             const bData = bSnap.data() || {};
@@ -9822,29 +9832,77 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
                                 memberSnap = await tx.get(memberRef);
                             }
 
+                            // PHASE 2 — validation and message assembly
                             _assertOwnership(bData);
                             if (window.verifyBookingServerState) {
                                 window.verifyBookingServerState(bData, uiStatusAtPrompt);
+                            }
+                            if (window.isBookingTerminalStatus && window.isBookingTerminalStatus(bData.status)) {
+                                throw new Error(`This booking is ${bData.status} and is locked for audit integrity.`);
                             }
                             if (bData.status !== 'Pending' && bData.status !== 'Confirmed') {
                                 throw new Error(window.BOOKING_STATE_CHANGED_MSG || `This session was already marked "${bData.status}". No further action needed.`);
                             }
 
-                            if (bookingHoldsCredit(bData) && bData.memberId) {
-                                if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
-                                tx.update(memberRef, { sessionsRemaining: increment(1) });
-                                tx.update(bookingRef, { status: newStatus, cancelRemarks: template, creditState: 'refunded' });
+                            const slotTime = bData.time || bData.startTime || '00:00';
+                            const autoMessage = (newStatus === 'Declined' && typeof window.buildBookingDeclineAutoMessage === 'function')
+                                ? window.buildBookingDeclineAutoMessage(reason, bData.date, slotTime)
+                                : `I have to decline due to the reason: ${reason}`;
+
+                            // PHASE 3 — lowered writes
+                            if (newStatus === 'Declined') {
+                                const declineUpdate = { status: 'Declined', declineReason: reason, cancelRemarks: autoMessage };
+                                if (bookingHoldsCredit(bData) && bData.memberId) {
+                                    if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
+                                    tx.update(memberRef, { sessionsRemaining: increment(1) });
+                                    tx.update(bookingRef, { ...declineUpdate, creditState: 'refunded' });
+                                } else {
+                                    tx.update(bookingRef, declineUpdate);
+                                }
+                                if (bData.memberId && bData.trainerId) {
+                                    const newMessageRef = doc(messagesCol);
+                                    const _callerName = localStorage.getItem("loggedInUser") || bData.trainerName || "Trainer";
+                                    tx.set(newMessageRef, {
+                                        sender: _callerName,
+                                        receiver: bData.memberName || "",
+                                        senderId: bData.trainerId,
+                                        receiverId: bData.memberId,
+                                        text: autoMessage,
+                                        timestamp: Date.now()
+                                    });
+                                }
                             } else {
-                                tx.update(bookingRef, { status: newStatus, cancelRemarks: template });
+                                if (bookingHoldsCredit(bData) && bData.memberId) {
+                                    if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
+                                    tx.update(memberRef, { sessionsRemaining: increment(1) });
+                                    tx.update(bookingRef, { status: newStatus, cancelRemarks: autoMessage, creditState: 'refunded' });
+                                } else {
+                                    tx.update(bookingRef, { status: newStatus, cancelRemarks: autoMessage });
+                                }
+                                if (bData.memberId && bData.trainerId) {
+                                    const newMessageRef = doc(messagesCol);
+                                    const _callerName = localStorage.getItem("loggedInUser") || bData.trainerName || "Trainer";
+                                    tx.set(newMessageRef, {
+                                        sender: _callerName,
+                                        receiver: bData.memberName || "",
+                                        senderId: bData.trainerId,
+                                        receiverId: bData.memberId,
+                                        text: autoMessage,
+                                        timestamp: Date.now()
+                                    });
+                                }
                             }
 
-                            if (bData.trainerId && bData.date && bData.time) {
-                                tx.delete(doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
+                            if (bData.trainerId && bData.date && slotTime) {
+                                tx.delete(doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, slotTime)));
                             }
-                            if (bData.memberId && bData.date && bData.time) {
-                                tx.delete(doc(db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, bData.time)));
+                            if (bData.memberId && bData.date && slotTime) {
+                                tx.delete(doc(db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, slotTime)));
                             }
                         });
+
+                        showToast(`Session ${newStatus.toLowerCase()} and message sent.`, "success");
+                        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}. Message sent to ${b.memberName}.`);
                     } catch (err) {
                         console.error("Status-change transaction failed:", err);
                         const msg = (err && err.message) || '';
@@ -9856,31 +9914,9 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
                         } else {
                             showToast(msg || `Failed to mark session ${newStatus.toLowerCase()}.`, "error");
                         }
+                    } finally {
                         _release();
-                        return;
                     }
-
-                    // Send chat message to the member (outside tx — non-critical)
-                    // Store both name strings (for manual-chat compat) and IDs (for reliable auto-message delivery)
-                    if (b.memberId && b.trainerId) {
-                        try {
-                            const _callerName = localStorage.getItem("loggedInUser") || b.trainerName || "Trainer";
-                            await addDoc(messagesCol, {
-                                sender:     _callerName,
-                                receiver:   b.memberName || "",
-                                senderId:   b.trainerId,
-                                receiverId: b.memberId,
-                                text:       template,
-                                timestamp:  Date.now()
-                            });
-                        } catch (msgErr) {
-                            console.error("Chat message failed:", msgErr);
-                        }
-                    }
-
-                    _release();
-                    showToast(`Session ${newStatus.toLowerCase()} and message sent.`, "success");
-                    if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}. Message sent to ${b.memberName}.`);
                 });
             },
             onCancel: _release,
@@ -11006,14 +11042,17 @@ if (document.getElementById('editBookingForm')) {
 
         const id = document.getElementById('editBookingId').value;
         const status = document.getElementById('editBookingStatus').value;
+        const currentBooking = (window.bookingsData || []).find(x => x.id === id);
         let remarks = document.getElementById('editBookingRemarks') ? document.getElementById('editBookingRemarks').value : "";
+        const rawReason = (remarks || '').trim();
 
-        if ((status === 'Cancelled' || status === 'Declined') && remarks && !remarks.includes("I have to decline")) {
-            remarks = `I have to decline due to the reason: ${remarks}`;
+        if (status === 'Declined' && rawReason && typeof window.buildBookingDeclineAutoMessage === 'function') {
+            remarks = window.buildBookingDeclineAutoMessage(rawReason, currentBooking?.date, currentBooking?.time || currentBooking?.startTime);
+        } else if ((status === 'Cancelled' || status === 'Declined') && rawReason && !rawReason.includes("I have to decline")) {
+            remarks = `I have to decline due to the reason: ${rawReason}`;
         }
 
         // Block illegal transitions same as updateBookingStatus does
-        const currentBooking = (window.bookingsData || []).find(x => x.id === id);
         if (currentBooking) {
             if (window.isBookingTerminalStatus && window.isBookingTerminalStatus(currentBooking.status)) {
                 _rearmBtn();
@@ -11093,7 +11132,15 @@ if (document.getElementById('editBookingForm')) {
                 }
 
                 const update = { status };
-                if (remarks) update.cancelRemarks = remarks;
+                const slotTime = bData.time || bData.startTime || '00:00';
+                let chatMessage = remarks;
+                if (status === 'Declined' && rawReason) {
+                    chatMessage = (typeof window.buildBookingDeclineAutoMessage === 'function')
+                        ? window.buildBookingDeclineAutoMessage(rawReason, bData.date, slotTime)
+                        : remarks;
+                    update.declineReason = rawReason;
+                }
+                if (chatMessage) update.cancelRemarks = chatMessage;
 
                 if (status === 'Confirmed') {
                     if (bData.status !== 'Pending') {
@@ -11141,11 +11188,22 @@ if (document.getElementById('editBookingForm')) {
                     if (bookingHoldsCredit(bData) && bData.memberId && memberRef && memberSnap && memberSnap.exists()) {
                         tx.update(memberRef, { sessionsRemaining: increment(1) });
                     }
-                    if (bData.trainerId && bData.date && bData.time) {
-                        tx.delete(doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
+                    if (bData.trainerId && bData.date && slotTime) {
+                        tx.delete(doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, slotTime)));
                     }
-                    if (bData.memberId && bData.date && bData.time) {
-                        tx.delete(doc(db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, bData.time)));
+                    if (bData.memberId && bData.date && slotTime) {
+                        tx.delete(doc(db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, slotTime)));
+                    }
+                    if (chatMessage && bData.memberId && bData.trainerId) {
+                        const newMessageRef = doc(messagesCol);
+                        tx.set(newMessageRef, {
+                            sender: bData.trainerName || localStorage.getItem("loggedInUser") || "Trainer",
+                            receiver: bData.memberName || "",
+                            senderId: bData.trainerId,
+                            receiverId: bData.memberId,
+                            text: chatMessage,
+                            timestamp: Date.now()
+                        });
                     }
                 } else if (status === 'Completed' || status === 'No Show') {
                     if (!bData.creditState && bData.memberId && memberRef && memberSnap && memberSnap.exists() && update.creditState === 'consumed') {
@@ -11167,26 +11225,6 @@ if (document.getElementById('editBookingForm')) {
             else showToast(err.message || "Failed to update booking.", "error");
             _rearmBtn();
             return;
-        }
-
-        // Send as chat message if cancelled/declined
-        // Store both name strings and IDs for reliable delivery.
-        if ((status === 'Cancelled' || status === 'Declined') && remarks) {
-            const b = (window.bookingsData || []).find(x => x.id === id);
-            if (b && b.memberId && b.trainerId) {
-                try {
-                    await addDoc(messagesCol, {
-                        sender:     b.trainerName || "",
-                        receiver:   b.memberName || "",
-                        senderId:   b.trainerId,
-                        receiverId: b.memberId,
-                        text:       remarks,
-                        timestamp:  Date.now()
-                    });
-                } catch (msgErr) {
-                    console.error("Chat message failed from modal:", msgErr);
-                }
-            }
         }
 
         _rearmBtn();

@@ -99,6 +99,28 @@ window.isLateCancellation = function (booking) {
     return diffMs >= 0 && diffMs < BOOKING_LATE_CANCEL_MS;
 };
 
+window.formatBookingDateAndTime = function (date, timeStr) {
+    if (!date) return 'unknown date';
+    const rawTime = timeStr || '00:00';
+    const [y, m, d] = date.split('-').map(Number);
+    const [eH, eM] = rawTime.split(':').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    if (isNaN(dateObj.getTime())) return `${date} ${rawTime}`;
+    const datePart = dateObj.toLocaleDateString('en-US', {
+        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+    });
+    const period = eH >= 12 ? 'PM' : 'AM';
+    const dispHour = eH > 12 ? eH - 12 : (eH === 0 ? 12 : eH);
+    const timePart = `${dispHour}:${String(eM || 0).padStart(2, '0')} ${period}`;
+    return `${datePart} at ${timePart}`;
+};
+
+window.buildBookingDeclineAutoMessage = function (reason, date, startTime) {
+    const dateAndTime = window.formatBookingDateAndTime(date, startTime);
+    const trimmedReason = (reason || '').trim() || 'No reason provided';
+    return `[auto-generated message] I have to decline your Trainer booking on ${dateAndTime} due to: ${trimmedReason}`;
+};
+
 window.assertMemberBookingEligible = function (memberData, bookingContext) {
     if (!memberData) {
         return { ok: false, message: MEMBER_ELIGIBILITY_ABORT_MSG };
