@@ -7807,6 +7807,20 @@ if (document.getElementById('editStaffForm')) {
                                     for (const ref of bookingRefs) {
                                         snaps.push(await tx.get(ref));
                                     }
+                                    const memberIdsToRefund = new Set();
+                                    for (let i = 0; i < snaps.length; i++) {
+                                        const bSnap = snaps[i];
+                                        if (!bSnap.exists()) continue;
+                                        const bData = bSnap.data();
+                                        if (bData.status !== 'Confirmed' && bData.status !== 'Pending') continue;
+                                        if (bookingHoldsCredit(bData) && bData.memberId) {
+                                            memberIdsToRefund.add(bData.memberId);
+                                        }
+                                    }
+                                    const memberRefundSnaps = new Map();
+                                    for (const mid of memberIdsToRefund) {
+                                        memberRefundSnaps.set(mid, await tx.get(doc(db, "users", mid)));
+                                    }
                                     cancelledForChat.length = 0;
                                     for (let i = 0; i < snaps.length; i++) {
                                         const bSnap = snaps[i];
@@ -7818,6 +7832,10 @@ if (document.getElementById('editStaffForm')) {
                                         const bookingRef = bookingRefs[i];
 
                                         if (bookingHoldsCredit(bData) && bData.memberId) {
+                                            const mSnap = memberRefundSnaps.get(bData.memberId);
+                                            if (!mSnap || !mSnap.exists()) {
+                                                throw new Error(`Cannot cascade-cancel: member record ${bData.memberId} is missing.`);
+                                            }
                                             tx.update(doc(db, "users", bData.memberId), { sessionsRemaining: increment(1) });
                                             tx.update(bookingRef, { status: "Cancelled", creditState: 'refunded', cancelRemarks: template });
                                         } else {
@@ -7949,7 +7967,15 @@ window.archiveUser = async (id, currentStatus, btn) => {
                                     status: 'Cancelled',
                                     cancelRemarks: `Cancelled automatically: ${userName} account archived.`
                                 };
+                                let memberSnapArchive = null;
                                 if (bookingHoldsCredit(bData) && bData.memberId && bData.memberId !== id) {
+                                    const memberRefArchive = doc(db, "users", bData.memberId);
+                                    memberSnapArchive = await tx.get(memberRefArchive);
+                                    if (!memberSnapArchive.exists()) {
+                                        throw new Error(`Cannot archive: member ${bData.memberId} missing for credit refund.`);
+                                    }
+                                }
+                                if (bookingHoldsCredit(bData) && bData.memberId && bData.memberId !== id && memberSnapArchive && memberSnapArchive.exists()) {
                                     tx.update(doc(db, "users", bData.memberId), { sessionsRemaining: increment(1) });
                                     update.creditState = 'refunded';
                                 }
@@ -8041,9 +8067,16 @@ window.deleteUser = async (id, btn) => {
                                 status: 'Cancelled',
                                 cancelRemarks: `Cancelled automatically: ${userName} account deleted.`
                             };
+                            let memberSnapDelete = null;
+                            if (bookingHoldsCredit(bData) && bData.memberId && bData.memberId !== id) {
+                                memberSnapDelete = await tx.get(doc(db, "users", bData.memberId));
+                                if (!memberSnapDelete.exists()) {
+                                    throw new Error(`Cannot delete user: member ${bData.memberId} missing for credit refund.`);
+                                }
+                            }
                             // Refund held credit only if the held-from member still exists
                             // (i.e. credit was held against the OTHER party, not the deleted user)
-                            if (bookingHoldsCredit(bData) && bData.memberId && bData.memberId !== id) {
+                            if (bookingHoldsCredit(bData) && bData.memberId && bData.memberId !== id && memberSnapDelete && memberSnapDelete.exists()) {
                                 tx.update(doc(db, "users", bData.memberId), { sessionsRemaining: increment(1) });
                                 update.creditState = 'refunded';
                             }
@@ -9410,13 +9443,28 @@ window.rebindBookingsListener = bindBookingsListener;
 bindBookingsListener();
 
 window.renderBookings = renderBookings;
+function _bookingRowDateParts(b) {
+    const slotMs = parseBookingSlotLocal(b.date, b.time);
+    if (slotMs === null) {
+        return { dateStr: b.date || '—', timeStr: b.time || '—' };
+    }
+    const dateObj = new Date(slotMs);
+    return {
+        dateStr: dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        timeStr: dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    };
+}
+
 function renderBookings() {
     const tbody = document.getElementById('bookingsBody');
     const myTbody = document.getElementById('myBookingsBody');
     const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
     const loggedInUserId = localStorage.getItem("userId");
 
-    let displayData = [...bookingsData].sort((a, b) => {
+    let displayData = (bookingsData || [])
+        .map(b => (typeof window.normalizeBookingRecord === 'function' ? window.normalizeBookingRecord(b) : b))
+        .filter(Boolean)
+        .sort((a, b) => {
         // Use parseBookingSlotLocal to avoid UTC/local ambiguity in Safari/Chrome
         const ta = parseBookingSlotLocal(a.date, a.time) || 0;
         const tb = parseBookingSlotLocal(b.date, b.time) || 0;
@@ -9551,6 +9599,7 @@ function renderBookings() {
     if (dateFilter) displayData = displayData.filter(b => b.date === dateFilter);
 
         const renderBookingRow = (b) => {
+            if (!b || !b.id) return '';
             let badgeClass = "pending";
             if (b.status === "Confirmed") badgeClass = "confirmed";
             if (b.status === "Completed") badgeClass = "completed";
@@ -9558,9 +9607,7 @@ function renderBookings() {
             if (b.status === "Declined") badgeClass = "declined";
             if (b.status === "No Show") badgeClass = "noshow";
 
-            const dateObj = new Date(`${b.date}T${b.time}`);
-            const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            const timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const { dateStr, timeStr } = _bookingRowDateParts(b);
 
             if (loggedInRole === "member") {
                 const remarksHtml = (b.status === "Cancelled" || b.status === "Declined") && b.cancelRemarks
@@ -9569,8 +9616,9 @@ function renderBookings() {
 
                 const offset = window.serverTimeOffsetMs || 0;
                 const nowMs = Date.now() + offset;
-                const bookingMs = new Date(`${b.date}T${b.time}`).getTime();
+                const bookingMs = parseBookingSlotLocal(b.date, b.time);
                 const canReschedule = ["Pending", "Confirmed"].includes(b.status)
+                    && bookingMs !== null
                     && (bookingMs - nowMs > 2 * 60 * 60 * 1000);
                 const rescheduleBtn = canReschedule
                     ? `<button type="button" class="btn-icon btn-edit btn-xs" title="Reschedule Booking" onclick="openRescheduleModal('${b.id}')"><i class="fas fa-rotate"></i></button>`
@@ -9872,10 +9920,23 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
                                     });
                                 }
                             } else {
+                                const lateCancel = newStatus === 'Cancelled'
+                                    && typeof window.isLateCancellation === 'function'
+                                    && window.isLateCancellation({ date: bData.date, time: slotTime });
+                                const privilegedDesk = _callerRole === 'admin' || _callerRole === 'staff';
+
                                 if (bookingHoldsCredit(bData) && bData.memberId) {
-                                    if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
-                                    tx.update(memberRef, { sessionsRemaining: increment(1) });
-                                    tx.update(bookingRef, { status: newStatus, cancelRemarks: autoMessage, creditState: 'refunded' });
+                                    if (lateCancel && !privilegedDesk) {
+                                        tx.update(bookingRef, {
+                                            status: newStatus,
+                                            cancelRemarks: autoMessage + " (Late cancellation — session credit forfeited.)",
+                                            creditState: 'consumed'
+                                        });
+                                    } else {
+                                        if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
+                                        tx.update(memberRef, { sessionsRemaining: increment(1) });
+                                        tx.update(bookingRef, { status: newStatus, cancelRemarks: autoMessage, creditState: 'refunded' });
+                                    }
                                 } else {
                                     tx.update(bookingRef, { status: newStatus, cancelRemarks: autoMessage });
                                 }
@@ -10600,6 +10661,8 @@ window.setupBookingModalListeners = () => {
 
             // 2. Transaction Enforced Booking validation
             try {
+                await syncServerTimeOffset();
+                const _bookingServerOffset = window.serverTimeOffsetMs || 0;
                 if (isReschedule) {
                     const originalId = window.bookingState.originalBookingId;
                     const prevDate = window.bookingState.previousDate;
@@ -10678,15 +10741,16 @@ window.setupBookingModalListeners = () => {
                         }
 
                         // Re-check the 2-hour rule against the booking's CURRENT scheduled time
-                        await syncServerTimeOffset();
-                        const offset = window.serverTimeOffsetMs || 0;
-                        const freshNow = new Date(Date.now() + offset);
-                        const originalDateTime = new Date(`${bData.date}T${bData.time}`);
-                        if (originalDateTime.getTime() - freshNow.getTime() <= 2 * 60 * 60 * 1000) {
+                        const freshNowMsRS = Date.now() + _bookingServerOffset;
+                        const originalSlotMs = parseBookingSlotLocal(bData.date, bData.time);
+                        if (originalSlotMs === null) {
+                            throw new Error("This booking has invalid date/time data and cannot be rescheduled.");
+                        }
+                        if (originalSlotMs - freshNowMsRS <= 2 * 60 * 60 * 1000) {
                             throw new Error("Reschedule window has closed (less than 2 hours until the booking).");
                         }
-                        const newDateTime = new Date(`${bookDate}T${bookTime}`);
-                        if (newDateTime.getTime() < freshNow.getTime()) {
+                        const newSlotMs = parseBookingSlotLocal(bookDate, bookTime);
+                        if (newSlotMs === null || newSlotMs < freshNowMsRS) {
                             throw new Error("Choose a date and time in the future.");
                         }
 
@@ -10711,7 +10775,7 @@ window.setupBookingModalListeners = () => {
                             date: bookDate,
                             time: bookTime,
                             status: "Pending",
-                            rescheduledAt: freshNow.getTime(),
+                            rescheduledAt: freshNowMsRS,
                             previousDate: prevDate,
                             previousTime: prevTime
                         });
@@ -10787,12 +10851,10 @@ window.setupBookingModalListeners = () => {
                         throw new Error("You have 0 session credits remaining. Please buy more credits at the desk.");
                     }
 
-                    // Time-Tampering / Future Date check using server offset
-                    await syncServerTimeOffset();
-                    const offset = window.serverTimeOffsetMs || 0;
-                    const freshNow = new Date(Date.now() + offset);
-                    const bookDateTime = new Date(`${bookDate}T${bookTime}`);
-                    if (bookDateTime.getTime() < freshNow.getTime()) {
+                    // Time-Tampering / Future Date check using server offset (synced before transaction)
+                    const freshNowMsMB = Date.now() + _bookingServerOffset;
+                    const bookSlotMs = parseBookingSlotLocal(bookDate, bookTime);
+                    if (bookSlotMs === null || bookSlotMs < freshNowMsMB) {
                         throw new Error("Choose a date and time in the future. Past sessions cannot be booked.");
                     }
 
@@ -10810,7 +10872,7 @@ window.setupBookingModalListeners = () => {
                         time: bookTime,
                         status: "Pending",
                         creditState: "held",
-                        timestamp: freshNow.getTime()
+                        timestamp: freshNowMsMB
                     });
                 });
 
@@ -10857,19 +10919,28 @@ window.openBookingModal = () => {
 if (document.getElementById('bookingForm')) {
     document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (window._adminBookingInFlight) return;
+        window._adminBookingInFlight = true;
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
         }
+        const _releaseAdminBooking = () => {
+            window._adminBookingInFlight = false;
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+        };
         const memberSelect = document.getElementById('bookMember'), trainerSelect = document.getElementById('bookTrainer');
         const dateEl = document.getElementById('bookDate');
         const timeEl = document.getElementById('bookTime');
         setBookingDateMin(dateEl);
         updateBookingTimeMinForToday(dateEl, timeEl);
-        if (!dateEl.checkValidity()) { dateEl.reportValidity(); if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; } return; }
-        if (!timeEl.checkValidity()) { timeEl.reportValidity(); if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; } return; }
+        if (!dateEl.checkValidity()) { dateEl.reportValidity(); _releaseAdminBooking(); return; }
+        if (!timeEl.checkValidity()) { timeEl.reportValidity(); _releaseAdminBooking(); return; }
         const memberId = memberSelect.value, trainerId = trainerSelect.value, bookDate = dateEl.value, bookTime = timeEl.value;
         const memberName = memberSelect.options[memberSelect.selectedIndex].text, trainerName = trainerSelect.options[trainerSelect.selectedIndex].text;
 
@@ -10881,7 +10952,7 @@ if (document.getElementById('bookingForm')) {
         } catch (err) {
             console.error("Conflict pre-query failed:", err);
             showToast("Failed to check schedule conflicts.", "error");
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            _releaseAdminBooking();
             return;
         }
 
@@ -10902,25 +10973,39 @@ if (document.getElementById('bookingForm')) {
 
         if (conflict) {
             showToast("This trainer already has a session booked within 1 hour of this time.", "error");
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalBtnText; }
+            _releaseAdminBooking();
             return;
         }
 
         // 2. Transaction Enforced Booking validation
         try {
+            await syncServerTimeOffset();
+            const _adminBookingOffset = window.serverTimeOffsetMs || 0;
             await runTransaction(db, async (transaction) => {
                 const memberRef = doc(db, "users", memberId);
+                const trainerRef = doc(db, "users", trainerId);
                 const trainerSlotRef = doc(db, "bookingSlots", slotIdForTrainer(trainerId, bookDate, bookTime));
                 const memberSlotRef  = doc(db, "bookingSlots", slotIdForMember(memberId, bookDate, bookTime));
 
-                const [memberSnap, trainerSlotSnap, memberSlotSnap] = await Promise.all([
+                const [memberSnap, trainerSnap, trainerSlotSnap, memberSlotSnap] = await Promise.all([
                     transaction.get(memberRef),
+                    transaction.get(trainerRef),
                     transaction.get(trainerSlotRef),
                     transaction.get(memberSlotRef),
                 ]);
 
                 if (!memberSnap.exists()) {
                     throw new Error("Member record does not exist.");
+                }
+                if (!trainerSnap.exists()) {
+                    throw new Error("Selected trainer no longer exists. Please choose a different trainer.");
+                }
+                const tData = trainerSnap.data() || {};
+                if ((tData.role || '').toLowerCase() !== 'trainer') {
+                    throw new Error("Selected user is no longer a trainer.");
+                }
+                if ((tData.status || 'Active') !== 'Active') {
+                    throw new Error("Selected trainer is not currently active.");
                 }
                 const mData = memberSnap.data();
                 if ((mData.status || 'Active') === 'Suspended') {
@@ -10944,15 +11029,14 @@ if (document.getElementById('bookingForm')) {
 
                 // Credit Check
                 const sessionsRemaining = mData.sessionsRemaining !== undefined ? Number(mData.sessionsRemaining) : 0;
-                if (sessionsRemaining <= 0) {
+                if (!Number.isFinite(sessionsRemaining) || sessionsRemaining <= 0) {
                     throw new Error(`Cannot book session: ${memberName} has 0 session credits remaining. Please purchase more credits.`);
                 }
 
                 // Time-Tampering / Future Date check using server offset
-                const offset = window.serverTimeOffsetMs || 0;
-                const freshNow = new Date(Date.now() + offset);
-                const bookDateTime = new Date(`${bookDate}T${bookTime}`);
-                if (bookDateTime.getTime() < freshNow.getTime()) {
+                const freshNowMsAdmin = Date.now() + _adminBookingOffset;
+                const bookSlotMsAdmin = parseBookingSlotLocal(bookDate, bookTime);
+                if (bookSlotMsAdmin === null || bookSlotMsAdmin < freshNowMsAdmin) {
                     throw new Error("Choose a date and time in the future. Past sessions cannot be booked.");
                 }
 
@@ -10970,24 +11054,18 @@ if (document.getElementById('bookingForm')) {
                     time: bookTime,
                     status: "Confirmed",
                     creditState: "held",
-                    timestamp: freshNow.getTime()
+                    timestamp: freshNowMsAdmin
                 });
             });
 
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnText;
-            }
             window.closeModal('bookingModal');
             showToast("Personal Training Session booked successfully!", "success");
             if (window.logActivity) window.logActivity("Booking Created", `Admin/Staff booked a training session.`);
         } catch (err) {
             console.error("Booking transaction failed:", err);
             showToast(err.message || "Failed to book training session.", "error");
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnText;
-            }
+        } finally {
+            _releaseAdminBooking();
         }
     });
 }
@@ -11170,7 +11248,18 @@ if (document.getElementById('editBookingForm')) {
                         }
                     }
                 } else if (status === 'Cancelled' || status === 'Declined') {
-                    if (bookingHoldsCredit(bData) && bData.memberId) {
+                    if (status === 'Cancelled' && bookingHoldsCredit(bData) && bData.memberId) {
+                        const lateCancelEdit = typeof window.isLateCancellation === 'function'
+                            && window.isLateCancellation({ date: bData.date, time: slotTime });
+                        const deskOverride = (localStorage.getItem("userRole") || '').toLowerCase() === 'admin'
+                            || (localStorage.getItem("userRole") || '').toLowerCase() === 'staff';
+                        if (lateCancelEdit && !deskOverride) {
+                            update.creditState = 'consumed';
+                        } else {
+                            if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
+                            update.creditState = 'refunded';
+                        }
+                    } else if (status === 'Declined' && bookingHoldsCredit(bData) && bData.memberId) {
                         if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
                         update.creditState = 'refunded';
                     }
@@ -11185,7 +11274,7 @@ if (document.getElementById('editBookingForm')) {
                 }
 
                 if (status === 'Cancelled' || status === 'Declined') {
-                    if (bookingHoldsCredit(bData) && bData.memberId && memberRef && memberSnap && memberSnap.exists()) {
+                    if (bookingHoldsCredit(bData) && bData.memberId && memberRef && memberSnap && memberSnap.exists() && update.creditState === 'refunded') {
                         tx.update(memberRef, { sessionsRemaining: increment(1) });
                     }
                     if (bData.trainerId && bData.date && slotTime) {
@@ -11282,7 +11371,9 @@ window.deleteBooking = async (id, btn) => {
 
 // BUG-11: memberId param removed — ownership is re-verified from localStorage inside the
 // transaction, so the caller cannot supply an arbitrary ID to trigger a foreign refund.
+if (!window._cancelBookingInFlight) window._cancelBookingInFlight = new Set();
 window.cancelMemberBooking = function (bookingId, btn) {
+    if (window._cancelBookingInFlight.has(bookingId)) return;
     const _origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
     const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
@@ -11300,6 +11391,8 @@ window.cancelMemberBooking = function (bookingId, btn) {
         : "Cancel this booking request? Your session credit will be refunded.";
 
     showConfirm({ message: confirmMessage, onCancel: _rearmBtn, onConfirm: async () => {
+        if (window._cancelBookingInFlight.has(bookingId)) return;
+        window._cancelBookingInFlight.add(bookingId);
         const uiStatusAtCancel = (_preview && _preview.status) || 'Pending';
         try {
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
@@ -11380,6 +11473,7 @@ window.cancelMemberBooking = function (bookingId, btn) {
             if (window.bookingActionFailedToast) window.bookingActionFailedToast(err);
             else showToast(err.message || "Failed to cancel booking.", "error");
         } finally {
+            window._cancelBookingInFlight.delete(bookingId);
             _rearmBtn();
         }
     }});

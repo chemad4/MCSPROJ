@@ -499,13 +499,20 @@ async function processRfidAttendance({ scannedTag, db, usersCol, attendanceCol }
               try {
                 await runTransaction(db, async (t) => {
                   const userRef = doc(db, "users", userId);
-                  const userSnap = await t.get(userRef);
+                  const attRef = doc(db, "attendance", activeAttId);
+                  const [userSnap, attSnap] = await Promise.all([
+                    t.get(userRef),
+                    t.get(attRef)
+                  ]);
                   // SP-6: guard against user document being deleted between scan and override confirm
                   if (!userSnap.exists()) throw new Error("User record no longer exists.");
+                  if (!attSnap.exists() || attSnap.data().status === "Checked Out") {
+                    throw new Error("Session already ended. Tap again to check in.");
+                  }
                   const user = userSnap.data();
                   const isTrainer = (user.role || "").toLowerCase() === "trainer";
 
-                  t.update(doc(db, "attendance", activeAttId), {
+                  t.update(attRef, {
                     timeOut: freshTimeStr,
                     status: "Checked Out",
                     overrideTapOut: true,
