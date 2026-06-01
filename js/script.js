@@ -1125,7 +1125,7 @@ const paymentsCol = collection(db, "payments");
 // Reject GCash ref IDs that have already been used for another payment.
 // Throws on duplicate; returns the cleaned ref on success.
 // NOTE: This is a pre-flight check only. The authoritative race-free lock
-// is reserveGcashRefInTxn() below, which must be called inside runTransaction().
+// is reserveGcashRefInTxn() (read) + commitGcashRefInTxn() (write) below, which must be called inside runTransaction().
 window.assertGcashRefUnused = async function (rawRef) {
     const cleaned = (rawRef || '').replace(/\s/g, '');
     if (!/^[0-9]{12}$/.test(cleaned)) {
@@ -1144,9 +1144,8 @@ window.assertGcashRefUnused = async function (rawRef) {
     return cleaned;
 };
 
-// C4 fix: race-free reservation. MUST be called inside runTransaction(), and MUST run
-// before any write in that transaction (Firestore requires reads-before-writes).
-// Returns the cleaned ref; throws on duplicate or bad format.
+// C4 fix: race-free reservation. MUST be called inside runTransaction() during the
+// reads phase (before any writes). Returns { cleaned, refDoc } for commitGcashRefInTxn().
 window.reserveGcashRefInTxn = async function (tx, rawRef) {
     const cleaned = (rawRef || '').replace(/\s/g, '');
     if (!/^[0-9]{12}$/.test(cleaned)) {
@@ -1157,8 +1156,11 @@ window.reserveGcashRefInTxn = async function (tx, rawRef) {
     if (snap.exists()) {
         throw new Error("This GCash Reference ID has already been used. Each ref can only be used once.");
     }
+    return { cleaned, refDoc };
+};
+// Write the GCash reservation during the transaction writes phase only.
+window.commitGcashRefInTxn = function (tx, refDoc) {
     tx.set(refDoc, { createdAt: Date.now() });
-    return cleaned;
 };
 const usersCol = collection(db, "users");
 const attendanceCol = collection(db, "attendance");
@@ -3604,36 +3606,46 @@ window.processPaymentConfirmed = async function () {
         }
 
         const transactionResult = await runTransaction(db, async (transaction) => {
-            // C4: reserve GCash ref atomically (must be done before any writes)
+            // ── PHASE 1: ALL READS (Firestore requires all reads before any writes) ──
+
+            let gcashReservation = null;
             if (selectedPaymentMethod === 'GCash' && posGcashRef) {
-                await window.reserveGcashRefInTxn(transaction, posGcashRef);
+                gcashReservation = await window.reserveGcashRefInTxn(transaction, posGcashRef);
             }
 
-            // H2: atomically claim each scanned guest card. Reads MUST happen before
-            // any writes in a Firestore txn, so we do this up-front. If another
-            // terminal beat us to the same card today, abort the whole checkout.
+            const guestCardReads = [];
             if (walkinQty > 0 && scannedTags.length > 0) {
                 for (let tag of scannedTags) {
                     const guestCardRef = doc(db, "guestCards", guestCardDocId(tag));
-                    const gcSnap = await transaction.get(guestCardRef);
-                    if (gcSnap.exists()) {
-                        const gcData = gcSnap.data() || {};
-                        if (gcData.status === "Issued" && gcData.issuedForDate === dateStrTemp) {
-                            throw new Error(`Guest card ${tag} was just issued by another terminal. Please re-scan a different card.`);
-                        }
-                    }
+                    guestCardReads.push({ tag, guestCardRef, gcSnap: await transaction.get(guestCardRef) });
                 }
             }
 
             const inventoryDocRefs = [];
             const inventorySnaps = [];
-
-            // 1. Fetch real-time products to check quantity and compute untampered price
             for (let item of posCart) {
                 if (item.id === 'WALKIN' || item.isPlan) continue;
                 const invRef = doc(db, "inventory", item.id);
                 inventoryDocRefs.push({ ref: invRef, cartItem: item });
                 inventorySnaps.push(await transaction.get(invRef));
+            }
+
+            let memberDocRef = null;
+            let memberSnap = null;
+            if (selectedPaymentMethod === 'RFID' && memberIdForCredit) {
+                memberDocRef = doc(db, "users", memberIdForCredit);
+                memberSnap = await transaction.get(memberDocRef);
+            }
+
+            // ── PHASE 2: VALIDATION & BUSINESS LOGIC ──
+
+            for (const { tag, gcSnap } of guestCardReads) {
+                if (gcSnap.exists()) {
+                    const gcData = gcSnap.data() || {};
+                    if (gcData.status === "Issued" && gcData.issuedForDate === dateStrTemp) {
+                        throw new Error(`Guest card ${tag} was just issued by another terminal. Please re-scan a different card.`);
+                    }
+                }
             }
 
             let computedSubtotal = 0;
@@ -3692,14 +3704,10 @@ window.processPaymentConfirmed = async function () {
             let computedDiscount = 0;
             let computedGrandTotal = computedSubtotal - computedDiscount;
 
-            // 3. Process RFID top-up validation using fresh computed total
             let balanceBefore = 0;
             let balanceAfter = 0;
-
             if (selectedPaymentMethod === 'RFID' && memberIdForCredit) {
-                const memberDocRef = doc(db, "users", memberIdForCredit);
-                const memberSnap = await transaction.get(memberDocRef);
-                if (!memberSnap.exists()) {
+                if (!memberSnap || !memberSnap.exists()) {
                     throw new Error("Member account does not exist.");
                 }
                 const mDataPOS = memberSnap.data();
@@ -3716,7 +3724,15 @@ window.processPaymentConfirmed = async function () {
                 }
                 balanceBefore = balance;
                 balanceAfter = balance - computedGrandTotal;
+            }
 
+            // ── PHASE 3: ALL WRITES ──
+
+            if (gcashReservation) {
+                window.commitGcashRefInTxn(transaction, gcashReservation.refDoc);
+            }
+
+            if (selectedPaymentMethod === 'RFID' && memberIdForCredit && memberDocRef) {
                 transaction.update(memberDocRef, {
                     creditBalance: balanceAfter
                 });
@@ -3736,7 +3752,7 @@ window.processPaymentConfirmed = async function () {
                 });
             }
 
-            // 4. Update inventory stock quantities (flat-qty items only)
+            // Update inventory stock quantities (flat-qty items only)
             for (let i = 0; i < inventorySnaps.length; i++) {
                 const snap = inventorySnaps[i];
                 const itemRef = inventoryDocRefs[i].ref;
@@ -5745,9 +5761,10 @@ window.confirmRenewal = async function (btn) {
             const currentTimestamp = Date.now() + (window.serverTimeOffsetMs || 0);
 
             await runTransaction(db, async (transaction) => {
-                // C4: reserve GCash ref atomically (must come before any writes)
+                // ── PHASE 1: ALL READS ──
+                let gcashReservation = null;
                 if (renewPayMethod === 'GCash' && renewGcashRef) {
-                    await window.reserveGcashRefInTxn(transaction, renewGcashRef);
+                    gcashReservation = await window.reserveGcashRefInTxn(transaction, renewGcashRef);
                 }
                 const memberRef = doc(db, "users", id);
                 const planRef = doc(db, "membershipPlans", selectedPlanId);
@@ -5756,6 +5773,14 @@ window.confirmRenewal = async function (btn) {
                     transaction.get(planRef)
                 ]);
 
+                let lockerRef = null;
+                let lockerSnap = null;
+                if (hasLocker && memberSnap.exists() && memberSnap.data().lockerId) {
+                    lockerRef = doc(db, "lockers", memberSnap.data().lockerId);
+                    lockerSnap = await transaction.get(lockerRef);
+                }
+
+                // ── PHASE 2: VALIDATION & BUSINESS LOGIC ──
                 if (!memberSnap.exists()) {
                     throw new Error("Member not found.");
                 }
@@ -5795,31 +5820,21 @@ window.confirmRenewal = async function (btn) {
                     expirySentNotification: false
                 };
 
+                let lockerUpdate = null;
                 if (hasLocker) {
                     updates.hasLocker = true;
                     if (!mData.lockerId) {
                         updates.lockerFeePrepaid = true;
                     }
-                    if (mData.lockerId) {
-                        const lockerRef = doc(db, "lockers", mData.lockerId);
-                        const lockerSnap = await transaction.get(lockerRef);
-                        if (lockerSnap.exists()) {
-                            const lData = lockerSnap.data();
-                            const currentExpiry = lData.expiryDate || Date.now();
-                            const baseDate = currentExpiry > Date.now() ? new Date(currentExpiry) : new Date();
-                            const newExpiry = new Date(baseDate.setMonth(baseDate.getMonth() + 1)).getTime();
-                            
-                            transaction.update(lockerRef, {
-                                expiryDate: newExpiry,
-                                status: 'Occupied'
-                            });
-                        }
+                    if (mData.lockerId && lockerRef && lockerSnap && lockerSnap.exists()) {
+                        const lData = lockerSnap.data();
+                        const currentExpiry = lData.expiryDate || Date.now();
+                        const baseDate = currentExpiry > Date.now() ? new Date(currentExpiry) : new Date();
+                        const newExpiry = new Date(baseDate.setMonth(baseDate.getMonth() + 1)).getTime();
+                        lockerUpdate = { expiryDate: newExpiry, status: 'Occupied' };
                     }
                 }
 
-                transaction.update(memberRef, updates);
-
-                // Record renewal payment
                 const paymentDocRef = doc(paymentsCol);
                 const paymentData = {
                     name: `${mData.givenName || mData.name} ${mData.familyName || ''}`.trim(),
@@ -5836,6 +5851,15 @@ window.confirmRenewal = async function (btn) {
                 if (renewPayMethod === 'GCash' && renewGcashRef) {
                     paymentData.gcashRefId = renewGcashRef;
                 }
+
+                // ── PHASE 3: ALL WRITES ──
+                if (gcashReservation) {
+                    window.commitGcashRefInTxn(transaction, gcashReservation.refDoc);
+                }
+                if (lockerRef && lockerUpdate) {
+                    transaction.update(lockerRef, lockerUpdate);
+                }
+                transaction.update(memberRef, updates);
                 transaction.set(paymentDocRef, paymentData);
             });
 
@@ -6569,16 +6593,19 @@ if (document.getElementById('assignLockerForm')) {
 
         try {
             await runTransaction(db, async (transaction) => {
-                // C4: reserve GCash ref atomically when locker payment uses GCash
+                // ── PHASE 1: ALL READS ──
+                let gcashReservation = null;
                 if (paymentOwed && payMethod === 'GCash' && gcashRef) {
-                    await window.reserveGcashRefInTxn(transaction, gcashRef);
+                    gcashReservation = await window.reserveGcashRefInTxn(transaction, gcashRef);
                 }
                 const lockerRef = doc(db, "lockers", lockerId);
                 const memberRef = doc(db, "users", memberId);
+                const [lockerSnap, memberSnap] = await Promise.all([
+                    transaction.get(lockerRef),
+                    transaction.get(memberRef)
+                ]);
 
-                const lockerSnap = await transaction.get(lockerRef);
-                const memberSnap = await transaction.get(memberRef);
-
+                // ── PHASE 2: VALIDATION & BUSINESS LOGIC ──
                 if (!lockerSnap.exists()) {
                     throw new Error("Locker record does not exist.");
                 }
@@ -6613,18 +6640,6 @@ if (document.getElementById('assignLockerForm')) {
                     }
                 }
 
-                // Update locker atomic status
-                transaction.update(lockerRef, {
-                    status: 'Occupied',
-                    memberId,
-                    memberName,
-                    expiryDate,
-                    assignedAt: Date.now()
-                });
-
-                // Calculate lease cost:
-                // If member has lockerFeePrepaid, they already paid for 1 month (₱300).
-                // If duration is greater than 1, they must pay for the remaining months (₱300 * (duration - 1)).
                 let leaseCost = 0;
                 let isPrepaidWaived = false;
 
@@ -6638,7 +6653,6 @@ if (document.getElementById('assignLockerForm')) {
                     leaseCost = 300 * duration;
                 }
 
-                // Update member atomic status
                 let memberUpdates = {
                     hasLocker: true,
                     lockerId: lockerId
@@ -6646,12 +6660,13 @@ if (document.getElementById('assignLockerForm')) {
                 if (memberData.lockerFeePrepaid) {
                     memberUpdates.lockerFeePrepaid = false;
                 }
-                transaction.update(memberRef, memberUpdates);
 
+                let paymentObj = null;
+                let paymentDocRef = null;
                 if (leaseCost > 0) {
-                    const paymentDocRef = doc(paymentsCol);
+                    paymentDocRef = doc(paymentsCol);
                     const nowTimestamp = Date.now();
-                    const paymentObj = {
+                    paymentObj = {
                         name: memberName,
                         transactionRef: generateTransactionRef(),
                         amount: leaseCost,
@@ -6668,6 +6683,21 @@ if (document.getElementById('assignLockerForm')) {
                     if (payMethod === 'GCash' && gcashRef) {
                         paymentObj.gcashRefId = gcashRef.replace(/\s/g, '');
                     }
+                }
+
+                // ── PHASE 3: ALL WRITES ──
+                if (gcashReservation) {
+                    window.commitGcashRefInTxn(transaction, gcashReservation.refDoc);
+                }
+                transaction.update(lockerRef, {
+                    status: 'Occupied',
+                    memberId,
+                    memberName,
+                    expiryDate,
+                    assignedAt: Date.now()
+                });
+                transaction.update(memberRef, memberUpdates);
+                if (paymentDocRef && paymentObj) {
                     transaction.set(paymentDocRef, paymentObj);
                 }
             });
@@ -8502,14 +8532,22 @@ if (document.getElementById('memberRegistrationForm')) {
             }
 
             await runTransaction(db, async (tx) => {
-                // C4: reserve GCash ref atomically for registration payments (use cleaned digits-only ref)
+                // ── PHASE 1: ALL READS ──
+                let gcashReservation = null;
                 if (regPayMethod === 'GCash' && cleanRegGcashRef) {
-                    await window.reserveGcashRefInTxn(tx, cleanRegGcashRef);
+                    gcashReservation = await window.reserveGcashRefInTxn(tx, cleanRegGcashRef);
                 }
                 let lockerRef = null;
+                let lockerSnap = null;
                 if (lockerId) {
                     lockerRef = doc(db, "lockers", lockerId);
-                    const lockerSnap = await tx.get(lockerRef);
+                    lockerSnap = await tx.get(lockerRef);
+                }
+                const planRef = doc(db, "membershipPlans", planId);
+                const planSnap = await tx.get(planRef);
+
+                // ── PHASE 2: VALIDATION & BUSINESS LOGIC ──
+                if (lockerId && lockerRef) {
                     if (!lockerSnap.exists()) {
                         throw new Error("Locker record does not exist.");
                     }
@@ -8517,10 +8555,6 @@ if (document.getElementById('memberRegistrationForm')) {
                         throw new Error("That locker has just been occupied by another member. Please select a different locker.");
                     }
                 }
-
-                // Authoritative plan fetch from Firestore inside transaction
-                const planRef = doc(db, "membershipPlans", planId);
-                const planSnap = await tx.get(planRef);
                 if (!planSnap.exists()) {
                     throw new Error("Selected plan no longer exists in database.");
                 }
@@ -8534,7 +8568,33 @@ if (document.getElementById('memberRegistrationForm')) {
                 const secureTotalAmount = planDbPrice + lockerPrice;
 
                 const newMemberRef = doc(usersCol);
-                
+                const paymentDocRef = doc(paymentsCol);
+                const paymentData = {
+                    name: `${given} ${family}`,
+                    transactionRef: generateTransactionRef(),
+                    amount: secureTotalAmount,
+                    items: `Membership: ${plan}${lockerId ? ' + Locker' : ''}`,
+                    type: "Membership",
+                    status: "Paid",
+                    paymentMethod: regPayMethod,
+                    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: currentTimestamp
+                };
+                if (regPayMethod === 'GCash' && cleanRegGcashRef) {
+                    paymentData.gcashRefId = cleanRegGcashRef;
+                }
+
+                let lockerExpiryDate = null;
+                if (lockerId && lockerRef) {
+                    const now = new Date();
+                    lockerExpiryDate = new Date(now.setMonth(now.getMonth() + 1)).getTime();
+                }
+
+                // ── PHASE 3: ALL WRITES ──
+                if (gcashReservation) {
+                    window.commitGcashRefInTxn(tx, gcashReservation.refDoc);
+                }
                 tx.set(newMemberRef, {
                     uid: window.generateUID("Member"),
                     name: `${given} ${family}`,
@@ -8559,34 +8619,16 @@ if (document.getElementById('memberRegistrationForm')) {
                     expirySentNotification: false
                 });
 
-                if (lockerId && lockerRef) {
-                    const now = new Date();
-                    const expiryDate = new Date(now.setMonth(now.getMonth() + 1)).getTime(); // Default 1 month
+                if (lockerId && lockerRef && lockerExpiryDate) {
                     tx.update(lockerRef, {
                         status: 'Occupied',
                         memberId: newMemberRef.id,
                         memberName: `${given} ${family}`.trim(),
-                        expiryDate,
+                        expiryDate: lockerExpiryDate,
                         assignedAt: Date.now()
                     });
                 }
 
-                const paymentDocRef = doc(paymentsCol);
-                const paymentData = {
-                    name: `${given} ${family}`,
-                    transactionRef: generateTransactionRef(),
-                    amount: secureTotalAmount,
-                    items: `Membership: ${plan}${lockerId ? ' + Locker' : ''}`,
-                    type: "Membership",
-                    status: "Paid",
-                    paymentMethod: regPayMethod,
-                    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                    time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-                    timestamp: currentTimestamp
-                };
-                if (regPayMethod === 'GCash' && cleanRegGcashRef) {
-                    paymentData.gcashRefId = cleanRegGcashRef;
-                }
                 tx.set(paymentDocRef, paymentData);
             });
 
@@ -9312,8 +9354,9 @@ window.isBookingSessionInPast = isBookingSessionInPast;
 
 // Scope the bookings listener by role to avoid syncing the entire bookings collection
 // to every client. Members only need their own bookings; trainers only their own sessions;
-// staff/admin keep collection-wide but only from today onward.
-(function attachBookingsListener() {
+// staff/admin date scoping is owned by bookings-ui.js buildBookingsQuery() (blank inputs = full catalog).
+let _bookingsUnsub = null;
+function bindBookingsListener() {
     if (!currentUserId) return;
     let bookingsQuery;
     if (roleNorm === "member") {
@@ -9321,22 +9364,18 @@ window.isBookingSessionInPast = isBookingSessionInPast;
     } else if (roleNorm === "trainer") {
         bookingsQuery = query(bookingsCol, where("trainerId", "==", currentUserId));
     } else if (isStaffSide) {
-        // QUOTA FIX: bookings.date is stored YYYY-MM-DD (en-CA / ISO), which IS
-        // lexicographically sortable — so a server-side range filter works. Keep the
-        // last 90 days plus all future bookings. Previously this loaded the ENTIRE
-        // collection on every staff/admin connect; the bookings table grew unbounded
-        // for the lifetime of the gym. 90 days covers quarterly reporting, all
-        // dashboard KPIs (today / this-week / no-shows-week), and trainer payroll.
-        const cutoff = new Date();
-        // PRESENTATION PROOFING: Reduce bookings lookup history to 14 days for extreme presentation speed
-        // and minimum read overhead.
-        cutoff.setDate(cutoff.getDate() - 14);
-        const cutoffStr = cutoff.toLocaleDateString('en-CA');
-        bookingsQuery = query(bookingsCol, where("date", ">=", cutoffStr));
+        bookingsQuery = typeof window.buildBookingsQuery === 'function'
+            ? window.buildBookingsQuery()
+            : bookingsCol;
+        if (!bookingsQuery) return;
     } else {
         return;
     }
-    onSnapshot(bookingsQuery, (snapshot) => {
+    if (_bookingsUnsub) {
+        _bookingsUnsub();
+        _bookingsUnsub = null;
+    }
+    _bookingsUnsub = onSnapshot(bookingsQuery, (snapshot) => {
         bookingsData = [];
         snapshot.forEach(doc => bookingsData.push({ id: doc.id, ...doc.data() }));
         window.bookingsData = bookingsData;
@@ -9366,7 +9405,9 @@ window.isBookingSessionInPast = isBookingSessionInPast;
             }
         }
     });
-})();
+}
+window.rebindBookingsListener = bindBookingsListener;
+bindBookingsListener();
 
 window.renderBookings = renderBookings;
 function renderBookings() {
@@ -9534,7 +9575,8 @@ function renderBookings() {
                 const rescheduleBtn = canReschedule
                     ? `<button type="button" class="btn-icon btn-edit btn-xs" title="Reschedule Booking" onclick="openRescheduleModal('${b.id}')"><i class="fas fa-rotate"></i></button>`
                     : '';
-                const cancelBtnInner = b.status === "Pending"
+                const cancelBtnInner = (b.status === "Pending" || b.status === "Confirmed")
+                    && !(window.isBookingTerminalStatus && window.isBookingTerminalStatus(b.status))
                     ? `<button type="button" class="btn-icon btn-delete btn-xs" title="Cancel Booking" onclick="cancelMemberBooking('${b.id}', this)"><i class="fas fa-times-circle"></i></button>`
                     : '';
                 const actionsCell = (rescheduleBtn || cancelBtnInner)
@@ -9552,7 +9594,9 @@ function renderBookings() {
                 `;
             } else {
             let actions = "";
-            if (loggedInRole === "trainer") {
+            if (window.isBookingTerminalStatus && window.isBookingTerminalStatus(b.status)) {
+                actions = "";
+            } else if (loggedInRole === "trainer") {
                 if (b.status === "Pending") {
                     actions = `
                         <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed', this)"><i class="fas fa-check"></i></button>
@@ -9618,7 +9662,7 @@ function renderBookings() {
     }
 }
 
-window.filterBookingsByDate = () => { bkCurrentPage = 1; renderBookings(); };
+window.filterBookingsByDate = () => { renderBookings(); };
 window.filterMyBookings = () => { myBkCurrentPage = 1; renderBookings(); };
 window.filterActivityLogs = () => { activityCurrentPage = 1; renderActivityLogs(); };
 window.filterLedger = () => { ledgerCurrentPage = 1; renderLedger(); };
@@ -9718,6 +9762,10 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
     // Validate transition
     const currentBooking = (window.bookingsData || []).find(x => x.id === id);
     if (currentBooking) {
+        if (window.isBookingTerminalStatus && window.isBookingTerminalStatus(currentBooking.status)) {
+            _release();
+            return showToast(`This booking is ${currentBooking.status} and is locked for audit integrity.`, "error");
+        }
         const currentStatus = currentBooking.status || 'Pending';
         const allowed = window.BOOKING_STATUS_TRANSITIONS[currentStatus] || [];
         if (currentStatus !== newStatus && !allowed.includes(newStatus)) {
@@ -9757,31 +9805,39 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
 
                     const b = (window.bookingsData || []).find(x => x.id === id);
                     if (!b) { _release(); return; }
+                    const uiStatusAtPrompt = b.status || 'Pending';
 
                     try {
+                        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
                         await runTransaction(db, async (tx) => {
                             const bookingRef = doc(db, "bookings", id);
                             const bSnap = await tx.get(bookingRef);
                             if (!bSnap.exists()) throw new Error("Booking no longer exists.");
-                            const bData = bSnap.data();
-                            _assertOwnership(bData);
+                            const bData = bSnap.data() || {};
 
-                            // L1: if the booking already moved past Pending (e.g. the
-                            // member cancelled while the trainer was typing remarks),
-                            // surface a clear message instead of a generic failure.
-                            if (bData.status !== 'Pending' && bData.status !== 'Confirmed') {
-                                throw new Error(`This session was already marked "${bData.status}". No further action needed.`);
+                            let memberRef = null;
+                            let memberSnap = null;
+                            if (bookingHoldsCredit(bData) && bData.memberId) {
+                                memberRef = doc(db, "users", bData.memberId);
+                                memberSnap = await tx.get(memberRef);
                             }
 
-                            // Idempotent refund: only when credit is currently held
+                            _assertOwnership(bData);
+                            if (window.verifyBookingServerState) {
+                                window.verifyBookingServerState(bData, uiStatusAtPrompt);
+                            }
+                            if (bData.status !== 'Pending' && bData.status !== 'Confirmed') {
+                                throw new Error(window.BOOKING_STATE_CHANGED_MSG || `This session was already marked "${bData.status}". No further action needed.`);
+                            }
+
                             if (bookingHoldsCredit(bData) && bData.memberId) {
-                                tx.update(doc(db, "users", bData.memberId), { sessionsRemaining: increment(1) });
+                                if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
+                                tx.update(memberRef, { sessionsRemaining: increment(1) });
                                 tx.update(bookingRef, { status: newStatus, cancelRemarks: template, creditState: 'refunded' });
                             } else {
                                 tx.update(bookingRef, { status: newStatus, cancelRemarks: template });
                             }
 
-                            // Free the trainer slot lock
                             if (bData.trainerId && bData.date && bData.time) {
                                 tx.delete(doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
                             }
@@ -9790,14 +9846,18 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
                             }
                         });
                     } catch (err) {
-                        _release();
                         console.error("Status-change transaction failed:", err);
-                        // L1: friendlier message when the booking vanished mid-flow.
                         const msg = (err && err.message) || '';
                         if (msg.includes("no longer exists")) {
-                            return showToast("This booking was already cancelled or removed.", "info");
+                            if (window.bookingActionFailedToast) window.bookingActionFailedToast(err);
+                            else showToast("This booking was already cancelled or removed.", "info");
+                        } else if (window.bookingActionFailedToast) {
+                            window.bookingActionFailedToast(err);
+                        } else {
+                            showToast(msg || `Failed to mark session ${newStatus.toLowerCase()}.`, "error");
                         }
-                        return showToast(msg || `Failed to mark session ${newStatus.toLowerCase()}.`, "error");
+                        _release();
+                        return;
                     }
 
                     // Send chat message to the member (outside tx — non-critical)
@@ -9834,33 +9894,96 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
         tone: 'success',
         confirmText: newStatus,
         onConfirm: async () => {
+        const uiStatusAtConfirm = (currentBooking && currentBooking.status) || 'Pending';
         try {
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
             await _assertNotFutureCompleted(currentBooking); // BUG-12: fresh time sync before write
+            if (newStatus === 'Confirmed' && currentBooking) {
+                try {
+                    if (typeof window.queryTrainerScheduleConflict === 'function') {
+                        const conflict = await window.queryTrainerScheduleConflict(
+                            currentBooking.trainerId, currentBooking.date, currentBooking.time, id
+                        );
+                        if (conflict) {
+                            throw new Error("Scheduling Conflict: Trainer already booked for this time slot.");
+                        }
+                    }
+                } catch (preErr) {
+                    console.error("Trainer conflict pre-check failed:", preErr);
+                    throw preErr;
+                }
+            }
             await runTransaction(db, async (tx) => {
                 const bookingRef = doc(db, "bookings", id);
                 const bSnap = await tx.get(bookingRef);
                 if (!bSnap.exists()) throw new Error("Booking no longer exists.");
-                const bData = bSnap.data();
+                const bData = bSnap.data() || {};
+
+                let memberRef = null;
+                let slotRef = null;
+                const needsMemberRead = !!(
+                    bData.memberId && (
+                        newStatus === 'Confirmed'
+                        || ((newStatus === 'Completed' || newStatus === 'No Show') && !bData.creditState)
+                    )
+                );
+                const needsSlotRead = !!(newStatus === 'Confirmed' && bData.trainerId && bData.date && bData.time);
+
+                if (needsMemberRead) memberRef = doc(db, "users", bData.memberId);
+                if (needsSlotRead) slotRef = doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time));
+
+                const memberSnap = memberRef ? await tx.get(memberRef) : null;
+                const slotSnap = slotRef ? await tx.get(slotRef) : null;
+
                 _assertOwnership(bData);
                 await _assertNotFutureCompleted(bData);
 
-                if (newStatus === 'Completed' || newStatus === 'No Show') {
-                    // Idempotent: a previously-held credit becomes consumed; no balance change
-                    // (decrement already happened at booking creation). For legacy bookings
-                    // without creditState, fall back to a one-time decrement, also idempotent.
+                if (window.verifyBookingServerState) {
+                    window.verifyBookingServerState(bData, uiStatusAtConfirm);
+                }
+                if (window.isBookingTerminalStatus && window.isBookingTerminalStatus(bData.status)) {
+                    throw new Error(`This booking is ${bData.status} and is locked for audit integrity.`);
+                }
+
+                if (newStatus === 'Confirmed') {
+                    if (bData.status !== 'Pending') {
+                        throw new Error(window.BOOKING_STATE_CHANGED_MSG || `Cannot confirm a booking that is already ${bData.status}.`);
+                    }
+                    if (memberRef) {
+                        if (!memberSnap || !memberSnap.exists()) {
+                            throw new Error("Operation Aborted: Member has insufficient session credits or an inactive package.");
+                        }
+                        const mData = memberSnap.data() || {};
+                        const inactiveStatuses = new Set(['Suspended', 'Archived', 'Frozen', 'Expired', 'On Leave']);
+                        if (inactiveStatuses.has(mData.status || 'Active')) {
+                            throw new Error("Operation Aborted: Member has insufficient session credits or an inactive package.");
+                        }
+                        if (window.isMemberPlanExpired && window.isMemberPlanExpired(mData)) {
+                            throw new Error("Operation Aborted: Member has insufficient session credits or an inactive package.");
+                        }
+                        const sessionsRemaining = mData.sessionsRemaining !== undefined ? Number(mData.sessionsRemaining) : 0;
+                        if (bData.creditState !== 'held' && sessionsRemaining <= 0) {
+                            throw new Error("Operation Aborted: Member has insufficient session credits or an inactive package.");
+                        }
+                    }
+                    if (slotSnap && slotSnap.exists()) {
+                        const slotBookingId = (slotSnap.data() || {}).bookingId;
+                        if (slotBookingId && slotBookingId !== id) {
+                            throw new Error("Scheduling Conflict: Trainer already booked for this time slot.");
+                        }
+                    }
+                    tx.update(bookingRef, { status: newStatus });
+                } else if (newStatus === 'Completed' || newStatus === 'No Show') {
                     if (bData.creditState === 'consumed') {
-                        // already finalized — only update status if it changed
                         tx.update(bookingRef, { status: newStatus });
                     } else if (bookingHoldsCredit(bData)) {
                         tx.update(bookingRef, { status: newStatus, creditState: 'consumed' });
-                    } else if (!bData.creditState && bData.memberId) {
-                        // legacy doc: mirror old behavior once, then mark consumed
-                        tx.update(doc(db, "users", bData.memberId), { sessionsRemaining: increment(-1) });
+                    } else if (!bData.creditState && bData.memberId && memberRef && memberSnap && memberSnap.exists()) {
+                        tx.update(memberRef, { sessionsRemaining: increment(-1) });
                         tx.update(bookingRef, { status: newStatus, creditState: 'consumed' });
                     } else {
                         tx.update(bookingRef, { status: newStatus });
                     }
-                    // Free slot locks
                     if (bData.trainerId && bData.date && bData.time) {
                         tx.delete(doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
                     }
@@ -9871,15 +9994,15 @@ window.updateBookingStatus = async (id, newStatus, btn) => {
                     tx.update(bookingRef, { status: newStatus });
                 }
             });
+            showToast(`Session marked as ${newStatus}.`, "success");
+            if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}.`);
         } catch (err) {
-            _release();
             console.error("Status-change transaction failed:", err);
-            return showToast(err.message || "Failed to update session status.", "error");
+            if (window.bookingActionFailedToast) window.bookingActionFailedToast(err);
+            else showToast(err.message || "Failed to update session status.", "error");
+        } finally {
+            _release();
         }
-
-        _release();
-        showToast(`Session marked as ${newStatus}.`, "success");
-        if (window.logActivity) window.logActivity("Booking Status Updated", `Booking ${id} marked as ${newStatus}.`);
         },
         onCancel: _release,
     });
@@ -10836,6 +10959,9 @@ if (document.getElementById('bookingForm')) {
 window.openEditBookingModal = (id) => {
     const b = bookingsData.find(x => x.id === id);
     if (!b) return;
+    if (window.isBookingTerminalStatus && window.isBookingTerminalStatus(b.status)) {
+        return showToast(`This booking is ${b.status} and is locked for audit integrity.`, "error");
+    }
     const dateObj = new Date(`${b.date}T${b.time}`);
     const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), timeStr = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
@@ -10889,6 +11015,10 @@ if (document.getElementById('editBookingForm')) {
         // Block illegal transitions same as updateBookingStatus does
         const currentBooking = (window.bookingsData || []).find(x => x.id === id);
         if (currentBooking) {
+            if (window.isBookingTerminalStatus && window.isBookingTerminalStatus(currentBooking.status)) {
+                _rearmBtn();
+                return showToast(`This booking is ${currentBooking.status} and is locked for audit integrity.`, "error");
+            }
             const currentStatus = currentBooking.status || 'Pending';
             const allowed = window.BOOKING_STATUS_TRANSITIONS[currentStatus] || [];
             if (currentStatus !== status && !allowed.includes(status)) {
@@ -10902,22 +11032,114 @@ if (document.getElementById('editBookingForm')) {
                     return showToast("Cannot mark a future session as Completed.", "error");
                 }
             }
+            if (status === 'Confirmed' && currentBooking) {
+                const member = (window.membersData || []).find(m => m.id === currentBooking.memberId);
+                if (typeof window.assertMemberBookingEligible === 'function') {
+                    const elig = window.assertMemberBookingEligible(member || null, currentBooking);
+                    if (!elig.ok) {
+                        _rearmBtn();
+                        return showToast(elig.message, "error");
+                    }
+                }
+                try {
+                    if (typeof window.queryTrainerScheduleConflict === 'function') {
+                        const conflict = await window.queryTrainerScheduleConflict(
+                            currentBooking.trainerId, currentBooking.date, currentBooking.time, id
+                        );
+                        if (conflict) {
+                            _rearmBtn();
+                            return showToast("Scheduling Conflict: Trainer already booked for this time slot.", "error");
+                        }
+                    }
+                } catch (preErr) {
+                    _rearmBtn();
+                    console.error("Trainer conflict pre-check failed:", preErr);
+                    return showToast("Unable to verify trainer availability. Please try again.", "error");
+                }
+            }
         }
+
+        const uiStatusAtSubmit = (currentBooking && currentBooking.status) || 'Pending';
 
         try {
             await runTransaction(db, async (tx) => {
                 const bookingRef = doc(db, "bookings", id);
                 const bSnap = await tx.get(bookingRef);
                 if (!bSnap.exists()) throw new Error("Booking no longer exists.");
-                const bData = bSnap.data();
+                const bData = bSnap.data() || {};
+
+                let memberRef = null;
+                let slotRef = null;
+                const needsMemberRead = !!(
+                    bData.memberId && (
+                        status === 'Confirmed'
+                        || ((status === 'Cancelled' || status === 'Declined') && bookingHoldsCredit(bData))
+                        || ((status === 'Completed' || status === 'No Show') && !bData.creditState)
+                    )
+                );
+                if (needsMemberRead) memberRef = doc(db, "users", bData.memberId);
+                if (status === 'Confirmed' && bData.trainerId && bData.date && bData.time) {
+                    slotRef = doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time));
+                }
+
+                const memberSnap = memberRef ? await tx.get(memberRef) : null;
+                const slotSnap = slotRef ? await tx.get(slotRef) : null;
+
+                if (window.isBookingTerminalStatus && window.isBookingTerminalStatus(bData.status)) {
+                    throw new Error(`This booking is ${bData.status} and is locked for audit integrity.`);
+                }
+                if (window.verifyBookingServerState) {
+                    window.verifyBookingServerState(bData, uiStatusAtSubmit);
+                }
 
                 const update = { status };
                 if (remarks) update.cancelRemarks = remarks;
 
-                if (status === 'Cancelled' || status === 'Declined') {
+                if (status === 'Confirmed') {
+                    if (bData.status !== 'Pending') {
+                        throw new Error(window.BOOKING_STATE_CHANGED_MSG || `Cannot confirm a booking that is already ${bData.status}.`);
+                    }
+                    if (memberRef) {
+                        if (!memberSnap || !memberSnap.exists()) {
+                            throw new Error("Operation Aborted: Member has insufficient session credits or an inactive package.");
+                        }
+                        const mData = memberSnap.data() || {};
+                        const inactiveStatuses = new Set(['Suspended', 'Archived', 'Frozen', 'Expired', 'On Leave']);
+                        if (inactiveStatuses.has(mData.status || 'Active')) {
+                            throw new Error("Operation Aborted: Member has insufficient session credits or an inactive package.");
+                        }
+                        if (window.isMemberPlanExpired && window.isMemberPlanExpired(mData)) {
+                            throw new Error("Operation Aborted: Member has insufficient session credits or an inactive package.");
+                        }
+                        const sessionsRemaining = mData.sessionsRemaining !== undefined ? Number(mData.sessionsRemaining) : 0;
+                        if (bData.creditState !== 'held' && sessionsRemaining <= 0) {
+                            throw new Error("Operation Aborted: Member has insufficient session credits or an inactive package.");
+                        }
+                    }
+                    if (slotSnap && slotSnap.exists()) {
+                        const slotBookingId = (slotSnap.data() || {}).bookingId;
+                        if (slotBookingId && slotBookingId !== id) {
+                            throw new Error("Scheduling Conflict: Trainer already booked for this time slot.");
+                        }
+                    }
+                } else if (status === 'Cancelled' || status === 'Declined') {
                     if (bookingHoldsCredit(bData) && bData.memberId) {
-                        tx.update(doc(db, "users", bData.memberId), { sessionsRemaining: increment(1) });
+                        if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
                         update.creditState = 'refunded';
+                    }
+                } else if (status === 'Completed' || status === 'No Show') {
+                    if (bData.creditState === 'consumed') {
+                        // already finalized
+                    } else if (bookingHoldsCredit(bData)) {
+                        update.creditState = 'consumed';
+                    } else if (!bData.creditState && bData.memberId && memberSnap && memberSnap.exists()) {
+                        update.creditState = 'consumed';
+                    }
+                }
+
+                if (status === 'Cancelled' || status === 'Declined') {
+                    if (bookingHoldsCredit(bData) && bData.memberId && memberRef && memberSnap && memberSnap.exists()) {
+                        tx.update(memberRef, { sessionsRemaining: increment(1) });
                     }
                     if (bData.trainerId && bData.date && bData.time) {
                         tx.delete(doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
@@ -10926,13 +11148,8 @@ if (document.getElementById('editBookingForm')) {
                         tx.delete(doc(db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, bData.time)));
                     }
                 } else if (status === 'Completed' || status === 'No Show') {
-                    if (bData.creditState === 'consumed') {
-                        // already finalized
-                    } else if (bookingHoldsCredit(bData)) {
-                        update.creditState = 'consumed';
-                    } else if (!bData.creditState && bData.memberId) {
-                        tx.update(doc(db, "users", bData.memberId), { sessionsRemaining: increment(-1) });
-                        update.creditState = 'consumed';
+                    if (!bData.creditState && bData.memberId && memberRef && memberSnap && memberSnap.exists() && update.creditState === 'consumed') {
+                        tx.update(memberRef, { sessionsRemaining: increment(-1) });
                     }
                     if (bData.trainerId && bData.date && bData.time) {
                         tx.delete(doc(db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
@@ -10941,12 +11158,15 @@ if (document.getElementById('editBookingForm')) {
                         tx.delete(doc(db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, bData.time)));
                     }
                 }
+
                 tx.update(bookingRef, update);
             });
         } catch (err) {
-            _rearmBtn();
             console.error("Edit booking transaction failed:", err);
-            return showToast(err.message || "Failed to update booking.", "error");
+            if (window.bookingActionFailedToast) window.bookingActionFailedToast(err);
+            else showToast(err.message || "Failed to update booking.", "error");
+            _rearmBtn();
+            return;
         }
 
         // Send as chat message if cancelled/declined
@@ -10982,6 +11202,10 @@ window.deleteBooking = async (id, btn) => {
     const _callerRole = (localStorage.getItem("userRole") || '').toLowerCase();
     if (_callerRole !== 'admin' && _callerRole !== 'staff') {
         return showToast("You do not have permission to delete booking records.", "error");
+    }
+    const _target = (window.bookingsData || []).find(x => x.id === id);
+    if (_target && window.isBookingTerminalStatus && window.isBookingTerminalStatus(_target.status)) {
+        return showToast(`Cannot delete a ${_target.status} booking record.`, "error");
     }
     const _origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
@@ -11024,32 +11248,78 @@ window.cancelMemberBooking = function (bookingId, btn) {
     const _origBtnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
     const _rearmBtn = () => { if (btn) { btn.disabled = false; btn.innerHTML = _origBtnHtml; } };
-    showConfirm({ message: "Cancel this booking request? Your session credit will be refunded.", onCancel: _rearmBtn, onConfirm: async () => {
+
+    const _preview = (window.bookingsData || []).find(x => x.id === bookingId);
+    if (_preview && window.isBookingTerminalStatus && window.isBookingTerminalStatus(_preview.status)) {
+        _rearmBtn();
+        return showToast(`This booking is ${_preview.status} and cannot be cancelled.`, "error");
+    }
+
+    const isLateCancel = _preview && typeof window.isLateCancellation === 'function'
+        && window.isLateCancellation(_preview);
+    const confirmMessage = isLateCancel
+        ? "Late Cancellation Rule Applied: Session credit forfeited.\n\nYou are cancelling within 2 hours of the session start. Your credit will NOT be refunded. Proceed?"
+        : "Cancel this booking request? Your session credit will be refunded.";
+
+    showConfirm({ message: confirmMessage, onCancel: _rearmBtn, onConfirm: async () => {
+        const uiStatusAtCancel = (_preview && _preview.status) || 'Pending';
         try {
-            // R2 (Sprint 7): `window.cancelMemberBooking` was console-callable on any
-            // bookingId — Member A could cancel Member B's pending booking. Caller must
-            // either own the booking or hold an admin/staff role.
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; }
             const callerId = localStorage.getItem("userId");
             const callerRole = (localStorage.getItem("userRole") || '').toLowerCase();
+            let lateForfeitApplied = false;
             await runTransaction(db, async (tx) => {
                 const bookingRef = doc(db, "bookings", bookingId);
                 const bSnap = await tx.get(bookingRef);
                 if (!bSnap.exists()) throw new Error("This booking no longer exists.");
-                const bData = bSnap.data();
-                // Ownership / RBAC gate inside the txn so the credit refund and slot
-                // cleanup can't be triggered against someone else's booking.
+                const bData = bSnap.data() || {};
+
+                let memberRef = null;
+                let memberSnap = null;
+                const willRefund = !(
+                    typeof window.isLateCancellation === 'function'
+                    && window.isLateCancellation({ date: bData.date, time: bData.time })
+                ) && bookingHoldsCredit(bData) && bData.memberId;
+                if (willRefund) {
+                    memberRef = doc(db, "users", bData.memberId);
+                    memberSnap = await tx.get(memberRef);
+                }
+
+                if (window.isBookingTerminalStatus && window.isBookingTerminalStatus(bData.status)) {
+                    throw new Error(`This booking is ${bData.status} and cannot be cancelled.`);
+                }
+                if (window.verifyBookingServerState) {
+                    window.verifyBookingServerState(bData, uiStatusAtCancel);
+                }
                 const isOwner = bData.memberId && bData.memberId === callerId;
                 const isPrivileged = callerRole === 'admin' || callerRole === 'staff';
                 if (!isOwner && !isPrivileged) {
                     throw new Error("You can only cancel your own bookings.");
                 }
-                if (bData.status !== "Pending") {
-                    throw new Error("This booking can no longer be cancelled.");
+                if (bData.status !== "Pending" && bData.status !== "Confirmed") {
+                    throw new Error(window.BOOKING_STATE_CHANGED_MSG || "This booking can no longer be cancelled.");
                 }
 
-                // Idempotent refund: only when credit is actually held
-                if (bookingHoldsCredit(bData) && bData.memberId) {
-                    tx.update(doc(db, "users", bData.memberId), { sessionsRemaining: increment(1) });
+                const lateCancel = typeof window.isLateCancellation === 'function'
+                    && window.isLateCancellation({ date: bData.date, time: bData.time });
+
+                if (lateCancel) {
+                    lateForfeitApplied = true;
+                    if (bookingHoldsCredit(bData)) {
+                        tx.update(bookingRef, {
+                            status: "Cancelled",
+                            cancelRemarks: "Late cancellation — session credit forfeited.",
+                            creditState: 'consumed'
+                        });
+                    } else {
+                        tx.update(bookingRef, {
+                            status: "Cancelled",
+                            cancelRemarks: "Late cancellation — session credit forfeited."
+                        });
+                    }
+                } else if (willRefund) {
+                    if (!memberSnap || !memberSnap.exists()) throw new Error("Member record no longer exists.");
+                    tx.update(memberRef, { sessionsRemaining: increment(1) });
                     tx.update(bookingRef, { status: "Cancelled", cancelRemarks: "Cancelled by member.", creditState: 'refunded' });
                 } else {
                     tx.update(bookingRef, { status: "Cancelled", cancelRemarks: "Cancelled by member." });
@@ -11061,11 +11331,16 @@ window.cancelMemberBooking = function (bookingId, btn) {
                     tx.delete(doc(db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, bData.time)));
                 }
             });
-            showToast("Booking cancelled and session credit restored.", "success");
+            if (lateForfeitApplied) {
+                showToast("Late Cancellation Rule Applied: Session credit forfeited.", "warning");
+            } else {
+                showToast("Booking cancelled and session credit restored.", "success");
+            }
             if (window.logActivity) window.logActivity("Booking Cancelled", `Member cancelled booking ID: ${bookingId}.`);
         } catch (err) {
             console.error("Cancel booking failed:", err);
-            showToast(err.message || "Failed to cancel booking.", "error");
+            if (window.bookingActionFailedToast) window.bookingActionFailedToast(err);
+            else showToast(err.message || "Failed to cancel booking.", "error");
         } finally {
             _rearmBtn();
         }
@@ -11472,44 +11747,26 @@ if (document.getElementById('addCreditForm')) {
 
             // Execute atomic transaction for balance + creditTransactions + payment record!
             await runTransaction(db, async (transaction) => {
-                // C4: reserve GCash ref atomically before any writes
+                // ── PHASE 1: ALL READS ──
+                let gcashReservation = null;
                 if (paymentMethod === 'GCash') {
                     const _ref = (document.getElementById('addCreditGcashRefId').value || '').replace(/\s/g, '');
-                    if (_ref) await window.reserveGcashRefInTxn(transaction, _ref);
+                    if (_ref) gcashReservation = await window.reserveGcashRefInTxn(transaction, _ref);
                 }
                 const memberSnap = await transaction.get(memberRef);
+
+                // ── PHASE 2: VALIDATION & BUSINESS LOGIC ──
                 if (!memberSnap.exists()) {
                     throw new Error("Member record not found.");
                 }
                 if ((memberSnap.data().status || 'Active') === 'Archived') {
                     throw new Error("ACCESS_DENIED: Cannot top up credit for an archived member.");
                 }
-                
+
                 const currentBalance = memberSnap.data().creditBalance || 0;
                 const newBalance = currentBalance + amount;
 
-                // 1. Update Member balance
-                transaction.update(memberRef, {
-                    creditBalance: newBalance
-                });
-
-                // 2. Write credit transactions log
                 const creditTxRef = doc(collection(db, "creditTransactions"));
-                transaction.set(creditTxRef, {
-                    memberId,
-                    memberName: member.name || (member.givenName + ' ' + member.familyName),
-                    type: "top-up",
-                    amount,
-                    balanceBefore: currentBalance,
-                    balanceAfter: newBalance,
-                    paymentMethod,
-                    note: note || "Counter top-up",
-                    processedBy: localStorage.getItem("userId"),
-                    processedByName: localStorage.getItem("loggedInUser"),
-                    timestamp: Date.now()
-                });
-
-                // 3. Write payment ledger entry
                 const now = new Date();
                 const paymentDocRef = doc(collection(db, "payments"));
                 const paymentObj = {
@@ -11527,6 +11784,27 @@ if (document.getElementById('addCreditForm')) {
                 if (paymentMethod === 'GCash') {
                     paymentObj.gcashRefId = (document.getElementById('addCreditGcashRefId').value || '').replace(/\s/g, '');
                 }
+
+                // ── PHASE 3: ALL WRITES ──
+                if (gcashReservation) {
+                    window.commitGcashRefInTxn(transaction, gcashReservation.refDoc);
+                }
+                transaction.update(memberRef, {
+                    creditBalance: newBalance
+                });
+                transaction.set(creditTxRef, {
+                    memberId,
+                    memberName: member.name || (member.givenName + ' ' + member.familyName),
+                    type: "top-up",
+                    amount,
+                    balanceBefore: currentBalance,
+                    balanceAfter: newBalance,
+                    paymentMethod,
+                    note: note || "Counter top-up",
+                    processedBy: localStorage.getItem("userId"),
+                    processedByName: localStorage.getItem("loggedInUser"),
+                    timestamp: Date.now()
+                });
                 transaction.set(paymentDocRef, paymentObj);
             });
 

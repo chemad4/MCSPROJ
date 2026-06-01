@@ -12,6 +12,193 @@ let _bkRenderLock = false; // Prevent infinite re-render loops
 let bkCurrentPage = 1;
 const bkItemsPerPage = 20;
 
+// --- Bookings table boot: keep date filters blank; build conditional Firestore query ---
+(function initBookingsTable() {
+    function clearBookingsDateInputs() {
+        const fromEl = document.getElementById('bkDateFrom');
+        const toEl = document.getElementById('bkDateTo');
+        // Do not prefill with today — empty inputs mean "no date constraint".
+        if (fromEl) fromEl.value = '';
+        if (toEl) toEl.value = '';
+    }
+
+    window.buildBookingsQuery = function () {
+        const fb = window._fb;
+        if (!fb) return null;
+
+        const currentUserId = localStorage.getItem('userId');
+        const roleNorm = (localStorage.getItem('userRole') || '').toLowerCase();
+        const isStaffSide = roleNorm === 'admin' || roleNorm === 'staff';
+
+        const constraints = [];
+        if (roleNorm === 'member') {
+            if (!currentUserId) return null;
+            constraints.push(fb.where('memberId', '==', currentUserId));
+        } else if (roleNorm === 'trainer') {
+            if (!currentUserId) return null;
+            constraints.push(fb.where('trainerId', '==', currentUserId));
+        } else if (isStaffSide) {
+            const startVal = document.getElementById('bkDateFrom')?.value || '';
+            const endVal = document.getElementById('bkDateTo')?.value || '';
+            if (startVal) constraints.push(fb.where('date', '>=', startVal));
+            if (endVal) constraints.push(fb.where('date', '<=', endVal));
+        } else {
+            return null;
+        }
+
+        return constraints.length
+            ? fb.query(fb.bookingsCol, ...constraints)
+            : fb.bookingsCol;
+    };
+
+    function bootstrapBookingsPipeline() {
+        clearBookingsDateInputs();
+        if (typeof window.rebindBookingsListener === 'function') {
+            window.rebindBookingsListener();
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', clearBookingsDateInputs);
+    } else {
+        clearBookingsDateInputs();
+    }
+
+    const pipelinePoll = setInterval(() => {
+        if (typeof window.rebindBookingsListener !== 'function') return;
+        clearInterval(pipelinePoll);
+        bootstrapBookingsPipeline();
+    }, 100);
+})();
+
+// --- Business rule guards (bridged to script.js status / cancellation modules) ---
+const BOOKING_TERMINAL_STATUSES = new Set(['Completed', 'Cancelled', 'Declined', 'No Show']);
+const BOOKING_ACTIVE_SLOT_STATUSES = ['Confirmed', 'active', 'In Session'];
+const BOOKING_INACTIVE_PACKAGE_STATUSES = new Set(['Suspended', 'Archived', 'Frozen', 'Expired', 'On Leave']);
+const BOOKING_LATE_CANCEL_MS = 2 * 60 * 60 * 1000;
+const MEMBER_ELIGIBILITY_ABORT_MSG = 'Operation Aborted: Member has insufficient session credits or an inactive package.';
+const TRAINER_CONFLICT_MSG = 'Scheduling Conflict: Trainer already booked for this time slot.';
+
+window.BOOKING_TERMINAL_STATUSES = BOOKING_TERMINAL_STATUSES;
+window.BOOKING_LATE_CANCEL_MS = BOOKING_LATE_CANCEL_MS;
+
+window.isBookingTerminalStatus = function (status) {
+    return BOOKING_TERMINAL_STATUSES.has(status);
+};
+
+window.getBookingSessionStartMs = function (booking) {
+    if (!booking || !booking.date || !booking.time) return NaN;
+    return new Date(`${booking.date}T${booking.time}`).getTime();
+};
+
+window.isLateCancellation = function (booking) {
+    const startMs = window.getBookingSessionStartMs(booking);
+    if (isNaN(startMs)) return false;
+    const offset = window.serverTimeOffsetMs || 0;
+    const diffMs = startMs - (Date.now() + offset);
+    return diffMs >= 0 && diffMs < BOOKING_LATE_CANCEL_MS;
+};
+
+window.assertMemberBookingEligible = function (memberData, bookingContext) {
+    if (!memberData) {
+        return { ok: false, message: MEMBER_ELIGIBILITY_ABORT_MSG };
+    }
+    const pkgStatus = memberData.status || 'Active';
+    if (BOOKING_INACTIVE_PACKAGE_STATUSES.has(pkgStatus)) {
+        return { ok: false, message: MEMBER_ELIGIBILITY_ABORT_MSG };
+    }
+    if (typeof window.isMemberPlanExpired === 'function' && window.isMemberPlanExpired(memberData)) {
+        return { ok: false, message: MEMBER_ELIGIBILITY_ABORT_MSG };
+    }
+    const creditHeld = bookingContext && bookingContext.creditState === 'held';
+    const sessionsRemaining = memberData.sessionsRemaining !== undefined
+        ? Number(memberData.sessionsRemaining)
+        : 0;
+    if (!creditHeld && (isNaN(sessionsRemaining) || sessionsRemaining <= 0)) {
+        return { ok: false, message: MEMBER_ELIGIBILITY_ABORT_MSG };
+    }
+    return { ok: true };
+};
+
+window._bookingHourKey = function (timeStr) {
+    const hour = parseInt((timeStr || '').split(':')[0], 10);
+    return isNaN(hour) ? '' : String(hour).padStart(2, '0');
+};
+
+window.queryTrainerScheduleConflict = async function (trainerId, date, time, excludeBookingId) {
+    const fb = window._fb;
+    if (!fb || !trainerId || !date || !time) return false;
+
+    const targetHour = window._bookingHourKey(time);
+    if (!targetHour) return false;
+
+    const q = fb.query(
+        fb.bookingsCol,
+        fb.where('trainerId', '==', trainerId),
+        fb.where('date', '==', date),
+        fb.where('status', 'in', BOOKING_ACTIVE_SLOT_STATUSES)
+    );
+    const snap = await fb.getDocs(q);
+    for (const docSnap of snap.docs) {
+        if (excludeBookingId && docSnap.id === excludeBookingId) continue;
+        if (window._bookingHourKey(docSnap.data().time) === targetHour) return true;
+    }
+    return false;
+};
+
+// ── Defensive helpers: null-safe records, race detection, button recovery ──
+window.BOOKING_STATE_CHANGED_MSG = 'Operation Aborted: This booking state has already changed.';
+
+window.normalizeBookingRecord = function (raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    return {
+        id: raw.id || '',
+        memberId: raw.memberId || '',
+        memberName: raw.memberName || 'Unknown Member',
+        trainerId: raw.trainerId || '',
+        trainerName: raw.trainerName || 'Unassigned',
+        date: raw.date || '',
+        time: raw.time || raw.startTime || '00:00',
+        status: raw.status || 'Pending',
+        creditState: raw.creditState || '',
+        cancelRemarks: raw.cancelRemarks || '',
+        timestamp: raw.timestamp || 0
+    };
+};
+
+window.verifyBookingServerState = function (serverData, uiExpectedStatus) {
+    const serverStatus = (serverData && serverData.status) || 'Pending';
+    const expected = uiExpectedStatus || 'Pending';
+    if (serverStatus !== expected) {
+        throw new Error(window.BOOKING_STATE_CHANGED_MSG);
+    }
+};
+
+window.bookingActionFailedToast = function (err) {
+    const msg = (err && err.message) ? err.message : 'Unknown error';
+    showToast('Action Failed: ' + msg, 'error');
+};
+
+window.runWithBookingButton = async function (btn, asyncFn) {
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    }
+    try {
+        await asyncFn();
+    } catch (err) {
+        console.error('[bookings-ui] Action failed:', err);
+        window.bookingActionFailedToast(err);
+        throw err;
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+};
+
 window.changeBkPage = function (dir) {
     bkCurrentPage += dir;
     if (bkCurrentPage < 1) bkCurrentPage = 1;
@@ -190,10 +377,12 @@ window.openBookingModal = window.openBookingDrawer;
 
 // --- KPI Update ---
 function updateBookingKPIs() {
-    const data = window.bookingsData || [];
+    const data = (window.bookingsData || [])
+        .map(b => window.normalizeBookingRecord(b))
+        .filter(Boolean);
     const today = new Date().toLocaleDateString('en-CA');
-    const todayCount = data.filter(b => b.date === today && b.status !== 'Cancelled').length;
-    const pendingCount = data.filter(b => b.status === 'Pending').length;
+    const todayCount = data.filter(b => (b.date || '') === today && (b.status || 'Pending') !== 'Cancelled').length;
+    const pendingCount = data.filter(b => (b.status || 'Pending') === 'Pending').length;
 
     // This week range
     const now = new Date();
@@ -201,9 +390,9 @@ function updateBookingKPIs() {
     const endOfWeek = new Date(startOfWeek); endOfWeek.setDate(startOfWeek.getDate() + 6);
     const sow = startOfWeek.toLocaleDateString('en-CA');
     const eow = endOfWeek.toLocaleDateString('en-CA');
-    const inWeek = (b) => b.date >= sow && b.date <= eow;
+    const inWeek = (b) => (b.date || '') >= sow && (b.date || '') <= eow;
     const weekCount = data.filter(inWeek).length;
-    const noShowWeek = data.filter(b => inWeek(b) && b.status === 'No Show').length;
+    const noShowWeek = data.filter(b => inWeek(b) && (b.status || '') === 'No Show').length;
 
     const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
     el('bkTodayCount', todayCount);
@@ -226,7 +415,10 @@ function populateTrainerFilter() {
 
 // --- Filter + Sort Logic ---
 function applyBookingFilters(data) {
-    let filtered = [...data];
+    const safeRows = (Array.isArray(data) ? data : [])
+        .map(b => window.normalizeBookingRecord(b))
+        .filter(Boolean);
+    let filtered = [...safeRows];
 
     // Search
     const searchVal = (document.getElementById('bookingSearch')?.value || '').toLowerCase();
@@ -245,16 +437,16 @@ function applyBookingFilters(data) {
     const statusFilter = document.getElementById('bkFilterStatus')?.value;
     if (statusFilter) filtered = filtered.filter(b => b.status === statusFilter);
 
-    // Date range
-    const dateFrom = document.getElementById('bkDateFrom')?.value;
-    const dateTo = document.getElementById('bkDateTo')?.value;
-    if (dateFrom) filtered = filtered.filter(b => b.date >= dateFrom);
-    if (dateTo) filtered = filtered.filter(b => b.date <= dateTo);
+    // Date range — only constrain when the operator has entered a value
+    const startVal = document.getElementById('bkDateFrom')?.value || '';
+    const endVal = document.getElementById('bkDateTo')?.value || '';
+    if (startVal) filtered = filtered.filter(b => b.date >= startVal);
+    if (endVal) filtered = filtered.filter(b => b.date <= endVal);
 
     // Status weight: active bookings float to the top, terminal states sink to the bottom.
     // Weight 1 = In Session, 2 = Confirmed, 3 = Pending, 4 = Completed, 5 = Cancelled / No Show
-    const STATUS_WEIGHT = { 'In Session': 1, 'active': 1, 'Confirmed': 2, 'Pending': 3, 'Completed': 4, 'Cancelled': 5, 'No Show': 5 };
-    const weightOf = (b) => STATUS_WEIGHT[b.status] ?? 3;
+    const STATUS_WEIGHT = { 'In Session': 1, 'active': 1, 'Confirmed': 2, 'Pending': 3, 'Completed': 4, 'Cancelled': 5, 'No Show': 5, 'Declined': 5 };
+    const weightOf = (b) => STATUS_WEIGHT[b.status || 'Pending'] ?? 3;
 
     filtered.sort((a, b) => {
         // Primary: status weight (ascending — lower weight = more urgent, stays on top)
@@ -263,16 +455,23 @@ function applyBookingFilters(data) {
 
         // Secondary: user-selected sort field + direction within the same weight tier
         let va, vb;
-        if (bkSortField === 'memberName') { va = (a.memberName || '').toLowerCase(); vb = (b.memberName || '').toLowerCase(); }
-        else if (bkSortField === 'time') { va = a.time || ''; vb = b.time || ''; }
-        else { va = a.date + 'T' + (a.time || ''); vb = b.date + 'T' + (b.time || ''); }
+        if (bkSortField === 'memberName') {
+            va = (a.memberName || '').toLowerCase();
+            vb = (b.memberName || '').toLowerCase();
+        } else if (bkSortField === 'time') {
+            va = a.time || '00:00';
+            vb = b.time || '00:00';
+        } else {
+            va = (a.date || '') + 'T' + (a.time || '00:00');
+            vb = (b.date || '') + 'T' + (b.time || '00:00');
+        }
 
         if (va < vb) return bkSortDir === 'asc' ? -1 : 1;
         if (va > vb) return bkSortDir === 'asc' ? 1 : -1;
 
         // Tertiary: chronological by date+startTime when both primary and secondary are equal
-        const da = a.date + 'T' + (a.time || '');
-        const db = b.date + 'T' + (b.time || '');
+        const da = (a.date || '') + 'T' + (a.time || '00:00');
+        const db = (b.date || '') + 'T' + (b.time || '00:00');
         return da < db ? -1 : da > db ? 1 : 0;
     });
 
@@ -280,12 +479,14 @@ function applyBookingFilters(data) {
 }
 
 // --- Enhanced Row Renderer ---
-function renderEnhancedBookingRow(b) {
-    // SP-3: guard against missing/invalid date+time to prevent "Invalid Date" in rows
+function renderEnhancedBookingRow(raw) {
+    const b = window.normalizeBookingRecord(raw);
+    if (!b) return '';
+
     const rawDt = b.date && b.time ? `${b.date}T${b.time}` : null;
     const dateObj = rawDt ? new Date(rawDt) : null;
     const dateStr = (dateObj && !isNaN(dateObj)) ? dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : (b.date || '—');
-    const timeStr = (dateObj && !isNaN(dateObj)) ? dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : (b.time || '—');
+    const timeStr = (dateObj && !isNaN(dateObj)) ? dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : (b.time || '00:00');
 
     // SP-4: guard against missing status; SL-4: whitelist to prevent CSS injection
     const VALID_STATUS_KEYS = new Set(['pending','confirmed','active','completed','cancelled','declined','noshow']);
@@ -293,22 +494,25 @@ function renderEnhancedBookingRow(b) {
     const statusKey = VALID_STATUS_KEYS.has(rawStatusKey) ? rawStatusKey : 'unknown';
     const statusClass = `status-${statusKey === 'noshow' ? 'noshow' : statusKey}`;
 
-    const statuses = ['Pending', 'Confirmed', 'active', 'Completed', 'Cancelled', 'Declined', 'No Show'];
     const dotColors = { Pending: '#F59E0B', Confirmed: '#3B82F6', active: '#8B5CF6', Completed: '#10B981', Cancelled: '#EF4444', Declined: '#B91C1C', 'No Show': '#7F1D1D' };
 
     const loggedInRole = (localStorage.getItem("userRole") || "").toLowerCase();
+    const rowStatus = b.status || 'Pending';
+    const rowId = b.id || '';
 
-    const allowedTransitions = (window.BOOKING_STATUS_TRANSITIONS && window.BOOKING_STATUS_TRANSITIONS[b.status]) || [];
+    const allowedTransitions = (window.BOOKING_STATUS_TRANSITIONS && window.BOOKING_STATUS_TRANSITIONS[rowStatus]) || [];
+    const isTerminal = typeof window.isBookingTerminalStatus === 'function'
+        && window.isBookingTerminalStatus(rowStatus);
     const statusCell = `
         <div class="bk-status-wrapper">
-            <span class="bk-status-badge ${statusClass}" ${allowedTransitions.length > 0 ? `onclick="toggleBkStatusDropdown(event, '${b.id}')"` : ''}>
-                ${b.status} ${allowedTransitions.length > 0 ? '<i class="fa-solid fa-chevron-down bk-chevron"></i>' : ''}
+            <span class="bk-status-badge ${statusClass}" ${(!isTerminal && allowedTransitions.length > 0) ? `onclick="toggleBkStatusDropdown(event, '${rowId}')"` : ''}>
+                ${rowStatus} ${(!isTerminal && allowedTransitions.length > 0) ? '<i class="fa-solid fa-chevron-down bk-chevron"></i>' : ''}
             </span>
-            ${allowedTransitions.length > 0 ? `
+            ${(!isTerminal && allowedTransitions.length > 0) ? `
             <div class="bk-status-dropdown">
                 ${allowedTransitions.map(s => `
-                    <div class="bk-status-option" onclick="quickUpdateStatus(event, '${b.id}', '${s}')">
-                        <span class="bk-dot" style="background: ${dotColors[s]}"></span> ${s}
+                    <div class="bk-status-option" onclick="quickUpdateStatus(event, '${rowId}', '${s}')">
+                        <span class="bk-dot" style="background: ${dotColors[s] || '#64748B'}"></span> ${s}
                     </div>
                 `).join('')}
             </div>
@@ -320,33 +524,36 @@ function renderEnhancedBookingRow(b) {
     const trainerColumnStyle = loggedInRole === 'trainer' ? 'display: none;' : '';
 
     // Trainer: show accept/decline for pending, edit for others; Admin/Staff: full actions
+    // Terminal states are audit-locked — no mutation controls rendered.
     let actions = '';
-    if (loggedInRole === 'trainer') {
-        if (b.status === 'Pending') {
+    if (isTerminal) {
+        actions = '<span style="color: var(--text-muted); font-size: 11px;">Locked</span>';
+    } else if (loggedInRole === 'trainer') {
+        if (rowStatus === 'Pending') {
             actions = `
-                <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${b.id}', 'Confirmed', this)"><i class="fas fa-check"></i></button>
-                <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${b.id}', 'Declined', this)"><i class="fas fa-times"></i></button>
+                <button type="button" class="btn-icon btn-edit" style="color: #27ae60;" title="Accept" onclick="updateBookingStatus('${rowId}', 'Confirmed', this)"><i class="fas fa-check"></i></button>
+                <button type="button" class="btn-icon btn-delete" style="color: #e74c3c;" title="Decline" onclick="updateBookingStatus('${rowId}', 'Declined', this)"><i class="fas fa-times"></i></button>
             `;
         } else {
-            actions = `<button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
+            actions = `<button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${rowId}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>`;
         }
     } else {
         actions = `
-            <button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${b.id}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>
-            <button type="button" class="btn-icon btn-delete" title="Delete Booking" onclick="deleteBooking('${b.id}')"><i class="fas fa-trash"></i></button>
+            <button type="button" class="btn-icon btn-edit" title="Update Status" onclick="openEditBookingModal('${rowId}')"><i class="fas fa-edit" style="color: var(--dark-black);"></i></button>
+            <button type="button" class="btn-icon btn-delete" title="Delete Booking" onclick="deleteBooking('${rowId}')"><i class="fas fa-trash"></i></button>
         `;
     }
 
     // Trainer: make member name clickable to view profile
-    let memberNameCell = `<span style="font-weight: 500;">${b.memberName}</span>`;
+    let memberNameCell = `<span style="font-weight: 500;">${b.memberName || 'Unknown Member'}</span>`;
     if (loggedInRole === 'trainer' && b.memberId) {
-        memberNameCell = `<a href="javascript:void(0)" onclick="window.openMemberProfile('${b.memberId}')" class="mp-link">${b.memberName}</a>`;
+        memberNameCell = `<a href="javascript:void(0)" onclick="window.openMemberProfile('${b.memberId}')" class="mp-link">${b.memberName || 'Unknown Member'}</a>`;
     }
 
     return `
         <tr>
             <td style="min-width: 120px;">${memberNameCell}</td>
-            <td class="trainer-col" style="${trainerColumnStyle}">${b.trainerName}</td>
+            <td class="trainer-col" style="${trainerColumnStyle}">${b.trainerName || 'Unassigned'}</td>
             <td style="min-width: 100px;">${dateStr}</td>
             <td style="min-width: 90px;"><span class="bk-time-display"><i class="fa-regular fa-clock"></i> ${timeStr}</span></td>
             <td>${statusCell}</td>
@@ -399,9 +606,10 @@ function renderBookingCalendar() {
     // Build a lookup: date -> hour -> bookings[] (show all statuses on calendar)
     // EC-4: skip records with missing/non-string time or NaN/out-of-range parsed hour
     const lookup = {};
-    data.forEach(b => {
-        if (!b.date || !b.time || typeof b.time !== 'string') return;
-        const h = parseInt(b.time.split(':')[0], 10);
+    data.forEach(raw => {
+        const b = window.normalizeBookingRecord(raw);
+        if (!b || !b.date || !b.time) return;
+        const h = parseInt(String(b.time).split(':')[0], 10);
         if (isNaN(h) || h < 0 || h > 23) return;
         const key = `${b.date}_${h}`;
         if (!lookup[key]) lookup[key] = [];
@@ -419,13 +627,16 @@ function renderBookingCalendar() {
             const bookings = lookup[key] || [];
             let cellContent = '';
             bookings.forEach(b => {
-                const sk = b.status.toLowerCase().replace(' ', '');
+                const sk = (b.status || 'Pending').toLowerCase().replace(' ', '');
                 const cls = sk === 'noshow' ? 'cal-noshow' : `cal-${sk}`;
-                const [th, tm] = (b.time || '0:0').split(':');
-                const ap = parseInt(th) >= 12 ? 'PM' : 'AM';
-                const dhr = parseInt(th) % 12 || 12;
-                cellContent += `<div class="bk-cal-block ${cls}" onclick="openEditBookingModal('${b.id}')" title="${b.memberName} with ${b.trainerName}">
-                    ${b.memberName}<br><span class="bk-cal-block-sub">${b.trainerName} · ${dhr}:${(tm || '00').padStart(2, '0')} ${ap}</span>
+                const [th, tm] = String(b.time || '0:0').split(':');
+                const ap = parseInt(th, 10) >= 12 ? 'PM' : 'AM';
+                const dhr = parseInt(th, 10) % 12 || 12;
+                const calClick = (typeof window.isBookingTerminalStatus === 'function' && window.isBookingTerminalStatus(b.status || 'Pending'))
+                    ? ''
+                    : `onclick="openEditBookingModal('${b.id || ''}')"`;
+                cellContent += `<div class="bk-cal-block ${cls}" ${calClick} title="${b.memberName || 'Unknown'} with ${b.trainerName || 'Unassigned'}">
+                    ${b.memberName || 'Unknown'}<br><span class="bk-cal-block-sub">${b.trainerName || 'Unassigned'} · ${dhr}:${(tm || '00').padStart(2, '0')} ${ap}</span>
                 </div>`;
             });
             html += `<div class="bk-cal-cell">${cellContent}</div>`;
@@ -508,6 +719,73 @@ function renderBookingCalendar() {
 
         // Trigger an initial render now that the override is in place
         window.renderBookings();
+
+        // Rebind Firestore pipeline when date filters change (staff/admin only)
+        window.filterBookingsByDate = function () {
+            bkCurrentPage = 1;
+            const roleNorm = (localStorage.getItem('userRole') || '').toLowerCase();
+            if ((roleNorm === 'admin' || roleNorm === 'staff') && typeof window.rebindBookingsListener === 'function') {
+                window.rebindBookingsListener();
+            }
+            window.renderBookings();
+        };
+    }, 100);
+})();
+
+// Bridge shared guards into global booking status / cancellation modules (script.js).
+(function bridgeBookingBusinessGuards() {
+    const poll = setInterval(() => {
+        if (typeof window.updateBookingStatus !== 'function') return;
+        clearInterval(poll);
+
+        const _origUpdateStatus = window.updateBookingStatus;
+        window.updateBookingStatus = async function (id, newStatus, btn) {
+            const booking = (window.bookingsData || []).find(x => x.id === id);
+            if (booking && window.isBookingTerminalStatus(booking.status)) {
+                return showToast(`This booking is ${booking.status} and is locked for audit integrity.`, 'error');
+            }
+            if (newStatus === 'Confirmed' && booking) {
+                const member = (window.membersData || []).find(m => m.id === booking.memberId);
+                const elig = window.assertMemberBookingEligible(member || null, booking);
+                if (!elig.ok) return showToast(elig.message, 'error');
+                try {
+                    const conflict = await window.queryTrainerScheduleConflict(
+                        booking.trainerId, booking.date, booking.time, id
+                    );
+                    if (conflict) return showToast(TRAINER_CONFLICT_MSG, 'error');
+                } catch (err) {
+                    console.error('[bookings-ui] Trainer conflict pre-check failed:', err);
+                    return window.bookingActionFailedToast(err);
+                }
+            }
+            try {
+                return await _origUpdateStatus(id, newStatus, btn);
+            } catch (err) {
+                window.bookingActionFailedToast(err);
+            }
+        };
+
+        if (typeof window.openEditBookingModal === 'function') {
+            const _origOpenEdit = window.openEditBookingModal;
+            window.openEditBookingModal = function (id) {
+                const booking = (window.bookingsData || []).find(x => x.id === id);
+                if (booking && window.isBookingTerminalStatus(booking.status)) {
+                    return showToast(`This booking is ${booking.status} and is locked for audit integrity.`, 'error');
+                }
+                return _origOpenEdit(id);
+            };
+        }
+
+        if (typeof window.deleteBooking === 'function') {
+            const _origDelete = window.deleteBooking;
+            window.deleteBooking = function (id, btn) {
+                const booking = (window.bookingsData || []).find(x => x.id === id);
+                if (booking && window.isBookingTerminalStatus(booking.status)) {
+                    return showToast(`Cannot delete a ${booking.status} booking record.`, 'error');
+                }
+                return _origDelete(id, btn);
+            };
+        }
     }, 100);
 })();
 
@@ -805,24 +1083,21 @@ window.setupManualCalNav = () => {
     });
 };
 
-window.executeManualBooking = async () => {
+window.executeManualBooking = async function () {
     const confirmBtn = document.getElementById('manualConfirmBookingBtn');
-    if (confirmBtn.disabled) return;
+    if (!confirmBtn || confirmBtn.disabled) return;
     const originalHtml = confirmBtn.innerHTML;
 
     if (!window.manualBookingState) {
-        showToast("Booking state is invalid.", "error");
+        showToast('Action Failed: Booking state is invalid.', 'error');
         return;
     }
     const { memberId, memberName, trainerId, trainerName, date, time } = window.manualBookingState;
     if (!memberId || !trainerId || !date || !time) {
-        showToast("Please make sure all booking fields (Member, Trainer, Date, and Time) are selected.", "error");
+        showToast('Action Failed: Please select Member, Trainer, Date, and Time.', 'error');
         return;
     }
 
-    // Same-day pre-confirm: warn (but allow) when the target member already has
-    // a booking on the chosen date. The operator must explicitly click "Proceed anyway"
-    // to set allowSameDay on the state — the server also enforces this independently (SL-1).
     if (!window.manualBookingState.allowSameDay && typeof window.findSameDayBookings === 'function') {
         const sameDay = window.findSameDayBookings(memberId, date);
         if (sameDay.length > 0) {
@@ -841,33 +1116,46 @@ window.executeManualBooking = async () => {
             return;
         }
     }
-    // Reset the override flag after each run so it doesn't persist across bookings
     if (window.manualBookingState) window.manualBookingState.allowSameDay = false;
 
-    confirmBtn.disabled = true;
-    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-
     try {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
         if (typeof window.syncServerTimeOffset === 'function') {
             await window.syncServerTimeOffset();
         }
         const offset = window.serverTimeOffsetMs || 0;
         const freshNowMs = Date.now() + offset;
-        // EC-3: append :00Z so the string is parsed as UTC, not local timezone
         const targetBookingTimeMsCheck = new Date(`${date}T${time}:00Z`).getTime();
         if (targetBookingTimeMsCheck < freshNowMs) {
-            showToast("Choose a date and time in the future. Past sessions cannot be booked.", "error");
-            confirmBtn.disabled = false;
-            confirmBtn.innerHTML = originalHtml;
-            return;
+            throw new Error('Choose a date and time in the future. Past sessions cannot be booked.');
         }
 
         const fb = window._fb;
+        if (!fb) throw new Error('Booking service is not ready. Please refresh the page.');
+
+        const trainerConflict = await window.queryTrainerScheduleConflict(trainerId, date, time);
+        if (trainerConflict) throw new Error(TRAINER_CONFLICT_MSG);
+
+        let sameDayConflict = false;
+        if (!window.manualBookingState?.allowSameDay) {
+            const sameDayRef = fb.query(
+                fb.bookingsCol,
+                fb.where('memberId', '==', memberId),
+                fb.where('date', '==', date),
+                fb.where('status', 'in', ['Confirmed', 'Pending'])
+            );
+            const sameDaySnap = await fb.getDocs(sameDayRef);
+            sameDayConflict = !sameDaySnap.empty;
+        }
+
         await fb.runTransaction(fb.db, async (tx) => {
-            const memberRef = fb.doc(fb.db, "users", memberId);
-            const trainerRef = fb.doc(fb.db, "users", trainerId);
-            const trainerSlotRef = fb.doc(fb.db, "bookingSlots", window.slotIdForTrainer(trainerId, date, time));
-            const memberSlotRef  = fb.doc(fb.db, "bookingSlots", window.slotIdForMember(memberId, date, time));
+            // ── PHASE 1: ALL READS ──
+            const memberRef = fb.doc(fb.db, 'users', memberId);
+            const trainerRef = fb.doc(fb.db, 'users', trainerId);
+            const trainerSlotRef = fb.doc(fb.db, 'bookingSlots', window.slotIdForTrainer(trainerId, date, time));
+            const memberSlotRef = fb.doc(fb.db, 'bookingSlots', window.slotIdForMember(memberId, date, time));
 
             const [memberSnap, trainerSnap, trainerSlotSnap, memberSlotSnap] = await Promise.all([
                 tx.get(memberRef),
@@ -876,35 +1164,30 @@ window.executeManualBooking = async () => {
                 tx.get(memberSlotRef)
             ]);
 
-            if (!memberSnap.exists()) {
-                throw new Error("Member record does not exist.");
-            }
-            // H1: trainer must still exist, still be a Trainer, and still be Active.
-            if (!trainerSnap.exists()) {
-                throw new Error("Trainer no longer exists. Please choose a different trainer.");
-            }
+            // ── PHASE 2: VALIDATION & BUSINESS LOGIC ──
+            if (!memberSnap.exists()) throw new Error('Member record does not exist.');
+            if (!trainerSnap.exists()) throw new Error('Trainer no longer exists. Please choose a different trainer.');
+
             const tData = trainerSnap.data() || {};
             if ((tData.role || '').toLowerCase() !== 'trainer') {
-                throw new Error("Selected user is no longer a trainer. Please choose a different trainer.");
+                throw new Error('Selected user is no longer a trainer. Please choose a different trainer.');
             }
-            // O2 (Sprint 9): match the member-booking path's check at script.js:9037.
-            // Treat missing status as 'Active' so trainers seeded without an explicit status
-            // field aren't incorrectly rejected during admin/staff manual booking.
             if ((tData.status || 'Active') !== 'Active') {
-                throw new Error("Trainer is not currently active. Please choose a different trainer.");
+                throw new Error('Trainer is not currently active. Please choose a different trainer.');
             }
-            const mData = memberSnap.data();
 
+            const mData = memberSnap.data() || {};
             if ((mData.status || 'Active') === 'Suspended') {
-                throw new Error("ACCESS_DENIED: Member account is suspended. Bookings are prohibited.");
+                throw new Error('ACCESS_DENIED: Member account is suspended. Bookings are prohibited.');
             }
             if ((mData.status || 'Active') === 'Archived') {
-                throw new Error("ACCESS_DENIED: Member account is archived. Bookings are prohibited.");
+                throw new Error('ACCESS_DENIED: Member account is archived. Bookings are prohibited.');
             }
-
-            // Expiration Check
+            if (['Frozen', 'Expired'].includes(mData.status || '')) {
+                throw new Error(MEMBER_ELIGIBILITY_ABORT_MSG);
+            }
             if (window.isMemberPlanExpired && window.isMemberPlanExpired(mData)) {
-                throw new Error("Member's membership has expired. Please renew their plan before booking.");
+                throw new Error(MEMBER_ELIGIBILITY_ABORT_MSG);
             }
             if (typeof mData.dateRegistered === 'number') {
                 const planDays = (typeof window.getPlanDays === 'function') ? window.getPlanDays(mData.plan) : 30;
@@ -915,68 +1198,48 @@ window.executeManualBooking = async () => {
                 }
             }
 
-            // Time-Tampering / Future Date check
             const freshNowMsTx = Date.now() + (window.serverTimeOffsetMs || 0);
             const targetBookingTimeMsTx = new Date(`${date}T${time}:00Z`).getTime();
             if (targetBookingTimeMsTx < freshNowMsTx) {
-                throw new Error("Choose a date and time in the future. Past sessions cannot be booked.");
+                throw new Error('Choose a date and time in the future. Past sessions cannot be booked.');
             }
 
-            // Slot collisions
-            if (trainerSlotSnap.exists()) {
-                throw new Error("Trainer already has a confirmed session at this hour.");
-            }
-            if (memberSlotSnap.exists()) {
-                throw new Error("Member already has a booking at this hour.");
-            }
-
-            // Credit Check
             const sessionsRemaining = mData.sessionsRemaining !== undefined ? Number(mData.sessionsRemaining) : 0;
-            if (sessionsRemaining <= 0) {
-                throw new Error("Member has 0 session credits remaining. Please buy more credits first.");
+            if (sessionsRemaining <= 0) throw new Error(MEMBER_ELIGIBILITY_ABORT_MSG);
+
+            if (trainerSlotSnap.exists()) throw new Error(TRAINER_CONFLICT_MSG);
+            if (memberSlotSnap.exists()) throw new Error('Member already has a booking at this hour.');
+
+            if (sameDayConflict) {
+                throw new Error(`SAME_DAY_CONFLICT: ${memberName} already has an active booking on ${date}. Set allowSameDay to override.`);
             }
 
-            // SL-1: server-side same-day guard — the UI warning is skippable via console,
-            // so we enforce a hard limit of 1 active booking per member per day in the transaction.
-            // Admin/staff may override by passing a truthy `allowSameDay` flag via manualBookingState.
-            if (!window.manualBookingState?.allowSameDay) {
-                const sameDayRef = fb.query(
-                    fb.bookingsCol,
-                    fb.where("memberId", "==", memberId),
-                    fb.where("date", "==", date),
-                    fb.where("status", "in", ["Confirmed", "Pending"])
-                );
-                const sameDaySnap = await fb.getDocs(sameDayRef);
-                if (!sameDaySnap.empty) {
-                    throw new Error(`SAME_DAY_CONFLICT: ${memberName} already has an active booking on ${date}. Set allowSameDay to override.`);
-                }
-            }
-
-            // Write atomically
             const newBookingRef = fb.doc(fb.bookingsCol);
-            tx.update(memberRef, { sessionsRemaining: fb.increment(-1) });
-            tx.set(trainerSlotRef, { bookingId: newBookingRef.id, trainerId, date, time });
-            tx.set(memberSlotRef,  { bookingId: newBookingRef.id, memberId,  date, time });
-
-            tx.set(newBookingRef, {
+            const bookingPayload = {
                 memberId,
-                memberName,
+                memberName: memberName || 'Unknown Member',
                 trainerId,
-                trainerName,
+                trainerName: trainerName || 'Unassigned',
                 date,
                 time,
-                status: "Confirmed",
-                creditState: "held",
+                status: 'Confirmed',
+                creditState: 'held',
                 timestamp: Date.now()
-            });
+            };
+
+            // ── PHASE 3: ALL WRITES ──
+            tx.update(memberRef, { sessionsRemaining: fb.increment(-1) });
+            tx.set(trainerSlotRef, { bookingId: newBookingRef.id, trainerId, date, time });
+            tx.set(memberSlotRef, { bookingId: newBookingRef.id, memberId, date, time });
+            tx.set(newBookingRef, bookingPayload);
         });
 
         window.closeModal('bookingModal');
-        showToast("PT Session booked successfully!", "success");
-        if (window.logActivity) window.logActivity("Booking Created", `Admin/Staff booked a training session on ${date} at ${time} with ${trainerName}.`);
+        showToast('PT Session booked successfully!', 'success');
+        if (window.logActivity) window.logActivity('Booking Created', `Admin/Staff booked a training session on ${date} at ${time} with ${trainerName}.`);
     } catch (err) {
-        console.error("Manual Booking failed:", err);
-        showToast(err.message || "Failed to book session.", "error");
+        console.error('Manual Booking failed:', err);
+        window.bookingActionFailedToast(err);
     } finally {
         confirmBtn.disabled = false;
         confirmBtn.innerHTML = originalHtml;
@@ -1024,33 +1287,53 @@ window.executeManualBooking = async () => {
         if (!fb) return;
         try {
             await fb.runTransaction(fb.db, async (tx) => {
-                const bookingRef = fb.doc(fb.db, "bookings", bookingId);
+                const bookingRef = fb.doc(fb.db, 'bookings', bookingId);
                 const snap = await tx.get(bookingRef);
-                if (!snap.exists()) throw new Error("Booking gone");
-                const bData = snap.data();
+                if (!snap.exists()) throw new Error('Booking gone');
+                const bData = snap.data() || {};
 
-                const allowed = (window.BOOKING_STATUS_TRANSITIONS && window.BOOKING_STATUS_TRANSITIONS[bData.status]) || [];
-                if (!allowed.includes(newStatus)) throw new Error(`Transition ${bData.status} → ${newStatus} blocked`);
+                const allowed = (window.BOOKING_STATUS_TRANSITIONS && window.BOOKING_STATUS_TRANSITIONS[bData.status || 'Pending']) || [];
+                if (!allowed.includes(newStatus)) {
+                    throw new Error(`Transition ${bData.status || 'Pending'} → ${newStatus} blocked`);
+                }
 
                 const update = { status: newStatus, ...(extraFields || {}) };
+                const needsLegacyMemberDebit = (newStatus === 'Completed' || newStatus === 'No Show')
+                    && !bData.creditState
+                    && bData.memberId;
+
+                let memberRef = null;
+                if (needsLegacyMemberDebit) {
+                    memberRef = fb.doc(fb.db, 'users', bData.memberId);
+                }
+
+                const memberSnap = memberRef ? await tx.get(memberRef) : null;
 
                 if (newStatus === 'Completed' || newStatus === 'No Show') {
                     if (bData.creditState === 'consumed') {
-                        // already finalised
+                        // already finalised — status-only update below
                     } else if (bData.creditState === 'held') {
                         update.creditState = 'consumed';
-                    } else if (!bData.creditState && bData.memberId) {
-                        tx.update(fb.doc(fb.db, "users", bData.memberId), { sessionsRemaining: fb.increment(-1) });
+                    } else if (needsLegacyMemberDebit && memberSnap && memberSnap.exists()) {
                         update.creditState = 'consumed';
-                    }
-                    // Free slot locks
-                    if (bData.trainerId && bData.date && bData.time) {
-                        const { slotIdForTrainer, slotIdForMember } = window;
-                        if (slotIdForTrainer) tx.delete(fb.doc(fb.db, "bookingSlots", slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
-                        if (slotIdForMember)  tx.delete(fb.doc(fb.db, "bookingSlots", slotIdForMember(bData.memberId, bData.date, bData.time)));
                     }
                 }
 
+                // ── PHASE 3: ALL WRITES ──
+                if (needsLegacyMemberDebit && memberSnap && memberSnap.exists() && update.creditState === 'consumed') {
+                    tx.update(memberRef, { sessionsRemaining: fb.increment(-1) });
+                }
+                if (newStatus === 'Completed' || newStatus === 'No Show') {
+                    if (bData.trainerId && bData.date && bData.time) {
+                        const { slotIdForTrainer, slotIdForMember } = window;
+                        if (slotIdForTrainer) {
+                            tx.delete(fb.doc(fb.db, 'bookingSlots', slotIdForTrainer(bData.trainerId, bData.date, bData.time)));
+                        }
+                        if (slotIdForMember && bData.memberId) {
+                            tx.delete(fb.doc(fb.db, 'bookingSlots', slotIdForMember(bData.memberId, bData.date, bData.time)));
+                        }
+                    }
+                }
                 tx.update(bookingRef, update);
             });
         } catch (err) {
@@ -1119,8 +1402,11 @@ window.executeManualBooking = async () => {
         const now = _nowMs();
         const bookings = window.bookingsData || [];
 
-        bookings.forEach(b => {
-            if (!b.id || !b.date || !b.time) return;
+        bookings.forEach(raw => {
+            const b = (typeof window.normalizeBookingRecord === 'function')
+                ? window.normalizeBookingRecord(raw)
+                : raw;
+            if (!b || !b.id || !b.date || !b.time) return;
 
             const startMs = _sessionStartMs(b);
             const endMs   = _sessionEndMs(b);
@@ -1234,9 +1520,21 @@ window.executeManualBooking = async () => {
         const resolve = async (rating, remarks) => {
             const fb = window._fb;
             if (!fb) return;
+            const submitBtnLocal = submitBtn;
+            const skipBtnLocal = skipBtn;
+            const origSubmitHtml = submitBtnLocal ? submitBtnLocal.innerHTML : '';
             try {
+                if (submitBtnLocal) {
+                    submitBtnLocal.disabled = true;
+                    submitBtnLocal.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+                }
+                if (skipBtnLocal) skipBtnLocal.disabled = true;
+
                 await fb.runTransaction(fb.db, async (tx) => {
-                    const ref = fb.doc(fb.db, "pendingRatings", docId);
+                    const ref = fb.doc(fb.db, 'pendingRatings', docId);
+                    const snap = await tx.get(ref);
+                    if (!snap.exists()) return;
+                    if (snap.data().resolved) return;
                     tx.update(ref, {
                         resolved: true,
                         rating: rating || '',
@@ -1245,13 +1543,20 @@ window.executeManualBooking = async () => {
                     });
                 });
                 if (rating || remarks) {
-                    showToast("Thank you for your feedback!", "success");
-                    if (window.logActivity) window.logActivity("Session Rated", `Member rated session with ${ratingData.trainerName}.`);
+                    showToast('Thank you for your feedback!', 'success');
+                    if (window.logActivity) window.logActivity('Session Rated', `Member rated session with ${ratingData.trainerName || 'trainer'}.`);
                 }
             } catch (err) {
-                console.warn("[SessionEngine] Failed to resolve rating:", err.message);
+                console.warn('[SessionEngine] Failed to resolve rating:', err.message);
+                window.bookingActionFailedToast(err);
+            } finally {
+                if (submitBtnLocal) {
+                    submitBtnLocal.disabled = false;
+                    submitBtnLocal.innerHTML = origSubmitHtml;
+                }
+                if (skipBtnLocal) skipBtnLocal.disabled = false;
+                close();
             }
-            close();
         };
 
         if (skipBtn) skipBtn.onclick = () => resolve('', '');
